@@ -30,7 +30,6 @@ import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callb
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CardVaultRouteImport } from './routes/card-vault'
@@ -46,6 +45,7 @@ import { Route as AgencyPaymentsRouteImport } from './routes/agency-payments'
 import { Route as AgenciesRouteImport } from './routes/agencies'
 import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
@@ -159,11 +159,6 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsRoute = ClientsRouteImport.update({
-  id: '/clients',
-  path: '/clients',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ClientSpendReportRoute = ClientSpendReportRouteImport.update({
   id: '/client-spend-report',
   path: '/client-spend-report',
@@ -239,6 +234,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientsIndexRoute = ClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TenantsIdRoute = TenantsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -250,9 +250,9 @@ const InvoiceRequestIdRoute = InvoiceRequestIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClientsIdRoute = ClientsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ClientsRoute,
+  id: '/clients/$id',
+  path: '/clients/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AgenciesIdRoute = AgenciesIdRouteImport.update({
   id: '/$id',
@@ -291,7 +291,6 @@ export interface FileRoutesByFullPath {
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
-  '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
@@ -320,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
+  '/clients/': typeof ClientsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -337,7 +337,6 @@ export interface FileRoutesByTo {
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
-  '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
@@ -366,6 +365,7 @@ export interface FileRoutesByTo {
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
+  '/clients': typeof ClientsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -384,7 +384,6 @@ export interface FileRoutesById {
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
-  '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
@@ -413,6 +412,7 @@ export interface FileRoutesById {
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
+  '/clients/': typeof ClientsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -432,7 +432,6 @@ export interface FileRouteTypes {
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
-    | '/clients'
     | '/dashboard'
     | '/failed-topups'
     | '/feedback'
@@ -461,6 +460,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
+    | '/clients/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -478,7 +478,6 @@ export interface FileRouteTypes {
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
-    | '/clients'
     | '/dashboard'
     | '/failed-topups'
     | '/feedback'
@@ -507,6 +506,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
+    | '/clients'
   id:
     | '__root__'
     | '/'
@@ -524,7 +524,6 @@ export interface FileRouteTypes {
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
-    | '/clients'
     | '/dashboard'
     | '/failed-topups'
     | '/feedback'
@@ -553,6 +552,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
+    | '/clients/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -571,7 +571,6 @@ export interface RootRouteChildren {
   CardVaultRoute: typeof CardVaultRoute
   ChatRoute: typeof ChatRoute
   ClientSpendReportRoute: typeof ClientSpendReportRoute
-  ClientsRoute: typeof ClientsRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FailedTopupsRoute: typeof FailedTopupsRoute
   FeedbackRoute: typeof FeedbackRoute
@@ -595,7 +594,9 @@ export interface RootRouteChildren {
   WalletBalancesRoute: typeof WalletBalancesRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ClientsIdRoute: typeof ClientsIdRoute
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
+  ClientsIndexRoute: typeof ClientsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -747,13 +748,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients': {
-      id: '/clients'
-      path: '/clients'
-      fullPath: '/clients'
-      preLoaderRoute: typeof ClientsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/client-spend-report': {
       id: '/client-spend-report'
       path: '/client-spend-report'
@@ -859,6 +853,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clients/': {
+      id: '/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof ClientsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tenants/$id': {
       id: '/tenants/$id'
       path: '/$id'
@@ -875,10 +876,10 @@ declare module '@tanstack/react-router' {
     }
     '/clients/$id': {
       id: '/clients/$id'
-      path: '/$id'
+      path: '/clients/$id'
       fullPath: '/clients/$id'
       preLoaderRoute: typeof ClientsIdRouteImport
-      parentRoute: typeof ClientsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/agencies/$id': {
       id: '/agencies/$id'
@@ -935,17 +936,6 @@ const AgenciesRouteWithChildren = AgenciesRoute._addFileChildren(
   AgenciesRouteChildren,
 )
 
-interface ClientsRouteChildren {
-  ClientsIdRoute: typeof ClientsIdRoute
-}
-
-const ClientsRouteChildren: ClientsRouteChildren = {
-  ClientsIdRoute: ClientsIdRoute,
-}
-
-const ClientsRouteWithChildren =
-  ClientsRoute._addFileChildren(ClientsRouteChildren)
-
 interface TenantsRouteChildren {
   TenantsIdRoute: typeof TenantsIdRoute
 }
@@ -973,7 +963,6 @@ const rootRouteChildren: RootRouteChildren = {
   CardVaultRoute: CardVaultRoute,
   ChatRoute: ChatRoute,
   ClientSpendReportRoute: ClientSpendReportRoute,
-  ClientsRoute: ClientsRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FailedTopupsRoute: FailedTopupsRoute,
   FeedbackRoute: FeedbackRoute,
@@ -997,7 +986,9 @@ const rootRouteChildren: RootRouteChildren = {
   WalletBalancesRoute: WalletBalancesRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ClientsIdRoute: ClientsIdRoute,
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
+  ClientsIndexRoute: ClientsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
