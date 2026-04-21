@@ -2,101 +2,94 @@
 
 ## Goal
 
-1. **Failed top-up retry success → show source IP**: After a successful retry, display "via Proxy IP `1.2.3.4`" (or "Direct") in the toast and timeline.
-2. **Seller dashboard "Total" column = Due/Advance running balance** (not bank cash inflow). Each row's Total shows the seller's accumulated Due (−) or Advance (+) up to that point.
-3. **Telegram payment-proof caption**: include the new running Due/Advance total after that payment so reviewers see "Due: −৳47,00,000" or "Advance: +৳47,00,000" right in Telegram.
+User-er feedback অনুযায়ী 3-ta jinis confirm/finish korte hobe:
+
+1. **Seller dashboard-er per-row "TOTAL"** — running Due/Advance dekhabe (e.g. last BDT Payment row e `Due −৳48,09,340.66`), per-bank cash-in noy.
+2. **Telegram payment-proof caption** — payment forward howar somoy niche oi exact running total line jabe (`🔴 Total: Due −৳48,09,340`).
+3. **Notun: Chronological "Balance History" chart** — kivabe Due/Advance build up holo seta visual timeline e dekhabe (payment add → due kome, USDT given → due barhe, etc.).
+
+---
+
+## Current State (verified via DB + code read)
+
+- DB-e Faisal Kabir-er **actual Due = −৳48,09,340.66** (BDT in 82,41,665 − USDT cost 1,30,51,005.66). Apnar mention kora "48 lakh due" eta exactly match.
+- `src/components/seller/SellerDashboard.tsx` ar `src/components/admin/AdminSellers.tsx` — code-e already `formatDueAdvance(runningTotals.get(t.id))` wired ache prottek row e (mobile + desktop). Apnar screenshot-e "TOTAL ৳42,56,500" (green positive) jeta dekhachhe seta **purono cached build** — refresh/rebuild lagbe, code already correct.
+- `supabase/functions/forward-seller-proof/index.ts` — local code-e Due/Advance line caption-e add kora hoye gechhe, kintu **edge function ekhono deploy hoyni** Supabase-e — tai Telegram-e ekhono purono caption jachhe.
 
 ---
 
 ## Plan
 
-### 1. Show IP on successful retry
+### 1. Deploy `forward-seller-proof` edge function
 
-**`supabase/functions/retry-failed-topup/index.ts`** — `metaFetch` already falls back proxy → direct, but it doesn't return route info.
-- Refactor `metaFetch` to return `{ response, via: "proxy"|"direct", sourceIp: string|null }`.
-- After the successful Meta POST + verify, capture `via` and `sourceIp` (from proxy header `x-egress-ip`).
-- Write into `failed_topups` row BEFORE deleting it (or change to `status='resolved'` so history stays — but current code deletes; we'll keep the delete and instead include the info in the response payload + system_logs).
-- Update `system_logs.details` to append " — via Proxy (IP: 1.2.3.4)" or " — via Direct".
-- Return `{ success, new_spend_cap, via, source_ip }` in JSON response.
+Supabase-e local file-er notun version push korte hobe jate Telegram caption-e Due/Advance line jay:
 
-Apply the same `metaFetch` upgrade to `spend-cap-update`, `resolve-failed-topup`, `tiktok-topup`, `get-account-insights` for consistency.
-
-**`src/components/FailedTopUps.tsx`** — `retryMutation.onSuccess`:
-- Show enhanced toast: `Spend cap updated to $X — via Proxy (IP: 1.2.3.4)` or `via Direct`.
-
-### 2. Seller dashboard Total column = Due/Advance running balance
-
-Rewrite **`src/lib/sellerRunningTotal.ts`** logic:
-
-Instead of "per-bank cash balance", compute a single global running **Due/Advance** number per row (chronological):
-
-```text
-running += bdt_amount    when type = bdt_payment OR client_topup   (money received → reduces due / increases advance)
-running -= bdt_amount    when type = withdraw                       (cash out → increases due)
-running -= usdt_amount * rate   when type = usdt_received           (USDT given to client = cost → increases due)
+```
+💰 Seller Payment
+👤 Faisal Kabir
+🏦 City bank — 1454533103001
+৳800,000
+🔖 Ref: 261121728464
+🔴 Total: Due −৳48,09,340
 ```
 
-Result: positive = Advance (seller received more than owed), negative = Due (seller owes/needs to pay).
+Verify after deploy: 1-ta test BDT payment kore Telegram check.
 
-- New function `computeDueAdvanceRunning(transactions): Map<txn_id, number>` (single global series, no per-bank split).
-- Keep `formatBdt` but add `formatDueAdvance(value)` returning `+৳47,00,000` (green) or `−৳47,00,000` (red).
+### 2. Force fresh build for SellerDashboard / AdminSellers
 
-**`src/components/seller/SellerDashboard.tsx`**:
-- Replace `runningTotals.get(t.id)` usage in the Total column (mobile + desktop + Excel export).
-- Total column header → "Due/Advance".
-- Cell: red text + "−" prefix when negative (Due), green + "+" prefix when positive (Advance).
+Code already correct — kintu apnar screenshot-er per-row "TOTAL ৳42,56,500" purono. Browser hard-refresh / cache-bust korte hobe। Ami extra koren sure korte ekta tiny version-marker comment add korbo jate Vite forced rebuild kore.
 
-### 3. Telegram caption — include Due/Advance after payment
+Ar **per-row label ektu boro/clear korbo** mobile card-e — ekhon "📊 Due" small text e ache, eta boro "TOTAL: Due −৳48,09,340" font-e dekhabo jate apnar screenshot-er TOTAL row-er position-eyi seta dekhay (eta confirm korbe je "TOTAL" label-er pasher value Due/Advance, bank cash-in noy).
 
-**Remote edge function `forward-seller-proof`** (deployed on Supabase, not in repo). Update it to:
-- Before sending the Telegram message, query `seller_transactions` for this `seller_id` ordered ASC, run the same Due/Advance reduction up to and including the just-inserted row.
-- Append a new line to the caption:
+### 3. New: "Balance History" visual chart on selected seller
+
+`AdminSellers.tsx` selected seller view-er upore ekta notun **collapsible chart card** add korbo:
+
+- **Line chart** (recharts use kore — already installed): X-axis = chronological dates, Y-axis = running Due/Advance balance.
+- Color: line green jokhon Advance (above 0), red jokhon Due (below 0).
+- Hover-tooltip: oi point-er date + transaction type + amount + balance.
+- Below the chart, ekta compact **timeline list** (Last 10 movements):
   ```
-  📊 Total: Due ৳47,00,000  (or Advance +৳47,00,000)
+  Apr 22  +৳800,000 BDT Payment       → Due −৳48,09,340
+  Apr 21  +৳38,400  Client Top-Up     → Due −৳48,89,340
+  Apr 17  −৳41,19,444 USDT Given (32694 × 126) → Due −৳49,27,740
+  ...
   ```
-- Color cue with emoji: 🔴 for Due, 🟢 for Advance.
+  Prottekta entry-te show kora hobe: date, +/- amount + type, → resulting balance (color-coded).
 
-**Caller side** (`src/components/admin/AdminSellers.tsx` and any other place that invokes `forward-seller-proof`):
-- Pass `seller_id` in the body so the function can compute the running total. Currently it isn't passed — verify and add.
+Eta exactly user-er chaowa "kivabe due build holo, one by one, kisher pore ki update hochhe" seta visualize korbe.
 
-```text
-Telegram caption (new format):
-─────────────────────────────
-💰 New BDT Payment
-Seller: Faisal Kabir
-Amount: ৳1,00,000
-Bank: City Bank ****1234
-TrxID: ABC123
-🔴 Total: Due ৳47,00,000
-─────────────────────────────
-```
+Same chart **SellerDashboard.tsx** (seller's own view) e ও add korbo.
+
+### 4. Quick sanity guards
+
+- `computeDueAdvanceRunning` already chronological ASC sort e chole — confirm. ✅
+- Per-row balance ALL transactions theke compute hoy (filtered noy) — confirm. ✅ (fixed previous turn)
+- Telegram forward-er somoy `seller_id` pass hochhe — verify caller in `AdminSellers.tsx` saveOcrMutation (line 219 `seller_id: selectedSeller.user_id` already passed). ✅
 
 ---
 
 ## Technical Details
 
-- `metaFetch` change is backward-compatible (existing callers ignore the new fields).
-- Due/Advance computation uses ALL approved transactions (pending/rejected skipped), sorted by `created_at` ASC, regardless of bank — it's a single global running balance per seller.
-- Telegram function will read transactions via service-role client (already used) — no RLS issue.
-- Excel export "Running Total" column renamed to "Due/Advance (BDT)" with signed values.
+- **Chart library**: `recharts` (already in deps via shadcn `chart.tsx`). Use `LineChart` with `ReferenceLine y={0}`.
+- **Data prep**: From `sellerTxns` ASC-sorted, build `[{date, balance, type, delta}]` array. Same logic as `computeDueAdvanceRunning` but emit each step.
+- **Mobile card emphasis**: Replace small "📊 Due" with bordered footer row showing "TOTAL" label + colored amount, identical visual weight to the existing summary so user clearly sees this is the running balance, not bank-cash.
+- **Edge deploy**: `forward-seller-proof` push to Supabase via deploy tool.
 
 ---
 
 ## Files Touched
 
-- `supabase/functions/retry-failed-topup/index.ts` — `metaFetch` returns `{response, via, sourceIp}`, response/log includes IP.
-- `supabase/functions/spend-cap-update/index.ts`, `resolve-failed-topup/index.ts`, `tiktok-topup/index.ts`, `get-account-insights/index.ts` — same `metaFetch` upgrade (already partially done, verify).
-- `supabase/functions/forward-seller-proof/index.ts` — append Due/Advance line; recreate locally (currently only on remote).
-- `src/lib/sellerRunningTotal.ts` — new `computeDueAdvanceRunning` + `formatDueAdvance`.
-- `src/components/seller/SellerDashboard.tsx` — use new running total, color-code, rename column.
-- `src/components/FailedTopUps.tsx` — toast shows IP/route on success.
-- `src/components/admin/AdminSellers.tsx` — pass `seller_id` to `forward-seller-proof`.
+- `supabase/functions/forward-seller-proof/index.ts` — redeploy (no source change, local already correct).
+- `src/components/seller/SellerDashboard.tsx` — bigger TOTAL footer per row + new BalanceHistoryChart component above ledger.
+- `src/components/admin/AdminSellers.tsx` — bigger TOTAL footer per mobile card + same BalanceHistoryChart for selected seller.
+- `src/components/seller/BalanceHistoryChart.tsx` — NEW: line chart + timeline list of running balance progression.
 
 ---
 
 ## Out of Scope
 
-- Showing IP for failed (still-pending) attempts — only success path for now.
-- Direct-call IP (Cloudflare Worker outbound IP isn't exposed) — will display "Direct" without IP.
-- Changing per-bank chip totals on the dashboard (those stay as cash-in per bank).
+- Changing "BDT Received / USDT Given / USDT(BDT) / Withdrawn" summary cards — those stay as filter chips; chart is the "how it built up" view.
+- Per-bank chip totals (City Bank ৳42,56,500 etc.) stay as bank cash-in.
+- Failed top-up retry IP display — already implemented previous turn, will verify by triggering a retry.
 
