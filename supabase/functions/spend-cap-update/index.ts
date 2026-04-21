@@ -31,43 +31,37 @@ async function metaFetch(url, options = {}) {
       }).finally(() => clearTimeout(timer));
       // Capture proxy IP from response header
       try {
-        const proxyIp = proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp && typeof lastMetaProxyIp !== "undefined") lastMetaProxyIp = proxyIp;
-      } catch  {}
+        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
+        if (proxyIp) lastMetaIp = proxyIp;
+      } catch {}
       const text = await proxyRes.text();
       const trimmed = text.trimStart();
       const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      // Detect proxy-level errors (proxy server reporting its own failure,
-      // not a Meta API error). Proxy errors look like {"error":"string"};
+      // Detect proxy-level errors. Proxy errors look like {"error":"string"};
       // Meta errors look like {"error":{"message":...,"code":...}}.
       let isProxyOwnError = false;
-      if (proxyRes.status >= 500 && proxyRes.status < 600 && trimmed.startsWith("{")) {
+      if (trimmed.startsWith("{")) {
         try {
           const parsed = JSON.parse(text);
           if (parsed && typeof parsed.error === "string") {
             isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta API:", parsed.error);
+            console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
           }
-        } catch  {}
+        } catch {}
       }
-      if (!looksLikeHtml && !isProxyOwnError) {
-        return new Response(text, {
-          status: proxyRes.status,
-          headers: proxyRes.headers
-        });
+      // Fallback on ANY non-2xx, HTML body, or proxy-shape error
+      const shouldFallback = looksLikeHtml || isProxyOwnError || proxyRes.status < 200 || proxyRes.status >= 300;
+      if (!shouldFallback) {
+        lastMetaVia = "proxy";
+        return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
       }
-      if (looksLikeHtml) {
-        console.warn("Proxy returned HTML, falling back to direct Meta API call");
-      }
+      console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
     } catch (proxyErr) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr);
+      console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
     }
   }
-  if (typeof lastMetaProxyIp !== "undefined") {
-    try {
-      lastMetaProxyIp = "direct";
-    } catch  {}
-  }
+  lastMetaVia = "direct";
+  lastMetaIp = null;
   return fetch(url, options);
 }
 async function decryptToken(stored, secret) {
