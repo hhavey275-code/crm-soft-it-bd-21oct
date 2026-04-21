@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trophy, Activity, CheckCircle2, AlertTriangle, MessageCircle, Clock } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "@/lib/router-compat";
 import {
   computeAdminMetrics,
   categoryBreakdown,
