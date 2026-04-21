@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { computeDueAdvanceRunning, formatDueAdvance } from "@/lib/sellerRunningTotal";
+import { BalanceHistoryChart } from "./BalanceHistoryChart";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -462,6 +463,9 @@ export function SellerDashboard() {
         )}
       </div>
 
+      {/* Balance History — visual timeline of how Due/Advance built up */}
+      <BalanceHistoryChart transactions={transactions} />
+
       {/* Transaction Ledger */}
       <Card className="border-0 shadow-lg shadow-black/5 dark:shadow-black/20 bg-card/80 backdrop-blur-sm overflow-hidden rounded-xl">
         <CardHeader className="p-4 md:p-6 pb-3 border-b border-border/50">
@@ -556,16 +560,23 @@ export function SellerDashboard() {
                         <ImageIcon className="h-3 w-3" /> View Proof
                       </button>
                     )}
-                    {/* Running Due/Advance balance */}
+                    {/* Running Due/Advance balance — emphasized footer */}
                     {(() => {
                       const da = formatDueAdvance(runningTotals.get(t.id) || 0);
                       return (
-                        <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            📊 {da.isZero ? "Total" : da.isAdvance ? "Advance" : "Due"}
+                        <div className={cn(
+                          "mt-2 -mx-3 -mb-3 px-3 py-2 border-t-2 flex items-center justify-between",
+                          da.isZero
+                            ? "border-border bg-muted/40"
+                            : da.isAdvance
+                            ? "border-emerald-500/40 bg-emerald-500/5"
+                            : "border-rose-500/40 bg-rose-500/5"
+                        )}>
+                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                            TOTAL · {da.isZero ? "—" : da.isAdvance ? "Advance" : "Due"}
                           </span>
                           <span className={cn(
-                            "text-sm font-extrabold tabular-nums",
+                            "text-base font-extrabold tabular-nums",
                             da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                           )}>{da.text}</span>
                         </div>
