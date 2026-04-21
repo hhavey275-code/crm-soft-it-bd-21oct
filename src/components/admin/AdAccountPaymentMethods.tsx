@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { EditCardLabelDialog } from "@/components/admin/EditCardLabelDialog";
 import { toast } from "sonner";
-import { CreditCard, Loader2, Trash2, Plus } from "lucide-react";
+import { CreditCard, Loader2, Trash2, Plus, Pencil } from "lucide-react";
 
 interface Props {
   adAccountId: string;
@@ -18,6 +19,29 @@ interface Props {
 export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmin = false }: Props) {
   const queryClient = useQueryClient();
   const [showBmCards, setShowBmCards] = useState(false);
+  const [editCard, setEditCard] = useState<any>(null);
+
+  // Friendly labels (admin_label / bank_name / holder_name) keyed by display_string
+  const { data: cardMeta } = useQuery({
+    queryKey: ["ad-account-cards-meta", adAccountId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("ad_account_card_assignments")
+        .select("display_string, funding_source_id, ad_account_cards(id, display_string, admin_label, bank_name, holder_name, notes)")
+        .eq("ad_account_id", adAccountId)
+        .order("detected_at", { ascending: false })
+        .limit(50);
+      const map = new Map<string, any>();
+      (data ?? []).forEach((row: any) => {
+        const card = row.ad_account_cards;
+        if (!card) return;
+        const key = (row.display_string || card.display_string || "").toLowerCase();
+        if (key && !map.has(key)) map.set(key, card);
+      });
+      return map;
+    },
+    enabled: !!adAccountId,
+  });
 
   const { data: accountCards, isLoading: loadingCards } = useQuery({
     queryKey: ["account-all-cards", adAccountId],
@@ -106,48 +130,74 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
             </div>
           ) : displayCards.length > 0 ? (
             <div className="space-y-2">
-              {displayCards.map((card, idx) => (
-                <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CardBrandIcon displayString={card.display_string} />
-                    <div>
-                      <span className="text-sm font-medium">{card.display_string}</span>
-                      {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          Expires {(card as any).exp_month}/{(card as any).exp_year}
-                        </span>
-                      )}
+              {displayCards.map((card, idx) => {
+                const meta = cardMeta?.get((card.display_string || "").toLowerCase());
+                const friendly = meta?.admin_label || meta?.bank_name || meta?.holder_name;
+                return (
+                  <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <CardBrandIcon displayString={card.display_string} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{friendly || card.display_string}</span>
+                          {idx === 0 && displayCards.length > 1 && (
+                            <Badge variant="outline" className="text-xs">Default</Badge>
+                          )}
+                          {idx > 0 && (
+                            <Badge variant="secondary" className="text-xs">Backup</Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {friendly ? card.display_string : (meta?.bank_name || "Unlabeled card")}
+                          {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
+                            <span className="ml-2">· Exp {(card as any).exp_month}/{(card as any).exp_year}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    {idx === 0 && displayCards.length > 1 && (
-                      <Badge variant="outline" className="text-xs">Default</Badge>
-                    )}
-                    {idx > 0 && (
-                      <Badge variant="secondary" className="text-xs">Backup</Badge>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1">
+                        {meta && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => setEditCard(meta)}
+                            title="Edit label"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm("Remove this payment method from the ad account?")) {
+                              removeMutation.mutate(card.id || "");
+                            }
+                          }}
+                          disabled={removeMutation.isPending}
+                        >
+                          {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  {isAdmin && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        if (confirm("Remove this payment method from the ad account?")) {
-                          removeMutation.mutate(card.id || "");
-                        }
-                      }}
-                      disabled={removeMutation.isPending}
-                    >
-                      {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No payment method linked to this ad account.</p>
           )}
         </CardContent>
       </Card>
+
+      <EditCardLabelDialog
+        card={editCard}
+        open={!!editCard}
+        onOpenChange={(o) => !o && setEditCard(null)}
+      />
 
       <Dialog open={showBmCards} onOpenChange={setShowBmCards}>
         <DialogContent className="max-w-md">
