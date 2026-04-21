@@ -187,6 +187,9 @@
   --sidebar-accent-foreground: 30 20% 90%;
   --sidebar-border: 24 16% 14%;
   --sidebar-ring: 24 95% 58%;
+  --chart-1: 24 95% 60%;
+  --chart-2: 28 95% 70%;
+  --chart-3: 32 95% 80%;
 }
 
 .theme-green {
@@ -246,6 +249,9 @@
   --sidebar-accent-foreground: 150 20% 90%;
   --sidebar-border: 160 16% 14%;
   --sidebar-ring: 160 84% 42%;
+  --chart-1: 160 84% 45%;
+  --chart-2: 155 70% 60%;
+  --chart-3: 150 60% 72%;
 }
 
 @layer base {
