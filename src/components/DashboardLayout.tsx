@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ColorThemePicker } from "@/components/ColorThemePicker";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Zap } from "lucide-react";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <NotificationBell />
               <ColorThemePicker />
               <ThemeToggle />
             </div>
