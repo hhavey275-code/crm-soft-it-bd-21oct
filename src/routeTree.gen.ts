@@ -250,9 +250,9 @@ const InvoiceRequestIdRoute = InvoiceRequestIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClientsIdRoute = ClientsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ClientsRoute,
+  id: '/clients/$id',
+  path: '/clients/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AgenciesIdRoute = AgenciesIdRouteImport.update({
   id: '/$id',
@@ -594,6 +594,7 @@ export interface RootRouteChildren {
   WalletBalancesRoute: typeof WalletBalancesRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ClientsIdRoute: typeof ClientsIdRoute
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
 }
@@ -875,10 +876,10 @@ declare module '@tanstack/react-router' {
     }
     '/clients/$id': {
       id: '/clients/$id'
-      path: '/$id'
+      path: '/clients/$id'
       fullPath: '/clients/$id'
       preLoaderRoute: typeof ClientsIdRouteImport
-      parentRoute: typeof ClientsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/agencies/$id': {
       id: '/agencies/$id'
@@ -985,6 +986,7 @@ const rootRouteChildren: RootRouteChildren = {
   WalletBalancesRoute: WalletBalancesRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ClientsIdRoute: ClientsIdRoute,
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
 }
