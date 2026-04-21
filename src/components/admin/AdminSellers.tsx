@@ -22,6 +22,7 @@ import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDial
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
 import { computeDueAdvanceRunning, formatDueAdvance } from "@/lib/sellerRunningTotal";
+import { BalanceHistoryChart } from "@/components/seller/BalanceHistoryChart";
 import * as XLSX from "xlsx";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
