@@ -1,7 +1,7 @@
 // Temporary helper: fetches edge function source via Supabase Management API.
 // Parses eszip body and returns extracted source files.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import * as eszip from "jsr:@deno/eszip@^0.83";
+import * as eszip from "https://deno.land/x/eszip@v0.83.0/mod.ts";
 
 const PAT = Deno.env.get("SB_MGMT_PAT")!;
 const PROJECT_REF = "dhswrfzdqcavgmymllat";
