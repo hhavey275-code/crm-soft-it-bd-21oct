@@ -4,8 +4,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track the last proxy IP used for Meta API calls
-let lastMetaProxyIp = "direct";
+// Track route + IP used for the most recent Meta API call (per request)
+let lastMetaVia = "direct";
+let lastMetaIp = null;
 async function metaFetch(url, options = {}) {
   if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
   const proxySecret = Deno.env.get("META_PROXY_SECRET");
@@ -16,19 +17,18 @@ async function metaFetch(url, options = {}) {
       const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
       const method = options.method ?? "GET";
       const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
+      // 8s timeout so a hung proxy can't block the function
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
       const proxyRes = await fetch(proxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-proxy-secret": proxySecret
         },
-        body: JSON.stringify({
-          url,
-          method,
-          body,
-          contentType
-        })
-      });
+        body: JSON.stringify({ url, method, body, contentType }),
+        signal: ctl.signal,
+      }).finally(() => clearTimeout(timer));
       // Capture proxy IP from response header
       try {
         const proxyIp = proxyRes.headers.get("x-proxy-ip");
