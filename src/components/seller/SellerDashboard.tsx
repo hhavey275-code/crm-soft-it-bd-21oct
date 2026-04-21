@@ -556,11 +556,21 @@ export function SellerDashboard() {
                         <ImageIcon className="h-3 w-3" /> View Proof
                       </button>
                     )}
-                    {/* Running cumulative total per bank */}
-                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">📊 Total</span>
-                      <span className="text-sm font-extrabold text-primary tabular-nums">{formatBdt(runningTotals.get(t.id) || 0)}</span>
-                    </div>
+                    {/* Running Due/Advance balance */}
+                    {(() => {
+                      const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                      return (
+                        <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            📊 {da.isZero ? "Total" : da.isAdvance ? "Advance" : "Due"}
+                          </span>
+                          <span className={cn(
+                            "text-sm font-extrabold tabular-nums",
+                            da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                          )}>{da.text}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -598,7 +608,7 @@ export function SellerDashboard() {
                     <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Conv BDT</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">TrxID / Note</th>
                     <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Proof</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-primary">Total (৳)</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-primary">Due/Advance (৳)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -662,9 +672,17 @@ export function SellerDashboard() {
                             </button>
                           ) : <span className="text-muted-foreground/30">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-extrabold text-primary tabular-nums whitespace-nowrap">
-                          {formatBdt(runningTotals.get(t.id) || 0)}
-                        </td>
+                        {(() => {
+                          const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                          return (
+                            <td className={cn(
+                              "px-4 py-3 text-right text-xs font-extrabold tabular-nums whitespace-nowrap",
+                              da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                            )}>
+                              {da.text}
+                            </td>
+                          );
+                        })()}
                       </tr>
                     );
                   })}
