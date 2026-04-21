@@ -130,48 +130,74 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
             </div>
           ) : displayCards.length > 0 ? (
             <div className="space-y-2">
-              {displayCards.map((card, idx) => (
-                <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CardBrandIcon displayString={card.display_string} />
-                    <div>
-                      <span className="text-sm font-medium">{card.display_string}</span>
-                      {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          Expires {(card as any).exp_month}/{(card as any).exp_year}
-                        </span>
-                      )}
+              {displayCards.map((card, idx) => {
+                const meta = cardMeta?.get((card.display_string || "").toLowerCase());
+                const friendly = meta?.admin_label || meta?.bank_name || meta?.holder_name;
+                return (
+                  <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <CardBrandIcon displayString={card.display_string} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{friendly || card.display_string}</span>
+                          {idx === 0 && displayCards.length > 1 && (
+                            <Badge variant="outline" className="text-xs">Default</Badge>
+                          )}
+                          {idx > 0 && (
+                            <Badge variant="secondary" className="text-xs">Backup</Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {friendly ? card.display_string : (meta?.bank_name || "Unlabeled card")}
+                          {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
+                            <span className="ml-2">· Exp {(card as any).exp_month}/{(card as any).exp_year}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    {idx === 0 && displayCards.length > 1 && (
-                      <Badge variant="outline" className="text-xs">Default</Badge>
-                    )}
-                    {idx > 0 && (
-                      <Badge variant="secondary" className="text-xs">Backup</Badge>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1">
+                        {meta && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => setEditCard(meta)}
+                            title="Edit label"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm("Remove this payment method from the ad account?")) {
+                              removeMutation.mutate(card.id || "");
+                            }
+                          }}
+                          disabled={removeMutation.isPending}
+                        >
+                          {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  {isAdmin && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        if (confirm("Remove this payment method from the ad account?")) {
-                          removeMutation.mutate(card.id || "");
-                        }
-                      }}
-                      disabled={removeMutation.isPending}
-                    >
-                      {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No payment method linked to this ad account.</p>
           )}
         </CardContent>
       </Card>
+
+      <EditCardLabelDialog
+        card={editCard}
+        open={!!editCard}
+        onOpenChange={(o) => !o && setEditCard(null)}
+      />
 
       <Dialog open={showBmCards} onOpenChange={setShowBmCards}>
         <DialogContent className="max-w-md">
