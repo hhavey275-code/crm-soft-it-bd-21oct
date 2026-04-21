@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
