@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as TopUpRouteImport } from './routes/top-up'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TenantsRouteImport } from './routes/tenants'
 import { Route as SystemTopUpRouteImport } from './routes/system-top-up'
+import { Route as SystemLogsRouteImport } from './routes/system-logs'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SignupSuccessRouteImport } from './routes/signup-success'
 import { Route as SignupRouteImport } from './routes/signup'
@@ -21,16 +23,23 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SellersRouteImport } from './routes/sellers'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as MyUnusedAccountsRouteImport } from './routes/my-unused-accounts'
+import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedTopUpsRouteImport } from './routes/failed-top-ups'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
+import { Route as ChatRouteImport } from './routes/chat'
+import { Route as CardVaultRouteImport } from './routes/card-vault'
 import { Route as BusinessManagersRouteImport } from './routes/business-managers'
 import { Route as BillingsRouteImport } from './routes/billings'
 import { Route as BanksRouteImport } from './routes/banks'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AnnouncementsRouteImport } from './routes/announcements'
+import { Route as AgentRouteImport } from './routes/agent'
 import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
 import { Route as AgenciesRouteImport } from './routes/agencies'
 import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
@@ -57,6 +66,11 @@ const TopUpRoute = TopUpRouteImport.update({
   path: '/top-up',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TenantsRoute = TenantsRouteImport.update({
   id: '/tenants',
   path: '/tenants',
@@ -65,6 +79,11 @@ const TenantsRoute = TenantsRouteImport.update({
 const SystemTopUpRoute = SystemTopUpRouteImport.update({
   id: '/system-top-up',
   path: '/system-top-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemLogsRoute = SystemLogsRouteImport.update({
+  id: '/system-logs',
+  path: '/system-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubscriptionsRoute = SubscriptionsRouteImport.update({
@@ -102,6 +121,11 @@ const RequestsRoute = RequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PerformanceRoute = PerformanceRouteImport.update({
   id: '/performance',
   path: '/performance',
@@ -110,6 +134,16 @@ const PerformanceRoute = PerformanceRouteImport.update({
 const MyUnusedAccountsRoute = MyUnusedAccountsRouteImport.update({
   id: '/my-unused-accounts',
   path: '/my-unused-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
+  id: '/meta-oauth-callback',
+  path: '/meta-oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FailedTopUpsRoute = FailedTopUpsRouteImport.update({
@@ -132,6 +166,16 @@ const ClientSpendReportRoute = ClientSpendReportRouteImport.update({
   path: '/client-spend-report',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CardVaultRoute = CardVaultRouteImport.update({
+  id: '/card-vault',
+  path: '/card-vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BusinessManagersRoute = BusinessManagersRouteImport.update({
   id: '/business-managers',
   path: '/business-managers',
@@ -150,6 +194,16 @@ const BanksRoute = BanksRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnnouncementsRoute = AnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentRoute = AgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgencyWalletRoute = AgencyWalletRouteImport.update({
@@ -208,16 +262,23 @@ export interface FileRoutesByFullPath {
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
   '/agency-wallet': typeof AgencyWalletRoute
+  '/agent': typeof AgentRoute
+  '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/card-vault': typeof CardVaultRoute
+  '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-top-ups': typeof FailedTopUpsRoute
+  '/feedback': typeof FeedbackRoute
+  '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/performance': typeof PerformanceRoute
+  '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sellers': typeof SellersRoute
@@ -225,8 +286,10 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/system-logs': typeof SystemLogsRoute
   '/system-top-up': typeof SystemTopUpRoute
   '/tenants': typeof TenantsRouteWithChildren
+  '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
   '/wallet-balances': typeof WalletBalancesRoute
@@ -242,16 +305,23 @@ export interface FileRoutesByTo {
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
   '/agency-wallet': typeof AgencyWalletRoute
+  '/agent': typeof AgentRoute
+  '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/card-vault': typeof CardVaultRoute
+  '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-top-ups': typeof FailedTopUpsRoute
+  '/feedback': typeof FeedbackRoute
+  '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/performance': typeof PerformanceRoute
+  '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sellers': typeof SellersRoute
@@ -259,8 +329,10 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/system-logs': typeof SystemLogsRoute
   '/system-top-up': typeof SystemTopUpRoute
   '/tenants': typeof TenantsRouteWithChildren
+  '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
   '/wallet-balances': typeof WalletBalancesRoute
@@ -277,16 +349,23 @@ export interface FileRoutesById {
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
   '/agency-wallet': typeof AgencyWalletRoute
+  '/agent': typeof AgentRoute
+  '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/card-vault': typeof CardVaultRoute
+  '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/clients': typeof ClientsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/failed-top-ups': typeof FailedTopUpsRoute
+  '/feedback': typeof FeedbackRoute
+  '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/performance': typeof PerformanceRoute
+  '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sellers': typeof SellersRoute
@@ -294,8 +373,10 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/system-logs': typeof SystemLogsRoute
   '/system-top-up': typeof SystemTopUpRoute
   '/tenants': typeof TenantsRouteWithChildren
+  '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
   '/wallet-balances': typeof WalletBalancesRoute
@@ -313,16 +394,23 @@ export interface FileRouteTypes {
     | '/ad-accounts'
     | '/agencies'
     | '/agency-wallet'
+    | '/agent'
+    | '/announcements'
     | '/auth'
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/card-vault'
+    | '/chat'
     | '/client-spend-report'
     | '/clients'
     | '/dashboard'
     | '/failed-top-ups'
+    | '/feedback'
+    | '/meta-oauth-callback'
     | '/my-unused-accounts'
     | '/performance'
+    | '/privacy'
     | '/requests'
     | '/reset-password'
     | '/sellers'
@@ -330,8 +418,10 @@ export interface FileRouteTypes {
     | '/signup'
     | '/signup-success'
     | '/subscriptions'
+    | '/system-logs'
     | '/system-top-up'
     | '/tenants'
+    | '/terms'
     | '/top-up'
     | '/transactions'
     | '/wallet-balances'
@@ -347,16 +437,23 @@ export interface FileRouteTypes {
     | '/ad-accounts'
     | '/agencies'
     | '/agency-wallet'
+    | '/agent'
+    | '/announcements'
     | '/auth'
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/card-vault'
+    | '/chat'
     | '/client-spend-report'
     | '/clients'
     | '/dashboard'
     | '/failed-top-ups'
+    | '/feedback'
+    | '/meta-oauth-callback'
     | '/my-unused-accounts'
     | '/performance'
+    | '/privacy'
     | '/requests'
     | '/reset-password'
     | '/sellers'
@@ -364,8 +461,10 @@ export interface FileRouteTypes {
     | '/signup'
     | '/signup-success'
     | '/subscriptions'
+    | '/system-logs'
     | '/system-top-up'
     | '/tenants'
+    | '/terms'
     | '/top-up'
     | '/transactions'
     | '/wallet-balances'
@@ -381,16 +480,23 @@ export interface FileRouteTypes {
     | '/ad-accounts'
     | '/agencies'
     | '/agency-wallet'
+    | '/agent'
+    | '/announcements'
     | '/auth'
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/card-vault'
+    | '/chat'
     | '/client-spend-report'
     | '/clients'
     | '/dashboard'
     | '/failed-top-ups'
+    | '/feedback'
+    | '/meta-oauth-callback'
     | '/my-unused-accounts'
     | '/performance'
+    | '/privacy'
     | '/requests'
     | '/reset-password'
     | '/sellers'
@@ -398,8 +504,10 @@ export interface FileRouteTypes {
     | '/signup'
     | '/signup-success'
     | '/subscriptions'
+    | '/system-logs'
     | '/system-top-up'
     | '/tenants'
+    | '/terms'
     | '/top-up'
     | '/transactions'
     | '/wallet-balances'
@@ -416,16 +524,23 @@ export interface RootRouteChildren {
   AdAccountsRoute: typeof AdAccountsRouteWithChildren
   AgenciesRoute: typeof AgenciesRouteWithChildren
   AgencyWalletRoute: typeof AgencyWalletRoute
+  AgentRoute: typeof AgentRoute
+  AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
   BanksRoute: typeof BanksRoute
   BillingsRoute: typeof BillingsRoute
   BusinessManagersRoute: typeof BusinessManagersRoute
+  CardVaultRoute: typeof CardVaultRoute
+  ChatRoute: typeof ChatRoute
   ClientSpendReportRoute: typeof ClientSpendReportRoute
   ClientsRoute: typeof ClientsRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FailedTopUpsRoute: typeof FailedTopUpsRoute
+  FeedbackRoute: typeof FeedbackRoute
+  MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
   MyUnusedAccountsRoute: typeof MyUnusedAccountsRoute
   PerformanceRoute: typeof PerformanceRoute
+  PrivacyRoute: typeof PrivacyRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SellersRoute: typeof SellersRoute
@@ -433,8 +548,10 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SignupSuccessRoute: typeof SignupSuccessRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
+  SystemLogsRoute: typeof SystemLogsRoute
   SystemTopUpRoute: typeof SystemTopUpRoute
   TenantsRoute: typeof TenantsRouteWithChildren
+  TermsRoute: typeof TermsRoute
   TopUpRoute: typeof TopUpRoute
   TransactionsRoute: typeof TransactionsRoute
   WalletBalancesRoute: typeof WalletBalancesRoute
@@ -465,6 +582,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TopUpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tenants': {
       id: '/tenants'
       path: '/tenants'
@@ -477,6 +601,13 @@ declare module '@tanstack/react-router' {
       path: '/system-top-up'
       fullPath: '/system-top-up'
       preLoaderRoute: typeof SystemTopUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system-logs': {
+      id: '/system-logs'
+      path: '/system-logs'
+      fullPath: '/system-logs'
+      preLoaderRoute: typeof SystemLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscriptions': {
@@ -528,6 +659,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/performance': {
       id: '/performance'
       path: '/performance'
@@ -540,6 +678,20 @@ declare module '@tanstack/react-router' {
       path: '/my-unused-accounts'
       fullPath: '/my-unused-accounts'
       preLoaderRoute: typeof MyUnusedAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meta-oauth-callback': {
+      id: '/meta-oauth-callback'
+      path: '/meta-oauth-callback'
+      fullPath: '/meta-oauth-callback'
+      preLoaderRoute: typeof MetaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/failed-top-ups': {
@@ -570,6 +722,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientSpendReportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/card-vault': {
+      id: '/card-vault'
+      path: '/card-vault'
+      fullPath: '/card-vault'
+      preLoaderRoute: typeof CardVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/business-managers': {
       id: '/business-managers'
       path: '/business-managers'
@@ -596,6 +762,20 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/announcements': {
+      id: '/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AnnouncementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent': {
+      id: '/agent'
+      path: '/agent'
+      fullPath: '/agent'
+      preLoaderRoute: typeof AgentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agency-wallet': {
@@ -722,16 +902,23 @@ const rootRouteChildren: RootRouteChildren = {
   AdAccountsRoute: AdAccountsRouteWithChildren,
   AgenciesRoute: AgenciesRouteWithChildren,
   AgencyWalletRoute: AgencyWalletRoute,
+  AgentRoute: AgentRoute,
+  AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,
   BanksRoute: BanksRoute,
   BillingsRoute: BillingsRoute,
   BusinessManagersRoute: BusinessManagersRoute,
+  CardVaultRoute: CardVaultRoute,
+  ChatRoute: ChatRoute,
   ClientSpendReportRoute: ClientSpendReportRoute,
   ClientsRoute: ClientsRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FailedTopUpsRoute: FailedTopUpsRoute,
+  FeedbackRoute: FeedbackRoute,
+  MetaOauthCallbackRoute: MetaOauthCallbackRoute,
   MyUnusedAccountsRoute: MyUnusedAccountsRoute,
   PerformanceRoute: PerformanceRoute,
+  PrivacyRoute: PrivacyRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SellersRoute: SellersRoute,
@@ -739,8 +926,10 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SignupSuccessRoute: SignupSuccessRoute,
   SubscriptionsRoute: SubscriptionsRoute,
+  SystemLogsRoute: SystemLogsRoute,
   SystemTopUpRoute: SystemTopUpRoute,
   TenantsRoute: TenantsRouteWithChildren,
+  TermsRoute: TermsRoute,
   TopUpRoute: TopUpRoute,
   TransactionsRoute: TransactionsRoute,
   WalletBalancesRoute: WalletBalancesRoute,
