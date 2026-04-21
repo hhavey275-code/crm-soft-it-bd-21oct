@@ -47,6 +47,11 @@ type LinkCompatProps = Omit<TSLinkProps, "to"> & {
   to: string;
   children?: React.ReactNode;
   className?: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  target?: string;
+  rel?: string;
+  style?: React.CSSProperties;
+  title?: string;
 };
 
 export const Link = forwardRef<HTMLAnchorElement, LinkCompatProps>(

@@ -9,20 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
+import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as TopUpRouteImport } from './routes/top-up'
+import { Route as SystemTopUpRouteImport } from './routes/system-top-up'
 import { Route as SignupSuccessRouteImport } from './routes/signup-success'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
 import { Route as MyUnusedAccountsRouteImport } from './routes/my-unused-accounts'
+import { Route as FailedTopUpsRouteImport } from './routes/failed-top-ups'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BusinessManagersRouteImport } from './routes/business-managers'
+import { Route as BanksRouteImport } from './routes/banks'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
 import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
 
+const WalletBalancesRoute = WalletBalancesRouteImport.update({
+  id: '/wallet-balances',
+  path: '/wallet-balances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TopUpRoute = TopUpRouteImport.update({
+  id: '/top-up',
+  path: '/top-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemTopUpRoute = SystemTopUpRouteImport.update({
+  id: '/system-top-up',
+  path: '/system-top-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupSuccessRoute = SignupSuccessRouteImport.update({
   id: '/signup-success',
   path: '/signup-success',
@@ -53,6 +81,11 @@ const MyUnusedAccountsRoute = MyUnusedAccountsRouteImport.update({
   path: '/my-unused-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FailedTopUpsRoute = FailedTopUpsRouteImport.update({
+  id: '/failed-top-ups',
+  path: '/failed-top-ups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -63,9 +96,19 @@ const BusinessManagersRoute = BusinessManagersRouteImport.update({
   path: '/business-managers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BanksRoute = BanksRouteImport.update({
+  id: '/banks',
+  path: '/banks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgencyWalletRoute = AgencyWalletRouteImport.update({
+  id: '/agency-wallet',
+  path: '/agency-wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdAccountsRoute = AdAccountsRouteImport.update({
@@ -76,6 +119,11 @@ const AdAccountsRoute = AdAccountsRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceRequestIdRoute = InvoiceRequestIdRouteImport.update({
+  id: '/invoice/$requestId',
+  path: '/invoice/$requestId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdsManagerAccountIdRoute = AdsManagerAccountIdRouteImport.update({
@@ -92,114 +140,198 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
+  '/agency-wallet': typeof AgencyWalletRoute
   '/auth': typeof AuthRoute
+  '/banks': typeof BanksRoute
   '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/failed-top-ups': typeof FailedTopUpsRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/system-top-up': typeof SystemTopUpRoute
+  '/top-up': typeof TopUpRoute
+  '/transactions': typeof TransactionsRoute
+  '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
+  '/invoice/$requestId': typeof InvoiceRequestIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
+  '/agency-wallet': typeof AgencyWalletRoute
   '/auth': typeof AuthRoute
+  '/banks': typeof BanksRoute
   '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/failed-top-ups': typeof FailedTopUpsRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/system-top-up': typeof SystemTopUpRoute
+  '/top-up': typeof TopUpRoute
+  '/transactions': typeof TransactionsRoute
+  '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
+  '/invoice/$requestId': typeof InvoiceRequestIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
+  '/agency-wallet': typeof AgencyWalletRoute
   '/auth': typeof AuthRoute
+  '/banks': typeof BanksRoute
   '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/failed-top-ups': typeof FailedTopUpsRoute
   '/my-unused-accounts': typeof MyUnusedAccountsRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/system-top-up': typeof SystemTopUpRoute
+  '/top-up': typeof TopUpRoute
+  '/transactions': typeof TransactionsRoute
+  '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
+  '/invoice/$requestId': typeof InvoiceRequestIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/ad-accounts'
+    | '/agency-wallet'
     | '/auth'
+    | '/banks'
     | '/business-managers'
     | '/dashboard'
+    | '/failed-top-ups'
     | '/my-unused-accounts'
     | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/system-top-up'
+    | '/top-up'
+    | '/transactions'
+    | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/ads-manager/$accountId'
+    | '/invoice/$requestId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ad-accounts'
+    | '/agency-wallet'
     | '/auth'
+    | '/banks'
     | '/business-managers'
     | '/dashboard'
+    | '/failed-top-ups'
     | '/my-unused-accounts'
     | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/system-top-up'
+    | '/top-up'
+    | '/transactions'
+    | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/ads-manager/$accountId'
+    | '/invoice/$requestId'
   id:
     | '__root__'
     | '/'
     | '/ad-accounts'
+    | '/agency-wallet'
     | '/auth'
+    | '/banks'
     | '/business-managers'
     | '/dashboard'
+    | '/failed-top-ups'
     | '/my-unused-accounts'
     | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/system-top-up'
+    | '/top-up'
+    | '/transactions'
+    | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/ads-manager/$accountId'
+    | '/invoice/$requestId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdAccountsRoute: typeof AdAccountsRouteWithChildren
+  AgencyWalletRoute: typeof AgencyWalletRoute
   AuthRoute: typeof AuthRoute
+  BanksRoute: typeof BanksRoute
   BusinessManagersRoute: typeof BusinessManagersRoute
   DashboardRoute: typeof DashboardRoute
+  FailedTopUpsRoute: typeof FailedTopUpsRoute
   MyUnusedAccountsRoute: typeof MyUnusedAccountsRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SignupSuccessRoute: typeof SignupSuccessRoute
+  SystemTopUpRoute: typeof SystemTopUpRoute
+  TopUpRoute: typeof TopUpRoute
+  TransactionsRoute: typeof TransactionsRoute
+  WalletBalancesRoute: typeof WalletBalancesRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet-balances': {
+      id: '/wallet-balances'
+      path: '/wallet-balances'
+      fullPath: '/wallet-balances'
+      preLoaderRoute: typeof WalletBalancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/top-up': {
+      id: '/top-up'
+      path: '/top-up'
+      fullPath: '/top-up'
+      preLoaderRoute: typeof TopUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system-top-up': {
+      id: '/system-top-up'
+      path: '/system-top-up'
+      fullPath: '/system-top-up'
+      preLoaderRoute: typeof SystemTopUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup-success': {
       id: '/signup-success'
       path: '/signup-success'
@@ -242,6 +374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyUnusedAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/failed-top-ups': {
+      id: '/failed-top-ups'
+      path: '/failed-top-ups'
+      fullPath: '/failed-top-ups'
+      preLoaderRoute: typeof FailedTopUpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -256,11 +395,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessManagersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/banks': {
+      id: '/banks'
+      path: '/banks'
+      fullPath: '/banks'
+      preLoaderRoute: typeof BanksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agency-wallet': {
+      id: '/agency-wallet'
+      path: '/agency-wallet'
+      fullPath: '/agency-wallet'
+      preLoaderRoute: typeof AgencyWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ad-accounts': {
@@ -275,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoice/$requestId': {
+      id: '/invoice/$requestId'
+      path: '/invoice/$requestId'
+      fullPath: '/invoice/$requestId'
+      preLoaderRoute: typeof InvoiceRequestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ads-manager/$accountId': {
@@ -309,16 +469,24 @@ const AdAccountsRouteWithChildren = AdAccountsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdAccountsRoute: AdAccountsRouteWithChildren,
+  AgencyWalletRoute: AgencyWalletRoute,
   AuthRoute: AuthRoute,
+  BanksRoute: BanksRoute,
   BusinessManagersRoute: BusinessManagersRoute,
   DashboardRoute: DashboardRoute,
+  FailedTopUpsRoute: FailedTopUpsRoute,
   MyUnusedAccountsRoute: MyUnusedAccountsRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SignupSuccessRoute: SignupSuccessRoute,
+  SystemTopUpRoute: SystemTopUpRoute,
+  TopUpRoute: TopUpRoute,
+  TransactionsRoute: TransactionsRoute,
+  WalletBalancesRoute: WalletBalancesRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  InvoiceRequestIdRoute: InvoiceRequestIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
