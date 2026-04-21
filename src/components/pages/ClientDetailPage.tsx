@@ -37,7 +37,8 @@ import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 
 export default function ClientDetailPage() {
-  const { userId } = useParams<{ userId: string }>();
+  const params = useParams<{ userId?: string; id?: string }>();
+  const userId = params.userId || params.id;
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
