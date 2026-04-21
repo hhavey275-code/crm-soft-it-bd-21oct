@@ -1,113 +1,249 @@
-import { Link, useLocation } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Wallet, Receipt, ArrowUpFromLine, Settings, LogOut,
-  Building2, CreditCard, Users, FileText, MessageSquare, AlertCircle,
-  ScrollText, Megaphone, MessageCircle, Building, Activity, BarChart3, Bot,
-  ListChecks, Briefcase, Banknote, Sparkles, ShoppingBag, Vault,
+  LayoutDashboard,
+  MonitorSmartphone,
+  ArrowUpCircle,
+  History,
+  Settings,
+  LogOut,
+  Zap,
+  Building2,
+  Landmark,
+  Users,
+  Receipt,
+  MessageCircle,
+  ScrollText,
+  AlertTriangle,
+  FileText,
+  Store,
+  Shield,
+  CreditCard,
+  Bot,
+  Megaphone,
+  MessageSquareHeart,
+  Trophy,
 } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
+import { NavLink } from "@/components/NavLink";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSidebarBadges } from "@/hooks/useSidebarBadges";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarFooter,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const clientItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Ad Accounts", url: "/ad-accounts", icon: Wallet },
-  { title: "Top Up", url: "/top-up", icon: ArrowUpFromLine },
-  { title: "Transactions", url: "/transactions", icon: Receipt },
-  { title: "My Unused", url: "/my-unused-accounts", icon: AlertCircle },
-  { title: "Settings", url: "/settings", icon: Settings },
+const adminNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
+  { title: "Requests", url: "/requests", icon: FileText, key: "requests" },
+  { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
+  { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Clients", url: "/clients", icon: Users, key: "clients" },
+  { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
+  { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
+  { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
+  { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
+  { title: "Agencies", url: "/agencies", icon: Building2, key: "agencies" },
+  { title: "Spend Report", url: "/client-spend-report", icon: Receipt, key: "spend-report" },
+  { title: "Tenants", url: "/tenants", icon: Building2, key: "tenants" },
+  { title: "System Log", url: "/system-logs", icon: ScrollText, key: "system-logs" },
+  { title: "AI Agent", url: "/agent", icon: Bot, key: "agent" },
+  { title: "Announcements", url: "/announcements", icon: Megaphone, key: "announcements" },
+  { title: "Admin Performance", url: "/admin/performance", icon: Trophy, key: "admin-performance" },
+  { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
-const adminItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Ad Accounts", url: "/ad-accounts", icon: Wallet },
-  { title: "Business Managers", url: "/business-managers", icon: Building2 },
-  { title: "Banks", url: "/banks", icon: Banknote },
-  { title: "Clients", url: "/clients", icon: Users },
-  { title: "Billings", url: "/billings", icon: FileText },
-  { title: "Requests", url: "/requests", icon: ListChecks },
-  { title: "Sellers", url: "/sellers", icon: ShoppingBag },
-  { title: "Card Vault", url: "/card-vault", icon: Vault },
-  { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertCircle },
-  { title: "Wallet Balances", url: "/wallet-balances", icon: CreditCard },
-  { title: "Spend Report", url: "/client-spend-report", icon: BarChart3 },
-  { title: "Performance", url: "/admin-performance", icon: Activity },
-  { title: "Announcements", url: "/announcements", icon: Megaphone },
-  { title: "Feedback", url: "/feedback", icon: MessageCircle },
-  { title: "Chat", url: "/chat", icon: MessageSquare },
-  { title: "System Logs", url: "/system-logs", icon: ScrollText },
-  { title: "Settings", url: "/settings", icon: Settings },
+const clientNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Ads Manager", url: "/ad-accounts", icon: Megaphone, key: "ads-manager" },
+  { title: "My Unused Accounts", url: "/my-unused", icon: AlertTriangle, key: "my-unused" },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
+  { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
-const superadminItems = [
-  ...adminItems,
-  { title: "Tenants", url: "/tenants", icon: Building },
-  { title: "Subscriptions", url: "/subscriptions", icon: Sparkles },
-  { title: "Agencies", url: "/agencies", icon: Briefcase },
-  { title: "System Top-Up", url: "/system-topup", icon: ArrowUpFromLine },
-  { title: "Agent", url: "/agent", icon: Bot },
+const sellerNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
-const agencyItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Wallet", url: "/agency-wallet", icon: Wallet },
-  { title: "Payments", url: "/agency-payments", icon: Receipt },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
-
-const sellerItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Transactions", url: "/transactions", icon: Receipt },
-  { title: "Settings", url: "/settings", icon: Settings },
+const agencyNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
+  { title: "Agency Top-Up", url: "/agency-topup", icon: Zap, key: "agency-topup" },
+  { title: "Top-Up Requests", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Clients", url: "/clients", icon: Users, key: "clients" },
+  { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
+  { title: "Wallet", url: "/wallet", icon: Landmark, key: "wallet" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
 export function AppSidebar() {
-  const { isAdmin, isSuperAdmin, isSeller, isAgency, signOut, user } = useAuth();
-  const { logoUrl, siteName } = useSiteSettings();
-  const location = useLocation();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { signOut, profile, role, isAdmin, isSuperAdmin, isSeller, isAgency, user } = useAuth();
+  const { logoUrl, siteName } = useSiteSettings();
+  const badges = useSidebarBadges();
 
-  const items = isSuperAdmin
-    ? superadminItems
-    : isAdmin
-    ? adminItems
-    : isAgency
-    ? agencyItems
-    : isSeller
-    ? sellerItems
-    : clientItems;
+  // Fetch menu permissions for admin (non-superadmin) and client users
+  const { data: menuPermissions } = useQuery({
+    queryKey: ["menu-permissions", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("menu_permissions")
+        .select("menu_key")
+        .eq("user_id", user!.id);
+      return (data as any[])?.map((p: any) => p.menu_key) ?? [];
+    },
+    enabled: !!user && (role === "admin" || role === "client"),
+  });
 
-  const isActive = (url: string) => location.pathname === url || location.pathname.startsWith(url + "/");
+  // Check if tenant mode (is_tenant flag OR test mode enabled)
+  const { data: isTenantMode } = useQuery({
+    queryKey: ["is-tenant-mode-sidebar"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("key, value")
+        .in("key", ["is_tenant", "master_url"]);
+
+      const config = (data ?? []).reduce<Record<string, string>>((acc, row: any) => {
+        acc[row.key] = row.value ?? "";
+        return acc;
+      }, {});
+
+      if (config.is_tenant === "true" || !!config.master_url) return true;
+
+      try {
+        return localStorage.getItem("tenant_test_mode") === "true";
+      } catch {
+        return false;
+      }
+    },
+    initialData: (() => {
+      try {
+        return localStorage.getItem("tenant_test_mode") === "true";
+      } catch {
+        return false;
+      }
+    })(),
+    staleTime: 5_000,
+  });
+
+  const tenantNavItems = [
+    { title: "System Top-Up", url: "/system-topup", icon: Shield, key: "system-topup" },
+    { title: "Subscriptions", url: "/subscriptions", icon: CreditCard, key: "subscriptions" },
+  ];
+
+  // Keys to hide in tenant mode
+  const tenantHiddenKeys = ["agencies", "sellers", "spend-report"];
+
+  let navItems: typeof adminNavItems;
+  if (isSuperAdmin) {
+    navItems = isTenantMode ? adminNavItems.filter(i => !tenantHiddenKeys.includes(i.key)) : adminNavItems;
+  } else if (role === "admin") {
+    let base = adminNavItems;
+    if (menuPermissions && menuPermissions.length > 0) {
+      base = adminNavItems.filter(item => menuPermissions.includes(item.key));
+    }
+    navItems = isTenantMode ? base.filter(i => !tenantHiddenKeys.includes(i.key)) : base;
+  } else if (isAgency) {
+    navItems = agencyNavItems;
+  } else if (isSeller) {
+    navItems = sellerNavItems;
+  } else {
+    // Client: filter out permission-gated items like ads-manager
+    const permGatedKeys = ["ads-manager"];
+    navItems = clientNavItems.filter(item =>
+      !permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key))
+    );
+  }
+
+  // Inject tenant-only menus after Dashboard if tenant mode
+  if (isAdmin && isTenantMode) {
+    const dashIdx = navItems.findIndex(i => i.key === "dashboard");
+    navItems = [
+      ...navItems.slice(0, dashIdx + 1),
+      ...tenantNavItems,
+      ...navItems.slice(dashIdx + 1),
+    ];
+  }
+
+  const displayName = siteName || "Meta Ad Top-Up";
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b">
-        <div className="flex items-center gap-2 px-2 py-2">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded object-contain flex-shrink-0" />
-          ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-primary-foreground text-xs font-bold">
-              {(siteName || "CRM").slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          {!collapsed && (
-            <span className="font-semibold text-sm truncate">{siteName || "CRM"}</span>
-          )}
-        </div>
-      </SidebarHeader>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel className="px-4 py-6 mt-4 h-auto">
+            {!collapsed && (
+              <div className="flex items-center gap-4">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-12 w-12 rounded-lg object-contain" />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-base font-semibold text-sidebar-foreground leading-tight">{displayName}</p>
+                  <p className="text-xs text-sidebar-muted capitalize mt-1">{role ?? "—"}</p>
+                </div>
+              </div>
+            )}
+            {collapsed && (
+              <>
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-10 w-10 rounded-lg object-contain" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-5 w-5 text-primary-foreground" />
+                  </div>
+                )}
+              </>
+            )}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
+            <SidebarMenu className="space-y-1">
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      end={item.url === "/dashboard"}
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <div className="relative mr-2">
+                        <item.icon className="h-4 w-4" />
+                        {(badges[item.key] ?? 0) > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+                            {badges[item.key] > 9 ? "9+" : badges[item.key]}
+                          </span>
+                        )}
+                      </div>
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -115,13 +251,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t">
-        {!collapsed && user?.email && (
-          <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user.email}</div>
+      <SidebarFooter className="p-3">
+        {!collapsed && profile && (
+          <div className="mb-2 rounded-md bg-sidebar-accent p-3">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">
+              {profile.full_name || profile.email || "User"}
+            </p>
+            <p className="text-xs text-sidebar-muted truncate">{profile.email}</p>
+          </div>
         )}
-        <Button variant="ghost" size="sm" onClick={signOut} className="justify-start gap-2">
-          <LogOut className="h-4 w-4" />
-          {!collapsed && <span>Sign Out</span>}
+        <div className={collapsed ? "flex justify-center mb-2" : "flex items-center gap-2 mb-2"}>
+          <ThemeToggle />
+          {!collapsed && <span className="text-sm text-sidebar-foreground">Theme</span>}
+        </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          {!collapsed && "Sign Out"}
         </Button>
       </SidebarFooter>
     </Sidebar>

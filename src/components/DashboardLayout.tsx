@@ -1,21 +1,33 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { ColorThemePicker } from "@/components/ColorThemePicker";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ChatWidget } from "@/components/ChatWidget";
+import { ColorThemePicker } from "@/components/ColorThemePicker";
+import { WhatsNewDialog } from "@/components/WhatsNewDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
+
+const TechBackground = lazy(() => import("@/components/TechBackground"));
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
+  const { isAdmin } = useAuth();
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full relative">
+        <div className="fixed inset-0 w-screen h-screen opacity-60 pointer-events-none" style={{ zIndex: 0 }}>
+          <Suspense fallback={null}>
+            <TechBackground />
+          </Suspense>
+        </div>
+
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b bg-card/80 backdrop-blur-sm px-4 sticky top-0 z-30">
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
+          <header className="h-14 flex items-center justify-between border-b bg-card/80 backdrop-blur-sm px-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <SidebarTrigger />
               {logoUrl ? (
@@ -25,7 +37,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <Zap className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
               )}
-              {headerAnnouncement && (
+              {headerAnnouncement ? (
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="announcement-ticker">
                     <span
@@ -36,12 +48,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     </span>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <NotificationBell />
               <ColorThemePicker />
               <ThemeToggle />
+              <NotificationBell />
             </div>
           </header>
           <main className="flex-1 p-3 md:p-6 overflow-auto">
@@ -49,6 +61,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {!isAdmin && <ChatWidget />}
+      <WhatsNewDialog />
     </SidebarProvider>
   );
 }
