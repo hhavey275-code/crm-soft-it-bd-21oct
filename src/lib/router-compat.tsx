@@ -7,7 +7,7 @@ import {
   Link as TSLink,
   type LinkProps as TSLinkProps,
 } from "@tanstack/react-router";
-import { forwardRef } from "react";
+import { forwardRef, useEffect } from "react";
 
 export function useNavigate() {
   const nav = useTSNavigate();
