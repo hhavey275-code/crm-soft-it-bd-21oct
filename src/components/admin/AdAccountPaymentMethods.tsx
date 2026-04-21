@@ -19,6 +19,29 @@ interface Props {
 export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmin = false }: Props) {
   const queryClient = useQueryClient();
   const [showBmCards, setShowBmCards] = useState(false);
+  const [editCard, setEditCard] = useState<any>(null);
+
+  // Friendly labels (admin_label / bank_name / holder_name) keyed by display_string
+  const { data: cardMeta } = useQuery({
+    queryKey: ["ad-account-cards-meta", adAccountId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("ad_account_card_assignments")
+        .select("display_string, funding_source_id, ad_account_cards(id, display_string, admin_label, bank_name, holder_name, notes)")
+        .eq("ad_account_id", adAccountId)
+        .order("detected_at", { ascending: false })
+        .limit(50);
+      const map = new Map<string, any>();
+      (data ?? []).forEach((row: any) => {
+        const card = row.ad_account_cards;
+        if (!card) return;
+        const key = (row.display_string || card.display_string || "").toLowerCase();
+        if (key && !map.has(key)) map.set(key, card);
+      });
+      return map;
+    },
+    enabled: !!adAccountId,
+  });
 
   const { data: accountCards, isLoading: loadingCards } = useQuery({
     queryKey: ["account-all-cards", adAccountId],
