@@ -56,6 +56,8 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("Card details saved");
       queryClient.invalidateQueries({ queryKey: ["card-vault"] });
+      queryClient.invalidateQueries({ queryKey: ["ad-account-cards-meta"] });
+      queryClient.invalidateQueries({ queryKey: ["card-assignment-history"] });
       onOpenChange(false);
     },
     onError: (err: any) => toast.error(err.message),
