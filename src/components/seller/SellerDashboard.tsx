@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { computeRunningTotalsByBank, formatBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance } from "@/lib/sellerRunningTotal";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -143,9 +143,9 @@ export function SellerDashboard() {
 
   const dueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
 
-  // Running cumulative total per bank — computed from ALL transactions (not just filtered),
-  // so each filtered row still shows its true historical running balance.
-  const runningTotals = useMemo(() => computeRunningTotalsByBank(transactions || []), [transactions]);
+  // Running Due/Advance balance per row — computed from ALL transactions (not just filtered),
+  // so each filtered row still shows its true historical balance up to that point.
+  const runningTotals = useMemo(() => computeDueAdvanceRunning(transactions || []), [transactions]);
   const hasActiveFilter = typeFilter !== "all" || bankFilter || datePreset !== "all";
   const clearAllFilters = () => { setTypeFilter("all"); setBankFilter(null); setDatePreset("all"); setCustomFrom(undefined); setCustomTo(undefined); };
   const toggleTypeFilter = (type: TypeFilter) => setTypeFilter(prev => prev === type ? "all" : type);
@@ -180,7 +180,7 @@ export function SellerDashboard() {
         "Rate": Number(t.rate || 0),
         "Converted (BDT)": Number(convBdt.toFixed(2)),
         "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
-        "Running Total (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
+        "Due/Advance (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
         "Description": t.description || "",
         "Proof URL": t.proof_url || "",
       };
@@ -192,7 +192,7 @@ export function SellerDashboard() {
       "Rate": 0,
       "Converted (BDT)": Number(totals.totalConvertedBdt.toFixed(2)),
       "Bank": `Withdrawn: BDT ${totals.totalWithdrawn.toLocaleString()}`,
-      "Running Total (BDT)": "",
+      "Due/Advance (BDT)": "",
       "Description": dueAdvance >= 0 ? `Advance: BDT ${dueAdvance.toFixed(2)}` : `Due: BDT ${Math.abs(dueAdvance).toFixed(2)}`,
       "Proof URL": "",
     } as any);
