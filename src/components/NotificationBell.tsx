@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Bell, CheckCheck, BellRing } from "lucide-react";
 import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // Base64 encoded short notification beep (works in background tabs unlike AudioContext)
