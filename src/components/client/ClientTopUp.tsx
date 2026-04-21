@@ -1,0 +1,1013 @@
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatusBadge } from "@/components/StatusBadge";
+import { toast } from "sonner";
+import { ArrowUpCircle, Banknote, DollarSign, ImageIcon, X, FileText, ChevronLeft, ChevronRight, Check, CreditCard, Building2, Wallet, ArrowRight, Smartphone, Globe, Landmark, Loader2, Copy } from "lucide-react";
+
+import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { logSystemAction } from "@/lib/systemLog";
+import { cn } from "@/lib/utils";
+
+type PaymentMethod = "online_transfer" | "atm_deposit" | "cash_deposit";
+type PaymentCategory = "bank" | "mfs";
+
+const isMFS = (name: string) => /bkash|nagad/i.test(name);
+
+const STEPS = [
+  { label: "Method", icon: CreditCard },
+  { label: "Bank", icon: Building2 },
+  { label: "Details", icon: FileText },
+  { label: "Review", icon: Check },
+];
+
+// Premium icon components
+function PremiumIcon({ children, gradient, size = "lg" }: { children: React.ReactNode; gradient: string; size?: "lg" | "md" }) {
+  return (
+    <div className={cn(
+      "rounded-2xl flex items-center justify-center shadow-lg",
+      size === "lg" ? "h-14 w-14" : "h-11 w-11"
+    )} style={{ background: gradient }}>
+      {children}
+    </div>
+  );
+}
+
+function BankTransferIcon() {
+  return (
+    <PremiumIcon gradient="linear-gradient(135deg, #2563eb, #1d4ed8)">
+      <Landmark className="h-7 w-7 text-white" />
+    </PremiumIcon>
+  );
+}
+
+function MFSIcon() {
+  return (
+    <PremiumIcon gradient="linear-gradient(135deg, #e91e8c, #f97316)">
+      <Smartphone className="h-7 w-7 text-white" />
+    </PremiumIcon>
+  );
+}
+
+function OnlineIcon() {
+  return (
+    <PremiumIcon gradient="linear-gradient(135deg, #3b82f6, #06b6d4)" size="md">
+      <Globe className="h-6 w-6 text-white" />
+    </PremiumIcon>
+  );
+}
+
+function ATMIcon() {
+  return (
+    <PremiumIcon gradient="linear-gradient(135deg, #8b5cf6, #a855f7)" size="md">
+      <CreditCard className="h-6 w-6 text-white" />
+    </PremiumIcon>
+  );
+}
+
+function CashIcon() {
+  return (
+    <PremiumIcon gradient="linear-gradient(135deg, #10b981, #059669)" size="md">
+      <Banknote className="h-6 w-6 text-white" />
+    </PremiumIcon>
+  );
+}
+
+export function ClientTopUp() {
+  const isMobile = useIsMobile();
+  const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
+  const isInactive = (profile as any)?.status === "inactive";
+  const agencyId = (profile as any)?.agency_id;
+
+  const { data: agencyWalletData } = useQuery({
+    queryKey: ["agency-wallet-check", agencyId],
+    queryFn: async () => {
+      const { data } = await supabase.from("agency_wallets").select("balance").eq("agency_id", agencyId!).single();
+      return data;
+    },
+    enabled: !!agencyId,
+  });
+  const agencyBlocked = agencyId && agencyWalletData && Number(agencyWalletData.balance) <= 0;
+
+  // Wizard state
+  const [step, setStep] = useState(0);
+  const [category, setCategory] = useState<PaymentCategory | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [selectedBank, setSelectedBank] = useState("");
+  const [bdtAmount, setBdtAmount] = useState("");
+  const [paymentRef, setPaymentRef] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [duplicateRefError, setDuplicateRefError] = useState<string | null>(null);
+  const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // MFS charge rates
+  const getMFSChargeRate = (bankName: string): number => {
+    if (/bkash/i.test(bankName)) return 0.0185; // 1.85%
+    if (/nagad/i.test(bankName)) return 0.015;   // 1.5%
+    return 0;
+  };
+
+  // OCR extraction from screenshot
+  const runOcrExtraction = async (file: File) => {
+    setOcrLoading(true);
+    setAccountVerified(null);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('ocr-seller-payment', {
+        body: { image_url: dataUrl, verify_account_number: selectedBankDetails?.account_number || null },
+      });
+      if (error) throw error;
+      if (data?.reference) {
+        setPaymentRef(data.reference);
+        toast.success("Transaction ID auto-filled from screenshot!");
+      }
+      if (data?.bdt_amount) {
+        const finalAmount = Number(data.bdt_amount);
+        // OCR now extracts the principal/base amount directly (charge already excluded by AI)
+        if (selectedBankDetails && isMFS(selectedBankDetails.bank_name)) {
+          toast.info(`প্রাপ্ত পরিমাণ (চার্জ বাদে): ৳${finalAmount.toLocaleString()}`);
+        }
+        setBdtAmount(String(finalAmount));
+      }
+      // Account verification result
+      if (typeof data?.account_verified === 'boolean') {
+        const isMFSPayment = selectedBankDetails && isMFS(selectedBankDetails.bank_name);
+        if (!data.account_verified) {
+          if (isMFSPayment) {
+            // MFS: allow submit, just warn
+            setAccountVerified(null);
+            toast.warning("⚠️ Account number পাওয়া যায়নি। TrxID দিয়ে verify হবে।");
+          } else {
+            setAccountVerified(false);
+            toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
+          }
+        } else {
+          setAccountVerified(true);
+          toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
+        }
+      }
+    } catch (err: any) {
+      console.error("OCR extraction failed:", err);
+      const message = typeof err?.message === "string" ? err.message : "";
+      if (message.includes("401") || message.toLowerCase().includes("unauthorized")) {
+        toast.error("Session invalid. অনুগ্রহ করে আবার login করে চেষ্টা করুন।");
+      } else {
+        toast.error("Screenshot থেকে তথ্য বের করা যায়নি। ম্যানুয়ালি পূরণ করুন।");
+      }
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("File size must be under 5MB"); return; }
+    setProofFile(file);
+    setProofPreview(URL.createObjectURL(file));
+    runOcrExtraction(file);
+  };
+
+  const clearFile = () => {
+    setProofFile(null);
+    setProofPreview(null);
+    setAccountVerified(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { toast.error("File size must be under 5MB"); return; }
+        setProofFile(file);
+        setProofPreview(URL.createObjectURL(file));
+        toast.success("Screenshot pasted!");
+        runOcrExtraction(file);
+        return;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handlePaste]);
+
+  // Duplicate reference check
+  const checkDuplicateRef = async (ref: string): Promise<boolean> => {
+    if (!ref.trim()) return false;
+    const { data } = await supabase
+      .from("top_up_requests")
+      .select("id, status")
+      .eq("payment_reference", ref.trim())
+      .in("status", ["pending", "approved"])
+      .limit(1);
+    return (data?.length ?? 0) > 0;
+  };
+
+  // Clear duplicate error when ref changes
+  useEffect(() => {
+    setDuplicateRefError(null);
+  }, [paymentRef]);
+
+  // Queries
+  const { data: usdRate } = useQuery({
+    queryKey: ["usd-rate", user?.id],
+    queryFn: async () => {
+      const { data: freshProfile } = await supabase.from("profiles").select("usd_rate").eq("user_id", user!.id).single();
+      const clientRate = freshProfile?.usd_rate;
+      if (clientRate != null && clientRate > 0) return Number(clientRate);
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
+      return Number(data?.value ?? 120);
+    },
+    enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const { data: wallet } = useQuery({
+    queryKey: ["client-wallet", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("wallets").select("balance").eq("user_id", user!.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: assignedBanks } = useQuery({
+    queryKey: ["client-assigned-banks", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(*)").eq("user_id", user!.id);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: myRequests } = useQuery({
+    queryKey: ["client-topup-history", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("top_up_requests").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(20);
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const reviewerIds = [...new Set((myRequests ?? []).map((r: any) => r.reviewed_by).filter(Boolean))];
+  const { data: reviewerProfiles } = useQuery({
+    queryKey: ["reviewer-profiles", reviewerIds.join(",")],
+    queryFn: async () => {
+      if (reviewerIds.length === 0) return [];
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", reviewerIds);
+      return (data as any[]) ?? [];
+    },
+    enabled: reviewerIds.length > 0,
+  });
+
+  // Realtime
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel("client-topup-realtime").on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests", filter: `user_id=eq.${user.id}` }, () => {
+      queryClient.invalidateQueries({ queryKey: ["client-topup-history", user.id] });
+      queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
+    }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
+
+  // Card billing due check
+  const { data: cardBillDue } = useQuery({
+    queryKey: ["card-bill-due", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("card_bills").select("*").eq("user_id", user!.id).eq("status", "pending").limit(1);
+      return data?.[0] || null;
+    },
+    enabled: !!user,
+  });
+
+  const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
+  const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
+  const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
+  const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
+
+  // Filter banks by category
+  const filteredBanks = assignedBanks?.filter((cb: any) => {
+    const bank = cb.bank_accounts;
+    if (!bank) return false;
+    if (category === "mfs") return isMFS(bank.bank_name);
+    if (category === "bank") return !isMFS(bank.bank_name);
+    return true;
+  }) ?? [];
+
+  // Check if MFS banks exist
+  const hasMFSBanks = assignedBanks?.some((cb: any) => cb.bank_accounts && isMFS(cb.bank_accounts.bank_name)) ?? false;
+  const hasBankBanks = assignedBanks?.some((cb: any) => cb.bank_accounts && !isMFS(cb.bank_accounts.bank_name)) ?? false;
+
+  const fetchTelegramFirst = async () => {
+    try { await supabase.functions.invoke('telegram-poll', { body: { quick: true } }); } catch (err) { console.log('telegram-poll pre-fetch skipped:', err); }
+  };
+
+  const verifyWithRetry = async (requestId: string, attempt = 1) => {
+    const maxRetries = 4;
+    const retryDelayMs = 3 * 60 * 1000;
+    try {
+      await fetchTelegramFirst();
+      const { data, error } = await supabase.functions.invoke('verify-topup', { body: { request_id: requestId } });
+      if (error) throw error;
+      if (data?.auto_approved) { toast.success("Payment auto-approved! ✅"); queryClient.invalidateQueries({ queryKey: ["client-topup-history"] }); queryClient.invalidateQueries({ queryKey: ["client-wallet"] }); return; }
+      if (attempt < maxRetries) { toast.info(`Verifying payment... retry ${attempt}/${maxRetries} in 3 min`); setTimeout(() => verifyWithRetry(requestId, attempt + 1), retryDelayMs); return; }
+      toast.info("Payment pending manual review by admin.");
+    } catch (err) {
+      console.warn('verify-topup error (silent):', err);
+      if (attempt < maxRetries) { setTimeout(() => verifyWithRetry(requestId, attempt + 1), retryDelayMs); }
+    }
+  };
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      // Check for duplicate payment reference
+      if (paymentRef?.trim()) {
+        const isDuplicate = await checkDuplicateRef(paymentRef);
+        if (isDuplicate) {
+          setDuplicateRefError("এই Transaction ID দিয়ে ইতোমধ্যে একটি request আছে। একই TXN ID দিয়ে দুইবার request করা যাবে না।");
+          throw new Error("Duplicate transaction reference. This TXN ID has already been used.");
+        }
+      }
+      let proofUrl: string | null = null;
+      if (proofFile) {
+        const ext = proofFile.name.split(".").pop();
+        const filePath = `${user!.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("payment-proofs").upload(filePath, proofFile);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(filePath);
+        proofUrl = urlData.publicUrl;
+      }
+      const { data: inserted, error } = await supabase.from("top_up_requests").insert({
+        user_id: user!.id,
+        amount: parseFloat(usdEquivalent),
+        bdt_amount: parseFloat(bdtAmount),
+        usd_rate: usdRate,
+        bank_account_id: selectedBank,
+        payment_reference: paymentRef || null,
+        payment_method: paymentMethod === "online_transfer" ? "bank_transfer" : paymentMethod,
+        proof_url: proofUrl,
+      } as any).select("id").single();
+      if (error) throw error;
+      if (inserted?.id) {
+        // Fire-and-forget — never let verification errors bubble up to the mutation
+        setTimeout(() => { try { verifyWithRetry(inserted.id); } catch (e) { console.warn(e); } }, 0);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Top-up request submitted! Verifying payment...");
+      logSystemAction("Top-Up Submitted", `$${usdEquivalent} (৳${bdtAmount})`, user!.id, profile?.full_name || user!.email);
+      queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
+      setStep(0);
+      setBdtAmount("");
+      setSelectedBank("");
+      setPaymentRef("");
+      setPaymentMethod(null);
+      setCategory(null);
+      clearFile();
+    },
+    onError: (err: any) => {
+      const msg = String(err?.message || err || "");
+      // Suppress transient network noise from background verification calls
+      if (/failed to fetch/i.test(msg)) return;
+      toast.error(msg);
+    },
+  });
+
+  const methodLabel = (m: PaymentMethod | null) => {
+    if (m === "online_transfer") return "Online Bank Transfer";
+    if (m === "atm_deposit") return "ATM Deposit";
+    if (m === "cash_deposit") return "Cash Deposit";
+    return "";
+  };
+
+  const getBkashColor = (name: string) => {
+    if (/bkash/i.test(name)) return { bg: "linear-gradient(135deg, #E2136E, #c41060)", border: "#E2136E" };
+    if (/nagad/i.test(name)) return { bg: "linear-gradient(135deg, #F6921E, #e07d0a)", border: "#F6921E" };
+    return { bg: "linear-gradient(135deg, #6366f1, #4f46e5)", border: "#6366f1" };
+  };
+
+  // Step Progress
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-1 mb-6">
+      {STEPS.map((s, i) => {
+        const Icon = s.icon;
+        const isCompleted = i < step;
+        const isCurrent = i === step;
+        return (
+          <div key={i} className="flex items-center gap-1">
+            <div className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all",
+              isCurrent && "bg-primary text-primary-foreground shadow-sm",
+              isCompleted && "bg-primary/15 text-primary",
+              !isCurrent && !isCompleted && "bg-muted text-muted-foreground"
+            )}>
+              <Icon className="h-3.5 w-3.5" />
+              {!isMobile && <span>{s.label}</span>}
+            </div>
+            {i < STEPS.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Header bar
+  const HeaderBar = () => (
+    <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <div className="flex items-center gap-2">
+        <Wallet className="h-5 w-5 text-primary" />
+        <span className="text-sm font-medium">Balance: <span className="text-lg font-bold text-primary">${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm">Rate: <span className="font-semibold">৳{usdRate}</span>/USD</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+          <ArrowUpCircle className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+          Top-Up Wallet
+        </h1>
+      </div>
+
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account was frozen for violating our policy. You cannot submit top-up requests.</span>
+          </CardContent>
+        </Card>
+      )}
+
+      <HeaderBar />
+      <StepIndicator />
+
+      {/* Step 0: Select Category */}
+      {step === 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Choose Payment Type</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Bank Transfer Category */}
+            {hasBankBanks && (
+              <Card
+                className={cn(
+                  "cursor-pointer transition-all hover:shadow-xl active:scale-[0.97] border-2 overflow-hidden",
+                  category === "bank" ? "border-primary bg-primary/5 shadow-xl" : "border-border hover:border-primary/60"
+                )}
+                onClick={() => { setCategory("bank"); setStep(0.5 as any); }}
+              >
+                <CardContent className="p-6 flex items-center gap-5">
+                  <BankTransferIcon />
+                  <div className="flex-1">
+                    <p className="font-bold text-base">Bank Transfer</p>
+                    <p className="text-sm text-muted-foreground mt-1">Online, ATM & Cash deposit</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* MFS Category */}
+            {hasMFSBanks && (
+              <Card
+                className={cn(
+                  "cursor-pointer transition-all hover:shadow-xl active:scale-[0.97] border-2 overflow-hidden",
+                  category === "mfs" ? "border-primary bg-primary/5 shadow-xl" : "border-border hover:border-primary/60"
+                )}
+                onClick={() => { setCategory("mfs"); setPaymentMethod("online_transfer"); setStep(1); }}
+              >
+                <CardContent className="p-6 flex items-center gap-5">
+                  <MFSIcon />
+                  <div className="flex-1">
+                    <p className="font-bold text-base">MFS</p>
+                    <p className="text-sm text-muted-foreground mt-1">bKash, Nagad</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Step 0.5: Select Bank Sub-method */}
+      {(step as number) === 0.5 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setStep(0); setCategory(null); }} className="gap-1">
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+            <h2 className="text-lg font-semibold">Select Transfer Method</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {([
+              { value: "online_transfer" as PaymentMethod, label: "Online Transfer", desc: "Internet/Mobile Banking", IconComp: OnlineIcon },
+              { value: "atm_deposit" as PaymentMethod, label: "ATM Deposit", desc: "Deposit via ATM", IconComp: ATMIcon },
+              { value: "cash_deposit" as PaymentMethod, label: "Cash Deposit", desc: "Bank branch deposit", IconComp: CashIcon },
+            ]).map((m) => (
+              <Card
+                key={m.value}
+                className={cn(
+                  "cursor-pointer transition-all hover:shadow-lg active:scale-[0.97] border-2",
+                  paymentMethod === m.value ? "border-primary bg-primary/5 shadow-lg" : "border-border hover:border-primary/40"
+                )}
+                onClick={() => { setPaymentMethod(m.value); setStep(1); }}
+              >
+                <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                  <m.IconComp />
+                  <div>
+                    <p className="font-bold text-sm">{m.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{m.desc}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: Select Bank */}
+      {step === 1 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => {
+              if (category === "mfs") { setStep(0); setCategory(null); setPaymentMethod(null); }
+              else { setStep(0.5 as any); }
+            }} className="gap-1">
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+            <h2 className="text-lg font-semibold">
+              {category === "mfs" ? "Select MFS Account" : "Select Payment Bank"}
+            </h2>
+          </div>
+
+          {filteredBanks.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-8 text-center">
+                <Building2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {category === "mfs" ? "No MFS accounts assigned. Contact your admin." : "No banks assigned. Contact your admin."}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {filteredBanks.map((cb: any) => {
+                const bank = cb.bank_accounts;
+                if (!bank) return null;
+                const isSelected = selectedBank === cb.bank_account_id;
+                const mfsColors = category === "mfs" ? getBkashColor(bank.bank_name) : null;
+
+                return (
+                  <Card
+                    key={cb.bank_account_id}
+                    className={cn(
+                      "cursor-pointer transition-all hover:shadow-lg active:scale-[0.97] border-2 overflow-hidden",
+                      isSelected
+                        ? mfsColors ? "shadow-lg" : "border-primary bg-primary/5 shadow-lg"
+                        : mfsColors ? "hover:shadow-lg" : "border-border hover:border-primary/40"
+                    )}
+                    style={mfsColors ? {
+                      borderColor: isSelected ? mfsColors.border : undefined,
+                      background: isSelected ? `${mfsColors.border}08` : undefined,
+                    } : undefined}
+                    onClick={() => { setSelectedBank(cb.bank_account_id); setStep(2); }}
+                  >
+                    <CardContent className="p-5 space-y-3">
+                      <div className="flex items-center gap-4">
+                        {category === "mfs" ? (
+                          <div className="h-12 w-12 rounded-xl flex items-center justify-center shadow-md shrink-0" style={{ background: mfsColors?.bg }}>
+                            <Smartphone className="h-6 w-6 text-white" />
+                          </div>
+                        ) : bank.logo_url ? (
+                          <img src={bank.logo_url} alt={bank.bank_name} className="h-12 w-12 rounded-xl border object-contain bg-white shrink-0" />
+                        ) : (
+                          <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                            <Building2 className="h-6 w-6 text-blue-600" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-base">{bank.bank_name}</p>
+                          <p className="text-sm text-muted-foreground">{bank.account_name}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm space-y-1 text-muted-foreground pl-16">
+                        <p className="flex items-center gap-2">{category === "mfs" ? "Number" : "A/C"}: <span className="font-mono font-semibold text-foreground text-base select-all">{bank.account_number}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(bank.account_number); toast.success("Account number copied!"); }} className="p-1 rounded hover:bg-accent"><Copy className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                        </p>
+                        <p className="flex items-center gap-2">Name: <span className="font-medium text-foreground select-all">{bank.account_name}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(bank.account_name); toast.success("Account name copied!"); }} className="p-1 rounded hover:bg-accent"><Copy className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                        </p>
+                        {bank.branch && <p>Branch: {bank.branch}</p>}
+                        {bank.routing_number && <p>Routing: {bank.routing_number}</p>}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const lines = [
+                              `Bank: ${bank.bank_name}`,
+                              `Account Name: ${bank.account_name}`,
+                              `${category === "mfs" ? "Number" : "A/C"}: ${bank.account_number}`,
+                              bank.branch ? `Branch: ${bank.branch}` : null,
+                              bank.routing_number ? `Routing: ${bank.routing_number}` : null,
+                            ].filter(Boolean).join("\n");
+                            navigator.clipboard.writeText(lines);
+                            toast.success("All bank info copied!");
+                          }}
+                          className="text-xs font-medium flex items-center gap-1.5 px-2.5 py-1 rounded-md border bg-background hover:bg-accent transition-colors"
+                        >
+                          <Copy className="h-3 w-3" /> Copy All
+                        </button>
+                        <span className="text-xs font-semibold flex items-center gap-1" style={{ color: mfsColors?.border || "hsl(var(--primary))" }}>
+                          Select <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 2: Payment Details */}
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1">
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+            <h2 className="text-lg font-semibold">Payment Details</h2>
+          </div>
+
+          {/* Selected bank summary */}
+          {selectedBankDetails && (
+            <Card className="bg-muted/50 border">
+              <CardContent className="p-4 flex items-center gap-4">
+                {category === "mfs" ? (
+                  <div className="h-11 w-11 rounded-xl flex items-center justify-center shadow-sm shrink-0" style={{ background: getBkashColor(selectedBankDetails.bank_name).bg }}>
+                    <Smartphone className="h-5 w-5 text-white" />
+                  </div>
+                ) : selectedBankDetails.logo_url ? (
+                  <img src={selectedBankDetails.logo_url} alt="" className="h-11 w-11 rounded-xl border object-contain bg-white shrink-0" />
+                ) : (
+                  <div className="h-11 w-11 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">{selectedBankDetails.bank_name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedBankDetails.account_name} — <span className="font-mono">{selectedBankDetails.account_number}</span></p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Screenshot first - for OCR auto-fill */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-primary" />
+              Payment Screenshot
+              <span className="text-xs font-normal text-muted-foreground">(upload first to auto-fill)</span>
+            </Label>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+            {!proofPreview ? (
+              <Button type="button" variant="outline" className="w-full border-dashed border-2 border-primary/30 h-32 flex flex-col gap-2 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all" onClick={() => fileInputRef.current?.click()}>
+                <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center">
+                  <ImageIcon className="h-5 w-5 text-primary" />
+                </div>
+                <span className="text-sm text-muted-foreground">Click to attach or Ctrl+V to paste</span>
+              </Button>
+            ) : (
+              <div className="relative inline-block">
+                <img src={proofPreview} alt="Payment proof" className="max-h-44 rounded-lg border shadow-sm" />
+                <button type="button" onClick={clearFile} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                {ocrLoading && (
+                  <div className="absolute inset-0 bg-background/60 rounded-lg flex items-center justify-center">
+                    <div className="flex items-center gap-2 bg-background rounded-full px-3 py-1.5 shadow-md border">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-xs font-medium">Extracting info...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Account verification status */}
+            {accountVerified === true && (
+              <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
+                <Check className="h-3 w-3" /> অ্যাকাউন্ট নম্বর screenshot এ verified
+              </p>
+            )}
+            {accountVerified === false && (
+              <div className="mt-1 p-2 rounded-md bg-destructive/10 border border-destructive/30">
+                <p className="text-xs text-destructive font-medium">
+                  ⚠️ নির্বাচিত অ্যাকাউন্ট নম্বর ({selectedBankDetails?.account_number}) screenshot এ পাওয়া যায়নি। সঠিক screenshot আপলোড করুন।
+                </p>
+              </div>
+            )}
+            {accountVerified === null && proofFile && selectedBankDetails && isMFS(selectedBankDetails.bank_name) && (
+              <div className="mt-1 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  ℹ️ Account number verify হয়নি — TrxID দিয়ে auto-matching হবে।
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Amount */}
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Amount (BDT) <span className="text-xs font-normal text-muted-foreground">(edit if needed)</span></Label>
+                <Input type="number" min="1" step="1" value={bdtAmount} onChange={(e) => setBdtAmount(e.target.value)} placeholder="10000" className="text-lg" />
+                {selectedBankDetails && isMFS(selectedBankDetails.bank_name) && bdtAmount && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">💡 MFS charge বাদ দেওয়া হয়েছে। ভুল হলে সঠিক amount দিন।</p>
+                )}
+                <p className="text-xs text-muted-foreground">Minimum: ৳500</p>
+              </div>
+
+              {bdtAmount && parseFloat(bdtAmount) > 0 && (
+                <div className="space-y-2">
+                  {cardDueBdt > 0 && (
+                    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া: ৳{cardDueBdt.toLocaleString()}</p>
+                      <div className="grid grid-cols-3 gap-1.5 text-center">
+                        <div className="p-1.5 bg-background rounded">
+                          <p className="text-[10px] text-muted-foreground">মোট জমা</p>
+                          <p className="text-sm font-bold">৳{Number(bdtAmount).toLocaleString()}</p>
+                        </div>
+                        <div className="p-1.5 bg-background rounded">
+                          <p className="text-[10px] text-muted-foreground">কার্ড বিল</p>
+                          <p className="text-sm font-bold text-amber-600">-৳{Math.min(cardDueBdt, Number(bdtAmount)).toLocaleString()}</p>
+                        </div>
+                        <div className="p-1.5 bg-background rounded">
+                          <p className="text-[10px] text-muted-foreground">বাকি BDT</p>
+                          <p className="text-sm font-bold text-primary">৳{effectiveBdt.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="rounded-lg bg-primary/10 p-4 text-center">
+                    <p className="text-xs text-muted-foreground">{cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
+                    <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
+                    <p className="text-xs text-muted-foreground">@ ৳{usdRate}/USD</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Transaction Ref */}
+            {paymentMethod !== "cash_deposit" && (
+              <div className="space-y-2">
+                <Label>Transaction Reference / ID <span className="text-xs font-normal text-muted-foreground">(edit if needed)</span></Label>
+                <div className="relative">
+                  <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" className={duplicateRefError ? "border-destructive" : ""} />
+                  {ocrLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                {duplicateRefError && (
+                  <p className="text-xs text-destructive font-medium">{duplicateRefError}</p>
+                )}
+                {paymentRef && !duplicateRefError && (
+                  <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Auto-filled — সঠিক না হলে edit করুন
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!proofFile && (
+            <p className="text-xs text-destructive font-medium text-center">⚠️ Payment screenshot আপলোড করা বাধ্যতামূলক</p>
+          )}
+          <Button className="w-full" onClick={() => setStep(3)} disabled={!bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) || ocrLoading}>
+            Continue to Review <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
+      {/* Step 3: Review & Submit */}
+      {step === 3 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1">
+              <ChevronLeft className="h-4 w-4" /> Edit Details
+            </Button>
+            <h2 className="text-lg font-semibold">Review & Confirm</h2>
+          </div>
+
+          <Card className="border">
+            <CardContent className="p-4 space-y-4">
+              {/* Method */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Payment Method</span>
+                <span className="text-sm font-medium">
+                  {category === "mfs" ? "MFS Transfer" : methodLabel(paymentMethod)}
+                </span>
+              </div>
+
+              {/* Bank */}
+              {selectedBankDetails && (
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">Payment To</span>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    {category === "mfs" ? (
+                      <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: getBkashColor(selectedBankDetails.bank_name).bg }}>
+                        <Smartphone className="h-4 w-4 text-white" />
+                      </div>
+                    ) : selectedBankDetails.logo_url ? (
+                      <img src={selectedBankDetails.logo_url} alt="" className="h-9 w-9 rounded-lg border object-contain bg-white shrink-0" />
+                    ) : (
+                      <div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                        <Building2 className="h-4 w-4 text-blue-600" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold">{selectedBankDetails.bank_name}</p>
+                      <p className="text-xs text-muted-foreground">{selectedBankDetails.account_name} — {selectedBankDetails.account_number}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Amount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground">BDT Amount</p>
+                  <p className="text-lg font-bold">৳{Number(bdtAmount).toLocaleString()}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-primary/10 text-center">
+                  <p className="text-xs text-muted-foreground">USD Amount</p>
+                  <p className="text-lg font-bold text-primary">${usdEquivalent}</p>
+                </div>
+              </div>
+
+              {/* Card Bill Due Warning */}
+              {cardDueBdt > 0 && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    আপনার কার্ড বিল বকেয়া: <strong>৳{cardDueBdt.toLocaleString()}</strong>। পেমেন্ট থেকে আগে কার্ড বিল কেটে নেওয়া হবে।
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="text-center p-2 bg-background rounded">
+                      <p className="text-[10px] text-muted-foreground">মোট জমা</p>
+                      <p className="text-sm font-bold">৳{bdtAmount ? Number(bdtAmount).toLocaleString() : '0'}</p>
+                    </div>
+                    <div className="text-center p-2 bg-background rounded">
+                      <p className="text-[10px] text-muted-foreground">কার্ড বিল</p>
+                      <p className="text-sm font-bold text-amber-600">-৳{cardDueBdt.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center p-2 bg-background rounded">
+                      <p className="text-[10px] text-muted-foreground">ওয়ালেটে</p>
+                      <p className="text-sm font-bold text-primary">${usdEquivalent}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Reference */}
+              {paymentRef && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Reference</span>
+                  <span className="text-sm font-mono font-medium">{paymentRef}</span>
+                </div>
+              )}
+
+              {/* Proof */}
+              {proofPreview && (
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">Payment Proof</span>
+                  <img src={proofPreview} alt="Proof" className="max-h-32 rounded-md border" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Edit
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => submitMutation.mutate()}
+              disabled={isInactive || !!agencyBlocked || !proofFile || submitMutation.isPending}
+            >
+              {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* My Requests History */}
+      <Card className="shadow-sm mt-6">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-base">My Requests</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          {isMobile ? (
+            <div className="space-y-2.5">
+              {myRequests?.map((r: any) => (
+                <div key={r.id} className="rounded-lg border border-border/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-bold">${Number(r.amount).toLocaleString()}</span>
+                      {r.bdt_amount && <span className="text-xs text-muted-foreground ml-1.5">(৳{Number(r.bdt_amount).toLocaleString()})</span>}
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[11px] text-muted-foreground">{format(new Date(r.created_at), "MMM d, hh:mm a")}</span>
+                    {r.payment_reference && <span className="text-[11px] text-muted-foreground">Ref: {r.payment_reference}</span>}
+                  </div>
+                  {r.status === "approved" && (
+                    <div className="flex justify-end mt-2">
+                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
+                        <Link to={`/invoice/${r.id}`} target="_blank"><FileText className="h-3 w-3" />Invoice</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(!myRequests || myRequests.length === 0) && <p className="text-center text-muted-foreground py-6 text-sm">No requests yet</p>}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>BDT</TableHead>
+                  <TableHead>USD</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Invoice</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {myRequests?.map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, hh:mm a")}</TableCell>
+                    <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
+                    <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
+                    <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
+                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell>
+                      {r.status === "approved" ? (
+                        <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
+                          <Link to={`/invoice/${r.id}`} target="_blank"><FileText className="h-3.5 w-3.5" />Invoice</Link>
+                        </Button>
+                      ) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!myRequests || myRequests.length === 0) && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
