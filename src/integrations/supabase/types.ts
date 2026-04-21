@@ -1429,7 +1429,12 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          last_attempt_ip: string | null
+          last_attempt_via: string | null
           old_spend_cap: number | null
+          resolved_at: string | null
+          resolved_ip: string | null
+          resolved_via: string | null
           status: string
           user_id: string
         }
@@ -1439,7 +1444,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_attempt_ip?: string | null
+          last_attempt_via?: string | null
           old_spend_cap?: number | null
+          resolved_at?: string | null
+          resolved_ip?: string | null
+          resolved_via?: string | null
           status?: string
           user_id: string
         }
@@ -1449,7 +1459,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_attempt_ip?: string | null
+          last_attempt_via?: string | null
           old_spend_cap?: number | null
+          resolved_at?: string | null
+          resolved_ip?: string | null
+          resolved_via?: string | null
           status?: string
           user_id?: string
         }
@@ -2220,8 +2235,10 @@ export type Database = {
           id: string
           processed_by: string | null
           reference_id: string | null
+          source_ip: string | null
           type: string
           user_id: string
+          via: string | null
         }
         Insert: {
           amount: number
@@ -2232,8 +2249,10 @@ export type Database = {
           id?: string
           processed_by?: string | null
           reference_id?: string | null
+          source_ip?: string | null
           type: string
           user_id: string
+          via?: string | null
         }
         Update: {
           amount?: number
@@ -2244,8 +2263,10 @@ export type Database = {
           id?: string
           processed_by?: string | null
           reference_id?: string | null
+          source_ip?: string | null
           type?: string
           user_id?: string
+          via?: string | null
         }
         Relationships: [
           {

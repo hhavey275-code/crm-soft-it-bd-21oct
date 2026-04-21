@@ -69,17 +69,26 @@ export default function AdAccountDetailPage() {
 
   const isTikTok = account?.platform === "tiktok";
 
-  // Meta insights via edge function
-  const { data: metaInsights } = useQuery({
+  // Meta insights via edge function — gracefully return null on failure so the page still renders
+  const { data: metaInsights, refetch: refetchInsights, isError: insightsError } = useQuery({
     queryKey: ["ad-account-insights-detail", id],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: [id], source: "cache" },
-      });
-      if (error) throw error;
-      return data?.insights?.[id!] ?? null;
+      try {
+        const { data, error } = await supabase.functions.invoke("get-account-insights", {
+          body: { ad_account_ids: [id], source: "cache" },
+        });
+        if (error) {
+          console.warn("Insights fetch failed:", error);
+          return null;
+        }
+        return data?.insights?.[id!] ?? null;
+      } catch (err) {
+        console.warn("Insights fetch threw:", err);
+        return null;
+      }
     },
     enabled: !!id && !isTikTok,
+    retry: 1,
   });
 
   // TikTok insights from DB
