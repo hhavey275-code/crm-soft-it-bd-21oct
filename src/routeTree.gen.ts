@@ -13,9 +13,15 @@ import { Route as SignupSuccessRouteImport } from './routes/signup-success'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RequestsRouteImport } from './routes/requests'
+import { Route as MyUnusedAccountsRouteImport } from './routes/my-unused-accounts'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BusinessManagersRouteImport } from './routes/business-managers'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
+import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
 
 const SignupSuccessRoute = SignupSuccessRouteImport.update({
   id: '/signup-success',
@@ -37,9 +43,24 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RequestsRoute = RequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyUnusedAccountsRoute = MyUnusedAccountsRouteImport.update({
+  id: '/my-unused-accounts',
+  path: '/my-unused-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessManagersRoute = BusinessManagersRouteImport.update({
+  id: '/business-managers',
+  path: '/business-managers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -47,78 +68,134 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdAccountsRoute = AdAccountsRouteImport.update({
+  id: '/ad-accounts',
+  path: '/ad-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdsManagerAccountIdRoute = AdsManagerAccountIdRouteImport.update({
+  id: '/ads-manager/$accountId',
+  path: '/ads-manager/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdAccountsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/my-unused-accounts': typeof MyUnusedAccountsRoute
+  '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/ad-accounts/$id': typeof AdAccountsIdRoute
+  '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/my-unused-accounts': typeof MyUnusedAccountsRoute
+  '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/ad-accounts/$id': typeof AdAccountsIdRoute
+  '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/business-managers': typeof BusinessManagersRoute
   '/dashboard': typeof DashboardRoute
+  '/my-unused-accounts': typeof MyUnusedAccountsRoute
+  '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/ad-accounts/$id': typeof AdAccountsIdRoute
+  '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ad-accounts'
     | '/auth'
+    | '/business-managers'
     | '/dashboard'
+    | '/my-unused-accounts'
+    | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/ad-accounts/$id'
+    | '/ads-manager/$accountId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ad-accounts'
     | '/auth'
+    | '/business-managers'
     | '/dashboard'
+    | '/my-unused-accounts'
+    | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/ad-accounts/$id'
+    | '/ads-manager/$accountId'
   id:
     | '__root__'
     | '/'
+    | '/ad-accounts'
     | '/auth'
+    | '/business-managers'
     | '/dashboard'
+    | '/my-unused-accounts'
+    | '/requests'
     | '/reset-password'
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/ad-accounts/$id'
+    | '/ads-manager/$accountId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdAccountsRoute: typeof AdAccountsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BusinessManagersRoute: typeof BusinessManagersRoute
   DashboardRoute: typeof DashboardRoute
+  MyUnusedAccountsRoute: typeof MyUnusedAccountsRoute
+  RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SignupSuccessRoute: typeof SignupSuccessRoute
+  AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -151,11 +228,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/requests': {
+      id: '/requests'
+      path: '/requests'
+      fullPath: '/requests'
+      preLoaderRoute: typeof RequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-unused-accounts': {
+      id: '/my-unused-accounts'
+      path: '/my-unused-accounts'
+      fullPath: '/my-unused-accounts'
+      preLoaderRoute: typeof MyUnusedAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business-managers': {
+      id: '/business-managers'
+      path: '/business-managers'
+      fullPath: '/business-managers'
+      preLoaderRoute: typeof BusinessManagersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -165,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ad-accounts': {
+      id: '/ad-accounts'
+      path: '/ad-accounts'
+      fullPath: '/ad-accounts'
+      preLoaderRoute: typeof AdAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -172,17 +277,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ads-manager/$accountId': {
+      id: '/ads-manager/$accountId'
+      path: '/ads-manager/$accountId'
+      fullPath: '/ads-manager/$accountId'
+      preLoaderRoute: typeof AdsManagerAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ad-accounts/$id': {
+      id: '/ad-accounts/$id'
+      path: '/$id'
+      fullPath: '/ad-accounts/$id'
+      preLoaderRoute: typeof AdAccountsIdRouteImport
+      parentRoute: typeof AdAccountsRoute
+    }
   }
 }
 
+interface AdAccountsRouteChildren {
+  AdAccountsIdRoute: typeof AdAccountsIdRoute
+}
+
+const AdAccountsRouteChildren: AdAccountsRouteChildren = {
+  AdAccountsIdRoute: AdAccountsIdRoute,
+}
+
+const AdAccountsRouteWithChildren = AdAccountsRoute._addFileChildren(
+  AdAccountsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdAccountsRoute: AdAccountsRouteWithChildren,
   AuthRoute: AuthRoute,
+  BusinessManagersRoute: BusinessManagersRoute,
   DashboardRoute: DashboardRoute,
+  MyUnusedAccountsRoute: MyUnusedAccountsRoute,
+  RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SignupSuccessRoute: SignupSuccessRoute,
+  AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
