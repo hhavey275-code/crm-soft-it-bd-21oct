@@ -1,95 +1,110 @@
 
 
-## Goal
+## আমি আপনার কথা ভালো করে বুঝেছি ✅
 
-User-er feedback অনুযায়ী 3-ta jinis confirm/finish korte hobe:
+আপনার screenshot-এর `৳42,56,500` (green) আসলে **City Bank chip-এর per-bank cash-in value**, Due/Advance balance নয়। আপনি চাচ্ছেন ওই TOTAL row-এ এই card-এর payment দেওয়ার পর যে **running Due/Advance** হয়েছে সেটা দেখাতে — অর্থাৎ Apr 22-এর ৳800,000 BDT Payment এর জন্য `Due −৳48,09,340`।
 
-1. **Seller dashboard-er per-row "TOTAL"** — running Due/Advance dekhabe (e.g. last BDT Payment row e `Due −৳48,09,340.66`), per-bank cash-in noy.
-2. **Telegram payment-proof caption** — payment forward howar somoy niche oi exact running total line jabe (`🔴 Total: Due −৳48,09,340`).
-3. **Notun: Chronological "Balance History" chart** — kivabe Due/Advance build up holo seta visual timeline e dekhabe (payment add → due kome, USDT given → due barhe, etc.).
+### Database verification (confirm করেছি):
 
----
+| Date | Type | Amount | Running Balance |
+|---|---|---|---|
+| **Apr 22, 2026** | BDT Payment | +৳800,000 | **Due −৳48,09,340.66** ⬅ এটাই দেখাবে |
+| Apr 21, 2026 | Client Top-Up | +৳38,400 | Due −৳56,09,340.66 |
+| Apr 21, 2026 | Client Top-Up | +৳38,400 | Due −৳56,47,740.66 |
+| Apr 21, 2026 | Client Top-Up | +৳12,800 | Due −৳56,86,140.66 |
+| Apr 21, 2026 | BDT Payment | +৳128,000 | Due −৳56,98,940.66 |
+| ... | ... | ... | ... |
 
-## Current State (verified via DB + code read)
-
-- DB-e Faisal Kabir-er **actual Due = −৳48,09,340.66** (BDT in 82,41,665 − USDT cost 1,30,51,005.66). Apnar mention kora "48 lakh due" eta exactly match.
-- `src/components/seller/SellerDashboard.tsx` ar `src/components/admin/AdminSellers.tsx` — code-e already `formatDueAdvance(runningTotals.get(t.id))` wired ache prottek row e (mobile + desktop). Apnar screenshot-e "TOTAL ৳42,56,500" (green positive) jeta dekhachhe seta **purono cached build** — refresh/rebuild lagbe, code already correct.
-- `supabase/functions/forward-seller-proof/index.ts` — local code-e Due/Advance line caption-e add kora hoye gechhe, kintu **edge function ekhono deploy hoyni** Supabase-e — tai Telegram-e ekhono purono caption jachhe.
+Code-এ `formatDueAdvance(runningTotals.get(t.id))` already wired আছে (line 565, 687)। কিন্তু আপনার browser-এ পুরোনো cached JavaScript bundle চলছে, তাই নতুন value দেখাচ্ছে না।
 
 ---
 
 ## Plan
 
-### 1. Deploy `forward-seller-proof` edge function
+### 1. Cache-bust করে force fresh build
 
-Supabase-e local file-er notun version push korte hobe jate Telegram caption-e Due/Advance line jay:
+`SellerDashboard.tsx` ফাইলের top-এ একটা version comment + অন্য একটা cosmetic change করব যাতে Vite নতুন bundle hash তৈরি করে এবং browser-এ পুরোনো `.js` চলতে না পারে।
 
+### 2. TOTAL row-কে আরও clear + visual করব
+
+বর্তমান mobile card footer:
 ```
-💰 Seller Payment
-👤 Faisal Kabir
-🏦 City bank — 1454533103001
-৳800,000
-🔖 Ref: 261121728464
-🔴 Total: Due −৳48,09,340
+TOTAL · Due           −৳48,09,340.66
 ```
 
-Verify after deploy: 1-ta test BDT payment kore Telegram check.
+নতুন format (আরো boro, eye-catching, calculation breakdown সহ):
+```
+┌─────────────────────────────────────────┐
+│ 📊 RUNNING BALANCE        +৳800,000     │
+│                                          │
+│ Due −৳48,09,340.66                       │
+│ ─────────────                            │
+│ এই payment-এর পর আপনি এই amount দিতে    │
+│ বাকি (negative = Due, positive = Adv)   │
+└─────────────────────────────────────────┘
+```
 
-### 2. Force fresh build for SellerDashboard / AdminSellers
+প্রতিটা card-এ থাকবে:
+- **এই transaction-এর delta** (সবুজ +৳ বা লাল −৳, কত যোগ/বিয়োগ হয়েছে)
+- **এই transaction-এর পর running balance** (লাল Due বা নীল Advance)
+- **Calculation arrow**: `Previous balance → +/− delta → New balance` ছোট লাইনে
 
-Code already correct — kintu apnar screenshot-er per-row "TOTAL ৳42,56,500" purono. Browser hard-refresh / cache-bust korte hobe। Ami extra koren sure korte ekta tiny version-marker comment add korbo jate Vite forced rebuild kore.
+আপনার চাওয়া অনুযায়ী **Advance হলে নীল (blue)**, **Due হলে লাল (red)** color হবে (আগে advance-এ green ছিল, blue-তে change করব)।
 
-Ar **per-row label ektu boro/clear korbo** mobile card-e — ekhon "📊 Due" small text e ache, eta boro "TOTAL: Due −৳48,09,340" font-e dekhabo jate apnar screenshot-er TOTAL row-er position-eyi seta dekhay (eta confirm korbe je "TOTAL" label-er pasher value Due/Advance, bank cash-in noy).
+### 3. Desktop table column-এও same color rule
 
-### 3. New: "Balance History" visual chart on selected seller
+Desktop view-র "Due/Advance (৳)" column-এর header + value-তে blue-for-advance, red-for-due apply হবে।
 
-`AdminSellers.tsx` selected seller view-er upore ekta notun **collapsible chart card** add korbo:
+### 4. AdminSellers.tsx-এ একই update
 
-- **Line chart** (recharts use kore — already installed): X-axis = chronological dates, Y-axis = running Due/Advance balance.
-- Color: line green jokhon Advance (above 0), red jokhon Due (below 0).
-- Hover-tooltip: oi point-er date + transaction type + amount + balance.
-- Below the chart, ekta compact **timeline list** (Last 10 movements):
-  ```
-  Apr 22  +৳800,000 BDT Payment       → Due −৳48,09,340
-  Apr 21  +৳38,400  Client Top-Up     → Due −৳48,89,340
-  Apr 17  −৳41,19,444 USDT Given (32694 × 126) → Due −৳49,27,740
-  ...
-  ```
-  Prottekta entry-te show kora hobe: date, +/- amount + type, → resulting balance (color-coded).
+Admin view-এর mobile card footer ও same calculation breakdown এবং blue/red color পাবে।
 
-Eta exactly user-er chaowa "kivabe due build holo, one by one, kisher pore ki update hochhe" seta visualize korbe.
+### 5. BalanceHistoryChart-এও color update
 
-Same chart **SellerDashboard.tsx** (seller's own view) e ও add korbo.
+Chart-এর line + timeline pills-এ Advance = blue (আগে green ছিল), Due = red থাকবে।
 
-### 4. Quick sanity guards
+### 6. `formatDueAdvance` helper update
 
-- `computeDueAdvanceRunning` already chronological ASC sort e chole — confirm. ✅
-- Per-row balance ALL transactions theke compute hoy (filtered noy) — confirm. ✅ (fixed previous turn)
-- Telegram forward-er somoy `seller_id` pass hochhe — verify caller in `AdminSellers.tsx` saveOcrMutation (line 219 `seller_id: selectedSeller.user_id` already passed). ✅
+`sellerRunningTotal.ts` এ helper function-এর return এ `isAdvance` flag আছে — কিছু change লাগবে না, শুধু consumer-গুলোতে color class swap (`emerald-` → `sky-` / `blue-`)।
 
 ---
 
 ## Technical Details
 
-- **Chart library**: `recharts` (already in deps via shadcn `chart.tsx`). Use `LineChart` with `ReferenceLine y={0}`.
-- **Data prep**: From `sellerTxns` ASC-sorted, build `[{date, balance, type, delta}]` array. Same logic as `computeDueAdvanceRunning` but emit each step.
-- **Mobile card emphasis**: Replace small "📊 Due" with bordered footer row showing "TOTAL" label + colored amount, identical visual weight to the existing summary so user clearly sees this is the running balance, not bank-cash.
-- **Edge deploy**: `forward-seller-proof` push to Supabase via deploy tool.
+- **Color tokens**:
+  - Advance (positive): `text-sky-600 dark:text-sky-400`, bg `bg-sky-500/10`, border `border-sky-500/40`
+  - Due (negative): `text-rose-600 dark:text-rose-400`, bg `bg-rose-500/10`, border `border-rose-500/40`
+- **Per-row delta** calculate করব row-level useMemo-এর পরিবর্তে inline (ছোট data, ১বার pass)। Logic: `bdt_payment/client_topup` → +bdt, `withdraw` → −bdt, `usdt_received` → −(usdt × rate)।
+- **Cache-bust**: top-এ `// v2026.04.22-balance-display` marker comment + import order মাইন্যাচার টুইক যাতে output bundle hash change হয়।
 
 ---
 
 ## Files Touched
 
-- `supabase/functions/forward-seller-proof/index.ts` — redeploy (no source change, local already correct).
-- `src/components/seller/SellerDashboard.tsx` — bigger TOTAL footer per row + new BalanceHistoryChart component above ledger.
-- `src/components/admin/AdminSellers.tsx` — bigger TOTAL footer per mobile card + same BalanceHistoryChart for selected seller.
-- `src/components/seller/BalanceHistoryChart.tsx` — NEW: line chart + timeline list of running balance progression.
+- `src/components/seller/SellerDashboard.tsx` — mobile card-এ enhanced TOTAL footer (delta + running balance + arrow), desktop column blue/red colors, cache-bust marker.
+- `src/components/admin/AdminSellers.tsx` — same enhanced footer for admin's seller view.
+- `src/components/seller/BalanceHistoryChart.tsx` — Advance color green → blue.
+- `src/lib/sellerRunningTotal.ts` — কোনো logic change নয়, শুধু comment clarification।
 
 ---
 
-## Out of Scope
+## Final result (mobile card preview)
 
-- Changing "BDT Received / USDT Given / USDT(BDT) / Withdrawn" summary cards — those stay as filter chips; chart is the "how it built up" view.
-- Per-bank chip totals (City Bank ৳42,56,500 etc.) stay as bank cash-in.
-- Failed top-up retry IP display — already implemented previous turn, will verify by triggering a retry.
+```
+🟢 BDT Payment                Apr 22, 2026  🗑
+👤 Jahidul Kabir
+─────────────────────────────────
+BDT  ৳800,000.00       USDT  $0.00
+Rate 0.0               Conv  ৳0.00
+🏦 City bank — 1454533103001
+   Binary Digital printing
+TrxID: 261121728464          🖼 View
+═════════════════════════════════
+📊 RUNNING BALANCE  +৳8,00,000
+   Due −৳48,09,340.66
+   (এই payment-এর পরে balance)
+═════════════════════════════════
+```
+
+এখন আপনি প্রতিটা card-এ পরিষ্কার দেখবেন: কত টাকা ঢুকল, কত due কমল, এবং final due কত হলো।
 
