@@ -1293,7 +1293,7 @@ export default function ClientDetailPage() {
                               {showUnassignCheckboxes && (
                                 <TableHead className="w-[40px]">
                                   <Checkbox
-                                    checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                                    checked={(adAccounts?.length ?? 0) > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
                                     onCheckedChange={() => {
                                       if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) setUnassignSelectedIds(new Set());
                                       else setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
