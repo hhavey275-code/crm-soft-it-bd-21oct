@@ -102,10 +102,23 @@ export function AdminAdAccounts() {
     queryFn: async () => {
       if (!accounts || accounts.length === 0) return {};
       const ids = accounts.map((a: any) => a.id);
-      const { data } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "cache" },
+      const [edgeRes, dbRes] = await Promise.all([
+        supabase.functions.invoke("get-account-insights", {
+          body: { ad_account_ids: ids, source: "cache" },
+        }),
+        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
+      ]);
+      const edge = (edgeRes.data?.insights as Record<string, InsightsData>) ?? {};
+      // Merge DB row data so `cards` (and other fields) aren't lost when the edge cache lacks them
+      (dbRes.data ?? []).forEach((row: any) => {
+        const existing = edge[row.ad_account_id] ?? ({} as any);
+        edge[row.ad_account_id] = {
+          ...row,
+          ...existing,
+          cards: (existing.cards && existing.cards.length ? existing.cards : row.cards) ?? [],
+        };
       });
-      return (data?.insights as Record<string, InsightsData>) ?? {};
+      return edge;
     },
     enabled: !!accounts && accounts.length > 0,
     // Keep previously fetched data visible while refetching to avoid 0/-- flicker on tab return
