@@ -58,7 +58,7 @@ export function useLocation() {
 }
 
 export function useParams<T extends Record<string, string | undefined> = Record<string, string | undefined>>(): T {
-  return useTSParams({ strict: false }) as T;
+  return useTSParams({ strict: false } as any) as T;
 }
 
 export function useSearchParams(): [URLSearchParams, (params: URLSearchParams | Record<string, string>) => void] {
