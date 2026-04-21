@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
 
 import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router-compat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { MetricCard } from "@/components/MetricCard";
