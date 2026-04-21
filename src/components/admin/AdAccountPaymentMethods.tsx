@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { EditCardLabelDialog } from "@/components/admin/EditCardLabelDialog";
 import { toast } from "sonner";
-import { CreditCard, Loader2, Trash2, Plus } from "lucide-react";
+import { CreditCard, Loader2, Trash2, Plus, Pencil } from "lucide-react";
 
 interface Props {
   adAccountId: string;
