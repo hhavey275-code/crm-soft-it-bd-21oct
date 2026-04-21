@@ -87,6 +87,8 @@
   --chart-1: 214 100% 44%;
   --chart-2: 214 90% 60%;
   --chart-3: 214 80% 72%;
+  --chart-bar-start: var(--chart-2);
+  --chart-bar-end: var(--chart-1);
 }
 
 .dark {
