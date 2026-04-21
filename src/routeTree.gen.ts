@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
+import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as TopUpRouteImport } from './routes/top-up'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -40,6 +41,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AgentRouteImport } from './routes/agent'
 import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
+import { Route as AgencyTopupRouteImport } from './routes/agency-topup'
+import { Route as AgencyPaymentsRouteImport } from './routes/agency-payments'
 import { Route as AgenciesRouteImport } from './routes/agencies'
 import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -54,6 +57,11 @@ import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
   id: '/wallet-balances',
   path: '/wallet-balances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TransactionsRoute = TransactionsRouteImport.update({
@@ -206,6 +214,16 @@ const AgencyWalletRoute = AgencyWalletRouteImport.update({
   path: '/agency-wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgencyTopupRoute = AgencyTopupRouteImport.update({
+  id: '/agency-topup',
+  path: '/agency-topup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgencyPaymentsRoute = AgencyPaymentsRouteImport.update({
+  id: '/agency-payments',
+  path: '/agency-payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgenciesRoute = AgenciesRouteImport.update({
   id: '/agencies',
   path: '/agencies',
@@ -261,6 +279,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
+  '/agency-payments': typeof AgencyPaymentsRoute
+  '/agency-topup': typeof AgencyTopupRoute
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
@@ -291,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
+  '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
@@ -304,6 +325,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
+  '/agency-payments': typeof AgencyPaymentsRoute
+  '/agency-topup': typeof AgencyTopupRoute
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
@@ -334,6 +357,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
+  '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
@@ -348,6 +372,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ad-accounts': typeof AdAccountsRouteWithChildren
   '/agencies': typeof AgenciesRouteWithChildren
+  '/agency-payments': typeof AgencyPaymentsRoute
+  '/agency-topup': typeof AgencyTopupRoute
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
@@ -378,6 +404,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
+  '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
@@ -393,6 +420,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ad-accounts'
     | '/agencies'
+    | '/agency-payments'
+    | '/agency-topup'
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
@@ -423,6 +452,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/top-up'
     | '/transactions'
+    | '/wallet'
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
@@ -436,6 +466,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ad-accounts'
     | '/agencies'
+    | '/agency-payments'
+    | '/agency-topup'
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
@@ -466,6 +498,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/top-up'
     | '/transactions'
+    | '/wallet'
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
@@ -479,6 +512,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ad-accounts'
     | '/agencies'
+    | '/agency-payments'
+    | '/agency-topup'
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
@@ -509,6 +544,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/top-up'
     | '/transactions'
+    | '/wallet'
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
@@ -523,6 +559,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdAccountsRoute: typeof AdAccountsRouteWithChildren
   AgenciesRoute: typeof AgenciesRouteWithChildren
+  AgencyPaymentsRoute: typeof AgencyPaymentsRoute
+  AgencyTopupRoute: typeof AgencyTopupRoute
   AgencyWalletRoute: typeof AgencyWalletRoute
   AgentRoute: typeof AgentRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
@@ -553,6 +591,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TopUpRoute: typeof TopUpRoute
   TransactionsRoute: typeof TransactionsRoute
+  WalletRoute: typeof WalletRoute
   WalletBalancesRoute: typeof WalletBalancesRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
@@ -566,6 +605,13 @@ declare module '@tanstack/react-router' {
       path: '/wallet-balances'
       fullPath: '/wallet-balances'
       preLoaderRoute: typeof WalletBalancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/transactions': {
@@ -778,6 +824,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgencyWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agency-topup': {
+      id: '/agency-topup'
+      path: '/agency-topup'
+      fullPath: '/agency-topup'
+      preLoaderRoute: typeof AgencyTopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agency-payments': {
+      id: '/agency-payments'
+      path: '/agency-payments'
+      fullPath: '/agency-payments'
+      preLoaderRoute: typeof AgencyPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agencies': {
       id: '/agencies'
       path: '/agencies'
@@ -901,6 +961,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdAccountsRoute: AdAccountsRouteWithChildren,
   AgenciesRoute: AgenciesRouteWithChildren,
+  AgencyPaymentsRoute: AgencyPaymentsRoute,
+  AgencyTopupRoute: AgencyTopupRoute,
   AgencyWalletRoute: AgencyWalletRoute,
   AgentRoute: AgentRoute,
   AnnouncementsRoute: AnnouncementsRoute,
@@ -931,6 +993,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TopUpRoute: TopUpRoute,
   TransactionsRoute: TransactionsRoute,
+  WalletRoute: WalletRoute,
   WalletBalancesRoute: WalletBalancesRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
