@@ -1,0 +1,245 @@
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
+import { logSystemAction } from "@/lib/systemLog";
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  account: {
+    id: string;
+    account_id: string;
+    account_name: string;
+    external_topup_url?: string | null;
+    external_crm_name?: string | null;
+    user_id?: string | null;
+  };
+}
+
+/**
+ * Initiate an external top-up: deducts the assigned client's wallet immediately,
+ * logs the transaction, records the request as completed, then opens the 3rd party CRM.
+ */
+export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const url = account.external_topup_url || "";
+  const crmName = account.external_crm_name || "External CRM";
+  const cleanAccountId = account.account_id.replace(/^act_/, "");
+
+  const initiateMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(amount);
+      if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
+      if (!url) throw new Error("External CRM URL not configured for this account");
+
+      // Resolve target client: ALWAYS check user_ad_accounts mapping (source of truth)
+      let targetUserId: string | null = null;
+      const { data: link, error: linkErr } = await supabase
+        .from("user_ad_accounts")
+        .select("user_id")
+        .eq("ad_account_id", account.id)
+        .maybeSingle();
+      if (linkErr) console.error("[ExternalTopUp] user_ad_accounts lookup failed:", linkErr);
+      targetUserId = link?.user_id ?? account.user_id ?? null;
+      console.log("[ExternalTopUp] resolved targetUserId:", targetUserId, "from link:", link, "account.user_id:", account.user_id);
+
+      if (!targetUserId) {
+        throw new Error("No client assigned to this ad account. Cannot deduct wallet.");
+      }
+      let newBalance: number | null = null;
+
+      // Deduct wallet immediately
+      {
+        const { data: wallet, error: wErr } = await supabase
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", targetUserId)
+          .single();
+        if (wErr) throw wErr;
+        const currentBalance = Number(wallet?.balance ?? 0);
+        if (currentBalance < amt) throw new Error(`Insufficient wallet balance ($${currentBalance.toFixed(2)})`);
+        newBalance = currentBalance - amt;
+
+        const { error: uErr } = await supabase
+          .from("wallets")
+          .update({ balance: newBalance } as any)
+          .eq("user_id", targetUserId);
+        if (uErr) throw uErr;
+      }
+
+      // Create the request as already completed (admin will perform the action manually in the partner CRM)
+      const { data, error } = await (supabase as any)
+        .from("external_topup_requests")
+        .insert({
+          ad_account_id: account.id,
+          user_id: targetUserId,
+          amount: amt,
+          status: "completed",
+          initiated_by: user!.id,
+          completed_by: user!.id,
+          completed_at: new Date().toISOString(),
+          wallet_deducted: !!targetUserId,
+          notes: notes || null,
+          external_crm_name: crmName,
+          external_topup_url: url,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Log transaction if wallet was deducted
+      if (targetUserId && newBalance !== null) {
+        await supabase.from("transactions").insert({
+          user_id: targetUserId,
+          type: "external_topup",
+          amount: amt,
+          balance_after: newBalance,
+          reference_id: data.id,
+          description: `External CRM top-up — ${crmName} (${account.account_name})`,
+          processed_by: `admin:${user!.id}`,
+        } as any);
+      }
+
+      // Copy account id + amount to clipboard
+      try {
+        await navigator.clipboard.writeText(`${cleanAccountId}\t${amt}`);
+        setCopied(true);
+      } catch {}
+
+      // Open external CRM — use anchor click to preserve Chrome profile session cookies.
+      // Drop "noreferrer" so the destination receives the Referer header and treats the
+      // navigation as user-initiated, allowing existing logged-in session to carry over.
+      {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      await logSystemAction(
+        "External Top-up Initiated",
+        `Account ${account.account_name} (${cleanAccountId}) — $${amt} via ${crmName}${targetUserId ? " (wallet deducted)" : ""}`,
+        user?.id,
+        user?.email
+      );
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Wallet deducted & external CRM opened. Complete the top-up in the partner CRM.");
+      qc.invalidateQueries({ queryKey: ["external-topup-history", account.id] });
+      qc.invalidateQueries({ queryKey: ["admin-wallets"] });
+      qc.invalidateQueries({ queryKey: ["wallet"] });
+      setAmount("");
+      setNotes("");
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to initiate"),
+  });
+
+  const copyAccountId = async () => {
+    try {
+      await navigator.clipboard.writeText(cleanAccountId);
+      setCopied(true);
+      toast.success("Account ID copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4 text-amber-600" />
+            External CRM Top-Up
+          </DialogTitle>
+          <DialogDescription>
+            Top up <strong>{account.account_name}</strong> via{" "}
+            <Badge variant="outline" className="ml-1">{crmName}</Badge>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {!url && (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>External CRM URL is not configured for this account. Please set it in Account Settings first.</span>
+            </div>
+          )}
+
+          <div className="rounded-md border p-3 bg-muted/30 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Account ID to paste</span>
+              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={copyAccountId}>
+                {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+            <div className="font-mono text-sm font-semibold">{cleanAccountId}</div>
+          </div>
+
+          <div>
+            <Label>Amount (USD)</Label>
+            <Input
+              type="number"
+              min="1"
+              step="0.01"
+              placeholder="Enter amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <Label>Notes (optional)</Label>
+            <Input
+              placeholder="Reference, batch, comments..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1">
+            <p className="font-semibold text-amber-700 dark:text-amber-300">What happens next:</p>
+            <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
+              <li>Client's wallet will be <strong>deducted immediately</strong> (if assigned).</li>
+              <li>Partner CRM opens in a new tab with Account ID + amount copied.</li>
+              <li>Login & complete the top-up there manually.</li>
+            </ol>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => initiateMutation.mutate()}
+            disabled={!amount || !url || initiateMutation.isPending}
+          >
+            <ExternalLink className="h-4 w-4 mr-1" />
+            {initiateMutation.isPending ? "Processing..." : "Deduct & Open CRM"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
