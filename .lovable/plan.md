@@ -2,79 +2,101 @@
 
 ## Goal
 
-Three problems to fix:
-1. Top-up fail hole jeno automatic ar reliable fallback hoy (proxy → direct Meta).
-2. Successful retry-er por jeno **kon IP theke top-up hoise** seta dekha jay (failed_topups + transactions e IP store + UI te show).
-3. Ad Account details page reliably load + click korle smooth navigation.
+1. **Failed top-up retry success → show source IP**: After a successful retry, display "via Proxy IP `1.2.3.4`" (or "Direct") in the toast and timeline.
+2. **Seller dashboard "Total" column = Due/Advance running balance** (not bank cash inflow). Each row's Total shows the seller's accumulated Due (−) or Advance (+) up to that point.
+3. **Telegram payment-proof caption**: include the new running Due/Advance total after that payment so reviewers see "Due: −৳47,00,000" or "Advance: +৳47,00,000" right in Telegram.
 
 ---
 
 ## Plan
 
-### 1. Stronger proxy → direct Meta fallback (all top-up edge functions)
+### 1. Show IP on successful retry
 
-Edit all 6 edge functions where `metaFetch` is used (`spend-cap-update`, `retry-failed-topup`, `get-account-insights`, `manage-ad-account-partners`, `scheduled-sync`, `sync-bm-accounts`, `rename-ad-account`):
+**`supabase/functions/retry-failed-topup/index.ts`** — `metaFetch` already falls back proxy → direct, but it doesn't return route info.
+- Refactor `metaFetch` to return `{ response, via: "proxy"|"direct", sourceIp: string|null }`.
+- After the successful Meta POST + verify, capture `via` and `sourceIp` (from proxy header `x-egress-ip`).
+- Write into `failed_topups` row BEFORE deleting it (or change to `status='resolved'` so history stays — but current code deletes; we'll keep the delete and instead include the info in the response payload + system_logs).
+- Update `system_logs.details` to append " — via Proxy (IP: 1.2.3.4)" or " — via Direct".
+- Return `{ success, new_spend_cap, via, source_ip }` in JSON response.
 
-- Trigger fallback to direct `fetch(graph.facebook.com, ...)` when proxy returns:
-  - any non-2xx status (already done for 5xx — extend to ALL non-2xx including 4xx with proxy-shape JSON like `{"error":"Proxy not configured"}`)
-  - HTML body
-  - JSON body containing `{"error": "..."}` without a `data`/Meta-shaped payload (proxy-level error, not Meta error)
-  - network exception / timeout (8s timeout via `AbortController`)
-- Return a small marker on the `Response` (custom header `x-meta-route: proxy|direct`) so the caller can record which path was used.
-- After successful Meta call, return that route info to the client in the JSON response (`via: "proxy" | "direct"`, plus the proxy/CF egress IP if available from response headers like `cf-connecting-ip` echo or proxy custom header).
+Apply the same `metaFetch` upgrade to `spend-cap-update`, `resolve-failed-topup`, `tiktok-topup`, `get-account-insights` for consistency.
 
-### 2. IP / route tracking for top-ups
+**`src/components/FailedTopUps.tsx`** — `retryMutation.onSuccess`:
+- Show enhanced toast: `Spend cap updated to $X — via Proxy (IP: 1.2.3.4)` or `via Direct`.
 
-**DB migration**: add columns
-- `failed_topups`: `last_attempt_via text`, `last_attempt_ip text`, `resolved_via text`, `resolved_ip text`, `resolved_at timestamptz`
-- `transactions`: `via text` (proxy/direct), `source_ip text`
+### 2. Seller dashboard Total column = Due/Advance running balance
 
-**Edge functions** (`spend-cap-update`, `retry-failed-topup`, `tiktok-topup`):
-- After successful Meta POST, capture: `via` (proxy/direct), `source_ip` (from proxy response header `x-egress-ip` if proxy provides it; otherwise leave null for direct calls — Worker outbound IP isn't reliably exposed but we still record the route).
-- On insert into `transactions`: include `via` + `source_ip`.
-- On retry success: update `failed_topups` row with `resolved_via`, `resolved_ip`, `resolved_at`, `status='resolved'` (currently just deletes/marks resolved — keep history).
-- On failure: write `last_attempt_via`, `last_attempt_ip` so the user can see what the failing attempt used.
+Rewrite **`src/lib/sellerRunningTotal.ts`** logic:
 
-**UI** (`FailedTopUps.tsx` + `TransactionsPage.tsx`):
-- After retry success toast, also show: "Top-up via Proxy IP `1.2.3.4`" or "via Direct".
-- In transactions table: add a small badge column "Source" → `Proxy (1.2.3.4)` / `Direct`.
-- In failed top-ups list: show `Last attempt: via Proxy / IP x.x.x.x` under the error message, so user sees which path was tried.
+Instead of "per-bank cash balance", compute a single global running **Due/Advance** number per row (chronological):
 
-### 3. Ad Account details page reliability
+```text
+running += bdt_amount    when type = bdt_payment OR client_topup   (money received → reduces due / increases advance)
+running -= bdt_amount    when type = withdraw                       (cash out → increases due)
+running -= usdt_amount * rate   when type = usdt_received           (USDT given to client = cost → increases due)
+```
 
-`AdAccountDetailPage.tsx`:
-- Main render currently waits only on `account` query — that's fine. Real risk: `metaInsights` query throws when proxy fails → rendered as a broken state in MetricCards. Fix:
-  - Wrap `get-account-insights` invoke in `try/catch`, return `null` insights on failure instead of throwing — page renders with "Insights unavailable, retry" button.
-  - Add explicit `errorComponent` to route `ad-accounts.$id.tsx` so any unhandled error shows a friendly fallback with Retry, not a blank screen.
-- AdminAdAccounts/ClientAdAccounts row click: confirm `navigate(\`/ad-accounts/${a.id}\`)` is not blocked by other onClick. Add `e.stopPropagation()` defensively where checkboxes/dropdowns sit inside the row, and ensure the row click only fires when target is the row container (skip when inside button/anchor) — prevents the "click karle kichu hocche na" symptom on rows with action menus.
-- Add `Link` (TanStack) variant on the account-name cell for proper middle-click / right-click and so navigation works even if onClick fails.
+Result: positive = Advance (seller received more than owed), negative = Due (seller owes/needs to pay).
+
+- New function `computeDueAdvanceRunning(transactions): Map<txn_id, number>` (single global series, no per-bank split).
+- Keep `formatBdt` but add `formatDueAdvance(value)` returning `+৳47,00,000` (green) or `−৳47,00,000` (red).
+
+**`src/components/seller/SellerDashboard.tsx`**:
+- Replace `runningTotals.get(t.id)` usage in the Total column (mobile + desktop + Excel export).
+- Total column header → "Due/Advance".
+- Cell: red text + "−" prefix when negative (Due), green + "+" prefix when positive (Advance).
+
+### 3. Telegram caption — include Due/Advance after payment
+
+**Remote edge function `forward-seller-proof`** (deployed on Supabase, not in repo). Update it to:
+- Before sending the Telegram message, query `seller_transactions` for this `seller_id` ordered ASC, run the same Due/Advance reduction up to and including the just-inserted row.
+- Append a new line to the caption:
+  ```
+  📊 Total: Due ৳47,00,000  (or Advance +৳47,00,000)
+  ```
+- Color cue with emoji: 🔴 for Due, 🟢 for Advance.
+
+**Caller side** (`src/components/admin/AdminSellers.tsx` and any other place that invokes `forward-seller-proof`):
+- Pass `seller_id` in the body so the function can compute the running total. Currently it isn't passed — verify and add.
+
+```text
+Telegram caption (new format):
+─────────────────────────────
+💰 New BDT Payment
+Seller: Faisal Kabir
+Amount: ৳1,00,000
+Bank: City Bank ****1234
+TrxID: ABC123
+🔴 Total: Due ৳47,00,000
+─────────────────────────────
+```
 
 ---
 
 ## Technical Details
 
-- Edge function fallback logic centralized in a `metaFetch` helper that returns `{ response, via, sourceIp }`.
-- Proxy server (`app.softitbd.com/api/meta-proxy`) — request that the proxy include header `x-egress-ip: <ip>` on every successful response so we can log it. If unavailable, we still log `via=proxy` without IP.
-- Direct Meta calls from Cloudflare Worker: outbound IP is not exposed by the Worker runtime, so `source_ip` will stay null for direct calls (we'll display "Direct (Cloudflare)" in UI).
-- New DB columns are nullable so existing rows are unaffected.
-- Realtime subscription on `failed_topups` already invalidates the UI list.
+- `metaFetch` change is backward-compatible (existing callers ignore the new fields).
+- Due/Advance computation uses ALL approved transactions (pending/rejected skipped), sorted by `created_at` ASC, regardless of bank — it's a single global running balance per seller.
+- Telegram function will read transactions via service-role client (already used) — no RLS issue.
+- Excel export "Running Total" column renamed to "Due/Advance (BDT)" with signed values.
 
 ---
 
 ## Files Touched
 
-- DB migration: `failed_topups`, `transactions` add nullable text columns.
-- Edge: `spend-cap-update`, `retry-failed-topup`, `resolve-failed-topup`, `tiktok-topup`, `get-account-insights`, `manage-ad-account-partners`, `scheduled-sync`, `sync-bm-accounts`, `rename-ad-account` — update `metaFetch` + insert calls.
-- `src/components/FailedTopUps.tsx` — show via/IP, success toast with IP.
-- `src/components/pages/TransactionsPage.tsx` (+ admin/agency/client transaction tables) — Source column.
-- `src/components/pages/AdAccountDetailPage.tsx` — graceful insights failure.
-- `src/routes/ad-accounts.$id.tsx` — `errorComponent`.
-- `src/components/admin/AdminAdAccounts.tsx`, `src/components/client/ClientAdAccounts.tsx` — defensive row click + Link wrapping for name cell.
+- `supabase/functions/retry-failed-topup/index.ts` — `metaFetch` returns `{response, via, sourceIp}`, response/log includes IP.
+- `supabase/functions/spend-cap-update/index.ts`, `resolve-failed-topup/index.ts`, `tiktok-topup/index.ts`, `get-account-insights/index.ts` — same `metaFetch` upgrade (already partially done, verify).
+- `supabase/functions/forward-seller-proof/index.ts` — append Due/Advance line; recreate locally (currently only on remote).
+- `src/lib/sellerRunningTotal.ts` — new `computeDueAdvanceRunning` + `formatDueAdvance`.
+- `src/components/seller/SellerDashboard.tsx` — use new running total, color-code, rename column.
+- `src/components/FailedTopUps.tsx` — toast shows IP/route on success.
+- `src/components/admin/AdminSellers.tsx` — pass `seller_id` to `forward-seller-proof`.
 
 ---
 
 ## Out of Scope
 
-- Fixing the actual `app.softitbd.com` proxy server (external — apnar server e thik korte hobe). Etake amra detect kore bypass korbo, kintu repair korbo na.
-- Showing IP for direct (Worker) calls — runtime e expose hoy na.
+- Showing IP for failed (still-pending) attempts — only success path for now.
+- Direct-call IP (Cloudflare Worker outbound IP isn't exposed) — will display "Direct" without IP.
+- Changing per-bank chip totals on the dashboard (those stay as cash-in per bank).
 
