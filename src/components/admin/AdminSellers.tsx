@@ -21,7 +21,8 @@ import { logSystemAction } from "@/lib/systemLog";
 import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDialog";
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
-import { computeDueAdvanceRunning, formatDueAdvance } from "@/lib/sellerRunningTotal";
+// v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
+import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
 import { BalanceHistoryChart } from "@/components/seller/BalanceHistoryChart";
 import * as XLSX from "xlsx";
 
@@ -1147,25 +1148,60 @@ export function AdminSellers() {
                           </button>
                         ) : null}
                       </div>
-                      {/* Running Due/Advance balance — emphasized footer */}
+                      {/* Running Due/Advance balance — enhanced TOTAL footer with delta + new running balance */}
                       {(() => {
-                        const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                        const newBalance = runningTotals.get(t.id) || 0;
+                        const delta = computeTransactionDelta(t);
+                        const prevBalance = newBalance - delta;
+                        const da = formatDueAdvance(newBalance);
+                        const prev = formatDueAdvance(prevBalance);
+                        const positiveDelta = delta >= 0;
                         return (
                           <div className={cn(
-                            "mt-1.5 -mx-3 -mb-3 px-3 py-2 border-t-2 flex items-center justify-between",
+                            "mt-1.5 -mx-3 -mb-3 px-3 py-2.5 border-t-2 space-y-1.5",
                             da.isZero
                               ? "border-border bg-muted/40"
                               : da.isAdvance
-                              ? "border-emerald-500/40 bg-emerald-500/5"
+                              ? "border-sky-500/40 bg-sky-500/5"
                               : "border-rose-500/40 bg-rose-500/5"
                           )}>
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                              TOTAL · {da.isZero ? "—" : da.isAdvance ? "Advance" : "Due"}
-                            </span>
-                            <span className={cn(
-                              "text-base font-extrabold tabular-nums",
-                              da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                            )}>{da.text}</span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                📊 Running Balance
+                              </span>
+                              <span className={cn(
+                                "text-xs font-bold tabular-nums px-1.5 py-0.5 rounded",
+                                delta === 0
+                                  ? "text-muted-foreground bg-muted"
+                                  : positiveDelta
+                                  ? "text-emerald-700 dark:text-emerald-400 bg-emerald-500/15"
+                                  : "text-rose-700 dark:text-rose-400 bg-rose-500/15"
+                              )}>
+                                {formatSignedBdt(delta)}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-[11px] font-bold uppercase tracking-wider">
+                                <span className={cn(
+                                  da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-700 dark:text-sky-400" : "text-rose-700 dark:text-rose-400"
+                                )}>TOTAL · {da.isZero ? "—" : da.isAdvance ? "Advance" : "Due"}</span>
+                              </span>
+                              <span className={cn(
+                                "text-base font-extrabold tabular-nums",
+                                da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
+                              )}>{da.text}</span>
+                            </div>
+                            {delta !== 0 && (
+                              <div className="text-[10px] text-muted-foreground tabular-nums leading-tight pt-0.5 border-t border-border/40">
+                                <span className="opacity-70">Prev:</span> <span className="font-semibold">{prev.text}</span>
+                                <span className="mx-1 opacity-50">→</span>
+                                <span className={cn("font-bold", positiveDelta ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                  {formatSignedBdt(delta)}
+                                </span>
+                                <span className="mx-1 opacity-50">→</span>
+                                <span className={cn("font-bold", da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400")}>{da.text}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -1254,7 +1290,7 @@ export function AdminSellers() {
                               return (
                                 <td className={cn(
                                   "border border-border px-3 py-1.5 text-right font-extrabold tabular-nums whitespace-nowrap",
-                                  da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                                  da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                                 )}>
                                   {da.text}
                                 </td>

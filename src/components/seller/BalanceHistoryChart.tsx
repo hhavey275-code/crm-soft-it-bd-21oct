@@ -157,7 +157,7 @@ export function BalanceHistoryChart({ transactions, defaultOpen = true, timeline
                 finalFmt.isZero
                   ? "text-muted-foreground bg-muted"
                   : finalFmt.isAdvance
-                  ? "text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
+                  ? "text-sky-700 dark:text-sky-400 bg-sky-500/10"
                   : "text-rose-700 dark:text-rose-400 bg-rose-500/10"
               )}
             >
@@ -214,7 +214,7 @@ export function BalanceHistoryChart({ transactions, defaultOpen = true, timeline
                 <Line
                   type="monotone"
                   dataKey="balance"
-                  stroke={finalBalance >= 0 ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"}
+                  stroke={finalBalance >= 0 ? "hsl(199 89% 48%)" : "hsl(0 72% 51%)"}
                   strokeWidth={2}
                   dot={{ r: 2 }}
                   activeDot={{ r: 5 }}
@@ -272,7 +272,7 @@ export function BalanceHistoryChart({ transactions, defaultOpen = true, timeline
                         fmt.isZero
                           ? "text-muted-foreground"
                           : fmt.isAdvance
-                          ? "text-emerald-600 dark:text-emerald-400"
+                          ? "text-sky-600 dark:text-sky-400"
                           : "text-rose-600 dark:text-rose-400"
                       )}
                     >
