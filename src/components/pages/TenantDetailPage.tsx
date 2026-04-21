@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 
 export default function TenantDetailPage() {
-  const { tenantId } = useParams();
+  const params = useParams() as Record<string, string | undefined>;
+  const tenantId = params.tenantId || params.id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();

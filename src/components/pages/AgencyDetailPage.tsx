@@ -31,7 +31,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 export default function AgencyDetailPage() {
-  const { agencyId } = useParams<{ agencyId: string }>();
+  const params = useParams<{ agencyId?: string; id?: string }>();
+  const agencyId = params.agencyId || params.id;
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
