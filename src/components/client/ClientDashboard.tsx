@@ -573,7 +573,7 @@ export function ClientDashboard() {
           )}
           <div className="rounded-lg bg-primary/[0.06] dark:bg-primary/[0.12] p-3 border border-primary/20 mt-4">
             <p className="text-[10px] text-muted-foreground font-medium">Total Orders (Period)</p>
-            <p className="text-lg font-bold text-primary">{spendOrderData.reduce((s, d) => s + d.orders, 0).toLocaleString()}</p>
+            <p className="text-lg font-bold text-primary">{spendOrderData.reduce((s: number, d: any) => s + d.orders, 0).toLocaleString()}</p>
             <p className="text-[10px] text-muted-foreground">{spendOrderData.length} days</p>
           </div>
         </CardContent>
@@ -633,7 +633,7 @@ export function ClientDashboard() {
           )}
           <div className="rounded-lg bg-primary/[0.06] dark:bg-primary/[0.12] p-3 border border-primary/20 mt-4">
             <p className="text-[10px] text-muted-foreground font-medium">Total Spend (Period)</p>
-            <p className="text-lg font-bold text-primary">{fmt(spendOrderData.reduce((s, d) => s + d.spend, 0))}</p>
+            <p className="text-lg font-bold text-primary">{fmt(spendOrderData.reduce((s: number, d: any) => s + d.spend, 0))}</p>
             <p className="text-[10px] text-muted-foreground">{spendOrderData.length} days</p>
           </div>
         </CardContent>
