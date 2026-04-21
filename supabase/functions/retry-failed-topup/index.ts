@@ -163,7 +163,7 @@ Deno.serve(async (req)=>{
     });
     // PRE-CHECK: Verify if the spend cap was already updated (from a previous attempt that falsely reported failure)
     try {
-      const preCheckRes = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
+      const { response: preCheckRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
         method: "GET"
       });
       const preCheckData = await preCheckRes.json();
@@ -187,7 +187,9 @@ Deno.serve(async (req)=>{
           return json({
             success: true,
             new_spend_cap: newSpendCapDollars,
-            auto_resolved: true
+            auto_resolved: true,
+            via: "precheck",
+            source_ip: null
           });
         }
       }
@@ -195,7 +197,7 @@ Deno.serve(async (req)=>{
       console.warn("Pre-check GET failed, proceeding with retry", preErr);
     }
     // Call Meta API
-    const metaRes = await metaFetch(`https://graph.facebook.com/v24.0/${actId}`, {
+    const { response: metaRes, via: postVia, sourceIp: postIp } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
@@ -215,24 +217,30 @@ Deno.serve(async (req)=>{
       const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
       console.warn("Retry Meta POST failed", {
         actId,
-        message: metaErrorMsg
+        message: metaErrorMsg,
+        via: postVia,
+        ip: postIp
       });
-      // Update error message
+      // Update error message + last attempt route info
       await supabase.from("failed_topups").update({
-        error_message: metaErrorMsg
+        error_message: metaErrorMsg,
+        last_attempt_via: postVia,
+        last_attempt_ip: postIp
       }).eq("id", failed_topup_id);
       await supabase.from("system_logs").insert({
         user_id: userId,
         user_name: userName,
         action: "Failed Top-Up Retry Failed",
-        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — ${metaErrorMsg}`
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — ${metaErrorMsg} — via ${postVia}${postIp ? ` (IP: ${postIp})` : ""}`
       });
       return json({
-        error: `Meta API error: ${metaErrorMsg}`
+        error: `Meta API error: ${metaErrorMsg}`,
+        via: postVia,
+        source_ip: postIp
       }, 400);
     }
     // Verify with GET
-    const verifyRes = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
+    const { response: verifyRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
       method: "GET"
     });
     let verifyData = null;
