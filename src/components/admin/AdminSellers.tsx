@@ -1066,6 +1066,9 @@ export function AdminSellers() {
             </Card>
           )}
 
+          {/* Balance History — visual timeline */}
+          <BalanceHistoryChart transactions={sellerTxns} />
+
           {/* Transaction Table — Google Sheets style */}
           {isMobile ? (
             /* Mobile: Card-based layout */

@@ -463,6 +463,9 @@ export function SellerDashboard() {
         )}
       </div>
 
+      {/* Balance History — visual timeline of how Due/Advance built up */}
+      <BalanceHistoryChart transactions={transactions} />
+
       {/* Transaction Ledger */}
       <Card className="border-0 shadow-lg shadow-black/5 dark:shadow-black/20 bg-card/80 backdrop-blur-sm overflow-hidden rounded-xl">
         <CardHeader className="p-4 md:p-6 pb-3 border-b border-border/50">
