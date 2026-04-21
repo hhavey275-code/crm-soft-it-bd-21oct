@@ -4,6 +4,7 @@ import {
   useNavigate as useTSNavigate,
   useParams as useTSParams,
   useSearch as useTSSearch,
+  useRouter as useTSRouter,
   Link as TSLink,
   type LinkProps as TSLinkProps,
 } from "@tanstack/react-router";
@@ -13,12 +14,29 @@ type NavigateOptions = { replace?: boolean; state?: any };
 
 export function useNavigate() {
   const nav = useTSNavigate();
+  const router = useTSRouter();
   return (to: string | number, options?: NavigateOptions) => {
     if (typeof to === "number") {
       if (typeof window !== "undefined") window.history.go(to);
       return;
     }
-    nav({ to: to as string, replace: options?.replace });
+    // Parse the URL so TanStack can match params/search/hash properly
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+      const url = new URL(to as string, origin);
+      const pathname = url.pathname;
+      const search: Record<string, string> = {};
+      url.searchParams.forEach((v, k) => { search[k] = v; });
+      const hash = url.hash ? url.hash.replace(/^#/, "") : undefined;
+      router.navigate({
+        to: pathname as any,
+        search: Object.keys(search).length ? (search as any) : undefined,
+        hash,
+        replace: options?.replace,
+      });
+    } catch {
+      nav({ to: to as any, replace: options?.replace });
+    }
   };
 }
 
