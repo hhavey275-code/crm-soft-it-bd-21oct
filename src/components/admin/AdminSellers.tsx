@@ -216,6 +216,7 @@ export function AdminSellers() {
           await supabase.functions.invoke("forward-seller-proof", {
             body: {
               proof_url: ocrImageUrl,
+              seller_id: selectedSeller.user_id,
               seller_name: selectedSeller.full_name || selectedSeller.email,
               bdt_amount: bdtAmount,
               bank_account_id: ocrIsOthersBank ? undefined : ocrSelectedBankId,

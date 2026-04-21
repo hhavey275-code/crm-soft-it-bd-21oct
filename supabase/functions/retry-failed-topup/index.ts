@@ -5,7 +5,10 @@ const corsHeaders = {
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
 async function metaFetch(url, options = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
+  if (!url.startsWith("https://graph.facebook.com/")) {
+    const r = await fetch(url, options);
+    return { response: r, via: "direct", sourceIp: null };
+  }
   const proxySecret = Deno.env.get("META_PROXY_SECRET");
   const proxyUrl = Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL;
   if (proxySecret && proxyUrl) {
@@ -14,29 +17,44 @@ async function metaFetch(url, options = {}) {
       const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
       const method = options.method ?? "GET";
       const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
       const proxyRes = await fetch(proxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-proxy-secret": proxySecret
         },
-        body: JSON.stringify({
-          url,
-          method,
-          body,
-          contentType
-        })
-      });
+        body: JSON.stringify({ url, method, body, contentType }),
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(t));
       const ct = proxyRes.headers.get("content-type") || "";
-      if (ct.includes("application/json") || proxyRes.status === 200) {
+      const egressIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-forwarded-for") || null;
+      if (proxyRes.ok && (ct.includes("application/json") || proxyRes.status === 200)) {
         const text = await proxyRes.text();
         if (!text.trimStart().startsWith("<!") && !text.trimStart().startsWith("<html")) {
-          return new Response(text, {
-            status: proxyRes.status,
-            headers: proxyRes.headers
-          });
+          // Detect proxy-level error JSON (no Meta-shaped body)
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed && parsed.error && typeof parsed.error === "string") {
+              console.warn("Proxy returned error JSON, falling back to direct:", parsed.error);
+            } else {
+              return {
+                response: new Response(text, { status: proxyRes.status, headers: proxyRes.headers }),
+                via: "proxy",
+                sourceIp: egressIp,
+              };
+            }
+          } catch {
+            return {
+              response: new Response(text, { status: proxyRes.status, headers: proxyRes.headers }),
+              via: "proxy",
+              sourceIp: egressIp,
+            };
+          }
+        } else {
+          console.warn("Proxy returned HTML, falling back to direct Meta API call");
         }
-        console.warn("Proxy returned HTML, falling back to direct Meta API call");
       } else {
         console.warn(`Proxy returned status ${proxyRes.status}, falling back to direct call`);
       }
@@ -44,7 +62,8 @@ async function metaFetch(url, options = {}) {
       console.warn("Proxy fetch failed, falling back to direct Meta API call:", proxyErr);
     }
   }
-  return fetch(url, options);
+  const r = await fetch(url, options);
+  return { response: r, via: "direct", sourceIp: null };
 }
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
