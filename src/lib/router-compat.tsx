@@ -9,14 +9,33 @@ import {
 } from "@tanstack/react-router";
 import { forwardRef, useEffect } from "react";
 
+type NavigateOptions = { replace?: boolean; state?: any };
+
 export function useNavigate() {
   const nav = useTSNavigate();
-  return (to: string | number) => {
+  return (to: string | number, options?: NavigateOptions) => {
     if (typeof to === "number") {
       if (typeof window !== "undefined") window.history.go(to);
       return;
     }
-    nav({ to: to as string });
+    nav({ to: to as string, replace: options?.replace });
+  };
+}
+
+export function useLocation() {
+  const search = useTSSearch({ strict: false }) as Record<string, any>;
+  const params = new URLSearchParams();
+  Object.entries(search || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) params.set(k, String(v));
+  });
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  return {
+    pathname,
+    search: params.toString() ? `?${params.toString()}` : (typeof window !== "undefined" ? window.location.search : ""),
+    hash,
+    state: null as any,
+    key: "default",
   };
 }
 
