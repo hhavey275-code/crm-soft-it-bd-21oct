@@ -93,6 +93,39 @@ export function formatBdt(value: number): string {
 }
 
 /**
+ * Compute the signed BDT delta a single transaction applies to the seller's
+ * running Due/Advance balance (positive = balance goes up = more Advance,
+ * negative = balance goes down = more Due).
+ *   bdt_payment / client_topup → +bdt_amount
+ *   withdraw                   → −bdt_amount
+ *   usdt_received              → −(usdt_amount × rate)
+ * Pending / rejected entries return 0.
+ */
+export function computeTransactionDelta(t: any): number {
+  if (!t) return 0;
+  const status = (t.status || "approved").toLowerCase();
+  if (status !== "approved") return 0;
+  if (t.type === "bdt_payment" || t.type === "client_topup") {
+    return Number(t.bdt_amount || 0);
+  }
+  if (t.type === "withdraw") {
+    return -Number(t.bdt_amount || 0);
+  }
+  if (t.type === "usdt_received") {
+    return -(Number(t.usdt_amount || 0) * Number(t.rate || 0));
+  }
+  return 0;
+}
+
+/** Format a signed BDT delta with explicit + or − sign for "this row contributed" display. */
+export function formatSignedBdt(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded === 0) return "৳0";
+  const sign = rounded > 0 ? "+" : "−";
+  return `${sign}৳${Math.abs(rounded).toLocaleString("en-IN")}`;
+}
+
+/**
  * Format a Due/Advance signed value for display.
  * Returns: { text, isAdvance } — caller picks color.
  *   Advance (positive)  => "+৳47,00,000"
