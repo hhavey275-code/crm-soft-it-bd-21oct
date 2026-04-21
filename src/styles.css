@@ -159,6 +159,8 @@
   --chart-1: 24 95% 53%;
   --chart-2: 28 95% 65%;
   --chart-3: 32 95% 75%;
+  --chart-bar-start: var(--chart-2);
+  --chart-bar-end: var(--chart-1);
 }
 
 .theme-orange.dark {
@@ -185,6 +187,9 @@
   --sidebar-accent-foreground: 30 20% 90%;
   --sidebar-border: 24 16% 14%;
   --sidebar-ring: 24 95% 58%;
+  --chart-1: 24 95% 60%;
+  --chart-2: 28 95% 70%;
+  --chart-3: 32 95% 80%;
 }
 
 .theme-green {
@@ -216,6 +221,8 @@
   --chart-1: 160 84% 35%;
   --chart-2: 155 70% 50%;
   --chart-3: 150 60% 65%;
+  --chart-bar-start: var(--chart-2);
+  --chart-bar-end: var(--chart-1);
 }
 
 .theme-green.dark {
@@ -242,6 +249,9 @@
   --sidebar-accent-foreground: 150 20% 90%;
   --sidebar-border: 160 16% 14%;
   --sidebar-ring: 160 84% 42%;
+  --chart-1: 160 84% 45%;
+  --chart-2: 155 70% 60%;
+  --chart-3: 150 60% 72%;
 }
 
 @layer base {
