@@ -21,7 +21,7 @@ import { logSystemAction } from "@/lib/systemLog";
 import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDialog";
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
-import { computeRunningTotalsByBank, formatBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
@@ -216,6 +216,7 @@ export function AdminSellers() {
           await supabase.functions.invoke("forward-seller-proof", {
             body: {
               proof_url: ocrImageUrl,
+              seller_id: selectedSeller.user_id,
               seller_name: selectedSeller.full_name || selectedSeller.email,
               bdt_amount: bdtAmount,
               bank_account_id: ocrIsOthersBank ? undefined : ocrSelectedBankId,
@@ -430,8 +431,8 @@ export function AdminSellers() {
 
   const dueAdvance = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
 
-  // Running cumulative total per bank (computed from full unfiltered set so each row reflects its true historical balance)
-  const runningTotals = useMemo(() => computeRunningTotalsByBank(sellerTxns || []), [sellerTxns]);
+  // Running Due/Advance balance per row (computed from full unfiltered set so each row reflects its true historical balance)
+  const runningTotals = useMemo(() => computeDueAdvanceRunning(sellerTxns || []), [sellerTxns]);
 
   const hasActiveFilter = typeFilter !== "all" || bankFilter || datePreset !== "all";
   const clearAllFilters = () => { setTypeFilter("all"); setBankFilter(null); setDatePreset("all"); setCustomFrom(undefined); setCustomTo(undefined); };
@@ -457,7 +458,7 @@ export function AdminSellers() {
         "Converted (BDT)": Number(convBdt.toFixed(2)),
         "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
         "Account Name": t.bank_accounts?.account_name || "",
-        "Running Total (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
+        "Due/Advance (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
         "Description": t.description || "",
         "Proof URL": t.proof_url || "",
       };
@@ -470,7 +471,7 @@ export function AdminSellers() {
       "Converted (BDT)": Number(sellerTotals.totalConvertedBdt.toFixed(2)),
       "Bank": `Withdrawn: BDT ${sellerTotals.totalWithdrawn.toLocaleString()}`,
       "Account Name": "",
-      "Running Total (BDT)": "",
+      "Due/Advance (BDT)": "",
       "Description": dueAdvance >= 0 ? `Advance: BDT ${dueAdvance.toFixed(2)}` : `Due: BDT ${Math.abs(dueAdvance).toFixed(2)}`,
       "Proof URL": "",
     });
@@ -1142,11 +1143,21 @@ export function AdminSellers() {
                           </button>
                         ) : null}
                       </div>
-                      {/* Running cumulative total per bank */}
-                      <div className="flex items-center justify-between pt-1.5 border-t border-border">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">📊 Total</span>
-                        <span className="text-sm font-extrabold text-primary tabular-nums">{formatBdt(runningTotals.get(t.id) || 0)}</span>
-                      </div>
+                      {/* Running Due/Advance balance */}
+                      {(() => {
+                        const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                        return (
+                          <div className="flex items-center justify-between pt-1.5 border-t border-border">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              📊 {da.isZero ? "Total" : da.isAdvance ? "Advance" : "Due"}
+                            </span>
+                            <span className={cn(
+                              "text-sm font-extrabold tabular-nums",
+                              da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                            )}>{da.text}</span>
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 );
@@ -1172,7 +1183,7 @@ export function AdminSellers() {
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">TrxID / Note</th>
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-primary whitespace-nowrap">Total (৳)</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-primary whitespace-nowrap">Due/Advance (৳)</th>
                         <th className="border border-border px-2 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap w-10"></th>
                       </tr>
                     </thead>
@@ -1227,9 +1238,17 @@ export function AdminSellers() {
                                 </button>
                               ) : "—"}
                             </td>
-                            <td className="border border-border px-3 py-1.5 text-right font-extrabold text-primary tabular-nums whitespace-nowrap">
-                              {formatBdt(runningTotals.get(t.id) || 0)}
-                            </td>
+                            {(() => {
+                              const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                              return (
+                                <td className={cn(
+                                  "border border-border px-3 py-1.5 text-right font-extrabold tabular-nums whitespace-nowrap",
+                                  da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                                )}>
+                                  {da.text}
+                                </td>
+                              );
+                            })()}
                             <td className="border border-border px-1 py-1.5 text-center">
                               <button
                                 onClick={() => setConfirmDialog({
