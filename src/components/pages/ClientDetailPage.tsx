@@ -747,7 +747,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Main Tabs */}
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div className={cn("flex items-center gap-3 flex-wrap", isMobile && "flex-col items-stretch gap-2")}>
             {/* Date Range Filter inline */}
             {!isMobile && (
