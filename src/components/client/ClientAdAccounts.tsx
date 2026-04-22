@@ -1136,6 +1136,47 @@ export function ClientAdAccounts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Spend Cap Withdraw Request Dialog */}
+      <Dialog open={!!withdrawAccount} onOpenChange={(open) => { if (!open) setWithdrawAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Spend Cap Withdraw</DialogTitle>
+            <DialogDescription>
+              Request a spend cap reduction for <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will review and process it manually.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Amount (USD) *</Label>
+              <Input
+                type="number"
+                min="1"
+                step="0.01"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                placeholder="e.g. 100"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Note (optional)</Label>
+              <Input
+                value={withdrawNote}
+                onChange={(e) => setWithdrawNote(e.target.value)}
+                placeholder="Reason or instructions"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawAccount(null)}>Cancel</Button>
+            <Button onClick={handleWithdrawSubmit} disabled={withdrawLoading || !withdrawAmount}>
+              {withdrawLoading ? "Submitting..." : "Submit Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Rename Dialog */}
       <Dialog open={!!renameAccount} onOpenChange={(open) => { if (!open) setRenameAccount(null); }}>
         <DialogContent className="sm:max-w-md">
