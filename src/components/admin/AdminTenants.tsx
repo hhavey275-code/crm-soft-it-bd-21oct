@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@/lib/router-compat";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,9 +91,7 @@ export function AdminTenants() {
   };
 
   const openTenantDetail = (tenantId: string) => {
-    if (typeof window !== "undefined") {
-      window.location.href = `/tenants/${tenantId}`;
-    }
+    navigate({ to: "/tenants/$id", params: { id: tenantId } });
   };
 
   const copyApiKey = (key: string) => {
