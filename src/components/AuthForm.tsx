@@ -45,6 +45,20 @@ export function AuthForm() {
   const displayLogo = agencyBranding.logoUrl || logoUrl;
   const displayName = agencyBranding.name || siteName;
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/dashboard` },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      toast.error(err?.message || "Google sign-in failed");
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
