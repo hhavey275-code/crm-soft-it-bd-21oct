@@ -50,6 +50,7 @@ import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
@@ -261,6 +262,11 @@ const ClientsIdRoute = ClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaProxyRoute = ApiMetaProxyRouteImport.update({
+  id: '/api/meta-proxy',
+  path: '/api/meta-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgenciesIdRoute = AgenciesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -328,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/admin/performance': typeof AdminPerformanceRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -375,6 +382,7 @@ export interface FileRoutesByTo {
   '/admin/performance': typeof AdminPerformanceRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -424,6 +432,7 @@ export interface FileRoutesById {
   '/admin/performance': typeof AdminPerformanceRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -474,6 +483,7 @@ export interface FileRouteTypes {
     | '/admin/performance'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/meta-proxy'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/admin/performance'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/meta-proxy'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/admin/performance'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/meta-proxy'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -616,6 +628,7 @@ export interface RootRouteChildren {
   WalletBalancesRoute: typeof WalletBalancesRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ApiMetaProxyRoute: typeof ApiMetaProxyRoute
   ClientsIdRoute: typeof ClientsIdRoute
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
@@ -911,6 +924,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta-proxy': {
+      id: '/api/meta-proxy'
+      path: '/api/meta-proxy'
+      fullPath: '/api/meta-proxy'
+      preLoaderRoute: typeof ApiMetaProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agencies/$id': {
       id: '/agencies/$id'
       path: '/$id'
@@ -1025,6 +1045,7 @@ const rootRouteChildren: RootRouteChildren = {
   WalletBalancesRoute: WalletBalancesRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ApiMetaProxyRoute: ApiMetaProxyRoute,
   ClientsIdRoute: ClientsIdRoute,
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
