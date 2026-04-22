@@ -33,18 +33,24 @@ export function HackRecoveryPanel({ adAccountId, account }: Props) {
   const { data: lastCards } = useQuery({
     queryKey: ["last-known-cards", adAccountId],
     queryFn: async () => {
-      // Get the most recent attached/snapshot/became_primary events; group by funding_source_id and keep the latest
+      // Pull a wider history (last 200 events). For each funding_source_id, prefer the most
+      // recent NON-detached event so that — even if a recent (possibly bogus) "detached"
+      // event was logged when Meta stripped funding info on a disabled account — we still
+      // surface the last card the bank should freeze.
       const { data } = await (supabase as any)
         .from("ad_account_card_assignments")
         .select("*, ad_account_cards(admin_label, bank_name, holder_name)")
         .eq("ad_account_id", adAccountId)
         .order("detected_at", { ascending: false })
-        .limit(50);
-      const latestPerCard = new Map<string, any>();
+        .limit(200);
+      const lastAttachedPerCard = new Map<string, any>();
       for (const ev of (data ?? []) as any[]) {
-        if (!latestPerCard.has(ev.funding_source_id)) latestPerCard.set(ev.funding_source_id, ev);
+        if (ev.event_type === "detached") continue;
+        if (!lastAttachedPerCard.has(ev.funding_source_id)) {
+          lastAttachedPerCard.set(ev.funding_source_id, ev);
+        }
       }
-      return Array.from(latestPerCard.values()).filter(ev => ev.event_type !== "detached");
+      return Array.from(lastAttachedPerCard.values());
     },
   });
 

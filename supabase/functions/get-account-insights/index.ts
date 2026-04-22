@@ -954,23 +954,31 @@ Deno.serve(async (req)=>{
               });
             }
           }
-          // Detect detachments: cards that were last known attached but no longer present
-          for (const [key, last] of latestByKey.entries()){
-            if (!key.startsWith(`${adAccountId}:`)) continue;
-            if (last.event_type === "detached") continue;
-            if (!seenFsIds.has(last.funding_source_id)) {
-              newAssignmentRows.push({
-                ad_account_id: adAccountId,
-                card_id: null,
-                funding_source_id: last.funding_source_id,
-                display_string: null,
-                event_type: "detached",
-                is_primary: false,
-                detected_by: "sync",
-                metadata: {
-                  reason: "no_longer_in_meta_response"
-                }
-              });
+          // Detect detachments: cards that were last known attached but no longer present.
+          // IMPORTANT: skip detach-detection entirely when Meta returned an empty cards array.
+          // Meta strips funding-source info on disabled / hold / unsettled accounts, so an empty
+          // response is NOT proof that the user actually removed cards — preserve last known.
+          const accountStatusNum = data?.account_status;
+          const accountIsHealthy = accountStatusNum === 1 || accountStatusNum == null;
+          const skipDetachDetection = cards.length === 0 && !accountIsHealthy;
+          if (!skipDetachDetection) {
+            for (const [key, last] of latestByKey.entries()){
+              if (!key.startsWith(`${adAccountId}:`)) continue;
+              if (last.event_type === "detached") continue;
+              if (!seenFsIds.has(last.funding_source_id)) {
+                newAssignmentRows.push({
+                  ad_account_id: adAccountId,
+                  card_id: null,
+                  funding_source_id: last.funding_source_id,
+                  display_string: null,
+                  event_type: "detached",
+                  is_primary: false,
+                  detected_by: "sync",
+                  metadata: {
+                    reason: "no_longer_in_meta_response"
+                  }
+                });
+              }
             }
           }
           // 3. Update last-known state (used by Hack Recovery panel)
@@ -984,18 +992,25 @@ Deno.serve(async (req)=>{
             });
           } else {
             const lastSpendDateForSnapshot = data.today_spend > 0 ? bdDateString() : data.yesterday_spend > 0 ? bdYesterdayString() : undefined;
-            lastKnownRows.push({
+            // Preserve last non-empty card snapshot if Meta returned empty (disabled/hold accounts
+            // lose funding info in the response). Only overwrite cards when we actually got data,
+            // or when the account is currently healthy (status=1) so empty truly means user removed cards.
+            const preserveCards = cards.length === 0 && !accountIsHealthy;
+            const snapshot: any = {
               ad_account_id: adAccountId,
               spend_cap: acc.spend_cap ?? 0,
               amount_spent: data.amount_spent ?? acc.amount_spent ?? 0,
               balance: data.balance ?? 0,
               account_status: data.account_status ?? null,
-              cards: cards,
               last_spend_date: lastSpendDateForSnapshot,
               last_synced_at: new Date().toISOString(),
               last_sync_error: null,
               last_sync_error_at: null
-            });
+            };
+            if (!preserveCards) {
+              snapshot.cards = cards;
+            }
+            lastKnownRows.push(snapshot);
           }
         }
         if (newAssignmentRows.length > 0) {
