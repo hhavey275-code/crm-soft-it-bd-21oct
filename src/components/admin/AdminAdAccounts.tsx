@@ -486,7 +486,9 @@ export function AdminAdAccounts() {
   const lastUpdated = useMemo(() => {
     const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
     if (times.length === 0) return null;
-    return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
+    // Latest sync time wins (was Math.min — caused stale label when a single
+    // account hadn't been refreshed in days).
+    return new Date(Math.max(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
   const [timeAgoStr, setTimeAgoStr] = useState("");

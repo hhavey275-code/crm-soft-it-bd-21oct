@@ -346,7 +346,7 @@ Deno.serve(async (req)=>{
             user_id: userId,
             user_name: userName,
             action: "Spend Cap Updated",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from POST error) [IP: ${lastMetaProxyIp}]`
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from POST error) [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
           });
           return json({
             success: true,
@@ -367,7 +367,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg} [IP: ${lastMetaProxyIp}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         const errorCode = rateLimited ? "META_RATE_LIMIT" : "META_API_ERROR";
         return json({
@@ -400,7 +400,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — Verification failed: ${verifyErrorMsg} [IP: ${lastMetaProxyIp}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — Verification failed: ${verifyErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
           error: `Meta verification failed. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -427,7 +427,7 @@ Deno.serve(async (req)=>{
             user_id: userId,
             user_name: userName,
             action: "Top-Up Failed",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}`
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
           });
           return json({
             error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -450,7 +450,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${failMsg} [IP: ${lastMetaProxyIp}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${failMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
           error: `${failMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -474,7 +474,7 @@ Deno.serve(async (req)=>{
         user_id: userId,
         user_name: userName,
         action: "Top-Up Failed",
-        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}`
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
       });
       return json({
         error: `Meta API error: ${metaErrorMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -508,7 +508,7 @@ Deno.serve(async (req)=>{
       user_id: userId,
       user_name: userName,
       action: "Spend Cap Updated",
-      details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} [IP: ${lastMetaProxyIp}]`
+      details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
     });
     // ============================================
     // STEP 4.5: Post-update health check — diagnostic

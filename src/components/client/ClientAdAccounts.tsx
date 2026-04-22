@@ -313,6 +313,8 @@ export function ClientAdAccounts() {
       } else {
         toast.success("All accounts updated from Meta");
       }
+      // Force a fresh DB read of the cache so the "Last synced" label updates immediately.
+      queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user?.id] });
       refetchInsights();
       // Invalidate dashboard queries so dashboard picks up fresh data
       queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
@@ -481,7 +483,9 @@ export function ClientAdAccounts() {
   const lastUpdated = useMemo(() => {
     const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
     if (times.length === 0) return null;
-    return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
+    // Use the LATEST sync time, not the oldest — otherwise a single never-refreshed
+    // account would drag the label back in time even when most accounts updated recently.
+    return new Date(Math.max(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
   const aggregatedTodaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0);

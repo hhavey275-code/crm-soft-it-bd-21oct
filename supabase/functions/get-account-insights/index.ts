@@ -34,6 +34,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
+// Track route + IP used for the most recent Meta API call (per request)
+let lastMetaVia = "direct";
+let lastMetaIp: string | null = null;
 // Bangladesh timezone helpers (UTC+6, no DST). Day rollover at 00:00 BD time.
 function bdDateString(date = new Date()) {
   const bdMs = date.getTime() + 6 * 60 * 60 * 1000;
@@ -68,8 +71,8 @@ async function metaFetch(url, options = {}) {
       });
       // Capture proxy IP from response header
       try {
-        const proxyIp = proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp && typeof lastMetaProxyIp !== "undefined") lastMetaProxyIp = proxyIp;
+        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
+        if (proxyIp) lastMetaIp = proxyIp;
       } catch  {}
       const text = await proxyRes.text();
       const trimmed = text.trimStart();
@@ -88,6 +91,7 @@ async function metaFetch(url, options = {}) {
         } catch  {}
       }
       if (!looksLikeHtml && !isProxyOwnError) {
+        lastMetaVia = "proxy";
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers
@@ -100,11 +104,8 @@ async function metaFetch(url, options = {}) {
       console.warn("Proxy failed, falling back to direct call:", proxyErr);
     }
   }
-  if (typeof lastMetaProxyIp !== "undefined") {
-    try {
-      lastMetaProxyIp = "direct";
-    } catch  {}
-  }
+  lastMetaVia = "direct";
+  lastMetaIp = null;
   return fetch(url, options);
 }
 function chunk(arr, size) {
@@ -555,6 +556,25 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
 // to avoid Meta API rate limits. Each account makes 3-4 API calls, so batch of 5 = ~20 calls.
 const META_BATCH_SIZE = 20;
 const META_BATCH_DELAY_MS = 300;
+
+async function logMetaCall(supabase: any, params: {
+  userId: string | null;
+  userName: string | null;
+  action: string;
+  details: string;
+}) {
+  try {
+    await supabase.from("system_logs").insert({
+      user_id: params.userId,
+      user_name: params.userName || "system",
+      action: params.action,
+      details: params.details,
+    });
+  } catch (e) {
+    console.warn("logMetaCall failed:", e);
+  }
+}
+
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -677,6 +697,20 @@ Deno.serve(async (req)=>{
           updated_at: row.updated_at,
           last_spend_date: row.last_spend_date ?? null
         };
+      }
+      // Log cache reads only when caller is a real user (skip noisy service polls)
+      if (callerUserId) {
+        let cacheUserName: string | null = null;
+        try {
+          const { data: pr } = await supabase.from("profiles").select("full_name, email").eq("user_id", callerUserId).single();
+          cacheUserName = pr?.full_name || pr?.email || null;
+        } catch {}
+        await logMetaCall(supabase, {
+          userId: callerUserId,
+          userName: cacheUserName,
+          action: "Meta Insights Cache Read",
+          details: `${filteredIds.length} account(s) from cache`,
+        });
       }
       return new Response(JSON.stringify({
         insights
@@ -1099,6 +1133,33 @@ Deno.serve(async (req)=>{
     const now = new Date().toISOString();
     for (const key of Object.keys(insights)){
       insights[key].updated_at = now;
+    }
+    // Log this Meta call (live source) into system_logs
+    if (callerUserId) {
+      let metaUserName: string | null = null;
+      try {
+        const { data: pr } = await supabase.from("profiles").select("full_name, email").eq("user_id", callerUserId).single();
+        metaUserName = pr?.full_name || pr?.email || null;
+      } catch {}
+      const isDateRange = !!(date_from && date_to);
+      const action = isDateRange ? "Meta Date-Range Fetch" : "Meta Insights Refresh";
+      const accountNames = (accounts ?? [])
+        .map((a: any) => a.account_name || a.account_id)
+        .filter(Boolean)
+        .slice(0, 5)
+        .join(", ");
+      const moreCount = Math.max(0, (accounts?.length ?? 0) - 5);
+      const range = isDateRange
+        ? ` · since=${date_from} until=${date_to}`
+        : (date ? ` · date=${date}` : "");
+      const details = `${accounts?.length ?? 0} accounts${range} · via=${lastMetaVia} · IP: ${lastMetaIp ?? "n/a"}` +
+        (accountNames ? ` · ${accountNames}${moreCount ? ` (+${moreCount} more)` : ""}` : "");
+      await logMetaCall(supabase, {
+        userId: callerUserId,
+        userName: metaUserName,
+        action,
+        details,
+      });
     }
     return new Response(JSON.stringify({
       insights,
