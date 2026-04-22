@@ -37,6 +37,7 @@ interface Props {
 
 export function UnusedAccountsView({ accounts, isLoading, showSearch = true, emptyMessage }: Props) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState<Tier>("15");
   const [search, setSearch] = useState("");
 
@@ -92,20 +93,20 @@ export function UnusedAccountsView({ accounts, isLoading, showSearch = true, emp
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tier)}>
         <TabsList className="grid w-full grid-cols-4 max-w-2xl">
-          <TabsTrigger value="15" className="gap-2">
-            15+ days
+          <TabsTrigger value="15" className="gap-1 text-xs sm:text-sm">
+            {isMobile ? "15+d" : "15+ days"}
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts["15"]}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="30" className="gap-2">
-            30+ days
+          <TabsTrigger value="30" className="gap-1 text-xs sm:text-sm">
+            {isMobile ? "30+d" : "30+ days"}
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts["30"]}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="45" className="gap-2">
-            45+ days
+          <TabsTrigger value="45" className="gap-1 text-xs sm:text-sm">
+            {isMobile ? "45+d" : "45+ days"}
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts["45"]}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="unknown" className="gap-2">
-            Needs sync
+          <TabsTrigger value="unknown" className="gap-1 text-xs sm:text-sm">
+            {isMobile ? "Sync" : "Needs sync"}
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.unknown}</Badge>
           </TabsTrigger>
         </TabsList>
@@ -120,6 +121,44 @@ export function UnusedAccountsView({ accounts, isLoading, showSearch = true, emp
                   ? `✅ All accounts have verified spend history.`
                   : `🎉 No accounts inactive for ${tab}+ days.`
               )}
+            </div>
+          ) : isMobile ? (
+            <div className="space-y-2">
+              {filtered.map((a) => {
+                const bal = a.balance != null
+                  ? Number(a.balance)
+                  : Math.max(0, Number(a.spend_cap ?? 0) - Number(a.amount_spent ?? 0));
+                return (
+                  <Card key={a.id} className="cursor-pointer active:scale-[0.99] transition-transform" onClick={() => navigate(`/ad-accounts/${a.id}`)}>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm truncate">{a.account_name}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono truncate">{a.account_id}</p>
+                        </div>
+                        <StatusBadge status={a.status} />
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">BM</p>
+                          <p className="truncate max-w-[120px]">{a.business_managers?.name || "—"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase text-muted-foreground">Inactive</p>
+                          <InactiveBadge lastSpendDate={a.last_spend_date ?? null} showActive showUnknown />
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase text-muted-foreground">Balance</p>
+                          <p className="font-mono font-semibold">${bal.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      {a.last_spend_date && (
+                        <p className="text-[11px] text-muted-foreground">Last spend: {a.last_spend_date.slice(0, 10)}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
