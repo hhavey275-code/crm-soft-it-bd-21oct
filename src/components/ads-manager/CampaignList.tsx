@@ -351,7 +351,7 @@ export function CampaignList({ accountId }: CampaignListProps) {
           <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
           <p className="text-destructive font-medium">Failed to load campaigns</p>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">{(error as Error)?.message || "Unknown error"}</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="h-4 w-4 mr-2" /> Retry</Button>
+          <Button variant="outline" size="sm" onClick={() => fetchCampaigns()}><RefreshCw className="h-4 w-4 mr-2" /> Retry</Button>
         </div>
       ) : !hasFetched ? (
         <div className="text-center py-16 rounded-lg border-2 border-dashed bg-muted/20">

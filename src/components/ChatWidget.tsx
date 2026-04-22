@@ -42,7 +42,6 @@ export function ChatWidget() {
     const SUPPORT_SENDER_ID = "00000000-0000-0000-0000-000000000000";
 
     const poll = async () => {
-      if (!tenantPollRef.current.isTenant) return;
       const since = tenantPollRef.current.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const res = await tenantForward("pull_chat", {
         tenant_user_id: user.id,
@@ -214,16 +213,13 @@ export function ChatWidget() {
         .update({ last_message_at: new Date().toISOString() })
         .eq("id", convId);
 
-      // Forward to master if this instance is a tenant
-      if (tenantPollRef.current.isTenant) {
-        const meta: any = (user as any).user_metadata || {};
-        tenantForward("chat_message", {
-          tenant_user_id: user.id,
-          tenant_user_name: meta.full_name || user.email,
-          tenant_user_email: user.email,
-          message: message.trim(),
-        }).catch(() => {});
-      }
+      const meta: any = (user as any).user_metadata || {};
+      tenantForward("chat_message", {
+        tenant_user_id: user.id,
+        tenant_user_name: meta.full_name || user.email,
+        tenant_user_email: user.email,
+        message: message.trim(),
+      }).catch(() => {});
 
       setMessage("");
     }
