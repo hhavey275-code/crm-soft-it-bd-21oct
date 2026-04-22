@@ -15,11 +15,12 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { Check, X, Search, Loader2 } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AdminRequests() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-
+  const isMobile = useIsMobile();
   // Ad Account Requests
   const { data: adRequests = [] } = useQuery({
     queryKey: ["admin-ad-requests"],
