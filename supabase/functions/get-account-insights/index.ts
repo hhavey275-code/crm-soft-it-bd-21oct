@@ -1116,15 +1116,43 @@ Deno.serve(async (req)=>{
       if (logRows.length > 0) {
         await supabase.from("api_call_logs").insert(logRows);
       }
+
+      // System log entry capturing proxy IP / route used for this batch.
+      try {
+        let userName: string | null = "system";
+        if (callerUserId) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("user_id", callerUserId)
+            .maybeSingle();
+          userName = prof?.full_name || prof?.email || "user";
+        }
+        const accountCount = (accounts ?? []).length;
+        const rangeLabel = date_from && date_to
+          ? `${date_from}..${date_to}`
+          : date
+            ? date
+            : "today/yesterday";
+        await logMetaCall(supabase, {
+          userId: callerUserId,
+          userName,
+          action: "Meta Insights Refresh",
+          details: `Refreshed ${accountCount} ad account(s) [range=${rangeLabel}] via ${lastMetaVia} [IP: ${lastMetaIp ?? "direct"}]`,
+        });
+      } catch (logErr) {
+        console.warn("system_logs insert (Meta Insights Refresh) failed:", logErr);
+      }
     }
     const now = new Date().toISOString();
     for (const key of Object.keys(insights)){
       insights[key].updated_at = now;
     }
-    // Meta insights refreshes are intentionally not written to system_logs.
     return new Response(JSON.stringify({
       insights,
-      rate_limited: rateLimited
+      rate_limited: rateLimited,
+      via: lastMetaVia,
+      proxy_ip: lastMetaIp,
     }), {
       headers: {
         ...corsHeaders,
