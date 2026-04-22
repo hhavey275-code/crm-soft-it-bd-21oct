@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { TenantRequestsPanel } from "@/components/admin/TenantRequestsPanel";
 
 interface SyncedAccount {
   account_id: string;
@@ -668,6 +669,9 @@ export function AdminBusinessManagers() {
           </Dialog>
         </div>
       </div>
+
+      {/* Tenant Requests (BM Share + Withdraw) */}
+      <TenantRequestsPanel />
 
       {/* BM List */}
       {bms?.map((bm: any) => {
