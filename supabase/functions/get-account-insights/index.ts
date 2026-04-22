@@ -1134,6 +1134,33 @@ Deno.serve(async (req)=>{
     for (const key of Object.keys(insights)){
       insights[key].updated_at = now;
     }
+    // Log this Meta call (live source) into system_logs
+    if (callerUserId) {
+      let metaUserName: string | null = null;
+      try {
+        const { data: pr } = await supabase.from("profiles").select("full_name, email").eq("user_id", callerUserId).single();
+        metaUserName = pr?.full_name || pr?.email || null;
+      } catch {}
+      const isDateRange = !!(date_from && date_to);
+      const action = isDateRange ? "Meta Date-Range Fetch" : "Meta Insights Refresh";
+      const accountNames = (accounts ?? [])
+        .map((a: any) => a.account_name || a.account_id)
+        .filter(Boolean)
+        .slice(0, 5)
+        .join(", ");
+      const moreCount = Math.max(0, (accounts?.length ?? 0) - 5);
+      const range = isDateRange
+        ? ` · since=${date_from} until=${date_to}`
+        : (date ? ` · date=${date}` : "");
+      const details = `${accounts?.length ?? 0} accounts${range} · via=${lastMetaVia} · IP: ${lastMetaIp ?? "n/a"}` +
+        (accountNames ? ` · ${accountNames}${moreCount ? ` (+${moreCount} more)` : ""}` : "");
+      await logMetaCall(supabase, {
+        userId: callerUserId,
+        userName: metaUserName,
+        action,
+        details,
+      });
+    }
     return new Response(JSON.stringify({
       insights,
       rate_limited: rateLimited
