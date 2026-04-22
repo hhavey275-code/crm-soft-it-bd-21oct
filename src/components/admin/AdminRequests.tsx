@@ -224,17 +224,17 @@ export function AdminRequests() {
       <h1 className="text-xl md:text-2xl font-bold">Requests</h1>
 
       <Tabs defaultValue="ad-account">
-        <TabsList>
-          <TabsTrigger value="ad-account" className="gap-1.5">
-            Ad Account Requests
+        <TabsList className="w-full md:w-auto">
+          <TabsTrigger value="ad-account" className="gap-1.5 flex-1 md:flex-none text-xs md:text-sm">
+            {isMobile ? "Ad Acc" : "Ad Account Requests"}
             {pendingAdCount > 0 && (
               <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {pendingAdCount}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="bm-access" className="gap-1.5">
-            BM Access Requests
+          <TabsTrigger value="bm-access" className="gap-1.5 flex-1 md:flex-none text-xs md:text-sm">
+            {isMobile ? "BM" : "BM Access Requests"}
             {pendingBmCount > 0 && (
               <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {pendingBmCount}
@@ -244,8 +244,58 @@ export function AdminRequests() {
         </TabsList>
 
         <TabsContent value="ad-account">
+          {isMobile ? (
+            <div className="space-y-3">
+              {adRequests.length === 0 ? (
+                <Card><CardContent className="text-center text-muted-foreground py-8 text-sm">No requests</CardContent></Card>
+              ) : adRequests.map((r: any) => {
+                const p = getProfile(r.user_id);
+                return (
+                  <Card key={r.id} className="overflow-hidden">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate">{p?.full_name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{p?.email || r.email}</p>
+                        </div>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">Account</p>
+                          <p className="font-medium truncate">{r.account_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">BM ID</p>
+                          <p className="font-mono text-[11px] truncate">{r.business_manager_id}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">Monthly</p>
+                          <p>{r.monthly_spend || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">Date</p>
+                          <p>{format(new Date(r.created_at), "MMM d")}</p>
+                        </div>
+                      </div>
+                      {r.status === "pending" && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <Button size="sm" className="gap-1 flex-1 h-8 text-xs" onClick={() => { setApproveAdReq(r); setAdminNote(""); setSelectedAdAccount(null); setAdAccountSearch(""); }}>
+                            <Check className="h-3 w-3" /> Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" className="gap-1 flex-1 h-8 text-xs" onClick={() => handleRejectAdRequest(r)}>
+                            <X className="h-3 w-3" /> Reject
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
           <Card>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -297,11 +347,69 @@ export function AdminRequests() {
               </Table>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="bm-access">
+          {isMobile ? (
+            <div className="space-y-3">
+              {bmRequests.length === 0 ? (
+                <Card><CardContent className="text-center text-muted-foreground py-8 text-sm">No requests</CardContent></Card>
+              ) : bmRequests.map((r: any) => {
+                const p = getProfile(r.user_id);
+                return (
+                  <Card key={r.id} className="overflow-hidden">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate">{p?.full_name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{p?.email || "—"}</p>
+                        </div>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="col-span-2">
+                          <p className="text-[10px] uppercase text-muted-foreground">Ad Account</p>
+                          <p className="font-medium truncate">{r.ad_accounts?.account_name || "—"}</p>
+                          {r.ad_accounts?.account_id && <p className="text-[11px] text-muted-foreground font-mono">{r.ad_accounts.account_id.replace(/^act_/, '')}</p>}
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">BM Name</p>
+                          <p className="truncate">{r.bm_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">BM ID</p>
+                          <p className="font-mono text-[11px] truncate">{r.bm_id}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-[10px] uppercase text-muted-foreground">Date</p>
+                          <p>{format(new Date(r.created_at), "MMM d, yyyy")}</p>
+                        </div>
+                      </div>
+                      {r.status === "pending" && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            className="gap-1 flex-1 h-8 text-xs"
+                            onClick={() => handleApproveBmRequest(r)}
+                            disabled={bmApproveLoading === r.id}
+                          >
+                            {bmApproveLoading === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" className="gap-1 flex-1 h-8 text-xs" onClick={() => handleRejectBmRequest(r)}>
+                            <X className="h-3 w-3" /> Reject
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
           <Card>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -363,6 +471,7 @@ export function AdminRequests() {
               </Table>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
       </Tabs>
 
