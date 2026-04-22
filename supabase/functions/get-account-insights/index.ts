@@ -48,8 +48,8 @@ function bdYesterdayString(date = new Date()) {
 }
 async function metaFetch(url, options = {}) {
   if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET");
-  const proxyUrl = Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL;
+  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
+  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
   if (proxySecret && proxyUrl) {
     try {
       const headers = new Headers(options.headers ?? {});
