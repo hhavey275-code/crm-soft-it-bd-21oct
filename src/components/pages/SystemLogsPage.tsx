@@ -40,13 +40,18 @@ const ACTION_COLORS: Record<string, string> = {
   "Top-Up Failed": "bg-red-500/10 text-red-700 border-red-200",
 };
 
-// Extract IP from details string like "... [IP: 1.2.3.4]"
+// Extract IP from details string. Supports formats:
+//   "... [IP: 1.2.3.4]"
+//   "... [via=proxy IP: 1.2.3.4]"
+//   "... [via=direct IP: n/a]"
 function extractIp(details: string | null): { ip: string | null; cleanDetails: string } {
   if (!details) return { ip: null, cleanDetails: details || "" };
-  const match = details.match(/\s*\[IP:\s*([^\]]+)\]/);
+  const match = details.match(/\s*\[(?:via=[^\s\]]+\s+)?IP:\s*([^\]]+)\]/i);
   if (match) {
+    const raw = match[1].trim();
+    const ip = raw && raw.toLowerCase() !== "n/a" ? raw : null;
     return {
-      ip: match[1].trim(),
+      ip,
       cleanDetails: details.replace(match[0], "").trim(),
     };
   }
