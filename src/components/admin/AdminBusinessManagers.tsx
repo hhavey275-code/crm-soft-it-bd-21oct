@@ -30,6 +30,15 @@ interface SyncedAccount {
   amount_spent: number;
 }
 
+async function invokeBmFunction<T = any>(functionName: string, body?: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke(functionName, { body });
+  if (error) throw error;
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    throw new Error(String(data.error));
+  }
+  return data as T;
+}
+
 export function AdminBusinessManagers() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -139,20 +148,12 @@ export function AdminBusinessManagers() {
 
   const addBmMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ action: "create", bm_id: bmId, name: bmName, access_token: accessToken }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Failed to create BM");
+      const result = await invokeBmFunction<{ data?: any }>("manage-bm", {
+        action: "create",
+        bm_id: bmId,
+        name: bmName,
+        access_token: accessToken,
+      });
       return result.data;
     },
     onSuccess: async (data) => {
@@ -173,21 +174,9 @@ export function AdminBusinessManagers() {
   const syncMutation = useMutation({
     mutationFn: async (businessManagerId: string) => {
       setSyncingBmId(businessManagerId);
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-bm-accounts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ business_manager_id: businessManagerId }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Sync failed");
-      return result;
+      return invokeBmFunction<{ accounts?: SyncedAccount[] }>("sync-bm-accounts", {
+        business_manager_id: businessManagerId,
+      });
     },
     onSuccess: async (result) => {
       const accounts: SyncedAccount[] = result.accounts ?? [];
@@ -260,20 +249,7 @@ export function AdminBusinessManagers() {
 
   const updateBmMutation = useMutation({
     mutationFn: async ({ id, name, bm_id, access_token }: { id: string; name?: string; bm_id?: string; access_token?: string }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ action: "update", id, name, bm_id, access_token }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Failed to update BM");
+      await invokeBmFunction("manage-bm", { action: "update", id, name, bm_id, access_token });
     },
     onSuccess: () => {
       toast.success("Business Manager updated");
@@ -374,23 +350,12 @@ export function AdminBusinessManagers() {
   const syncAllMutation = useMutation({
     mutationFn: async () => {
       if (!bms || bms.length === 0) throw new Error("No Business Managers to sync");
-      const { data: { session } } = await supabase.auth.getSession();
       const allSyncedAccounts: SyncedAccount[] = [];
       const results = await Promise.allSettled(
         bms.map(async (bm: any) => {
-          const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-bm-accounts`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session?.access_token}`,
-              },
-              body: JSON.stringify({ business_manager_id: bm.id }),
-            }
-          );
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Sync failed");
+          const result = await invokeBmFunction<{ accounts?: SyncedAccount[] }>("sync-bm-accounts", {
+            business_manager_id: bm.id,
+          });
           if (result.accounts) allSyncedAccounts.push(...result.accounts);
           return result;
         })
@@ -445,21 +410,7 @@ export function AdminBusinessManagers() {
 
   const encryptExistingMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ action: "encrypt_existing" }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Failed");
-      return result;
+      return invokeBmFunction<{ encrypted?: number }>("manage-bm", { action: "encrypt_existing" });
     },
     onSuccess: (result) => {
       toast.success(`${result.encrypted} token(s) encrypted successfully`);
@@ -471,21 +422,7 @@ export function AdminBusinessManagers() {
   // Revoke token mutation
   const revokeMutation = useMutation({
     mutationFn: async (params: { bm_id?: string; revoke_all?: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/revoke-bm-token`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify(params),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Revoke failed");
-      return result;
+      return invokeBmFunction<{ results?: Array<{ revoked?: boolean }> }>("revoke-bm-token", params);
     },
     onSuccess: (result) => {
       const revoked = result.results?.filter((r: any) => r.revoked).length || 0;
