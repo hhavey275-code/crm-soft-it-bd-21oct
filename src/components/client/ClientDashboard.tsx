@@ -27,9 +27,17 @@ export function ClientDashboard() {
   const isMobile = useIsMobile();
   const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [dismissedInstall, setDismissedInstall] = useState(() => localStorage.getItem("pwa-install-dismissed") === "true");
+  const [dismissedInstall, setDismissedInstall] = useState(false);
   const isInactive = (profile as any)?.status === "inactive";
   const agencyId = (profile as any)?.agency_id;
+
+  useEffect(() => {
+    try {
+      setDismissedInstall(localStorage.getItem("pwa-install-dismissed") === "true");
+    } catch {
+      setDismissedInstall(false);
+    }
+  }, []);
 
   const { data: agencyWallet } = useQuery({
     queryKey: ["agency-wallet-check", agencyId],
