@@ -11,6 +11,8 @@ import { ScrollText, Search, Filter, Globe } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 
+const HIDDEN_ACTIONS = new Set(["Meta Insights Refresh", "Meta Insights Cache Read"]);
+
 const ACTION_COLORS: Record<string, string> = {
   "Top-Up Approved": "bg-green-500/10 text-green-700 border-green-200",
   "Top-Up Rejected": "bg-red-500/10 text-red-700 border-red-200",
@@ -65,7 +67,7 @@ export default function SystemLogsPage() {
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      return (data as any[]) ?? [];
+      return ((data as any[]) ?? []).filter((log) => !HIDDEN_ACTIONS.has(log.action));
     },
   });
 
