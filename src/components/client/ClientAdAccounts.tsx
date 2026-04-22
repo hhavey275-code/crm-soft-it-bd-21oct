@@ -313,6 +313,8 @@ export function ClientAdAccounts() {
       } else {
         toast.success("All accounts updated from Meta");
       }
+      // Force a fresh DB read of the cache so the "Last synced" label updates immediately.
+      queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user?.id] });
       refetchInsights();
       // Invalidate dashboard queries so dashboard picks up fresh data
       queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
