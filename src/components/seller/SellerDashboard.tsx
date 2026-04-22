@@ -60,7 +60,8 @@ export function SellerDashboard() {
         .from("seller_transactions")
         .select("*, bank_accounts(bank_name, account_number)")
         .eq("seller_id", user!.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
       if (error) throw error;
       return (data as any[]) ?? [];
     },

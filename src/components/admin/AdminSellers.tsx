@@ -276,7 +276,8 @@ export function AdminSellers() {
         .from("seller_transactions")
         .select("*, bank_accounts(bank_name, account_number, account_name)")
         .eq("seller_id", selectedSeller.user_id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
       return (data as any[]) ?? [];
     },
   });
