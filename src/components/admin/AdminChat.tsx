@@ -186,8 +186,9 @@ export function AdminChat() {
   }, [selectedId, conversations.length]);
 
   useEffect(() => {
+    if (!user) return;
     const channel = supabase
-      .channel("admin-chat")
+      .channel(`admin-chat-${user.id}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
