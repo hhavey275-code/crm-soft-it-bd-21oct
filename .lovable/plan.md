@@ -1,46 +1,53 @@
 
 
-## ৪টা Update — Plan
+## Diagnosis (আপনার Screenshots-এর সাথে Code-এর Match)
 
-### 1. Google Sign-In on Auth Page
-`src/components/AuthForm.tsx`-এ "Continue with Google" button add করব (login + signup দুটোতেই, divider সহ):
+আপনার দাবি দুটো:
+1. **প্রতিটি payment/withdraw/USDT-এর পরে updated Due/Advance balance row-এর সাথে দেখাতে হবে** (যেটা hero card-এর সাথে match করবে)
+2. **BDT Payment ও Client Top-Up একই serial-এ thakbe (type-based grouping না)** — Excel-এও serial মেইনটেইন
+
+### Code review করে যা পেলাম
+
+**`src/components/admin/AdminSellers.tsx`** এবং **`src/components/seller/SellerDashboard.tsx`** — দুটোতেই:
+
+✅ **Per-row running balance already আছে** — `runningTotals = computeDueAdvanceRunning(sellerTxns)` (line 436), table-এর `Due/Advance (৳)` column-এ render হচ্ছে (line 1284-1294)। আপনার screenshot-১ এর right-এর red box-এ যে `১,৫৬,৫২,২৬৯` → `১,৫৩,০২,২৬৯` দেখাচ্ছে — সেটা এই column।
+
+✅ **Hero card final balance** (`+৳5,201,646.85 ADVANCE` / `−৳4,770,940.66 DUE`) — line 433 এ calc, line 783-803 এ render। Calculation: `totalBdtPaid + totalClientBdt − totalConvertedBdt − totalWithdrawn` — অর্থাৎ withdraw + USDT given উভয়ই বাদ দিচ্ছে। ✅ Correct।
+
+✅ **Chronological serial already maintained** — DB query line 279: `.order("created_at", { ascending: false })` — newest first, **কোনো type-based grouping নেই**। `filteredTxns`-এ কোনো re-sort নেই (line 368-396)। Excel export-ও same `filteredTxns` order-এ যাচ্ছে।
+
+### তাহলে আপনি যে সমস্যা দেখছেন সেটার আসল কারণ
+
+Screenshot-১ এ যে দেখা যাচ্ছে "সব Client Top-Up উপরে, BDT Payment আলাদা" — এটা কোনো grouping না, এটা actual `created_at` order: আজকের (Apr 22) সবগুলোই Client Top-Up auto-approved হয়েছে আগে, BDT Payment গুলো পরে বা আরো আগে হয়েছে। DB-তে যে order এ row insert হয়েছে সেটাই দেখাচ্ছে।
+
+কিন্তু একটা real edge-case আছে: যদি দুটো transaction **একই second-এ** insert হয় (auto top-up + manual BDT একসাথে), তখন `created_at` tie হলে browser-side render unpredictable হতে পারে।
+
+---
+
+## Plan — ২টা ছোট Improvement + 1 Confirmation
+
+### 1. Stable secondary sort (tiebreaker for same-second txns)
+
+`AdminSellers.tsx` (line 271-281) এবং `SellerDashboard.tsx`-এর equivalent query-তে **secondary order by `id`** add করব যাতে same `created_at` হলেও deterministic order থাকে এবং screen + Excel + Telegram সব জায়গায় same order:
+
 ```ts
-await supabase.auth.signInWithOAuth({
-  provider: "google",
-  options: { redirectTo: `${window.location.origin}/dashboard` },
-});
+.order("created_at", { ascending: false })
+.order("id", { ascending: false })  // tiebreaker
 ```
-**আপনাকে যা করতে হবে:** Supabase Dashboard → Authentication → Providers → **Google enable** করতে হবে (Client ID + Secret সহ)। আমি একটা link দেব।
 
-### 2. Seller Dashboard থেকে Graph + Recent Activity Remove
-`src/components/seller/SellerDashboard.tsx` line 467-468 থেকে `<BalanceHistoryChart />` remove করব। `BalanceHistoryChart.tsx` file-টাও delete করব। Calculation, totals, ledger — সব intact থাকবে।
+`computeDueAdvanceRunning` function-এও same secondary sort add করব (`src/lib/sellerRunningTotal.ts` line 21, 64) — যাতে UI render order এবং running-total computation একদম sync থাকে।
 
-### 3. Telegram Forward — Due/Advance Total Confirm
-`supabase/functions/forward-seller-proof/index.ts` already এই কাজ করছে (line 96-122):
-- `seller_transactions` থেকে seller-এর সব approved txn fetch করে
-- `computeDueAdvance()` দিয়ে running balance বের করে
-- Caption-এ append করে: `🟢 Total: Advance +৳X` বা `🔴 Total: Due −৳X`
+### 2. Hero card-এ subtle hint
 
-**Action:** Code review confirm করেছি এটা কাজ করছে। আমি একটা test invoke করে verify করব forward হচ্ছে কিনা — যদি কোনো bug দেখা যায়, fix করব। কোনো নতুন code change লাগবে না (সম্ভবত)।
+Hero card-এর `Due / Advance` value-এর নিচে একটা ছোট sub-label add করব: "After all transactions" — যাতে user বুঝতে পারে এটা পুরো ledger-এর cumulative balance, এবং row-এর `Due/Advance` column হলো সেই row পর্যন্ত running balance।
 
-### 4. "System Update" Button (Cache Clear)
-`src/components/AppSidebar.tsx`-এ profile area-র কাছে একটা **"Update System"** button add করব। Click করলে:
-- `caches.keys()` → সব service worker cache delete
-- `localStorage` থেকে non-auth keys clear (auth session preserve)
-- `sessionStorage.clear()`
-- Service worker unregister + re-register
-- Toast: "✅ Update applied! Reloading..." → 1.5s পরে hard reload (`window.location.reload()`)
+### 3. Excel sheet — same chronological order, no grouping
 
-Toast/banner-এ একটা subtle hint থাকবে dashboard-এ যখন নতুন update detect হয়।
+`exportToExcel` (line 445-486) ইতিমধ্যেই `filteredTxns` order use করছে — কোনো re-grouping নেই। Step-1 এর secondary sort apply হলে Excel-এও একই serial maintain হবে। **কোনো নতুন code change লাগবে না, automatically সঠিক হবে।**
 
-### 5. Admin Menu Permissions — Missing Menus Add
-`src/components/admin/AdminClients.tsx`-এর `ALL_MENU_KEYS` array (line 25-44) outdated। Sidebar-এর `adminNavItems`-এ এই menu গুলো আছে কিন্তু `ALL_MENU_KEYS`-এ নেই:
-- `feedback` (Feedback)
-- `announcements` (Announcements)
-- `admin-performance` (Admin Performance)
-- `card-vault` (Card Vault)
+### 4. Telegram forward-এ Due/Advance — Confirmed already working
 
-**Fix:** Sync করব দুই list — `ALL_MENU_KEYS` এ এই 4টা add করব। তাহলে superadmin admin-কে role assign করার সময় সব menu visible হবে।
+`supabase/functions/forward-seller-proof/index.ts` line 96-122 — already সঠিকভাবে seller-এর সব approved txn fetch করে `computeDueAdvance()` দিয়ে total বের করছে এবং caption-এ `🟢 Total: Advance +৳X` বা `🔴 Total: Due −৳X` add করছে। **কোনো change দরকার নেই — শুধু verify করব next proof submit করার সময়।**
 
 ---
 
@@ -48,16 +55,13 @@ Toast/banner-এ একটা subtle hint থাকবে dashboard-এ যখ�
 
 | File | Change |
 |---|---|
-| `src/components/AuthForm.tsx` | + Google sign-in button + divider |
-| `src/components/seller/SellerDashboard.tsx` | − BalanceHistoryChart import + render |
-| `src/components/seller/BalanceHistoryChart.tsx` | 🗑 delete |
-| `src/components/admin/AdminClients.tsx` | `ALL_MENU_KEYS` array-এ 4টা missing menu add |
-| `src/components/AppSidebar.tsx` | + "Update System" button + cache-clear handler |
-| `supabase/functions/forward-seller-proof/index.ts` | Verify only — likely no change |
+| `src/components/admin/AdminSellers.tsx` | + secondary `.order("id", desc)` in query, + sub-label on hero card |
+| `src/components/seller/SellerDashboard.tsx` | + secondary `.order("id", desc)` in query, + sub-label on hero card |
+| `src/lib/sellerRunningTotal.ts` | `computeDueAdvanceRunning` + `computeRunningTotalsByBank` — secondary sort by `id` after `created_at` |
 
 ---
 
-## আপনার জন্য Step (Google Sign-In Enable)
+## আপনার জন্য Bangla Note
 
-কাজ apply হওয়ার পরে Google sign-in কাজ করতে হলে **Supabase Dashboard-এ Google provider enable** করতে হবে — একটা link দেব Authentication → Providers page-এ।
+আপনি যা চাচ্ছেন (per-row running Due/Advance + serial chronological) **আসলে already কাজ করছে** — screenshot-১ এর right-এর `Total (৳)` column-ই সেটা। শুধু একটাই edge issue: একই second-এ multiple txn হলে order unstable হতে পারে। সেটা fix করে দিচ্ছি, এবং hero card-এ একটা small label দিচ্ছি যাতে confusion না হয়। BDT payment গুলো **আলাদা group-এ যাচ্ছে না** — সব chronological সাজানো আছে; আপনি `Apr 22`-এর সব Client Top-Up consecutive দেখছেন কারণ আজ অনেকগুলো auto-approve হয়েছে পরপর।
 
