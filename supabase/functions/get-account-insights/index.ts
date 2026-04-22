@@ -698,6 +698,20 @@ Deno.serve(async (req)=>{
           last_spend_date: row.last_spend_date ?? null
         };
       }
+      // Log cache reads only when caller is a real user (skip noisy service polls)
+      if (callerUserId) {
+        let cacheUserName: string | null = null;
+        try {
+          const { data: pr } = await supabase.from("profiles").select("full_name, email").eq("user_id", callerUserId).single();
+          cacheUserName = pr?.full_name || pr?.email || null;
+        } catch {}
+        await logMetaCall(supabase, {
+          userId: callerUserId,
+          userName: cacheUserName,
+          action: "Meta Insights Cache Read",
+          details: `${filteredIds.length} account(s) from cache`,
+        });
+      }
       return new Response(JSON.stringify({
         insights
       }), {
