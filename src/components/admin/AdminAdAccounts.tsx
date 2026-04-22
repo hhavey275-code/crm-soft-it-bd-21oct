@@ -534,13 +534,11 @@ export function AdminAdAccounts() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
-  const lastUpdated = useMemo(() => {
-    const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
-    if (times.length === 0) return null;
-    // Latest sync time wins (was Math.min — caused stale label when a single
-    // account hadn't been refreshed in days).
-    return new Date(Math.max(...times.map((t: string) => new Date(t).getTime())));
-  }, [insights]);
+  // Header "Synced X ago" reflects the last "Update All from Meta" run only.
+  // Single-account refreshes do NOT update this — they only update that row's
+  // own time inside the table. Persisted via localStorage so reload preserves it.
+  const [lastFullSyncAt, setLastFullSyncAt] = useState<number | null>(() => readLastFullSync());
+  const lastUpdated = useMemo(() => (lastFullSyncAt ? new Date(lastFullSyncAt) : null), [lastFullSyncAt]);
 
   const [timeAgoStr, setTimeAgoStr] = useState("");
   useEffect(() => {
