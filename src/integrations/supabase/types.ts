@@ -2024,6 +2024,144 @@ export type Database = {
           },
         ]
       }
+      tenant_bm_share_requests: {
+        Row: {
+          ad_account_external_id: string
+          ad_account_name: string | null
+          admin_notes: string | null
+          bm_id: string
+          bm_name: string | null
+          created_at: string
+          id: string
+          note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tenant_id: string
+          tenant_user_id: string
+          tenant_user_name: string | null
+        }
+        Insert: {
+          ad_account_external_id: string
+          ad_account_name?: string | null
+          admin_notes?: string | null
+          bm_id: string
+          bm_name?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id: string
+          tenant_user_id: string
+          tenant_user_name?: string | null
+        }
+        Update: {
+          ad_account_external_id?: string
+          ad_account_name?: string | null
+          admin_notes?: string | null
+          bm_id?: string
+          bm_name?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string
+          tenant_user_id?: string
+          tenant_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_bm_share_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          is_resolved: boolean
+          last_message_at: string
+          tenant_id: string
+          tenant_user_email: string | null
+          tenant_user_id: string
+          tenant_user_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          last_message_at?: string
+          tenant_id: string
+          tenant_user_email?: string | null
+          tenant_user_id: string
+          tenant_user_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          last_message_at?: string
+          tenant_id?: string
+          tenant_user_email?: string | null
+          tenant_user_id?: string
+          tenant_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_chat_conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_chat_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          direction: string
+          id: string
+          is_read: boolean
+          message: string
+          sender_label: string | null
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          direction: string
+          id?: string
+          is_read?: boolean
+          message: string
+          sender_label?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          sender_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_payments: {
         Row: {
           adjustment_reason: string | null
@@ -2092,6 +2230,62 @@ export type Database = {
           },
           {
             foreignKeyName: "tenant_payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_withdraw_requests: {
+        Row: {
+          ad_account_external_id: string
+          ad_account_name: string | null
+          admin_notes: string | null
+          amount_usd: number
+          created_at: string
+          id: string
+          note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tenant_id: string
+          tenant_user_id: string
+          tenant_user_name: string | null
+        }
+        Insert: {
+          ad_account_external_id: string
+          ad_account_name?: string | null
+          admin_notes?: string | null
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id: string
+          tenant_user_id: string
+          tenant_user_name?: string | null
+        }
+        Update: {
+          ad_account_external_id?: string
+          ad_account_name?: string | null
+          admin_notes?: string | null
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string
+          tenant_user_id?: string
+          tenant_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_withdraw_requests_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
