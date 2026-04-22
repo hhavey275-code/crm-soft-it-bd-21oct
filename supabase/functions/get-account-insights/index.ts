@@ -34,6 +34,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
+// Track route + IP used for the most recent Meta API call (per request)
+let lastMetaVia = "direct";
+let lastMetaIp: string | null = null;
 // Bangladesh timezone helpers (UTC+6, no DST). Day rollover at 00:00 BD time.
 function bdDateString(date = new Date()) {
   const bdMs = date.getTime() + 6 * 60 * 60 * 1000;
@@ -68,8 +71,8 @@ async function metaFetch(url, options = {}) {
       });
       // Capture proxy IP from response header
       try {
-        const proxyIp = proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp && typeof lastMetaProxyIp !== "undefined") lastMetaProxyIp = proxyIp;
+        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
+        if (proxyIp) lastMetaIp = proxyIp;
       } catch  {}
       const text = await proxyRes.text();
       const trimmed = text.trimStart();
@@ -88,6 +91,7 @@ async function metaFetch(url, options = {}) {
         } catch  {}
       }
       if (!looksLikeHtml && !isProxyOwnError) {
+        lastMetaVia = "proxy";
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers
@@ -100,11 +104,8 @@ async function metaFetch(url, options = {}) {
       console.warn("Proxy failed, falling back to direct call:", proxyErr);
     }
   }
-  if (typeof lastMetaProxyIp !== "undefined") {
-    try {
-      lastMetaProxyIp = "direct";
-    } catch  {}
-  }
+  lastMetaVia = "direct";
+  lastMetaIp = null;
   return fetch(url, options);
 }
 function chunk(arr, size) {
