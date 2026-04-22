@@ -48,11 +48,16 @@ export default function TenantDetailPage() {
   const { data: tenant, isLoading, error: tenantError } = useQuery({
     queryKey: ["tenant-detail", tenantId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("tenants").select("*").eq("id", tenantId).single();
+      const { data, error } = await (supabase as any)
+        .from("tenants")
+        .select("*")
+        .eq("id", tenantId)
+        .limit(1);
       if (error) throw error;
-      return data;
+      return data?.[0] ?? null;
     },
     enabled: !!tenantId,
+    retry: false,
   });
 
   // Payments
