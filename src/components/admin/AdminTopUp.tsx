@@ -451,36 +451,6 @@ export function AdminTopUp() {
                 reviewed_at: new Date().toISOString(),
                 entry_by_name: clientDisplayName,
               });
-
-              // Forward proof through forward-seller-proof so the Telegram "Total"
-              // line uses the correctly-computed Due/Advance for this seller
-              // (the per-bank forward-proof call above doesn't recompute the seller balance).
-              if (reqForSeller.proof_url) {
-                try {
-                  // Resolve seller name for caption
-                  let sellerName = "Seller";
-                  try {
-                    const { data: sp } = await (supabase as any)
-                      .from("sellers")
-                      .select("name")
-                      .eq("id", bankForSeller.seller_id)
-                      .single();
-                    sellerName = sp?.name || sellerName;
-                  } catch {}
-                  await supabase.functions.invoke("forward-seller-proof", {
-                    body: {
-                      proof_url: reqForSeller.proof_url,
-                      seller_name: sellerName,
-                      seller_id: bankForSeller.seller_id,
-                      bdt_amount: Number(reqForSeller.bdt_amount || 0),
-                      bank_account_id: reqForSeller.bank_account_id,
-                      reference: `Client top-up — ${clientDisplayName} — $${amount}`,
-                    },
-                  });
-                } catch (e) {
-                  console.error("forward-seller-proof failed:", e);
-                }
-              }
             }
           } catch (e) {
             console.error("Seller ledger sync failed:", e);
