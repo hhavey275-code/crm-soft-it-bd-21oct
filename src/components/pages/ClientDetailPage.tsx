@@ -747,7 +747,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Main Tabs */}
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div className={cn("flex items-center gap-3 flex-wrap", isMobile && "flex-col items-stretch gap-2")}>
             {/* Date Range Filter inline */}
             {!isMobile && (
@@ -778,32 +778,34 @@ export default function ClientDetailPage() {
                 </Popover>
               </div>
             )}
-            <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-full")}>
-              <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <User className="h-3.5 w-3.5" />
-                {isMobile ? "Info" : "Client Info"}
-              </TabsTrigger>
-              <TabsTrigger value="overview" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="transactions" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <Receipt className="h-3.5 w-3.5" />
-                {isMobile ? "Txns" : "Transactions"}
-              </TabsTrigger>
-              <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <Landmark className="h-3.5 w-3.5" />
-                {isMobile ? "Banks" : "Bank Info"}
-              </TabsTrigger>
-              <TabsTrigger value="topups" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <Banknote className="h-3.5 w-3.5" />
-                {isMobile ? "Top-Ups" : "Top Up History"}
-              </TabsTrigger>
-              <TabsTrigger value="unused" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-                <AppWindow className="h-3.5 w-3.5" />
-                Unused
-              </TabsTrigger>
-            </TabsList>
+            <div className={cn(isMobile && "w-full overflow-x-auto -mx-1 px-1 scrollbar-hide")}>
+              <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-max min-w-full")}>
+                <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <User className="h-3.5 w-3.5" />
+                  {isMobile ? "Info" : "Client Info"}
+                </TabsTrigger>
+                <TabsTrigger value="overview" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="transactions" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <Receipt className="h-3.5 w-3.5" />
+                  {isMobile ? "Txns" : "Transactions"}
+                </TabsTrigger>
+                <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <Landmark className="h-3.5 w-3.5" />
+                  {isMobile ? "Banks" : "Bank Info"}
+                </TabsTrigger>
+                <TabsTrigger value="topups" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <Banknote className="h-3.5 w-3.5" />
+                  {isMobile ? "Top-Ups" : "Top Up History"}
+                </TabsTrigger>
+                <TabsTrigger value="unused" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                  <AppWindow className="h-3.5 w-3.5" />
+                  Unused
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
           {/* Client Info Tab */}
