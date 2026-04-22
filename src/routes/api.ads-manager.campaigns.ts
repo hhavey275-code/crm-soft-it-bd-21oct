@@ -49,6 +49,12 @@ async function metaFetch(url: string, options: RequestInit = {}) {
   const proxySecret = process.env.META_PROXY_SECRET;
   const proxyUrl = process.env.META_PROXY_URL || DEFAULT_META_PROXY_URL;
 
+  console.log("[ads-manager] metaFetch", {
+    hasProxySecret: !!proxySecret,
+    proxyUrl,
+    target: url.split("?")[0],
+  });
+
   if (proxySecret && proxyUrl) {
     try {
       const headers = new Headers(options.headers ?? {});
@@ -73,9 +79,11 @@ async function metaFetch(url: string, options: RequestInit = {}) {
       const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
       lastMetaVia = "proxy";
       lastMetaIp = proxyIp;
+      console.log("[ads-manager] proxy response", { status: proxyRes.status, proxyIp });
       const text = await proxyRes.text();
       return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
-    } catch {
+    } catch (err) {
+      console.error("[ads-manager] proxy fetch threw", err);
       lastMetaVia = "direct";
       lastMetaIp = null;
     }
@@ -83,6 +91,7 @@ async function metaFetch(url: string, options: RequestInit = {}) {
 
   lastMetaVia = "direct";
   lastMetaIp = null;
+  console.log("[ads-manager] falling back to direct fetch (no proxy configured or proxy failed)");
   return fetch(url, options);
 }
 
