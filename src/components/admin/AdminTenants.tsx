@@ -171,7 +171,7 @@ export function AdminTenants() {
           <Card
             key={t.id}
             className="overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all"
-            onClick={() => navigate(`/tenants/${t.id}`)}
+            onClick={() => openTenantDetail(t.id)}
           >
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-start justify-between gap-2">
@@ -183,7 +183,7 @@ export function AdminTenants() {
                   <p className="text-xs text-muted-foreground truncate">{t.domain}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/tenants/${t.id}`)} title="View Details">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTenantDetail(t.id)} title="View Details">
                     <Eye className="h-3 w-3" />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyApiKey(t.api_key)} title="Copy API Key">
