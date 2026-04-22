@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +26,7 @@ import {
 
 export default function TenantDetailPage() {
   const params = useParams() as Record<string, string | undefined>;
-  const tenantId = params.tenantId || params.id;
+  const tenantId = useMemo(() => params.tenantId || params.id, [params.id, params.tenantId]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -45,7 +45,7 @@ export default function TenantDetailPage() {
   const [adjustReason, setAdjustReason] = useState("");
 
   // Tenant
-  const { data: tenant, isLoading } = useQuery({
+  const { data: tenant, isLoading, error: tenantError } = useQuery({
     queryKey: ["tenant-detail", tenantId],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("tenants").select("*").eq("id", tenantId).single();
@@ -232,10 +232,15 @@ export default function TenantDetailPage() {
     );
   }
 
-  if (!tenant) {
+  if (tenantError || !tenant) {
     return (
       <DashboardLayout>
-        <div className="text-center py-20 text-muted-foreground">Tenant not found</div>
+        <div className="space-y-3 text-center py-20">
+          <p className="text-muted-foreground">Tenant not found</p>
+          <Button variant="outline" size="sm" onClick={() => navigate("/tenants")}>
+            Back to Tenants
+          </Button>
+        </div>
       </DashboardLayout>
     );
   }
