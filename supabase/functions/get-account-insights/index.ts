@@ -556,6 +556,25 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
 // to avoid Meta API rate limits. Each account makes 3-4 API calls, so batch of 5 = ~20 calls.
 const META_BATCH_SIZE = 20;
 const META_BATCH_DELAY_MS = 300;
+
+async function logMetaCall(supabase: any, params: {
+  userId: string | null;
+  userName: string | null;
+  action: string;
+  details: string;
+}) {
+  try {
+    await supabase.from("system_logs").insert({
+      user_id: params.userId,
+      user_name: params.userName || "system",
+      action: params.action,
+      details: params.details,
+    });
+  } catch (e) {
+    console.warn("logMetaCall failed:", e);
+  }
+}
+
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, {
