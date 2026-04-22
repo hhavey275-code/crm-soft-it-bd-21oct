@@ -17,9 +17,13 @@ export function computeRunningTotalsByBank(transactions: any[]): Map<string, num
   const result = new Map<string, number>();
   if (!transactions || transactions.length === 0) return result;
 
-  const sorted = [...transactions].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  const sorted = [...transactions].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    // Tiebreaker: stable order by id (ascending) when timestamps match
+    return String(a.id).localeCompare(String(b.id));
+  });
 
   const bankRunning = new Map<string, number>();
 
@@ -58,9 +62,13 @@ export function computeDueAdvanceRunning(transactions: any[]): Map<string, numbe
   const result = new Map<string, number>();
   if (!transactions || transactions.length === 0) return result;
 
-  const sorted = [...transactions].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  const sorted = [...transactions].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    // Tiebreaker: stable order by id (ascending) when timestamps match
+    return String(a.id).localeCompare(String(b.id));
+  });
 
   let running = 0;
 

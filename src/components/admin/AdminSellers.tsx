@@ -276,7 +276,8 @@ export function AdminSellers() {
         .from("seller_transactions")
         .select("*, bank_accounts(bank_name, account_number, account_name)")
         .eq("seller_id", selectedSeller.user_id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
       return (data as any[]) ?? [];
     },
   });
@@ -801,6 +802,7 @@ export function AdminSellers() {
                 <p className={cn("text-2xl md:text-3xl font-extrabold tracking-tight", dueAdvance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                   {dueAdvance >= 0 ? "+" : "−"}৳{Math.abs(dueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </p>
+                <p className="text-[10px] text-muted-foreground mt-1">After all transactions</p>
               </div>
             </div>
 
