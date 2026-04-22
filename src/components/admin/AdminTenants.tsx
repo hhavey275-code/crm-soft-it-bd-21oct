@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Plus, Copy, Ban, CheckCircle, Landmark, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Copy, Ban, CheckCircle, Landmark, Trash2, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 export function AdminTenants() {
@@ -162,20 +162,24 @@ export function AdminTenants() {
         ) : tenants.length === 0 ? (
           <Card><CardContent className="py-8 text-center text-muted-foreground">No tenants yet</CardContent></Card>
         ) : tenants.map((t: any) => (
-          <Card key={t.id} className="overflow-hidden">
+          <Card
+            key={t.id}
+            className="overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all"
+            onClick={() => navigate(`/tenants/${t.id}`)}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-start justify-between gap-2">
-                <div
-                  className="flex-1 min-w-0 cursor-pointer"
-                  onClick={() => navigate(`/tenants/${t.id}`)}
-                >
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-sm sm:text-base truncate">{t.name}</h3>
                     <Badge variant={statusColor(t.status)} className="text-[10px]">{t.status}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground truncate">{t.domain}</p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/tenants/${t.id}`)} title="View Details">
+                    <Eye className="h-3 w-3" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyApiKey(t.api_key)} title="Copy API Key">
                     <Copy className="h-3 w-3" />
                   </Button>
