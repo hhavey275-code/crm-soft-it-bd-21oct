@@ -51,12 +51,12 @@ async function fetchSettings(): Promise<SiteSettings> {
 
 export function useSiteSettings() {
   const queryClient = useQueryClient();
-  const cached = getCachedSettings();
+  const cached = typeof document === "undefined" ? undefined : getCachedSettings();
 
   const { data, isLoading } = useQuery({
     queryKey: ["site-settings"],
     queryFn: fetchSettings,
-    initialData: cached,
+    initialData: undefined,
     staleTime: cached?.logoUrl ? 5 * 60 * 1000 : 0,
     refetchOnMount: !cached?.logoUrl ? "always" : false,
   });
