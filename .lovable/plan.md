@@ -1,78 +1,101 @@
+# Tenant ↔ Master Sync: Chat, BM Share & Withdraw Requests
 
+Goal: tenant instances (separate Lovable projects with their own DB) need to forward 3 things to the **master** project so superadmin/admin can see + reply: (a) client chat messages from the tenant's ChatWidget, (b) BM share requests (existing "Request BM Access" flow), (c) Spend-cap withdraw requests (new button next to ad accounts).
 
-## Top-Up Flow + Sync/Logging Fixes
-
-Goal: make the top-up flow truly safe (wallet → API → verify → DB), fix the misleading "Last synced" timestamp, log every Meta call (insights / date-range / dashboard) with caller + IP into System Logs, and fix the wrong "Total" line in the Telegram message that goes out when a **client top-up** is approved.
-
----
-
-### 1. Top-Up Flow — wallet first, then verify with GET (already mostly there, but broken)
-
-Current `spend-cap-update` already follows: deduct wallet → POST → if POST fails do GET-verify → on real success, write DB; on failure, refund-less "Failed Top-Up" entry. But it has bugs that make perfectly successful top-ups land in **Failed Top-Ups**, and other times silently mark fake successes:
-
-What we will do in `supabase/functions/spend-cap-update/index.ts`:
-
-1. **Always GET-verify after POST**, both on POST-success and POST-error paths. Today the success path trusts the POST response and skips a verify GET in some branches; the error path verifies. We unify it: after POST, *always* fetch `?fields=spend_cap` and compare `centsToDollars(metaCap) ≈ oldCap + amount` with a small tolerance (≥ amount − $0.02). Only then mark success.
-2. **Treat "GET shows the new cap" as the source of truth.** If POST returned an error but GET confirms the new cap → success (already done). If POST returned success but GET still shows the old cap → push to `failed_topups` instead of marking success (this is the "client top-up succeeded but spend cap didn't actually update" case the user described).
-3. Fix the broken `lastMetaProxyIp` references (the file uses `lastMetaIp` but logs `lastMetaProxyIp` → currently throws ReferenceError on every failure path, which is partly why "Failed" toasts appear even when the cap updated). Rename consistently to `lastMetaIp` and include `via` (proxy/direct) in every log line.
-4. Wrap the whole flow in clear ordered steps with comments: `(1) Deduct wallet → (2) POST spend_cap → (3) GET verify → (4a) success: update ad_accounts + log + health-check → (4b) failure: insert failed_topups + log` — no early-exit success without a verify.
+Currently `useTenantLicense` POSTs heartbeat to `${master_url}/functions/v1/tenant-webhook` — but **that function does not exist** on the master. So nothing from the tenant ever reaches the master. We will create it and wire all four message types (`heartbeat`, `chat_message`, `bm_share_request`, `spend_cap_withdraw_request`) through it.
 
 ---
 
-### 2. "Update All from Meta" timestamp showing 23h ago
+## 1. Master side — `tenant-webhook` Edge Function (NEW)
 
-In `src/components/client/ClientAdAccounts.tsx` the displayed "Last synced" uses `Math.min(...updated_at)` — so a single never-refreshed account drags the label back to its old time even when most accounts updated 3h ago.
+Create `supabase/functions/tenant-webhook/index.ts` on the master project. Single entrypoint, switches on `body.action`:
 
-Fix: use `Math.max(...updated_at)` (latest sync wins). Also make the post-refresh `refetchInsights()` actually re-read from the DB (force `staleTime: 0` for that one query invalidation) so the label updates immediately after the button finishes.
+- **Auth**: validates `X-Tenant-Key` header against `tenants.api_key`. If missing/invalid → 401. Resolves `tenant_id` from the matched row.
+- **Actions**:
+  - `heartbeat` — same response shape `useTenantLicense` already expects (status, system_limit, total_used, subscription_*, usd_rate). No write needed beyond bumping `tenants.last_heartbeat_at`.
+  - `chat_message` — payload `{ tenant_user_id, tenant_user_name, tenant_user_email, message, conversation_key }`. Upsert into `tenant_chat_conversations` (one per `tenant_id + conversation_key`), insert row in `tenant_chat_messages` with `direction='inbound'`. Master admin reply is handled separately (see §3).
+  - `bm_share_request` — payload `{ tenant_user_id, tenant_user_name, ad_account_external_id, ad_account_name, bm_id, bm_name, note }`. Insert into `tenant_bm_share_requests` (status='pending').
+  - `spend_cap_withdraw_request` — payload `{ tenant_user_id, tenant_user_name, ad_account_external_id, ad_account_name, amount_usd, note }`. Insert into `tenant_withdraw_requests` (status='pending').
+- Returns `{ ok: true, id?: <newRow.id> }` so the tenant can show a toast.
+- All inserts also write a `system_logs` row (action: `Tenant: <type>`, details include tenant name + user name + IP).
 
-Apply the same `Math.max` fix anywhere else this pattern exists (admin & agency lists if present).
+## 2. Master side — DB tables (NEW migration)
 
----
+Add migration creating:
 
-### 3. Log every Meta call into System Logs (caller + IP + which call)
+- `tenant_chat_conversations` — `id`, `tenant_id` (fk → tenants), `tenant_user_id` (text, the user id inside the tenant project), `tenant_user_name`, `tenant_user_email`, `last_message_at`, `is_resolved`, `created_at`. Unique on `(tenant_id, tenant_user_id)`.
+- `tenant_chat_messages` — `id`, `conversation_id` (fk), `direction` ('inbound' tenant→master, 'outbound' master→tenant), `sender_label` (e.g. tenant user name or admin full_name), `message`, `is_read`, `created_at`.
+- `tenant_bm_share_requests` — `id`, `tenant_id`, `tenant_user_id`, `tenant_user_name`, `ad_account_external_id`, `ad_account_name`, `bm_id`, `bm_name`, `note`, `status` (pending/approved/rejected), `admin_notes`, `created_at`, `resolved_at`, `resolved_by`.
+- `tenant_withdraw_requests` — `id`, `tenant_id`, `tenant_user_id`, `tenant_user_name`, `ad_account_external_id`, `ad_account_name`, `amount_usd` (numeric), `note`, `status`, `admin_notes`, `created_at`, `resolved_at`, `resolved_by`.
 
-Today only `spend-cap-update` writes to `system_logs`. Insights refresh, date-range dashboard fetches, and "Update All from Meta" don't — so the user can't see who pulled data, when, or from which IP.
+RLS: enable on all 4. Policies — `superadmin OR admin` (using existing `has_role`) gets full SELECT/UPDATE; INSERT only via service role (the edge function). No client/seller/agency can read.
 
-Changes in `supabase/functions/get-account-insights/index.ts`:
+## 3. Master side — UI surfaces
 
-1. Add a single `logMetaCall(supabase, {userId, userName, action, details, ip, via})` helper that inserts into `system_logs`.
-2. After each request, write **one** row capturing:
-   - action: `"Meta Insights Refresh"` (live source) or `"Meta Insights Cache Read"` (cache source) or `"Meta Date-Range Fetch"` when a `since/until` window is passed.
-   - details: `N accounts · since=YYYY-MM-DD until=YYYY-MM-DD · via=proxy · IP: 1.2.3.4` plus a comma-joined short list of account names (truncated).
-   - resolve `userId/userName` from the auth token (same `getClaims` pattern already used in spend-cap-update).
-3. Fix the same dangling `lastMetaProxyIp` symbol bug here (declare `let lastMetaIp = null; let lastMetaVia = "direct";` and update `metaFetch` to set them).
+### 3a. AdminChat — tenant chat shows in same inbox with badge
+(`src/components/admin/AdminChat.tsx`)
 
-Now System Logs will show: who clicked "Update All from Meta", who opened a date-range view on the dashboard, what IP Meta saw, and how many accounts/which window — covering every Meta API call, not just spend-cap.
+- Extend `loadConversations()` to also fetch `tenant_chat_conversations` + their last message + unread count, and merge into the same list (sorted by `last_message_at`).
+- Each conversation gets a `source` field: `"client"` (existing) or `"tenant"`. Tenant rows render with a small purple `<Badge>Tenant: {tenants.name}</Badge>` next to the name (this is the "super-admin badge" the user asked for).
+- When a tenant conversation is selected:
+  - Messages load from `tenant_chat_messages` (not `chat_messages`).
+  - Replies insert into `tenant_chat_messages` with `direction='outbound'`. Then call a new `notify-tenant` edge function (or reuse `tenant-webhook`'s reverse path) — see §3b.
+- Realtime: subscribe to inserts on `tenant_chat_messages` and `tenant_chat_conversations` in addition to existing channels.
 
----
+### 3b. Master → Tenant reply delivery
 
-### 4. Telegram total wrong on **client_topup** forward
+Tenant has no inbound webhook for now; instead, the tenant's ChatWidget will **poll** for new outbound messages whenever the user opens it / on a 15s interval while open. So no extra master function is needed — the tenant pulls via the same `tenant-webhook` action `pull_chat` (returns messages where `direction='outbound' AND created_at > since`). This keeps master->tenant one-way through the same single function and avoids exposing the tenant's DB.
 
-OCR (manual seller payment) sends the proof through `forward-seller-proof`, which correctly recomputes the seller's running Due/Advance and appends the right "Total" line.
+### 3c. AdminBusinessManagers — Tenant Requests panel
+(`src/components/admin/AdminBusinessManagers.tsx`)
 
-But when an admin approves a client top-up in `AdminTopUp.tsx`, the proof is forwarded via a different function (`forward-proof`) that does *not* recompute the seller balance — so the SMS-style message in Telegram shows a wrong total.
+Add a new collapsible section at the top of the page: **"Tenant Requests"** with two sub-tabs:
 
-Fix: after the client_topup `seller_transactions` row is inserted in `AdminTopUp.tsx` (lines ~439–453), also call `forward-seller-proof` (the function that already computes Due/Advance correctly) for the seller, instead of relying solely on `forward-proof`. Pass `seller_id`, `bdt_amount`, `bank_account_id`, `reference`, and the proof URL. This way both OCR and client-topup paths produce the same correct "Total: Advance/Due ৳X" line.
+- **BM Share Requests** — table over `tenant_bm_share_requests` where `status='pending'`. Columns: Tenant, User, Ad Account, BM (name + id), Note, Created. Actions: `Approve` / `Reject` (writes status + admin_notes + resolved_by/at, also pushes a `chat_message` outbound to that tenant user so they see the decision).
+- **Withdraw Requests** — table over `tenant_withdraw_requests` where `status='pending'`. Columns: Tenant, User, Ad Account, Amount (USD), Note, Created. Actions: `Approve` / `Reject` (same flow).
 
-Keep the existing `forward-proof` call for the bank-group image forward (that one is a different per-bank Telegram group and doesn't need a Total line). Only the seller-Total message gets re-routed through `forward-seller-proof`.
+Pending count badges shown next to each tab title. Resolved items hidden by default with a "Show resolved" toggle.
 
----
+Visibility: render the section only if `isAdmin || isSuperAdmin` (per user's answer).
 
-### Technical summary (files touched)
+## 4. Tenant side — wire the existing UI to push to master
 
-- `supabase/functions/spend-cap-update/index.ts`
-  - Unify "always GET-verify after POST"; treat GET as source of truth.
-  - Fix `lastMetaProxyIp` → `lastMetaIp`; include `via` (proxy/direct) in all log details.
-- `supabase/functions/get-account-insights/index.ts`
-  - Declare `lastMetaIp` / `lastMetaVia`, capture per-request.
-  - Resolve caller `userId` / `userName` from the bearer token.
-  - Insert one `system_logs` row per request: insights refresh, cache read, and date-range fetch.
-- `src/components/client/ClientAdAccounts.tsx`
-  - Replace `Math.min` with `Math.max` for `lastUpdated`.
-  - Force-refresh that query after `refreshAllMutation` finishes.
-- `src/components/admin/AdminAdAccounts.tsx` and `src/components/agency/AgencyAdAccounts.tsx` (if same pattern exists) — same `Math.max` fix.
-- `src/components/admin/AdminTopUp.tsx`
-  - After inserting the `seller_transactions` `client_topup` row, invoke `forward-seller-proof` with the seller + bdt context so the Telegram "Total" line is the correctly-computed Due/Advance.
+These edits live in the **tenant** Lovable project (same codebase template, just deployed as a tenant instance with `is_tenant=true`). All three changes go through one new helper:
 
-No DB migrations required.
+`src/lib/tenantForward.ts` (NEW) — single helper that reads `master_url + tenant_api_key` from `site_settings`, POSTs to `${master_url}/functions/v1/tenant-webhook` with `X-Tenant-Key`, and returns `{ ok, id?, error? }`. All three flows below call this.
 
+### 4a. ChatWidget (`src/components/ChatWidget.tsx`)
+
+- After local `chat_messages` insert succeeds, if `useTenantLicense().isTenant` → also call `tenantForward({ action: 'chat_message', payload: { conversation_key: user.id, tenant_user_id: user.id, tenant_user_name, tenant_user_email, message } })`. Local insert remains so the tenant's own admin can also see the chat in their own AdminChat.
+- Add a 15s `setInterval` while the widget is **open** that calls `tenantForward({ action: 'pull_chat', payload: { conversation_key: user.id, since: <last seen timestamp> } })` and inserts any returned outbound messages into the local `chat_messages` table (sender_id set to a special UUID `00000000-0000-0000-0000-000000000000` representing "Master Support") so they appear inside the tenant user's existing chat UI.
+
+### 4b. BM share request (`src/components/client/ClientAdAccounts.tsx` → `handleBmReqSubmit`)
+
+- After the existing local `bm_access_requests` insert succeeds, if `isTenant` → also `tenantForward({ action: 'bm_share_request', payload: { tenant_user_id, tenant_user_name, ad_account_external_id: bmReqAccount.account_id, ad_account_name, bm_id, bm_name, note } })`. Failure of the forward shows a non-blocking warning toast — local request still recorded.
+
+### 4c. Withdraw request (NEW button in `ClientAdAccounts.tsx`)
+
+- Add a new dropdown menu item next to "Request BM Access": **"Request Spend Cap Withdraw"**. Opens a small dialog asking for **Amount (USD)** and optional **Note**.
+- On submit:
+  - Insert a row into a new local table `spend_cap_withdraw_requests` (id, user_id, ad_account_id, amount_usd, note, status='pending', created_at) — created in the same migration as §2.
+  - If `isTenant` → also `tenantForward({ action: 'spend_cap_withdraw_request', payload: { ... } })`.
+  - Toast confirmation, no actual spend cap change here — the actual cap reduction happens later when a master admin approves; that approval flow is **out of scope** for this iteration (master just records + shows the request).
+
+## 5. Things explicitly NOT in this iteration
+
+- Auto-executing the spend cap reduction when a withdraw request is approved (admin will do it manually in their existing flow for now).
+- Tenant-side admin UI for these requests (they only flow tenant-user → master-admin).
+- File/image attachments in tenant chat.
+- Two-way realtime for tenant chat (we use 15s poll while widget is open; good enough for support chat; can upgrade to webhooks later).
+
+## 6. Files touched
+
+- NEW `supabase/functions/tenant-webhook/index.ts` (master)
+- NEW migration: 4 tables + RLS + 1 local table `spend_cap_withdraw_requests`
+- NEW `src/lib/tenantForward.ts`
+- EDIT `src/components/admin/AdminChat.tsx` — merge tenant conversations + replies route through `notify-tenant` outbound row
+- EDIT `src/components/admin/AdminBusinessManagers.tsx` — Tenant Requests section (BM share + Withdraw tabs)
+- EDIT `src/components/ChatWidget.tsx` — forward + 15s poll while open
+- EDIT `src/components/client/ClientAdAccounts.tsx` — forward BM req + new Withdraw req button/dialog
+
+No changes to `useTenantLicense` itself — once the master's `tenant-webhook` exists, the existing heartbeat call will start succeeding automatically.
