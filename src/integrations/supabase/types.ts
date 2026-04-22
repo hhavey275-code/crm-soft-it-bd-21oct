@@ -1871,6 +1871,48 @@ export type Database = {
         }
         Relationships: []
       }
+      spend_cap_withdraw_requests: {
+        Row: {
+          ad_account_id: string
+          admin_note: string | null
+          amount_usd: number
+          created_at: string
+          id: string
+          note: string | null
+          resolved_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          admin_note?: string | null
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          admin_note?: string | null
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sync_logs: {
         Row: {
           business_manager_id: string

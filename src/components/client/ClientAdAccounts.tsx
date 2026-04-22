@@ -25,6 +25,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logSystemAction } from "@/lib/systemLog";
 import { InactiveBadge } from "@/components/InactiveBadge";
+import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
+import { ArrowDownCircle } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
@@ -82,6 +84,17 @@ export function ClientAdAccounts() {
   const [bmReqForm, setBmReqForm] = useState({ bm_name: "", bm_id: "" });
   const [bmReqLoading, setBmReqLoading] = useState(false);
 
+  // Spend Cap Withdraw state
+  const [withdrawAccount, setWithdrawAccount] = useState<any>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawNote, setWithdrawNote] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [isTenantMode, setIsTenantMode] = useState(false);
+
+  useEffect(() => {
+    isTenantInstance().then(setIsTenantMode);
+  }, []);
+
   // Rename state
   const [renameAccount, setRenameAccount] = useState<any>(null);
   const [renameName, setRenameName] = useState("");
@@ -103,6 +116,23 @@ export function ClientAdAccounts() {
       });
       if (error) throw error;
       await logSystemAction("BM Access Requested", `BM "${bmReqForm.bm_name}" (${bmReqForm.bm_id}) for account ${bmReqAccount.account_name}`, user!.id, profile?.full_name || user!.email);
+
+      // Forward to master if tenant mode
+      if (isTenantMode) {
+        const fwd = await tenantForward("bm_share_request", {
+          tenant_user_id: user!.id,
+          tenant_user_name: profile?.full_name || user!.email,
+          ad_account_external_id: bmReqAccount.account_id,
+          ad_account_name: bmReqAccount.account_name,
+          bm_id: bmReqForm.bm_id,
+          bm_name: bmReqForm.bm_name,
+          note: null,
+        });
+        if (!fwd.ok && !fwd.skipped) {
+          toast.warning("Saved locally — failed to notify master support");
+        }
+      }
+
       toast.success("BM access request submitted!");
       setBmReqAccount(null);
       setBmReqForm({ bm_name: "", bm_id: "" });
@@ -110,6 +140,52 @@ export function ClientAdAccounts() {
       toast.error(err.message || "Failed to submit request");
     } finally {
       setBmReqLoading(false);
+    }
+  };
+
+  const handleWithdrawSubmit = async () => {
+    if (!withdrawAccount || !withdrawAmount) return;
+    const amount = parseFloat(withdrawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const { error } = await (supabase as any).from("spend_cap_withdraw_requests").insert({
+        user_id: user!.id,
+        ad_account_id: withdrawAccount.id,
+        amount_usd: amount,
+        note: withdrawNote || null,
+      });
+      if (error) throw error;
+      await logSystemAction(
+        "Spend Cap Withdraw Requested",
+        `$${amount} from ${withdrawAccount.account_name}${withdrawNote ? ` — ${withdrawNote}` : ""}`,
+        user!.id,
+        profile?.full_name || user!.email
+      );
+      if (isTenantMode) {
+        const fwd = await tenantForward("spend_cap_withdraw_request", {
+          tenant_user_id: user!.id,
+          tenant_user_name: profile?.full_name || user!.email,
+          ad_account_external_id: withdrawAccount.account_id,
+          ad_account_name: withdrawAccount.account_name,
+          amount_usd: amount,
+          note: withdrawNote || null,
+        });
+        if (!fwd.ok && !fwd.skipped) {
+          toast.warning("Saved locally — failed to notify master support");
+        }
+      }
+      toast.success("Withdraw request submitted!");
+      setWithdrawAccount(null);
+      setWithdrawAmount("");
+      setWithdrawNote("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setWithdrawLoading(false);
     }
   };
 
@@ -746,6 +822,10 @@ export function ClientAdAccounts() {
                             <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                               Request BM Access
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setWithdrawAccount(a); setWithdrawAmount(""); setWithdrawNote(""); }}>
+                              <ArrowDownCircle className="h-3.5 w-3.5 mr-2" />
+                              Request Spend Cap Withdraw
+                            </DropdownMenuItem>
                             {hasAutoTopupPermission && (
                               <DropdownMenuItem onClick={() => {
                                 setAutoTopupAccount(a);
@@ -888,6 +968,10 @@ export function ClientAdAccounts() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                                 Request BM Access
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setWithdrawAccount(a); setWithdrawAmount(""); setWithdrawNote(""); }}>
+                                <ArrowDownCircle className="h-3.5 w-3.5 mr-2" />
+                                Request Spend Cap Withdraw
                               </DropdownMenuItem>
                               {hasAutoTopupPermission && (
                                 <DropdownMenuItem onClick={() => {
@@ -1048,6 +1132,47 @@ export function ClientAdAccounts() {
             <Button variant="outline" onClick={() => setBmReqAccount(null)}>Cancel</Button>
             <Button onClick={handleBmReqSubmit} disabled={bmReqLoading || !bmReqForm.bm_name || !bmReqForm.bm_id}>
               {bmReqLoading ? "Submitting..." : "Submit Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Spend Cap Withdraw Request Dialog */}
+      <Dialog open={!!withdrawAccount} onOpenChange={(open) => { if (!open) setWithdrawAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Spend Cap Withdraw</DialogTitle>
+            <DialogDescription>
+              Request a spend cap reduction for <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will review and process it manually.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Amount (USD) *</Label>
+              <Input
+                type="number"
+                min="1"
+                step="0.01"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                placeholder="e.g. 100"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Note (optional)</Label>
+              <Input
+                value={withdrawNote}
+                onChange={(e) => setWithdrawNote(e.target.value)}
+                placeholder="Reason or instructions"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawAccount(null)}>Cancel</Button>
+            <Button onClick={handleWithdrawSubmit} disabled={withdrawLoading || !withdrawAmount}>
+              {withdrawLoading ? "Submitting..." : "Submit Request"}
             </Button>
           </DialogFooter>
         </DialogContent>

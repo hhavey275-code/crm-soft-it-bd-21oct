@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 
 interface ChatMessage {
   id: string;
@@ -27,6 +28,60 @@ export function ChatWidget() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tenantPollRef = useRef<{ since: string | null; isTenant: boolean }>({ since: null, isTenant: false });
+
+  // Detect tenant mode once
+  useEffect(() => {
+    isTenantInstance().then((v) => { tenantPollRef.current.isTenant = v; });
+  }, []);
+
+  // Poll master for outbound (admin reply) messages while widget is open
+  useEffect(() => {
+    if (!open || !user || !conversationId) return;
+    let cancelled = false;
+    const SUPPORT_SENDER_ID = "00000000-0000-0000-0000-000000000000";
+
+    const poll = async () => {
+      if (!tenantPollRef.current.isTenant) return;
+      const since = tenantPollRef.current.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const res = await tenantForward("pull_chat", {
+        tenant_user_id: user.id,
+        since,
+      });
+      if (cancelled || !res.ok || !res.messages?.length) return;
+      const profile: any = (user as any).user_metadata || {};
+      const newRows: ChatMessage[] = [];
+      for (const m of res.messages) {
+        // Insert into local chat_messages so they show in the same UI
+        let convId = conversationId;
+        if (!convId) continue;
+        const { data: inserted } = await (supabase as any)
+          .from("chat_messages")
+          .insert({
+            conversation_id: convId,
+            sender_id: SUPPORT_SENDER_ID,
+            message: m.message,
+          })
+          .select("*")
+          .maybeSingle();
+        if (inserted) newRows.push(inserted as ChatMessage);
+        if (m.created_at) tenantPollRef.current.since = m.created_at;
+      }
+      if (newRows.length > 0) {
+        setMessages((prev) => {
+          const map = new Map(prev.map((p) => [p.id, p] as const));
+          for (const r of newRows) map.set(r.id, r);
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 15_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [open, user, conversationId]);
 
   // Load or create conversation
   useEffect(() => {
@@ -158,6 +213,18 @@ export function ChatWidget() {
         .from("chat_conversations")
         .update({ last_message_at: new Date().toISOString() })
         .eq("id", convId);
+
+      // Forward to master if this instance is a tenant
+      if (tenantPollRef.current.isTenant) {
+        const meta: any = (user as any).user_metadata || {};
+        tenantForward("chat_message", {
+          tenant_user_id: user.id,
+          tenant_user_name: meta.full_name || user.email,
+          tenant_user_email: user.email,
+          message: message.trim(),
+        }).catch(() => {});
+      }
+
       setMessage("");
     }
     setSending(false);
