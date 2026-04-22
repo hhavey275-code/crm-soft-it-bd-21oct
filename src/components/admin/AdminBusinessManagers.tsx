@@ -410,21 +410,7 @@ export function AdminBusinessManagers() {
 
   const encryptExistingMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ action: "encrypt_existing" }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Failed");
-      return result;
+      return invokeBmFunction<{ encrypted?: number }>("manage-bm", { action: "encrypt_existing" });
     },
     onSuccess: (result) => {
       toast.success(`${result.encrypted} token(s) encrypted successfully`);
@@ -436,21 +422,7 @@ export function AdminBusinessManagers() {
   // Revoke token mutation
   const revokeMutation = useMutation({
     mutationFn: async (params: { bm_id?: string; revoke_all?: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/revoke-bm-token`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify(params),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Revoke failed");
-      return result;
+      return invokeBmFunction<{ results?: Array<{ revoked?: boolean }> }>("revoke-bm-token", params);
     },
     onSuccess: (result) => {
       const revoked = result.results?.filter((r: any) => r.revoked).length || 0;
