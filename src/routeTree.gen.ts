@@ -45,6 +45,7 @@ import { Route as AgencyPaymentsRouteImport } from './routes/agency-payments'
 import { Route as AgenciesRouteImport } from './routes/agencies'
 import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TenantsIndexRouteImport } from './routes/tenants.index'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
@@ -234,6 +235,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TenantsIndexRoute = TenantsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TenantsRoute,
+} as any)
 const ClientsIndexRoute = ClientsIndexRouteImport.update({
   id: '/clients/',
   path: '/clients/',
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/tenants/': typeof TenantsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -352,7 +359,6 @@ export interface FileRoutesByTo {
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
-  '/tenants': typeof TenantsRouteWithChildren
   '/terms': typeof TermsRoute
   '/top-up': typeof TopUpRoute
   '/transactions': typeof TransactionsRoute
@@ -366,6 +372,7 @@ export interface FileRoutesByTo {
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
   '/clients': typeof ClientsIndexRoute
+  '/tenants': typeof TenantsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -413,6 +420,7 @@ export interface FileRoutesById {
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/tenants/': typeof TenantsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -461,6 +469,7 @@ export interface FileRouteTypes {
     | '/invoice/$requestId'
     | '/tenants/$id'
     | '/clients/'
+    | '/tenants/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -493,7 +502,6 @@ export interface FileRouteTypes {
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
-    | '/tenants'
     | '/terms'
     | '/top-up'
     | '/transactions'
@@ -507,6 +515,7 @@ export interface FileRouteTypes {
     | '/invoice/$requestId'
     | '/tenants/$id'
     | '/clients'
+    | '/tenants'
   id:
     | '__root__'
     | '/'
@@ -553,6 +562,7 @@ export interface FileRouteTypes {
     | '/invoice/$requestId'
     | '/tenants/$id'
     | '/clients/'
+    | '/tenants/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -853,6 +863,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tenants/': {
+      id: '/tenants/'
+      path: '/'
+      fullPath: '/tenants/'
+      preLoaderRoute: typeof TenantsIndexRouteImport
+      parentRoute: typeof TenantsRoute
+    }
     '/clients/': {
       id: '/clients/'
       path: '/clients'
@@ -938,10 +955,12 @@ const AgenciesRouteWithChildren = AgenciesRoute._addFileChildren(
 
 interface TenantsRouteChildren {
   TenantsIdRoute: typeof TenantsIdRoute
+  TenantsIndexRoute: typeof TenantsIndexRoute
 }
 
 const TenantsRouteChildren: TenantsRouteChildren = {
   TenantsIdRoute: TenantsIdRoute,
+  TenantsIndexRoute: TenantsIndexRoute,
 }
 
 const TenantsRouteWithChildren =
