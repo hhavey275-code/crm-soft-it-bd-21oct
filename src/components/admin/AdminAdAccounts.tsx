@@ -42,6 +42,27 @@ interface InsightsData {
   last_spend_date?: string | null;
 }
 
+const INSIGHTS_CACHE_KEY = "adminInsightsCache_v1";
+
+function readInsightsLocalCache(): Record<string, InsightsData> | undefined {
+  try {
+    const raw = localStorage.getItem(INSIGHTS_CACHE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeInsightsLocalCache(data: Record<string, InsightsData>) {
+  try {
+    localStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // quota / disabled — ignore
+  }
+}
+
 export function AdminAdAccounts() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
