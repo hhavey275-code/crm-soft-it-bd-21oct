@@ -39,7 +39,7 @@ import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 export default function ClientDetailPage() {
   const params = useParams<{ userId?: string; id?: string }>();
   const userId = params.userId || params.id;
-  const { user: currentUser, isSuperAdmin } = useAuth();
+  const { user: currentUser, isSuperAdmin, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -643,7 +643,7 @@ export default function ClientDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {isSuperAdmin && (
+              {isAdmin && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -706,7 +706,7 @@ export default function ClientDetailPage() {
               <StatusBadge status={isActive ? "active" : "inactive"} />
             </div>
             <div className="flex items-center gap-2">
-              {isSuperAdmin && (
+              {isAdmin && (
                 <Button
                   size="sm"
                   variant="outline"

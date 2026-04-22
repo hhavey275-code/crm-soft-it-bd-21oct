@@ -480,10 +480,12 @@ export function AdminClients() {
                             <Building2 className="h-4 w-4 mr-2" />Convert to Agency
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-blue-600" onClick={() => impersonateMutation.mutate(client.user_id)}>
-                            <LogIn className="h-4 w-4 mr-2" />Login as Client
-                          </DropdownMenuItem>
                         </>
+                      )}
+                      {userRole === "client" && !isPending && (
+                        <DropdownMenuItem className="text-blue-600" onClick={() => impersonateMutation.mutate(client.user_id)}>
+                          <LogIn className="h-4 w-4 mr-2" />Login as Client
+                        </DropdownMenuItem>
                       )}
                       {isSuperAdmin && userRole === "admin" && (
                         <>
