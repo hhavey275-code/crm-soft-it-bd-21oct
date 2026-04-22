@@ -5,10 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { getInactiveDays } from "@/lib/inactiveDays";
 import { Search, ExternalLink } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Tier = "15" | "30" | "45" | "unknown";
 
