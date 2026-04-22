@@ -43,6 +43,7 @@ interface InsightsData {
 }
 
 const INSIGHTS_CACHE_KEY = "adminInsightsCache_v1";
+const LAST_FULL_SYNC_KEY = "adminLastFullSync_v1";
 
 function readInsightsLocalCache(): Record<string, InsightsData> | undefined {
   try {
@@ -60,6 +61,25 @@ function writeInsightsLocalCache(data: Record<string, InsightsData>) {
     localStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(data));
   } catch {
     // quota / disabled — ignore
+  }
+}
+
+function readLastFullSync(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_FULL_SYNC_KEY);
+    if (!raw) return null;
+    const ts = Number(raw);
+    return Number.isFinite(ts) && ts > 0 ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastFullSync(ts: number) {
+  try {
+    localStorage.setItem(LAST_FULL_SYNC_KEY, String(ts));
+  } catch {
+    // ignore
   }
 }
 
@@ -251,6 +271,10 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${assignedAccounts.length} assigned account(s) updated from Meta`);
       }
+      // Record the time of this full sync — header timestamp updates only here
+      const now = Date.now();
+      writeLastFullSync(now);
+      setLastFullSyncAt(now);
       refetchInsights();
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
