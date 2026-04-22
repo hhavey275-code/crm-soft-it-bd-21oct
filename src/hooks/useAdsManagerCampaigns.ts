@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface AdsManagerCampaign {
   id: string;
@@ -35,31 +35,26 @@ export function useAdsManagerCampaigns(params: {
   dateFrom: string;
   dateTo: string;
 }) {
-  const { session } = useAuth();
   const [data, setData] = useState<FetchCampaignsResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!session?.access_token) {
-        throw new Error("Please sign in again and retry.");
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        "ads-manager-campaigns",
+        { body: params },
+      );
+      if (fnError) {
+        const msg =
+          (fnError as any)?.context?.body?.error ||
+          (fnError as any)?.message ||
+          "Failed to fetch campaigns";
+        throw new Error(msg);
       }
-
-      const res = await fetch("/api/ads-manager/campaigns", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(params),
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to fetch campaigns");
+      if ((result as any)?.error) {
+        throw new Error((result as any).error);
       }
-
-      return json as FetchCampaignsResponse;
+      return result as FetchCampaignsResponse;
     },
     onMutate: () => {
       setError(null);
