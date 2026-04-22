@@ -90,6 +90,12 @@ export function AdminTenants() {
     toast.success(`Tenant ${newStatus === "active" ? "activated" : "frozen"}`);
   };
 
+  const openTenantDetail = (tenantId: string) => {
+    if (typeof window !== "undefined") {
+      window.location.href = `/tenants/${tenantId}`;
+    }
+  };
+
   const copyApiKey = (key: string) => {
     navigator.clipboard.writeText(key);
     toast.success("API key copied");
