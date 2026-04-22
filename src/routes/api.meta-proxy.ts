@@ -17,6 +17,10 @@ const proxyBodySchema = z.object({
 
 const allowedHosts = new Set(["graph.facebook.com"]);
 
+function normalizeSecret(value: string | undefined | null) {
+  return value?.trim().replace(/^['"]|['"]$/g, "") ?? "";
+}
+
 let cachedEgressIp: { value: string | null; fetchedAt: number } | null = null;
 
 function withCors(response: Response) {
@@ -91,12 +95,12 @@ export const Route = createFileRoute("/api/meta-proxy")({
           message: "Meta proxy is reachable",
         }),
       POST: async ({ request }) => {
-        const configuredSecret = process.env.META_PROXY_SECRET;
+        const configuredSecret = normalizeSecret(process.env.META_PROXY_SECRET);
         if (!configuredSecret) {
           return jsonResponse({ error: "META_PROXY_SECRET is not configured" }, 500);
         }
 
-        const incomingSecret = request.headers.get("x-proxy-secret")?.trim();
+        const incomingSecret = normalizeSecret(request.headers.get("x-proxy-secret"));
         if (!incomingSecret || incomingSecret !== configuredSecret) {
           return jsonResponse({ error: "Unauthorized" }, 401);
         }
