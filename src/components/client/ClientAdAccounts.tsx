@@ -481,7 +481,9 @@ export function ClientAdAccounts() {
   const lastUpdated = useMemo(() => {
     const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
     if (times.length === 0) return null;
-    return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
+    // Use the LATEST sync time, not the oldest — otherwise a single never-refreshed
+    // account would drag the label back in time even when most accounts updated recently.
+    return new Date(Math.max(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
   const aggregatedTodaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0);
