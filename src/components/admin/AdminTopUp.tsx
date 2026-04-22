@@ -411,29 +411,15 @@ export function AdminTopUp() {
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
 
-      // Forward proof image to per-bank Telegram group on approval (via edge function to avoid CORS)
+      // On approval: insert seller_transactions ledger row FIRST (so the Telegram
+      // running total includes this top-up), then forward the proof to Telegram.
       if (action === "approved") {
-        let forwarded = false;
-        try {
-          const { data: fwdData, error: fwdErr } = await supabase.functions.invoke("forward-proof", { body: { request_id: id } });
-          if (fwdErr) {
-            console.error("Telegram forward error:", fwdErr);
-          } else if (fwdData?.ok && !fwdData?.skipped) {
-            forwarded = true;
-          }
-        } catch (e) {
-          console.error("Telegram forward failed:", e);
-        }
-        // Save forward status
-        await (supabase as any).from("top_up_requests").update({ telegram_forwarded: forwarded }).eq("id", id);
-
         // Auto-sync to seller ledger if bank has a seller assigned
         const reqForSeller = requests?.find((r: any) => r.id === id);
         if (reqForSeller?.bank_account_id) {
           try {
             const { data: bankForSeller } = await (supabase as any).from("bank_accounts").select("seller_id").eq("id", reqForSeller.bank_account_id).single();
             if (bankForSeller?.seller_id) {
-              // Get client name for entry_by_name (since this is a client_topup)
               const clientProfileForName = reqForSeller.profile;
               const clientDisplayName = clientProfileForName?.full_name || clientProfileForName?.email || "Client";
               await (supabase as any).from("seller_transactions").insert({
@@ -456,6 +442,21 @@ export function AdminTopUp() {
             console.error("Seller ledger sync failed:", e);
           }
         }
+
+        // Forward proof image to per-bank Telegram group (after ledger insert so
+        // forward-proof's Due/Advance running total reflects the new entry).
+        let forwarded = false;
+        try {
+          const { data: fwdData, error: fwdErr } = await supabase.functions.invoke("forward-proof", { body: { request_id: id } });
+          if (fwdErr) {
+            console.error("Telegram forward error:", fwdErr);
+          } else if (fwdData?.ok && !fwdData?.skipped) {
+            forwarded = true;
+          }
+        } catch (e) {
+          console.error("Telegram forward failed:", e);
+        }
+        await (supabase as any).from("top_up_requests").update({ telegram_forwarded: forwarded }).eq("id", id);
       }
     },
     onSuccess: (_, { action }) => {
