@@ -139,11 +139,16 @@ export function AdminAdAccounts() {
           cards: (existing.cards && existing.cards.length ? existing.cards : row.cards) ?? [],
         };
       });
+      // Persist to localStorage so the next page reload can show data instantly
+      writeInsightsLocalCache(edge);
       return edge;
     },
     enabled: !!accounts && accounts.length > 0,
     // Keep previously fetched data visible while refetching to avoid 0/-- flicker on tab return
     placeholderData: keepPreviousData,
+    // Restore last successful fetch from localStorage so reload renders cached numbers instantly
+    initialData: readInsightsLocalCache,
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60_000, // 5 min — only refetch in background after this
     refetchOnMount: false,
     refetchOnWindowFocus: false,
