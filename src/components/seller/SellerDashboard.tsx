@@ -271,7 +271,7 @@ export function SellerDashboard() {
               {dueAdvance >= 0 ? "+" : "−"}৳{Math.abs(dueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
+              After all transactions · {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
             </p>
           </div>
         </div>
