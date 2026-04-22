@@ -150,7 +150,8 @@ export function AdminAdAccounts() {
     initialData: readInsightsLocalCache,
     initialDataUpdatedAt: 0,
     staleTime: 5 * 60_000, // 5 min — only refetch in background after this
-    refetchOnMount: false,
+    // Refetch on mount when stale (e.g. fresh reload restoring localStorage cache) so data updates silently in background
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
 
