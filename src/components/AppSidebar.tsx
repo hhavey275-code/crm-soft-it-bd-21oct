@@ -22,7 +22,9 @@ import {
   MessageSquareHeart,
   Trophy,
   Wallet,
+  RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
