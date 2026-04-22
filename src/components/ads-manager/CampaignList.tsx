@@ -28,6 +28,7 @@ import { SpendCapRuleDialog } from "./SpendCapRuleDialog";
 import { CostPerResultRuleDialog } from "./CostPerResultRuleDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAdsManagerCampaigns } from "@/hooks/useAdsManagerCampaigns";
 
 interface Campaign {
   id: string;
@@ -89,27 +90,21 @@ export function CampaignList({ accountId }: CampaignListProps) {
   const [spendDialog, setSpendDialog] = useState<{ open: boolean; campaignId?: string; campaignName?: string; existing?: CampaignRule }>({ open: false });
   const [cprDialog, setCprDialog] = useState<{ open: boolean; campaignId?: string; campaignName?: string; existing?: CampaignRule }>({ open: false });
 
-  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useQuery({
-    queryKey: ["ads-manager-campaigns", accountId],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("ads-manager", {
-        body: {
-          action: "list_campaigns",
-          account_id: accountId,
-          status_filter: statusFilter,
-          date_from: dateFrom,
-          date_to: dateTo,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data as { campaigns: Campaign[] };
-    },
-    staleTime: Infinity,
-    gcTime: 1000 * 60 * 30,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+  const {
+    campaigns: fetchedCampaigns,
+    isLoading,
+    isError,
+    error,
+    fetchCampaigns,
+    dataUpdatedAt,
+    via,
+    proxyIp,
+    hasFetched,
+  } = useAdsManagerCampaigns({
+    accountId,
+    statusFilter,
+    dateFrom,
+    dateTo,
   });
 
   const { data: rulesData } = useQuery({
@@ -185,13 +180,13 @@ export function CampaignList({ accountId }: CampaignListProps) {
   });
 
   const campaigns = useMemo(() => {
-    let list = data?.campaigns || [];
+    let list = fetchedCampaigns || [];
     if (statusFilter !== "all") {
       list = list.filter((c) => c.effective_status?.toLowerCase().includes(statusFilter.toLowerCase()));
     }
     if (searchTerm) list = list.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
     return list;
-  }, [data?.campaigns, searchTerm, statusFilter]);
+  }, [fetchedCampaigns, searchTerm, statusFilter]);
 
   const allSelected = campaigns.length > 0 && campaigns.every((c) => selectedIds.has(c.id));
   const someSelected = selectedIds.size > 0 && !allSelected;
@@ -209,7 +204,7 @@ export function CampaignList({ accountId }: CampaignListProps) {
   };
 
   const handleUpdate = async () => {
-    await refetch();
+    await fetchCampaigns();
     queryClient.invalidateQueries({ queryKey: ["ads-manager-rules", accountId] });
     toast.success("Campaigns updated");
   };
@@ -274,9 +269,9 @@ export function CampaignList({ accountId }: CampaignListProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button onClick={handleUpdate} disabled={isFetching} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          Update
+        <Button onClick={handleUpdate} disabled={isLoading} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          {hasFetched ? "Fetch Again" : "Fetch Campaigns"}
         </Button>
       </div>
 
@@ -328,9 +323,11 @@ export function CampaignList({ accountId }: CampaignListProps) {
       )}
 
       {dataUpdatedAt > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Last updated {formatDistanceToNow(dataUpdatedAt, { addSuffix: true })}
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <p>Last updated {formatDistanceToNow(dataUpdatedAt, { addSuffix: true })}</p>
+          {via && <Badge variant="outline" className="h-5 px-2 text-[10px] capitalize">via {via}</Badge>}
+          {proxyIp && <Badge variant="outline" className="h-5 px-2 text-[10px] font-mono">IP: {proxyIp}</Badge>}
+        </div>
       )}
 
       {/* Selection bar */}
@@ -354,7 +351,13 @@ export function CampaignList({ accountId }: CampaignListProps) {
           <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
           <p className="text-destructive font-medium">Failed to load campaigns</p>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">{(error as Error)?.message || "Unknown error"}</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="h-4 w-4 mr-2" /> Retry</Button>
+          <Button variant="outline" size="sm" onClick={() => fetchCampaigns()}><RefreshCw className="h-4 w-4 mr-2" /> Retry</Button>
+        </div>
+      ) : !hasFetched ? (
+        <div className="text-center py-16 rounded-lg border-2 border-dashed bg-muted/20">
+          <Megaphone className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="font-medium text-muted-foreground">Campaign fetch ready</p>
+          <p className="text-sm text-muted-foreground mt-1">Button চাপলে proxy IP দিয়ে campaigns load হবে, আর system log-এ save হবে।</p>
         </div>
       ) : campaigns.length === 0 ? (
         <div className="text-center py-16 rounded-lg border-2 border-dashed bg-muted/20">

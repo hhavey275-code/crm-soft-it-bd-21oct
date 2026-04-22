@@ -54,6 +54,7 @@ import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
+import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
   id: '/wallet-balances',
@@ -280,6 +281,11 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
+const ApiAdsManagerCampaignsRoute = ApiAdsManagerCampaignsRouteImport.update({
+  id: '/api/ads-manager/campaigns',
+  path: '/api/ads-manager/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/tenants/$id': typeof TenantsIdRoute
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
+  '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -373,6 +380,7 @@ export interface FileRoutesByTo {
   '/tenants/$id': typeof TenantsIdRoute
   '/clients': typeof ClientsIndexRoute
   '/tenants': typeof TenantsIndexRoute
+  '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -421,6 +429,7 @@ export interface FileRoutesById {
   '/tenants/$id': typeof TenantsIdRoute
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
+  '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -470,6 +479,7 @@ export interface FileRouteTypes {
     | '/tenants/$id'
     | '/clients/'
     | '/tenants/'
+    | '/api/ads-manager/campaigns'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/tenants/$id'
     | '/clients'
     | '/tenants'
+    | '/api/ads-manager/campaigns'
   id:
     | '__root__'
     | '/'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/tenants/$id'
     | '/clients/'
     | '/tenants/'
+    | '/api/ads-manager/campaigns'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -607,6 +619,7 @@ export interface RootRouteChildren {
   ClientsIdRoute: typeof ClientsIdRoute
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
+  ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -926,6 +939,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
+    '/api/ads-manager/campaigns': {
+      id: '/api/ads-manager/campaigns'
+      path: '/api/ads-manager/campaigns'
+      fullPath: '/api/ads-manager/campaigns'
+      preLoaderRoute: typeof ApiAdsManagerCampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1008,7 +1028,17 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIdRoute: ClientsIdRoute,
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
+  ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

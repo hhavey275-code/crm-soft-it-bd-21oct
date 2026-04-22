@@ -117,20 +117,17 @@ export function ClientAdAccounts() {
       if (error) throw error;
       await logSystemAction("BM Access Requested", `BM "${bmReqForm.bm_name}" (${bmReqForm.bm_id}) for account ${bmReqAccount.account_name}`, user!.id, profile?.full_name || user!.email);
 
-      // Forward to master if tenant mode
-      if (isTenantMode) {
-        const fwd = await tenantForward("bm_share_request", {
-          tenant_user_id: user!.id,
-          tenant_user_name: profile?.full_name || user!.email,
-          ad_account_external_id: bmReqAccount.account_id,
-          ad_account_name: bmReqAccount.account_name,
-          bm_id: bmReqForm.bm_id,
-          bm_name: bmReqForm.bm_name,
-          note: null,
-        });
-        if (!fwd.ok && !fwd.skipped) {
-          toast.warning("Saved locally — failed to notify master support");
-        }
+      const bmForward = await tenantForward("bm_share_request", {
+        tenant_user_id: user!.id,
+        tenant_user_name: profile?.full_name || user!.email,
+        ad_account_external_id: bmReqAccount.account_id,
+        ad_account_name: bmReqAccount.account_name,
+        bm_id: bmReqForm.bm_id,
+        bm_name: bmReqForm.bm_name,
+        note: null,
+      });
+      if (!bmForward.ok && !bmForward.skipped) {
+        toast.warning("Saved locally — failed to notify master support");
       }
 
       toast.success("BM access request submitted!");
@@ -165,18 +162,16 @@ export function ClientAdAccounts() {
         user!.id,
         profile?.full_name || user!.email
       );
-      if (isTenantMode) {
-        const fwd = await tenantForward("spend_cap_withdraw_request", {
-          tenant_user_id: user!.id,
-          tenant_user_name: profile?.full_name || user!.email,
-          ad_account_external_id: withdrawAccount.account_id,
-          ad_account_name: withdrawAccount.account_name,
-          amount_usd: amount,
-          note: withdrawNote || null,
-        });
-        if (!fwd.ok && !fwd.skipped) {
-          toast.warning("Saved locally — failed to notify master support");
-        }
+      const withdrawForward = await tenantForward("spend_cap_withdraw_request", {
+        tenant_user_id: user!.id,
+        tenant_user_name: profile?.full_name || user!.email,
+        ad_account_external_id: withdrawAccount.account_id,
+        ad_account_name: withdrawAccount.account_name,
+        amount_usd: amount,
+        note: withdrawNote || null,
+      });
+      if (!withdrawForward.ok && !withdrawForward.skipped) {
+        toast.warning("Saved locally — failed to notify master support");
       }
       toast.success("Withdraw request submitted!");
       setWithdrawAccount(null);
