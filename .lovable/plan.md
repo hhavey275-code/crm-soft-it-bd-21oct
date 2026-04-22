@@ -1,70 +1,63 @@
 
 
-## সমস্যা (Diagnosis)
+## ৪টা Update — Plan
 
-`src/routes/ad-accounts.tsx` (parent listing) এবং `src/routes/ad-accounts.$id.tsx` (detail) — TanStack Router-এর flat-dot convention অনুযায়ী এই দুটো একই prefix share করে, তাই auto-generated `routeTree.gen.ts` (line 905-910) detail route-কে parent route-এর **child** বানিয়ে দিয়েছে।
-
-কিন্তু parent route file `src/routes/ad-accounts.tsx` এর component এ কোনো `<Outlet />` নেই — সরাসরি `<AdAccountsPage />` render করছে। ফলাফল: `/ad-accounts/abc123` URL এ গেলেও listing page-ই render হয়, detail page render-ই হয় না, তাই tap করলে কিছু change হচ্ছে বলে মনে হচ্ছে না (আসলে URL change হচ্ছে, কিন্তু same UI দেখাচ্ছে)।
-
----
-
-## Fix (1টা ছোট change)
-
-**Option A (recommended, simplest):** `ad-accounts.$id.tsx` route-কে parent থেকে detach করে independent route বানাব। 
-
-TanStack এ এটা করার সবচেয়ে clean উপায় — file rename করে underscore prefix দেওয়া যাতে dot-nesting break হয়। কিন্তু আরও simple পথ হলো parent route file `src/routes/ad-accounts.tsx`-এ একটা special check বসানো:
-- যদি current path exactly `/ad-accounts` হয় → `<AdAccountsPage />` render করব
-- অন্যথায় (`/ad-accounts/<id>`) → `<Outlet />` render করব যাতে child detail route render হয়
-
-এটা stable, কোনো file rename লাগবে না, route-tree-ও untouched থাকবে।
-
-```tsx
-// src/routes/ad-accounts.tsx
-import { createFileRoute, Outlet, useMatches } from "@tanstack/react-router";
-import { ProtectedGuard } from "@/components/ProtectedGuard";
-import AdAccountsPage from "@/components/pages/AdAccountsPage";
-
-function AdAccountsRouteShell() {
-  const matches = useMatches();
-  // child route /ad-accounts/$id matched হলে only Outlet render করব
-  const hasChild = matches.some((m) => m.routeId === "/ad-accounts/$id");
-  return (
-    <ProtectedGuard>
-      {hasChild ? <Outlet /> : <AdAccountsPage />}
-    </ProtectedGuard>
-  );
-}
-
-export const Route = createFileRoute("/ad-accounts")({
-  component: AdAccountsRouteShell,
+### 1. Google Sign-In on Auth Page
+`src/components/AuthForm.tsx`-এ "Continue with Google" button add করব (login + signup দুটোতেই, divider সহ):
+```ts
+await supabase.auth.signInWithOAuth({
+  provider: "google",
+  options: { redirectTo: `${window.location.origin}/dashboard` },
 });
 ```
+**আপনাকে যা করতে হবে:** Supabase Dashboard → Authentication → Providers → **Google enable** করতে হবে (Client ID + Secret সহ)। আমি একটা link দেব।
 
-`src/routes/ad-accounts.$id.tsx` already correct আছে — ওটা untouched থাকবে।
+### 2. Seller Dashboard থেকে Graph + Recent Activity Remove
+`src/components/seller/SellerDashboard.tsx` line 467-468 থেকে `<BalanceHistoryChart />` remove করব। `BalanceHistoryChart.tsx` file-টাও delete করব। Calculation, totals, ledger — সব intact থাকবে।
+
+### 3. Telegram Forward — Due/Advance Total Confirm
+`supabase/functions/forward-seller-proof/index.ts` already এই কাজ করছে (line 96-122):
+- `seller_transactions` থেকে seller-এর সব approved txn fetch করে
+- `computeDueAdvance()` দিয়ে running balance বের করে
+- Caption-এ append করে: `🟢 Total: Advance +৳X` বা `🔴 Total: Due −৳X`
+
+**Action:** Code review confirm করেছি এটা কাজ করছে। আমি একটা test invoke করে verify করব forward হচ্ছে কিনা — যদি কোনো bug দেখা যায়, fix করব। কোনো নতুন code change লাগবে না (সম্ভবত)।
+
+### 4. "System Update" Button (Cache Clear)
+`src/components/AppSidebar.tsx`-এ profile area-র কাছে একটা **"Update System"** button add করব। Click করলে:
+- `caches.keys()` → সব service worker cache delete
+- `localStorage` থেকে non-auth keys clear (auth session preserve)
+- `sessionStorage.clear()`
+- Service worker unregister + re-register
+- Toast: "✅ Update applied! Reloading..." → 1.5s পরে hard reload (`window.location.reload()`)
+
+Toast/banner-এ একটা subtle hint থাকবে dashboard-এ যখন নতুন update detect হয়।
+
+### 5. Admin Menu Permissions — Missing Menus Add
+`src/components/admin/AdminClients.tsx`-এর `ALL_MENU_KEYS` array (line 25-44) outdated। Sidebar-এর `adminNavItems`-এ এই menu গুলো আছে কিন্তু `ALL_MENU_KEYS`-এ নেই:
+- `feedback` (Feedback)
+- `announcements` (Announcements)
+- `admin-performance` (Admin Performance)
+- `card-vault` (Card Vault)
+
+**Fix:** Sync করব দুই list — `ALL_MENU_KEYS` এ এই 4টা add করব। তাহলে superadmin admin-কে role assign করার সময় সব menu visible হবে।
 
 ---
 
 ## Files Touched
 
-- `src/routes/ad-accounts.tsx` — parent route component update (add Outlet logic)
+| File | Change |
+|---|---|
+| `src/components/AuthForm.tsx` | + Google sign-in button + divider |
+| `src/components/seller/SellerDashboard.tsx` | − BalanceHistoryChart import + render |
+| `src/components/seller/BalanceHistoryChart.tsx` | 🗑 delete |
+| `src/components/admin/AdminClients.tsx` | `ALL_MENU_KEYS` array-এ 4টা missing menu add |
+| `src/components/AppSidebar.tsx` | + "Update System" button + cache-clear handler |
+| `supabase/functions/forward-seller-proof/index.ts` | Verify only — likely no change |
 
 ---
 
-## Test Steps (apply হওয়ার পরে)
+## আপনার জন্য Step (Google Sign-In Enable)
 
-আপনি নিচের URLs দিয়ে test করতে পারবেন:
-
-1. **Listing page (আগের মতোই কাজ করবে)**:  
-   https://id-preview--6937668f-aa32-4cf4-a1b4-5e3bbd5f53fa.lovable.app/ad-accounts
-
-2. **Detail page direct test** — listing থেকে যেকোনো ad account-এর row/card tap করুন, OR URL bar-এ লিখুন:  
-   `https://id-preview--6937668f-aa32-4cf4-a1b4-5e3bbd5f53fa.lovable.app/ad-accounts/<কোনো-account-er-id>`
-
-   Listing-এ যেহেতু কোনো একটা ad account-এ tap করলে navigate call হয় `navigate(`/ad-accounts/${a.id}`)` সেটা থেকে exact ID টা পেয়ে যাবেন — fix-এর পরে detail page open হবে (header metrics, notes, payment methods সহ পুরো page)।
-
----
-
-## Bangla note
-
-আপনার tap কাজ করছিল ঠিকই, URL-ও change হচ্ছিল, কিন্তু parent page-এ `<Outlet />` না থাকায় detail page render হচ্ছিল না — তাই মনে হচ্ছিল কিছুই হচ্ছে না। উপরের ছোট fix-টা apply করলে immediately কাজ করবে, এবং আপনি direct URL-এ গিয়েও detail page দেখতে পারবেন।
+কাজ apply হওয়ার পরে Google sign-in কাজ করতে হলে **Supabase Dashboard-এ Google provider enable** করতে হবে — একটা link দেব Authentication → Providers page-এ।
 
