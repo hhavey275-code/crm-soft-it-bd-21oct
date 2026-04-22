@@ -21,6 +21,8 @@ interface Conversation {
   client_email?: string;
   last_message?: string;
   unread_count?: number;
+  source?: "client" | "tenant";
+  tenant_name?: string;
 }
 
 interface ChatMessage {
@@ -30,6 +32,7 @@ interface ChatMessage {
   message: string;
   is_read: boolean;
   created_at: string;
+  direction?: "inbound" | "outbound";
 }
 
 interface ClientProfile {
@@ -57,16 +60,14 @@ export function AdminChat() {
       .select("*")
       .order("last_message_at", { ascending: false });
 
-    if (!convos) return;
-
-    const clientIds = (convos as any[]).map((c: any) => c.client_id);
+    const clientIds = (convos ?? []).map((c: any) => c.client_id);
     const { data: profiles } = await supabase
       .from("profiles")
       .select("user_id, full_name, email")
       .in("user_id", clientIds);
 
     const enriched = await Promise.all(
-      (convos as any[]).map(async (conv: any) => {
+      (convos ?? []).map(async (conv: any) => {
         const profile = profiles?.find(p => p.user_id === conv.client_id);
         const { data: lastMsg } = await (supabase as any)
           .from("chat_messages")
@@ -89,11 +90,54 @@ export function AdminChat() {
           client_email: profile?.email || "",
           last_message: lastMsg?.message || "",
           unread_count: count || 0,
+          source: "client" as const,
         };
       })
     );
 
-    setConversations(enriched);
+    // Tenant conversations (separate table)
+    const { data: tenantConvos } = await (supabase as any)
+      .from("tenant_chat_conversations")
+      .select("*, tenants(name)")
+      .order("last_message_at", { ascending: false });
+
+    const tenantEnriched = await Promise.all(
+      (tenantConvos ?? []).map(async (conv: any) => {
+        const { data: lastMsg } = await (supabase as any)
+          .from("tenant_chat_messages")
+          .select("message")
+          .eq("conversation_id", conv.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { count } = await (supabase as any)
+          .from("tenant_chat_messages")
+          .select("*", { count: "exact", head: true })
+          .eq("conversation_id", conv.id)
+          .eq("is_read", false)
+          .eq("direction", "inbound");
+
+        return {
+          id: conv.id,
+          client_id: conv.tenant_user_id,
+          last_message_at: conv.last_message_at,
+          is_resolved: conv.is_resolved,
+          created_at: conv.created_at,
+          client_name: conv.tenant_user_name || "Tenant user",
+          client_email: conv.tenant_user_email || "",
+          last_message: lastMsg?.message || "",
+          unread_count: count || 0,
+          source: "tenant" as const,
+          tenant_name: conv.tenants?.name ?? "Tenant",
+        } as Conversation;
+      })
+    );
+
+    const merged = [...enriched, ...tenantEnriched].sort(
+      (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+    );
+    setConversations(merged);
   };
 
   useEffect(() => { loadConversations(); }, []);
