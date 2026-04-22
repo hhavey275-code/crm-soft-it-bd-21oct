@@ -2341,6 +2341,7 @@ export type Database = {
           created_at: string
           domain: string
           id: string
+          last_heartbeat_at: string | null
           name: string
           status: string
           subscription_fee: number | null
@@ -2356,6 +2357,7 @@ export type Database = {
           created_at?: string
           domain: string
           id?: string
+          last_heartbeat_at?: string | null
           name: string
           status?: string
           subscription_fee?: number | null
@@ -2371,6 +2373,7 @@ export type Database = {
           created_at?: string
           domain?: string
           id?: string
+          last_heartbeat_at?: string | null
           name?: string
           status?: string
           subscription_fee?: number | null
