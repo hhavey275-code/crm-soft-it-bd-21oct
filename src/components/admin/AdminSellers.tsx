@@ -23,7 +23,6 @@ import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
-import { BalanceHistoryChart } from "@/components/seller/BalanceHistoryChart";
 import * as XLSX from "xlsx";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
@@ -1066,9 +1065,6 @@ export function AdminSellers() {
               </CardContent>
             </Card>
           )}
-
-          {/* Balance History — visual timeline */}
-          <BalanceHistoryChart transactions={sellerTxns} />
 
           {/* Transaction Table — Google Sheets style */}
           {isMobile ? (

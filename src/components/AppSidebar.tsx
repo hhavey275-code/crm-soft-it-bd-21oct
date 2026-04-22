@@ -22,7 +22,9 @@ import {
   MessageSquareHeart,
   Trophy,
   Wallet,
+  RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
@@ -266,6 +268,53 @@ export function AppSidebar() {
           <ThemeToggle />
           {!collapsed && <span className="text-sm text-sidebar-foreground">Theme</span>}
         </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-primary mb-1"
+          onClick={async () => {
+            const t = toast.loading("Updating system...");
+            try {
+              // Preserve auth keys
+              const preserved: Record<string, string> = {};
+              try {
+                for (let i = 0; i < localStorage.length; i++) {
+                  const k = localStorage.key(i);
+                  if (k && (k.startsWith("sb-") || k.includes("supabase.auth"))) {
+                    preserved[k] = localStorage.getItem(k) || "";
+                  }
+                }
+              } catch {}
+
+              // Clear all caches
+              if ("caches" in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+              }
+
+              try { sessionStorage.clear(); } catch {}
+              try {
+                localStorage.clear();
+                Object.entries(preserved).forEach(([k, v]) => localStorage.setItem(k, v));
+              } catch {}
+
+              // Unregister service workers
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((r) => r.unregister()));
+              }
+
+              toast.success("✅ Update applied! Reloading...", { id: t });
+              setTimeout(() => {
+                window.location.reload();
+              }, 1500);
+            } catch (err: any) {
+              toast.error(err?.message || "Update failed", { id: t });
+            }
+          }}
+        >
+          <RefreshCw className="mr-2 h-4 w-4" />
+          {!collapsed && "Update System"}
+        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"

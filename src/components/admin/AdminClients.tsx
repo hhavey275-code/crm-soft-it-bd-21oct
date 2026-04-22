@@ -41,6 +41,10 @@ const ALL_MENU_KEYS = [
   { key: "system-logs", label: "System Log" },
   { key: "settings", label: "Settings" },
   { key: "agent", label: "AI Agent" },
+  { key: "feedback", label: "Feedback" },
+  { key: "announcements", label: "Announcements" },
+  { key: "admin-performance", label: "Admin Performance" },
+  { key: "card-vault", label: "Card Vault" },
 ];
 
 export function AdminClients() {

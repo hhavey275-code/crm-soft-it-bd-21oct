@@ -16,7 +16,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
-import { BalanceHistoryChart } from "./BalanceHistoryChart";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -463,9 +462,6 @@ export function SellerDashboard() {
           </Button>
         )}
       </div>
-
-      {/* Balance History — visual timeline of how Due/Advance built up */}
-      <BalanceHistoryChart transactions={transactions} />
 
       {/* Transaction Ledger */}
       <Card className="border-0 shadow-lg shadow-black/5 dark:shadow-black/20 bg-card/80 backdrop-blur-sm overflow-hidden rounded-xl">
