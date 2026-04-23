@@ -46,6 +46,10 @@ Deno.serve(async (req) => {
   const payload = body.payload ?? {};
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
+  // Some tenant calls send fields flat on the body (no `payload` wrapper).
+  // Use this helper to read either shape.
+  const field = <T = any>(key: string): T => (payload?.[key] ?? body?.[key]) as T;
+
   const logSystem = async (act: string, details: Record<string, unknown>) => {
     try {
       await supabase.from("system_logs").insert({
@@ -194,6 +198,109 @@ Deno.serve(async (req) => {
         if (error) throw error;
         await logSystem("withdraw_request", { user: tenant_user_name, ad_account: ad_account_external_id, amount_usd });
         return json({ ok: true, id: data.id });
+      }
+
+      case "get-banks":
+      case "get_banks": {
+        const { data: assigned, error } = await supabase
+          .from("tenant_banks")
+          .select("bank_account_id, bank_accounts(id, bank_name, account_name, account_number, branch, routing_number, logo_url, status)")
+          .eq("tenant_id", tenant.id);
+        if (error) throw error;
+        const banks = (assigned || [])
+          .map((r: any) => r.bank_accounts)
+          .filter((b: any) => b && b.status === "active");
+        return json({ ok: true, banks });
+      }
+
+      case "get-payments":
+      case "get_payments": {
+        const { data: payments, error } = await supabase
+          .from("tenant_payments")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (error) throw error;
+        return json({ ok: true, payments: payments || [] });
+      }
+
+      case "submit-payment":
+      case "submit_payment": {
+        const amount = Number(field("amount") ?? 0);
+        const proof_url = field<string>("proof_url");
+        const payment_type = field<string>("payment_type") ?? "limit_purchase";
+        const limit_amount = Number(field("limit_amount") ?? 0);
+        const bank_account_id = field<string>("bank_account_id") ?? null;
+        const payment_reference = field<string>("payment_reference") ?? null;
+        const duration_months = field<number>("duration_months") ?? null;
+        if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
+        const { data, error } = await supabase
+          .from("tenant_payments")
+          .insert({
+            tenant_id: tenant.id,
+            amount,
+            proof_url,
+            bank_account_id,
+            payment_type,
+            limit_amount,
+            payment_reference,
+            duration_months,
+            status: "pending",
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        await logSystem("submit_payment", {
+          payment_id: data.id, amount, payment_type, limit_amount,
+        });
+        return json({ ok: true, payment_id: data.id });
+      }
+
+      case "verify-tenant-payment":
+      case "verify_tenant_payment": {
+        // Lightweight stub: just return pending. Master admin reviews manually
+        // via AdminTenants UI; auto-approval pipeline is not yet wired.
+        const payment_id = field<string>("payment_id");
+        return json({ ok: true, auto_approved: false, payment_id });
+      }
+
+      case "report-usage":
+      case "report_usage": {
+        const amount = Number(field("amount") ?? 0);
+        if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
+        const newUsed = Number(tenant.total_used ?? 0) + amount;
+        const { error } = await supabase
+          .from("tenants")
+          .update({ total_used: newUsed } as any)
+          .eq("id", tenant.id);
+        if (error) throw error;
+        await logSystem("report_usage", { amount, new_total_used: newUsed });
+        return json({
+          success: true,
+          ok: true,
+          total_used: newUsed,
+          system_limit: tenant.system_limit ?? null,
+        });
+      }
+
+      case "refund-usage":
+      case "refund_usage": {
+        const amount = Number(field("amount") ?? 0);
+        if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
+        const newUsed = Math.max(0, Number(tenant.total_used ?? 0) - amount);
+        const { error } = await supabase
+          .from("tenants")
+          .update({ total_used: newUsed } as any)
+          .eq("id", tenant.id);
+        if (error) throw error;
+        await logSystem("refund_usage", { amount, new_total_used: newUsed });
+        return json({
+          success: true,
+          ok: true,
+          total_used: newUsed,
+          system_limit: tenant.system_limit ?? null,
+        });
       }
 
       default:
