@@ -257,7 +257,7 @@ Deno.serve(async (req)=>{
     }
     if (verifyData?.spend_cap !== undefined) {
       const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
-      if (Math.abs(verifiedDollars - newSpendCapDollars) >= 0.02) {
+      if (!isCapEffectivelyApplied(verifiedDollars, newSpendCapDollars)) {
         const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
         await supabase.from("failed_topups").update({
           error_message: mismatchMsg
