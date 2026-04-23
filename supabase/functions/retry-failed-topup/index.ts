@@ -175,7 +175,7 @@ Deno.serve(async (req)=>{
       const preCheckData = await preCheckRes.json();
       if (preCheckData?.spend_cap !== undefined) {
         const currentCapDollars = centsToDollars(Number(preCheckData.spend_cap));
-        if (Math.abs(currentCapDollars - newSpendCapDollars) < 0.02) {
+        if (isCapEffectivelyApplied(currentCapDollars, newSpendCapDollars)) {
           console.log(`Pre-check: cap already at $${currentCapDollars}. Marking as resolved without re-posting.`);
           const currentAmountSpent = Number(account.amount_spent);
           const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
