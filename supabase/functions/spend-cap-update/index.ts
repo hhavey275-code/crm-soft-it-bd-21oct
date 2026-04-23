@@ -98,6 +98,39 @@ function centsToDollars(cents) {
   return cents / 100;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+// Tolerance for "verified == expected" comparisons. Meta sometimes stores
+// caps with small currency-conversion / rounding offsets (often ±1¢).
+// We accept anything within $1 OR any value >= expected as success.
+const VERIFY_TOLERANCE = 1.00;
+function isCapEffectivelyApplied(verifiedDollars, expectedDollars) {
+  if (!Number.isFinite(verifiedDollars)) return false;
+  if (verifiedDollars >= expectedDollars) return true; // cap >= what we asked for
+  return Math.abs(verifiedDollars - expectedDollars) < VERIFY_TOLERANCE;
+}
+// Verify GET with one automatic retry after 3s — handles proxy/stale data.
+async function verifySpendCap(actId, bmToken) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await delay(3000);
+    try {
+      const res = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
+        method: "GET"
+      });
+      let data = null;
+      try { data = await res.json(); } catch { data = null; }
+      if (res.ok && !data?.error && data?.spend_cap !== undefined) {
+        return { ok: true, dollars: centsToDollars(Number(data.spend_cap)), error: null };
+      }
+      if (attempt === 1) {
+        return { ok: false, dollars: null, error: data?.error?.message || `Verify HTTP ${res.status}` };
+      }
+    } catch (err) {
+      if (attempt === 1) {
+        return { ok: false, dollars: null, error: err instanceof Error ? err.message : "verify network error" };
+      }
+    }
+  }
+  return { ok: false, dollars: null, error: "verify exhausted" };
+}
 function isMetaRateLimited(status, data) {
   const message = String(data?.error?.message ?? "").toLowerCase();
   return status === 429 || data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4 || message.includes("user request limit reached") || message.includes("request limit");
