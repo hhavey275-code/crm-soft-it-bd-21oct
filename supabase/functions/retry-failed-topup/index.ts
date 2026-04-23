@@ -98,6 +98,12 @@ async function decryptToken(stored, secret) {
 function centsToDollars(cents) {
   return cents / 100;
 }
+const VERIFY_TOLERANCE = 1.00;
+function isCapEffectivelyApplied(verifiedDollars, expectedDollars) {
+  if (!Number.isFinite(verifiedDollars)) return false;
+  if (verifiedDollars >= expectedDollars) return true;
+  return Math.abs(verifiedDollars - expectedDollars) < VERIFY_TOLERANCE;
+}
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response("ok", {
