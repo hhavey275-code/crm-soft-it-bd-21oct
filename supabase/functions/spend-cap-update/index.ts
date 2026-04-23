@@ -410,82 +410,55 @@ Deno.serve(async (req)=>{
         }, rateLimited ? 429 : 400);
       }
       // Verify with GET
-      const { res: verifyRes, data: verifyData } = await metaFetchWithRetry(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
-      });
-      if (!verifyRes.ok || verifyData?.error) {
-        const verifyErrorMsg = verifyData?.error?.message || `Meta verify HTTP ${verifyRes.status}`;
-        console.warn("Meta verification failed", {
-          actId,
-          message: verifyErrorMsg
-        });
-        // Insert into failed_topups
+      const verifyResult = await verifySpendCap(actId, bmToken);
+      if (!verifyResult.ok) {
+        const verifyErrorMsg = verifyResult.error || "Meta verify failed";
+        console.warn("Meta verification failed (after retry)", { actId, message: verifyErrorMsg });
+        // POST may have succeeded — flag clearly in error_message so admin
+        // can confirm in Meta before retrying (which would double-apply).
+        const safeMsg = `Verification failed: ${verifyErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
         const { data: failedRecord } = await supabase.from("failed_topups").insert({
           user_id: walletUserId,
           ad_account_id: ad_account_id,
           amount: amount,
           old_spend_cap: oldSpendCapDollars,
-          error_message: `Verification failed: ${verifyErrorMsg}`,
+          error_message: safeMsg,
           status: "pending"
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — Verification failed: ${verifyErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${safeMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
-          error: `Meta verification failed. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          error: `${safeMsg} Amount deducted from wallet.`,
           failed_topup_id: failedRecord?.id,
           wallet_charged: shouldDeductWallet
         }, 400);
       }
-      if (verifyData?.spend_cap !== undefined) {
-        const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
-        if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
-          console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
-        } else {
-          const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
-          console.warn(mismatchMsg);
-          const { data: failedRecord } = await supabase.from("failed_topups").insert({
-            user_id: walletUserId,
-            ad_account_id: ad_account_id,
-            amount: amount,
-            old_spend_cap: oldSpendCapDollars,
-            error_message: mismatchMsg,
-            status: "pending"
-          }).select("id").single();
-          await supabase.from("system_logs").insert({
-            user_id: userId,
-            user_name: userName,
-            action: "Top-Up Failed",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
-          });
-          return json({
-            error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
-            failed_topup_id: failedRecord?.id,
-            wallet_charged: shouldDeductWallet
-          }, 400);
-        }
+      const verifiedDollars = verifyResult.dollars;
+      if (isCapEffectivelyApplied(verifiedDollars, newSpendCapDollars)) {
+        console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
       } else {
-        const failMsg = "Verification GET returned no spend_cap";
-        console.warn(failMsg, verifyData);
+        const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+        console.warn(mismatchMsg);
         const { data: failedRecord } = await supabase.from("failed_topups").insert({
           user_id: walletUserId,
           ad_account_id: ad_account_id,
           amount: amount,
           old_spend_cap: oldSpendCapDollars,
-          error_message: failMsg,
+          error_message: mismatchMsg,
           status: "pending"
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${failMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
-          error: `${failMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
           failed_topup_id: failedRecord?.id,
           wallet_charged: shouldDeductWallet
         }, 400);
