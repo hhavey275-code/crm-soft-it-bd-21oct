@@ -357,9 +357,73 @@ export function AdminTopUp() {
       if (!updatedRows?.length) {
         throw new Error("This request was already processed (auto-verified or by another admin). Please refresh the page.");
       }
+
+      // Fix B: Consume any matching Telegram SMS so it can never trigger a
+      // duplicate auto-approval on a different pending request later.
+      // Match by amount + bank last4 within ±2h of the request creation time.
+      if (action === "approved") {
+        try {
+          const reqRow = requests?.find((r: any) => r.id === id);
+          const bdtAmt = Number(reqRow?.bdt_amount || 0);
+          const last4 = reqRow?.bankAccount?.account_number?.replace(/\s+/g, "").slice(-4) || "";
+          const ref = (reqRow?.payment_reference || "").trim();
+          const createdAt = new Date(reqRow?.created_at || Date.now());
+          const fromIso = new Date(createdAt.getTime() - 2 * 60 * 60 * 1000).toISOString();
+          const toIso = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000).toISOString();
+          if (bdtAmt > 0 || ref) {
+            const { data: candidates } = await (supabase as any)
+              .from("telegram_messages")
+              .select("update_id, text, raw_update")
+              .is("matched_request_id", null)
+              .gte("created_at", fromIso)
+              .lte("created_at", toIso)
+              .order("created_at", { ascending: false })
+              .limit(100);
+            const getText = (m: any) => {
+              const raw = m?.raw_update || {};
+              const p = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+              return (m?.text || p?.text || p?.caption || "") as string;
+            };
+            const target = (candidates || []).find((m: any) => {
+              const text = getText(m);
+              if (!text) return false;
+              if (ref && text.toLowerCase().includes(ref.toLowerCase())) return true;
+              if (bdtAmt > 0 && last4) {
+                const digits = text.replace(/[^\d]/g, "");
+                if (!digits.includes(last4)) return false;
+                const nums = text.match(/[\d,]+/g) || [];
+                return nums.some((n: string) => Math.abs(Number(n.replace(/,/g, "")) - bdtAmt) <= 15);
+              }
+              return false;
+            });
+            if (target) {
+              await (supabase as any)
+                .from("telegram_messages")
+                .update({ matched_request_id: id })
+                .eq("update_id", target.update_id)
+                .is("matched_request_id", null);
+            }
+          }
+        } catch (e) {
+          console.error("SMS consume on manual approval failed (non-blocking):", e);
+        }
+      }
+
       if (action === "approved") {
         let finalAmount = amount;
         
+        // Idempotency guard (Fix A): never double-credit.
+        // If a top_up transaction already exists for this request_id, abort.
+        const { data: existingTx } = await supabase
+          .from("transactions")
+          .select("id")
+          .eq("reference_id", id)
+          .eq("type", "top_up")
+          .limit(1);
+        if (existingTx && existingTx.length > 0) {
+          throw new Error("This request was already credited to the wallet (duplicate prevention). Refresh the page.");
+        }
+
         // Check for pending card bills and auto-deduct
         try {
           const { data: cardBill } = await (supabase as any).from("card_bills").select("*").eq("user_id", userId).eq("status", "pending").limit(1);

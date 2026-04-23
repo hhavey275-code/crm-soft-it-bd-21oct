@@ -402,6 +402,26 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Auto-approving request ${request_id}: ${logText}`);
+    // Idempotency guard: if a top_up transaction already exists for this request_id,
+    // someone (manual admin or another verifier) already credited the wallet.
+    // Never double-credit.
+    const { data: existingTx } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('reference_id', request_id)
+      .eq('type', 'top_up')
+      .limit(1);
+    if (existingTx && existingTx.length > 0) {
+      console.log(`Skip auto-approve: transaction already exists for request ${request_id}`);
+      // Still consume the matched SMS so it can't trigger another request later
+      if (matchedMsg) {
+        await supabase.from('telegram_messages').update({ matched_request_id: request_id }).eq('update_id', matchedMsg.update_id);
+      }
+      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'Already credited (idempotency guard)' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: approvedRows, error: updateErr } = await supabase
       .from('top_up_requests')
       .update({ status: 'approved', admin_note: logText, reviewed_by: null })
