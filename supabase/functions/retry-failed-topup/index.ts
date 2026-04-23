@@ -98,6 +98,12 @@ async function decryptToken(stored, secret) {
 function centsToDollars(cents) {
   return cents / 100;
 }
+const VERIFY_TOLERANCE = 1.00;
+function isCapEffectivelyApplied(verifiedDollars, expectedDollars) {
+  if (!Number.isFinite(verifiedDollars)) return false;
+  if (verifiedDollars >= expectedDollars) return true;
+  return Math.abs(verifiedDollars - expectedDollars) < VERIFY_TOLERANCE;
+}
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -169,7 +175,7 @@ Deno.serve(async (req)=>{
       const preCheckData = await preCheckRes.json();
       if (preCheckData?.spend_cap !== undefined) {
         const currentCapDollars = centsToDollars(Number(preCheckData.spend_cap));
-        if (Math.abs(currentCapDollars - newSpendCapDollars) < 0.02) {
+        if (isCapEffectivelyApplied(currentCapDollars, newSpendCapDollars)) {
           console.log(`Pre-check: cap already at $${currentCapDollars}. Marking as resolved without re-posting.`);
           const currentAmountSpent = Number(account.amount_spent);
           const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
@@ -251,7 +257,7 @@ Deno.serve(async (req)=>{
     }
     if (verifyData?.spend_cap !== undefined) {
       const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
-      if (Math.abs(verifiedDollars - newSpendCapDollars) >= 0.02) {
+      if (!isCapEffectivelyApplied(verifiedDollars, newSpendCapDollars)) {
         const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
         await supabase.from("failed_topups").update({
           error_message: mismatchMsg

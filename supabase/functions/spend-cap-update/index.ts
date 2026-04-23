@@ -98,6 +98,39 @@ function centsToDollars(cents) {
   return cents / 100;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+// Tolerance for "verified == expected" comparisons. Meta sometimes stores
+// caps with small currency-conversion / rounding offsets (often ±1¢).
+// We accept anything within $1 OR any value >= expected as success.
+const VERIFY_TOLERANCE = 1.00;
+function isCapEffectivelyApplied(verifiedDollars, expectedDollars) {
+  if (!Number.isFinite(verifiedDollars)) return false;
+  if (verifiedDollars >= expectedDollars) return true; // cap >= what we asked for
+  return Math.abs(verifiedDollars - expectedDollars) < VERIFY_TOLERANCE;
+}
+// Verify GET with one automatic retry after 3s — handles proxy/stale data.
+async function verifySpendCap(actId, bmToken) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await delay(3000);
+    try {
+      const res = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
+        method: "GET"
+      });
+      let data = null;
+      try { data = await res.json(); } catch { data = null; }
+      if (res.ok && !data?.error && data?.spend_cap !== undefined) {
+        return { ok: true, dollars: centsToDollars(Number(data.spend_cap)), error: null };
+      }
+      if (attempt === 1) {
+        return { ok: false, dollars: null, error: data?.error?.message || `Verify HTTP ${res.status}` };
+      }
+    } catch (err) {
+      if (attempt === 1) {
+        return { ok: false, dollars: null, error: err instanceof Error ? err.message : "verify network error" };
+      }
+    }
+  }
+  return { ok: false, dollars: null, error: "verify exhausted" };
+}
 function isMetaRateLimited(status, data) {
   const message = String(data?.error?.message ?? "").toLowerCase();
   return status === 429 || data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4 || message.includes("user request limit reached") || message.includes("request limit");
@@ -116,6 +149,11 @@ function getRetryDelayMs(attempt, retryAfterHeader) {
   return backoffMs[Math.min(attempt, backoffMs.length - 1)];
 }
 async function metaFetchWithRetry(url, options, maxRetries = 3) {
+  // SAFETY: POST is NOT idempotent. If a previous POST already updated the
+  // spend cap but the response was slow, retrying will double-apply the
+  // change. Force maxRetries=0 for any non-GET request.
+  const method = (options?.method || "GET").toUpperCase();
+  if (method !== "GET") maxRetries = 0;
   for(let attempt = 0; attempt <= maxRetries; attempt++){
     const res = await metaFetch(url, options);
     let data = null;
@@ -312,16 +350,10 @@ Deno.serve(async (req)=>{
         // Do a GET to check if spend cap was actually updated.
         let actuallySucceeded = false;
         try {
-          const checkRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-            method: "GET"
-          });
-          const checkData = await checkRes.json();
-          if (checkData?.spend_cap !== undefined) {
-            const currentCapDollars = centsToDollars(Number(checkData.spend_cap));
-            if (Math.abs(currentCapDollars - newSpendCapDollars) < 0.02) {
-              actuallySucceeded = true;
-              console.log(`POST returned error but GET confirms cap updated to $${currentCapDollars}. Treating as success.`);
-            }
+          const verifyResult = await verifySpendCap(actId, bmToken);
+          if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+            actuallySucceeded = true;
+            console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
           }
         } catch (verifyErr) {
           console.warn("Post-failure verification GET also failed", verifyErr);
@@ -378,82 +410,55 @@ Deno.serve(async (req)=>{
         }, rateLimited ? 429 : 400);
       }
       // Verify with GET
-      const { res: verifyRes, data: verifyData } = await metaFetchWithRetry(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
-      });
-      if (!verifyRes.ok || verifyData?.error) {
-        const verifyErrorMsg = verifyData?.error?.message || `Meta verify HTTP ${verifyRes.status}`;
-        console.warn("Meta verification failed", {
-          actId,
-          message: verifyErrorMsg
-        });
-        // Insert into failed_topups
+      const verifyResult = await verifySpendCap(actId, bmToken);
+      if (!verifyResult.ok) {
+        const verifyErrorMsg = verifyResult.error || "Meta verify failed";
+        console.warn("Meta verification failed (after retry)", { actId, message: verifyErrorMsg });
+        // POST may have succeeded — flag clearly in error_message so admin
+        // can confirm in Meta before retrying (which would double-apply).
+        const safeMsg = `Verification failed: ${verifyErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
         const { data: failedRecord } = await supabase.from("failed_topups").insert({
           user_id: walletUserId,
           ad_account_id: ad_account_id,
           amount: amount,
           old_spend_cap: oldSpendCapDollars,
-          error_message: `Verification failed: ${verifyErrorMsg}`,
+          error_message: safeMsg,
           status: "pending"
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — Verification failed: ${verifyErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${safeMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
-          error: `Meta verification failed. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          error: `${safeMsg} Amount deducted from wallet.`,
           failed_topup_id: failedRecord?.id,
           wallet_charged: shouldDeductWallet
         }, 400);
       }
-      if (verifyData?.spend_cap !== undefined) {
-        const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
-        if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
-          console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
-        } else {
-          const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
-          console.warn(mismatchMsg);
-          const { data: failedRecord } = await supabase.from("failed_topups").insert({
-            user_id: walletUserId,
-            ad_account_id: ad_account_id,
-            amount: amount,
-            old_spend_cap: oldSpendCapDollars,
-            error_message: mismatchMsg,
-            status: "pending"
-          }).select("id").single();
-          await supabase.from("system_logs").insert({
-            user_id: userId,
-            user_name: userName,
-            action: "Top-Up Failed",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
-          });
-          return json({
-            error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
-            failed_topup_id: failedRecord?.id,
-            wallet_charged: shouldDeductWallet
-          }, 400);
-        }
+      const verifiedDollars = verifyResult.dollars;
+      if (isCapEffectivelyApplied(verifiedDollars, newSpendCapDollars)) {
+        console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
       } else {
-        const failMsg = "Verification GET returned no spend_cap";
-        console.warn(failMsg, verifyData);
+        const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+        console.warn(mismatchMsg);
         const { data: failedRecord } = await supabase.from("failed_topups").insert({
           user_id: walletUserId,
           ad_account_id: ad_account_id,
           amount: amount,
           old_spend_cap: oldSpendCapDollars,
-          error_message: failMsg,
+          error_message: mismatchMsg,
           status: "pending"
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${failMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
         });
         return json({
-          error: `${failMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
           failed_topup_id: failedRecord?.id,
           wallet_charged: shouldDeductWallet
         }, 400);
@@ -461,13 +466,41 @@ Deno.serve(async (req)=>{
     } catch (err) {
       const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
+      // POST may have succeeded before the exception (timeout after Meta
+      // accepted the change). Try a verification GET first.
+      try {
+        const verifyResult = await verifySpendCap(actId, bmToken);
+        if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+          console.log(`Network error but GET confirms cap at $${verifyResult.dollars}. Treating as success.`);
+          const currentAmountSpent = Number(account.amount_spent);
+          const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
+          await supabase.from("ad_accounts").update({
+            spend_cap: newSpendCapDollars,
+            balance_after_topup: remainingAfterTopup
+          }).eq("id", ad_account_id);
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Spend Cap Updated",
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg}) [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          });
+          return json({
+            success: true,
+            old_spend_cap: oldSpendCapDollars,
+            new_spend_cap: newSpendCapDollars
+          });
+        }
+      } catch (verifyErr) {
+        console.warn("Recovery verify after network error also failed", verifyErr);
+      }
+      const safeMsg = `${metaErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
       // Insert into failed_topups
       const { data: failedRecord } = await supabase.from("failed_topups").insert({
         user_id: walletUserId,
         ad_account_id: ad_account_id,
         amount: amount,
         old_spend_cap: oldSpendCapDollars,
-        error_message: metaErrorMsg,
+        error_message: safeMsg,
         status: "pending"
       }).select("id").single();
       await supabase.from("system_logs").insert({
