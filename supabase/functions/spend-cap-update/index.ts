@@ -149,6 +149,11 @@ function getRetryDelayMs(attempt, retryAfterHeader) {
   return backoffMs[Math.min(attempt, backoffMs.length - 1)];
 }
 async function metaFetchWithRetry(url, options, maxRetries = 3) {
+  // SAFETY: POST is NOT idempotent. If a previous POST already updated the
+  // spend cap but the response was slow, retrying will double-apply the
+  // change. Force maxRetries=0 for any non-GET request.
+  const method = (options?.method || "GET").toUpperCase();
+  if (method !== "GET") maxRetries = 0;
   for(let attempt = 0; attempt <= maxRetries; attempt++){
     const res = await metaFetch(url, options);
     let data = null;
