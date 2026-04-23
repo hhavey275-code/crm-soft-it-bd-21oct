@@ -350,16 +350,10 @@ Deno.serve(async (req)=>{
         // Do a GET to check if spend cap was actually updated.
         let actuallySucceeded = false;
         try {
-          const checkRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-            method: "GET"
-          });
-          const checkData = await checkRes.json();
-          if (checkData?.spend_cap !== undefined) {
-            const currentCapDollars = centsToDollars(Number(checkData.spend_cap));
-            if (Math.abs(currentCapDollars - newSpendCapDollars) < 0.02) {
-              actuallySucceeded = true;
-              console.log(`POST returned error but GET confirms cap updated to $${currentCapDollars}. Treating as success.`);
-            }
+          const verifyResult = await verifySpendCap(actId, bmToken);
+          if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+            actuallySucceeded = true;
+            console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
           }
         } catch (verifyErr) {
           console.warn("Post-failure verification GET also failed", verifyErr);
