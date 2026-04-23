@@ -466,13 +466,41 @@ Deno.serve(async (req)=>{
     } catch (err) {
       const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
+      // POST may have succeeded before the exception (timeout after Meta
+      // accepted the change). Try a verification GET first.
+      try {
+        const verifyResult = await verifySpendCap(actId, bmToken);
+        if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+          console.log(`Network error but GET confirms cap at $${verifyResult.dollars}. Treating as success.`);
+          const currentAmountSpent = Number(account.amount_spent);
+          const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
+          await supabase.from("ad_accounts").update({
+            spend_cap: newSpendCapDollars,
+            balance_after_topup: remainingAfterTopup
+          }).eq("id", ad_account_id);
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Spend Cap Updated",
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg}) [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          });
+          return json({
+            success: true,
+            old_spend_cap: oldSpendCapDollars,
+            new_spend_cap: newSpendCapDollars
+          });
+        }
+      } catch (verifyErr) {
+        console.warn("Recovery verify after network error also failed", verifyErr);
+      }
+      const safeMsg = `${metaErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
       // Insert into failed_topups
       const { data: failedRecord } = await supabase.from("failed_topups").insert({
         user_id: walletUserId,
         ad_account_id: ad_account_id,
         amount: amount,
         old_spend_cap: oldSpendCapDollars,
-        error_message: metaErrorMsg,
+        error_message: safeMsg,
         status: "pending"
       }).select("id").single();
       await supabase.from("system_logs").insert({
