@@ -1,75 +1,66 @@
 
 
-## Bug: Auto/Manual Top-Up Telegram Message-এ ভুল "Total" যাচ্ছে
+# Failed Top-Up Verification Report
 
-### সমস্যা
+## প্রশ্ন: ki kokhon failed_topups e jay? Spend cap update hoye thakleo ki failed dekhate pare?
 
-Telegram-এ payment proof forward হওয়ার সময় **Total** line-এ ভুল number আসছে:
-- Screenshot-এ দেখাচ্ছে: `Total: ৳4,620,100` (শুধু Eastern Bank-এর cash-in sum)
-- আসল seller balance: `Due −৳3,492,540.66` (সব bank মিলে, USDT given বাদ দিয়ে)
+## কোডে যা পেলাম (`spend-cap-update` edge function)
 
-### Root Cause
+৬টা scenario আছে যেটায় record `failed_topups` table এ insert হয় — wallet টা **আগেই deduct হয়ে গেছে**, তারপর Meta API call করা হয়:
 
-দুটো deployed edge function-এ পুরোনো ভুল calculation logic রয়ে গেছে:
+| # | Trigger | Wallet status | Cap actually updated? |
+|---|---------|---------------|----------------------|
+| 1 | Meta POST returned error AND verify-GET shows cap **not** changed | Deducted | No → genuinely failed |
+| 2 | Meta POST returned error BUT verify-GET shows cap **already correct** | Deducted | **Yes** → auto-recovered, NOT marked failed (line 313-356) |
+| 3 | Verify GET itself fails (HTTP error) | Deducted | Unknown → marked failed |
+| 4 | Verify GET succeeds but `verifiedDollars ≠ expected` (>$0.02 diff) | Deducted | Partially / no → marked failed |
+| 5 | Verify GET returns no `spend_cap` field | Deducted | Unknown → marked failed |
+| 6 | Network exception thrown (timeout, fetch error) | Deducted | Unknown → marked failed |
+| 7 | Rate limit retries exhausted (`META_RATE_LIMIT_RETRY_EXHAUSTED`) | Deducted | No (POST never went through) | 
 
-1. **`forward-proof`** (manual top-up approve হলে call হয়) — শুধু `bank_account_id` filter করে total compute করে, USDT given বাদ দেয়।
-2. **`verify-topup`** (auto-verify / Telegram SMS match হলে in-line forward করে) — একই ভুল per-bank logic ব্যবহার করে।
+## "Cap update hoyeche kintu UI failed dekhacche" — eta possible?
 
-দুটোর pattern:
-```
-SELECT type, bdt_amount FROM seller_transactions WHERE bank_account_id = X
-total = sum(bdt_payment + client_topup) - sum(withdraw)
-// ❌ usdt_received (USDT given) বাদ
-// ❌ অন্য bank-এর entries বাদ
-// ❌ rate × usdt_amount conversion বাদ
-```
+**হ্যাঁ, possible — দুইটা bug আছে:**
 
-OCR দিয়ে seller payment submit-এর flow-এ আলাদা `forward-seller-proof` function ব্যবহার হয় যেটা ঠিক — পুরো seller-এর সব transaction নিয়ে global Due/Advance compute করে। সে কারণেই OCR-এর Total ঠিক, কিন্তু top-up-এর Total ভুল।
+### Bug 1: Verify GET timeout / proxy hiccup (scenario 3, 5, 6)
+POST সফল হয়ে Meta-তে cap update হয়ে গেছে, কিন্তু verify GET timeout/proxy error দিল। কোড সরাসরি `failed_topups` এ insert করে দেয় — POST আসলে সফল হয়েছে কিনা সেটা **double-check করে না**। এটা scenario 1-এ আছে (line 313-328 — POST error হলে GET দিয়ে recover করে), কিন্তু verify path-এ নাই।
 
-### Fix Plan
+### Bug 2: Mismatch tolerance খুব tight (scenario 4)
+`Math.abs(verifiedDollars - newSpendCapDollars) < 0.02` — মানে $0.02 difference allowed। কিন্তু:
+- Meta GET এ `centsToDollars(spend_cap)` করে — যদি Meta-র stored cap `$50.01` হয় আর expected `$50.00` হয়, তাহলে mismatch।
+- System logs এ এমন entry আছে: `$25.01 → $50.010000000000005` — floating point precision। আবার কোনো account এ Meta প্রায়ই `+1¢` অফসেটে cap রাখে (currency conversion artifact)।
+- এক্ষেত্রে cap actually update হয়ে গেছে, কিন্তু $0.01 mismatch-এর জন্য failed_topups এ চলে যাবে।
 
-দুটো edge function update করে সঠিক global Due/Advance logic বসাতে হবে — exact same formula যা `forward-seller-proof` use করে।
+### Bug 3 (potential): POST rate-limit retry double-charge
+`metaFetchWithRetry` rate-limited হলে retry করে। কিন্তু **POST রিকোয়েস্টও retry করে** — মানে প্রথম POST সফল (Meta-তে cap updated) কিন্তু response slow → next attempt আবার POST করে দিল → **cap দুইবার বাড়ল**। তারপর verify-এ `expected $X, got $X+amount` → mismatch → failed_topups এ যাবে যদিও cap actually আরো বেশি বেড়ে গেছে। POST কখনই idempotent না — POST retry করা risky।
 
-**1. `supabase/functions/verify-topup/index.ts`** (auto-verify path)
-- Per-bank total compute সরিয়ে seller-wide compute বসানো:
-  ```ts
-  const { data: txns } = await supabase
-    .from('seller_transactions')
-    .select('type, bdt_amount, usdt_amount, rate, status, created_at')
-    .eq('seller_id', sellerId);
+## বর্তমান DB অবস্থা
+- `failed_topups` table এখন **খালি** (0 rows)।
+- গত ২ দিনে শেষ failure: 22 Apr — সব `META_RATE_LIMIT_RETRY_EXHAUSTED` বা `Meta HTTP 500`। এগুলো genuine — POST পৌঁছায়ই নাই।
+- 21 Apr এর `Meta HTTP 500` গুলো all `via=direct` — proxy ছিল না।
 
-  let balance = 0;
-  for (const t of txns) {
-    if ((t.status || 'approved') !== 'approved') continue;
-    if (t.type === 'bdt_payment' || t.type === 'client_topup') balance += +t.bdt_amount;
-    else if (t.type === 'withdraw') balance -= +t.bdt_amount;
-    else if (t.type === 'usdt_received') balance -= (+t.usdt_amount) * (+t.rate);
-  }
-  ```
-- Total line format `forward-seller-proof`-এর সাথে identical:
-  - `balance > 0` → `🟢 Total: Advance +৳{abs}`
-  - `balance < 0` → `🔴 Total: Due −৳{abs}`
-  - `balance === 0` → `⚪ Total: ৳0`
+## Conclusion
 
-**2. `supabase/functions/forward-proof/index.ts`** (manual approve path)
-- উপরের একই formula বসানো
-- Bank lookup-এ আগে থেকেই `seller_id` resolve করে নেওয়া
+User এর সন্দেহ **সঠিক**: কিছু কেস-এ Meta-তে cap update হয়ে যাবার পরেও entry failed_topups-এ চলে আসতে পারে। মূলত:
+1. Verify GET fail হলে কোড recovery check করে না।
+2. $0.02 tolerance কম, floating point + Meta-র cent rounding mismatch করায়।
+3. POST retry করার কারণে double-POST হলে cap বেশি বেড়ে যায়, system mismatch বলে।
 
-**3. `src/components/admin/AdminTopUp.tsx`** (manual approve path simplification)
-- এখন duplicate Telegram message যাচ্ছে: `forward-proof` (ভুল) + `forward-seller-proof` (ঠিক)। `forward-proof` fix হওয়ার পর duplicate দরকার নেই।
-- Line 458–488-এর fallback `forward-seller-proof` invoke সরিয়ে দেওয়া (only one message যাবে — `forward-proof` দিয়েই, যেটা এখন সঠিক total নিয়ে আসবে)।
+## প্রস্তাবিত Fix (approve করলে implement করব)
 
-**4. `supabase/functions/forward-seller-proof/index.ts`** — কোনো পরিবর্তন লাগবে না, এটাই reference।
+### `supabase/functions/spend-cap-update/index.ts` এ ৪টা change:
 
-### Tenant payment path (verify needed before edit)
+1. **Verify GET fail হলে fallback recovery check** (scenario 3, 5, 6): যদি verify GET error দেয় বা empty আসে, ৩ সেকেন্ড wait করে আরেকবার GET try করব। তবুও fail হলে failed_topups-এ যাবে — কিন্তু `error_message`-এ স্পষ্ট লেখা থাকবে "POST may have succeeded — please verify in Meta before retry"।
 
-Tenant top-up auto-verify path-এও একই ভুল আছে কিনা সেটা `verify-topup` (বা `tenant-webhook`) source দেখে confirm করে একই fix apply করা হবে।
+2. **Mismatch tolerance বাড়ানো**: `< 0.02` → `< 1.00` (1 dollar)। Meta প্রায়ই currency conversion-এ small rounding করে; $1 এর কম diff হলে success ধরব। আর mismatch detect হলেও যদি `verifiedDollars >= newSpendCapDollars` (অর্থাৎ cap expected এর চেয়ে কম না), তাহলে success হিসেবে গ্রহণ করব।
 
-### Deploy
+3. **POST কখনো retry করা যাবে না**: `metaFetchWithRetry` এর POST এ `maxRetries=0` করব। শুধু GET-এ retry allowed। POST rate-limited হলে সরাসরি failed_topups-এ যাবে (cap untouched থাকবে — safe)।
 
-`verify-topup` এবং `forward-proof` redeploy করা হবে। AdminTopUp.tsx normal frontend deploy-এ যাবে।
+4. **Race-safe verify**: POST-এর পর verify GET এ unique mismatch detect হলে আরো ১ বার retry-GET (proxy থেকে stale data আসতে পারে)।
 
-### আপনি কীভাবে check করবেন
+### `supabase/functions/retry-failed-topup/index.ts`:
+- একই tolerance fix (`< 1.00`) এবং ≥ check।
+- এর জন্য আলাদা migration লাগবে না — শুধু edge function code change।
 
-Fix-এর পর একটা client top-up auto বা manual approve দিন → Telegram-এ একটাই message আসবে, এবং Total line-এ App-এর ledger-এর Due/Advance value-এর সাথে exact mil থাকবে (যেমন `🔴 Total: Due −৳3,492,540.66`)।
+কোনো DB migration লাগবে না, শুধু ২টা edge function update হবে।
 
