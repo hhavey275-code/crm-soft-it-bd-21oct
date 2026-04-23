@@ -360,6 +360,18 @@ export function AdminTopUp() {
       if (action === "approved") {
         let finalAmount = amount;
         
+        // Idempotency guard (Fix A): never double-credit.
+        // If a top_up transaction already exists for this request_id, abort.
+        const { data: existingTx } = await supabase
+          .from("transactions")
+          .select("id")
+          .eq("reference_id", id)
+          .eq("type", "top_up")
+          .limit(1);
+        if (existingTx && existingTx.length > 0) {
+          throw new Error("This request was already credited to the wallet (duplicate prevention). Refresh the page.");
+        }
+
         // Check for pending card bills and auto-deduct
         try {
           const { data: cardBill } = await (supabase as any).from("card_bills").select("*").eq("user_id", userId).eq("status", "pending").limit(1);
