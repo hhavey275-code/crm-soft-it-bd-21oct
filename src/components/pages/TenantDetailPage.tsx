@@ -388,6 +388,103 @@ export default function TenantDetailPage() {
           />
         </div>
 
+        {/* Live Stats Section — from tenant heartbeat */}
+        <Card className="border-border/60">
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Live Tenant Stats
+                {tenant.stats_updated_at ? (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <Circle className={cn(
+                      "h-1.5 w-1.5 fill-current",
+                      Date.now() - new Date(tenant.stats_updated_at).getTime() < 10 * 60_000
+                        ? "text-green-500" : "text-amber-500"
+                    )} />
+                    {formatDistanceToNow(new Date(tenant.stats_updated_at), { addSuffix: true })}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px]">No data yet</Badge>
+                )}
+              </div>
+              <Button size="sm" variant="ghost" className="h-7"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+                  queryClient.invalidateQueries({ queryKey: ["tenant-stats-snapshots", tenantId] });
+                  toast.success("Refreshed");
+                }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            {!tenant.stats_updated_at ? (
+              <p className="text-xs text-muted-foreground py-2">
+                Tenant CRM থেকে এখনো stats আসেনি। Tenant project-এ <code className="text-[11px]">collectTenantStats()</code> patch apply করার পরে heartbeat-এ data আসবে।
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                <MetricCard
+                  title="Ad Accounts"
+                  value={Number(tenant.stats_accounts_total || 0)}
+                  subtitle={`${tenant.stats_accounts_active || 0} active · ${tenant.stats_accounts_disabled || 0} disabled`}
+                  icon={MonitorSmartphone}
+                  iconBg="bg-blue-500/10"
+                  iconColor="text-blue-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Today Spend"
+                  value={`$${Number(tenant.stats_spend_today || 0).toLocaleString()}`}
+                  subtitle={`Yesterday $${Number(tenant.stats_spend_yesterday || 0).toLocaleString()}`}
+                  icon={TrendingUp}
+                  iconBg="bg-orange-500/10"
+                  iconColor="text-orange-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="This Month Spend"
+                  value={`$${Number(tenant.stats_spend_month || 0).toLocaleString()}`}
+                  subtitle={`Lifetime $${Number(tenant.stats_spend_lifetime || 0).toLocaleString()}`}
+                  icon={BarChart3}
+                  iconBg="bg-violet-500/10"
+                  iconColor="text-violet-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Wallet Balance"
+                  value={`$${Number(tenant.stats_total_wallet || 0).toLocaleString()}`}
+                  subtitle="all clients combined"
+                  icon={Wallet}
+                  iconBg="bg-emerald-500/10"
+                  iconColor="text-emerald-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Total Clients"
+                  value={Number(tenant.stats_total_clients || 0)}
+                  subtitle={`${tenant.stats_active_clients_today || 0} active today`}
+                  icon={Users}
+                  iconBg="bg-cyan-500/10"
+                  iconColor="text-cyan-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Today Top-Ups"
+                  value={`$${Number(tenant.stats_topups_today_amount || 0).toLocaleString()}`}
+                  subtitle={`${tenant.stats_topups_today_count || 0} done · ${tenant.stats_topups_pending || 0} pending`}
+                  icon={ShoppingCart}
+                  iconBg="bg-pink-500/10"
+                  iconColor="text-pink-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Usage Progress (if limit-based) */}
         {tenant.subscription_type === "subscription_with_limit" && (
           <Card>
