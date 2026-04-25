@@ -441,7 +441,7 @@ export default function TenantDetailPage() {
           <CardContent className="p-3 sm:p-4 pt-0">
             {!tenant.stats_updated_at ? (
               <p className="text-xs text-muted-foreground py-2">
-                Tenant CRM থেকে এখনো stats আসেনি। Tenant project-এ <code className="text-[11px]">collectTenantStats()</code> patch apply করার পরে heartbeat-এ data আসবে।
+                এখনো stats pull হয়নি। উপরের <strong>"Refresh Stats from Tenant"</strong> button চাপুন। Tenant এর own database থেকে aggregate করে আনবে — Meta API কে কোনো call হবে না।
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
