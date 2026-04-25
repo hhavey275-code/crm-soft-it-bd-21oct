@@ -109,7 +109,6 @@ export default function TenantDetailPage() {
       return (data as any[]) ?? [];
     },
     enabled: !!tenantId,
-    refetchInterval: 60_000,
   });
 
   // Tenant-side activity log (system_logs entries created by tenant-webhook)
@@ -127,7 +126,26 @@ export default function TenantDetailPage() {
       return (data as any[]) ?? [];
     },
     enabled: !!tenant?.name,
-    refetchInterval: 60_000,
+  });
+
+  // On-demand refresh: invokes tenant-pull-stats edge function which calls the
+  // tenant's webhook (NO Meta API call — tenant returns aggregated data from
+  // its own DB, fed by the tenant's existing "Update from Meta" runs).
+  const refreshStatsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("tenant-pull-stats", {
+        body: { tenant_id: tenantId },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-stats-snapshots", tenantId] });
+      toast.success("Stats refreshed from tenant");
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to refresh stats"),
   });
 
   // Update tenant
@@ -408,21 +426,22 @@ export default function TenantDetailPage() {
                   <Badge variant="secondary" className="text-[10px]">No data yet</Badge>
                 )}
               </div>
-              <Button size="sm" variant="ghost" className="h-7"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
-                  queryClient.invalidateQueries({ queryKey: ["tenant-stats-snapshots", tenantId] });
-                  toast.success("Refreshed");
-                }}
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7"
+                disabled={refreshStatsMutation.isPending}
+                onClick={() => refreshStatsMutation.mutate()}
               >
-                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                <RefreshCw className={cn("h-3 w-3 mr-1", refreshStatsMutation.isPending && "animate-spin")} />
+                {refreshStatsMutation.isPending ? "Pulling…" : "Refresh Stats from Tenant"}
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 pt-0">
             {!tenant.stats_updated_at ? (
               <p className="text-xs text-muted-foreground py-2">
-                Tenant CRM থেকে এখনো stats আসেনি। Tenant project-এ <code className="text-[11px]">collectTenantStats()</code> patch apply করার পরে heartbeat-এ data আসবে।
+                এখনো stats pull হয়নি। উপরের <strong>"Refresh Stats from Tenant"</strong> button চাপুন। Tenant এর own database থেকে aggregate করে আনবে — Meta API কে কোনো call হবে না।
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
