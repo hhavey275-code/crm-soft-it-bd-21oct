@@ -69,8 +69,9 @@ export default function SystemLogsPage() {
       const { data, error } = await (supabase as any)
         .from("system_logs")
         .select("*")
+        .not("action", "in", `(${[...HIDDEN_ACTIONS].map((a) => `"${a}"`).join(",")})`)
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(1000);
       if (error) throw error;
       return ((data as any[]) ?? []).filter((log) => !HIDDEN_ACTIONS.has(log.action));
     },
