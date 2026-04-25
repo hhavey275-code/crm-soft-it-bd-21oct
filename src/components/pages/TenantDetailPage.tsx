@@ -44,6 +44,7 @@ export default function TenantDetailPage() {
   const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set">("increase");
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
 
   // Tenant
   const { data: tenant, isLoading, error: tenantError } = useQuery({
@@ -93,6 +94,41 @@ export default function TenantDetailPage() {
   });
 
   const assignedBankIds = tenantBanks.map((tb: any) => tb.bank_account_id);
+
+  // Stats: history snapshots for chart
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["tenant-stats-snapshots", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_stats_snapshots")
+        .select("snapshot_at, spend_today, accounts_active, accounts_disabled, total_wallet_balance, orders_today")
+        .eq("tenant_id", tenantId)
+        .order("snapshot_at", { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60_000,
+  });
+
+  // Tenant-side activity log (system_logs entries created by tenant-webhook)
+  const { data: tenantActivity = [] } = useQuery({
+    queryKey: ["tenant-activity-log", tenantId, tenant?.name],
+    queryFn: async () => {
+      if (!tenant?.name) return [];
+      const { data, error } = await (supabase as any)
+        .from("system_logs")
+        .select("id, action, actor_email, created_at, ip_address, details")
+        .eq("actor_email", `tenant:${tenant.name}`)
+        .order("created_at", { ascending: false })
+        .limit(80);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenant?.name,
+    refetchInterval: 60_000,
+  });
 
   // Update tenant
   const updateMutation = useMutation({
