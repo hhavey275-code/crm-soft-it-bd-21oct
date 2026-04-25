@@ -16,12 +16,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Copy, Ban, CheckCircle, Trash2, Landmark, Edit, DollarSign,
-  CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, Wallet, SlidersHorizontal
+  CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, Wallet, SlidersHorizontal,
+  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink
 } from "lucide-react";
 
 export default function TenantDetailPage() {
