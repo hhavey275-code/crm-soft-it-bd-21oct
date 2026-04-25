@@ -16,12 +16,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Copy, Ban, CheckCircle, Trash2, Landmark, Edit, DollarSign,
-  CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, Wallet, SlidersHorizontal
+  CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, Wallet, SlidersHorizontal,
+  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink
 } from "lucide-react";
 
 export default function TenantDetailPage() {
@@ -43,6 +44,7 @@ export default function TenantDetailPage() {
   const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set">("increase");
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
 
   // Tenant
   const { data: tenant, isLoading, error: tenantError } = useQuery({
@@ -92,6 +94,41 @@ export default function TenantDetailPage() {
   });
 
   const assignedBankIds = tenantBanks.map((tb: any) => tb.bank_account_id);
+
+  // Stats: history snapshots for chart
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["tenant-stats-snapshots", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_stats_snapshots")
+        .select("snapshot_at, spend_today, accounts_active, accounts_disabled, total_wallet_balance, orders_today")
+        .eq("tenant_id", tenantId)
+        .order("snapshot_at", { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60_000,
+  });
+
+  // Tenant-side activity log (system_logs entries created by tenant-webhook)
+  const { data: tenantActivity = [] } = useQuery({
+    queryKey: ["tenant-activity-log", tenantId, tenant?.name],
+    queryFn: async () => {
+      if (!tenant?.name) return [];
+      const { data, error } = await (supabase as any)
+        .from("system_logs")
+        .select("id, action, actor_email, created_at, ip_address, details")
+        .eq("actor_email", `tenant:${tenant.name}`)
+        .order("created_at", { ascending: false })
+        .limit(80);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenant?.name,
+    refetchInterval: 60_000,
+  });
 
   // Update tenant
   const updateMutation = useMutation({
@@ -351,6 +388,103 @@ export default function TenantDetailPage() {
           />
         </div>
 
+        {/* Live Stats Section — from tenant heartbeat */}
+        <Card className="border-border/60">
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Live Tenant Stats
+                {tenant.stats_updated_at ? (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <Circle className={cn(
+                      "h-1.5 w-1.5 fill-current",
+                      Date.now() - new Date(tenant.stats_updated_at).getTime() < 10 * 60_000
+                        ? "text-green-500" : "text-amber-500"
+                    )} />
+                    {formatDistanceToNow(new Date(tenant.stats_updated_at), { addSuffix: true })}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px]">No data yet</Badge>
+                )}
+              </div>
+              <Button size="sm" variant="ghost" className="h-7"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+                  queryClient.invalidateQueries({ queryKey: ["tenant-stats-snapshots", tenantId] });
+                  toast.success("Refreshed");
+                }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            {!tenant.stats_updated_at ? (
+              <p className="text-xs text-muted-foreground py-2">
+                Tenant CRM থেকে এখনো stats আসেনি। Tenant project-এ <code className="text-[11px]">collectTenantStats()</code> patch apply করার পরে heartbeat-এ data আসবে।
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                <MetricCard
+                  title="Ad Accounts"
+                  value={Number(tenant.stats_accounts_total || 0)}
+                  subtitle={`${tenant.stats_accounts_active || 0} active · ${tenant.stats_accounts_disabled || 0} disabled`}
+                  icon={MonitorSmartphone}
+                  iconBg="bg-blue-500/10"
+                  iconColor="text-blue-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Today Spend"
+                  value={`$${Number(tenant.stats_spend_today || 0).toLocaleString()}`}
+                  subtitle={`Yesterday $${Number(tenant.stats_spend_yesterday || 0).toLocaleString()}`}
+                  icon={TrendingUp}
+                  iconBg="bg-orange-500/10"
+                  iconColor="text-orange-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="This Month Spend"
+                  value={`$${Number(tenant.stats_spend_month || 0).toLocaleString()}`}
+                  subtitle={`Lifetime $${Number(tenant.stats_spend_lifetime || 0).toLocaleString()}`}
+                  icon={BarChart3}
+                  iconBg="bg-violet-500/10"
+                  iconColor="text-violet-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Wallet Balance"
+                  value={`$${Number(tenant.stats_total_wallet || 0).toLocaleString()}`}
+                  subtitle="all clients combined"
+                  icon={Wallet}
+                  iconBg="bg-emerald-500/10"
+                  iconColor="text-emerald-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Total Clients"
+                  value={Number(tenant.stats_total_clients || 0)}
+                  subtitle={`${tenant.stats_active_clients_today || 0} active today`}
+                  icon={Users}
+                  iconBg="bg-cyan-500/10"
+                  iconColor="text-cyan-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+                <MetricCard
+                  title="Today Top-Ups"
+                  value={`$${Number(tenant.stats_topups_today_amount || 0).toLocaleString()}`}
+                  subtitle={`${tenant.stats_topups_today_count || 0} done · ${tenant.stats_topups_pending || 0} pending`}
+                  icon={ShoppingCart}
+                  iconBg="bg-pink-500/10"
+                  iconColor="text-pink-600"
+                  size={isMobile ? "xs" : "sm"}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Usage Progress (if limit-based) */}
         {tenant.subscription_type === "subscription_with_limit" && (
           <Card>
@@ -400,6 +534,8 @@ export default function TenantDetailPage() {
         <Tabs defaultValue="payments">
           <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
             <TabsTrigger value="payments" className={cn(isMobile && "text-xs flex-1")}>Payments</TabsTrigger>
+            <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
+            <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
             <TabsTrigger value="banks" className={cn(isMobile && "text-xs flex-1")}>Banks</TabsTrigger>
             <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
           </TabsList>
@@ -478,6 +614,158 @@ export default function TenantDetailPage() {
                         <p className="font-medium text-sm">{tb.bank_accounts?.bank_name}</p>
                         <p className="text-xs text-muted-foreground">{tb.bank_accounts?.account_name}</p>
                         <p className="text-xs font-mono text-muted-foreground">{tb.bank_accounts?.account_number}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Ad Accounts Tab — top accounts reported by tenant */}
+          <TabsContent value="accounts" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <MonitorSmartphone className="h-4 w-4" />
+                    Top Ad Accounts ({Array.isArray(tenant.stats_top_accounts) ? tenant.stats_top_accounts.length : 0})
+                  </div>
+                  <div className="relative w-40 sm:w-56">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <Input
+                      className="pl-7 h-8 text-xs"
+                      placeholder="Search account…"
+                      value={accountSearch}
+                      onChange={(e) => setAccountSearch(e.target.value)}
+                    />
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                {!Array.isArray(tenant.stats_top_accounts) || tenant.stats_top_accounts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">
+                    Tenant এখনো ad account list পাঠায়নি। heartbeat-এ stats যুক্ত হলে এখানে দেখা যাবে।
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(tenant.stats_top_accounts as any[])
+                      .filter((a: any) => {
+                        if (!accountSearch.trim()) return true;
+                        const q = accountSearch.toLowerCase();
+                        return (
+                          (a.name || "").toLowerCase().includes(q) ||
+                          (a.external_id || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .map((acc: any, idx: number) => (
+                        <div key={acc.external_id || idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-muted/30 border">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium truncate">{acc.name || "—"}</p>
+                              <Badge
+                                variant={acc.status === "active" || acc.status === 1 ? "default" : "secondary"}
+                                className="text-[10px]"
+                              >
+                                {String(acc.status ?? "—")}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground truncate">{acc.external_id || acc.account_id || "—"}</p>
+                          </div>
+                          <div className="flex items-center gap-3 sm:gap-4 text-xs">
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Today</p>
+                              <p className="font-semibold">${Number(acc.spend_today || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Lifetime</p>
+                              <p className="font-semibold">${Number(acc.spend_lifetime || acc.amount_spent || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Balance</p>
+                              <p className="font-semibold">${Number(acc.balance || 0).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {tenant.domain && (
+                  <p className="text-[11px] text-muted-foreground mt-3">
+                    Top 50 by spend দেখানো হচ্ছে। সম্পূর্ণ list-এর জন্য{" "}
+                    <a href={`https://${tenant.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                      tenant site <ExternalLink className="h-2.5 w-2.5" />
+                    </a>{" "}
+                    visit করুন।
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Spend trend mini chart */}
+            {snapshots.length > 1 && (
+              <Card>
+                <CardHeader className="p-3 sm:p-4 pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Spend Trend (last {snapshots.length} snapshots)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  {(() => {
+                    const series = [...snapshots].reverse();
+                    const max = Math.max(1, ...series.map((s: any) => Number(s.spend_today || 0)));
+                    return (
+                      <div className="flex items-end gap-1 h-24">
+                        {series.map((s: any, i: number) => {
+                          const v = Number(s.spend_today || 0);
+                          const h = (v / max) * 100;
+                          return (
+                            <div
+                              key={i}
+                              className="flex-1 bg-primary/70 hover:bg-primary rounded-t transition-colors"
+                              style={{ height: `${Math.max(2, h)}%` }}
+                              title={`${format(new Date(s.snapshot_at), "dd MMM HH:mm")} — $${v.toLocaleString()}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-[10px] text-muted-foreground mt-2">Each bar = today-spend value at that heartbeat.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Activity Tab — system_logs from tenant-webhook */}
+          <TabsContent value="activity" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Tenant Activity ({tenantActivity.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                {tenantActivity.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No activity logged yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
+                    {tenantActivity.map((log: any) => (
+                      <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/30 border-l-2 border-primary/40">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{log.action}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(log.created_at), "dd MMM yyyy, hh:mm:ss a")}
+                            {log.ip_address ? ` · ${log.ip_address}` : ""}
+                          </p>
+                          {log.details && Object.keys(log.details).length > 0 && (
+                            <pre className="text-[10px] text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap break-all">
+                              {JSON.stringify(log.details, null, 0).slice(0, 240)}
+                            </pre>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -66,10 +66,63 @@ Deno.serve(async (req) => {
   try {
     switch (action) {
       case "heartbeat": {
-        await supabase
-          .from("tenants")
-          .update({ last_heartbeat_at: new Date().toISOString() } as any)
-          .eq("id", tenant.id);
+        const stats = (body as any).stats ?? (payload as any)?.stats ?? null;
+        const updates: any = { last_heartbeat_at: new Date().toISOString() };
+
+        if (stats && typeof stats === "object") {
+          const num = (v: any) => Number(v ?? 0) || 0;
+          const int = (v: any) => Math.trunc(Number(v ?? 0)) || 0;
+          const cache = {
+            stats_updated_at: new Date().toISOString(),
+            stats_accounts_total: int(stats.accounts_total),
+            stats_accounts_active: int(stats.accounts_active),
+            stats_accounts_disabled: int(stats.accounts_disabled),
+            stats_accounts_inactive: int(stats.accounts_inactive),
+            stats_spend_today: num(stats.spend_today),
+            stats_spend_yesterday: num(stats.spend_yesterday),
+            stats_spend_month: num(stats.spend_this_month ?? stats.spend_month),
+            stats_spend_last_30d: num(stats.spend_last_30d),
+            stats_spend_lifetime: num(stats.spend_lifetime),
+            stats_orders_today: int(stats.orders_today),
+            stats_orders_yesterday: int(stats.orders_yesterday),
+            stats_total_wallet: num(stats.total_wallet_balance ?? stats.total_wallet),
+            stats_total_clients: int(stats.total_clients),
+            stats_active_clients_today: int(stats.active_clients_today),
+            stats_topups_today_count: int(stats.topups_today_count),
+            stats_topups_today_amount: num(stats.topups_today_amount),
+            stats_topups_pending: int(stats.topups_pending_count ?? stats.topups_pending),
+            stats_top_accounts: Array.isArray(stats.top_accounts) ? stats.top_accounts.slice(0, 100) : [],
+          };
+          Object.assign(updates, cache);
+
+          try {
+            await supabase.from("tenant_stats_snapshots").insert({
+              tenant_id: tenant.id,
+              accounts_total: cache.stats_accounts_total,
+              accounts_active: cache.stats_accounts_active,
+              accounts_disabled: cache.stats_accounts_disabled,
+              accounts_inactive: cache.stats_accounts_inactive,
+              spend_today: cache.stats_spend_today,
+              spend_yesterday: cache.stats_spend_yesterday,
+              spend_this_month: cache.stats_spend_month,
+              spend_last_30d: cache.stats_spend_last_30d,
+              spend_lifetime: cache.stats_spend_lifetime,
+              orders_today: cache.stats_orders_today,
+              orders_yesterday: cache.stats_orders_yesterday,
+              total_wallet_balance: cache.stats_total_wallet,
+              total_clients: cache.stats_total_clients,
+              active_clients_today: cache.stats_active_clients_today,
+              topups_today_count: cache.stats_topups_today_count,
+              topups_today_amount: cache.stats_topups_today_amount,
+              topups_pending_count: cache.stats_topups_pending,
+              raw: stats,
+            } as any);
+          } catch (snapErr) {
+            console.warn("snapshot insert failed:", (snapErr as any)?.message);
+          }
+        }
+
+        await supabase.from("tenants").update(updates).eq("id", tenant.id);
         return json({
           status: tenant.status ?? "active",
           system_limit: tenant.system_limit ?? null,
