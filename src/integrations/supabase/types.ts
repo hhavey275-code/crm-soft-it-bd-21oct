@@ -2423,6 +2423,7 @@ export type Database = {
           id: string
           last_heartbeat_at: string | null
           name: string
+          pull_api_key: string | null
           stats_accounts_active: number | null
           stats_accounts_disabled: number | null
           stats_accounts_inactive: number | null
@@ -2450,6 +2451,7 @@ export type Database = {
           total_used: number
           updated_at: string
           usd_rate: number | null
+          webhook_url: string | null
         }
         Insert: {
           api_key?: string
@@ -2458,6 +2460,7 @@ export type Database = {
           id?: string
           last_heartbeat_at?: string | null
           name: string
+          pull_api_key?: string | null
           stats_accounts_active?: number | null
           stats_accounts_disabled?: number | null
           stats_accounts_inactive?: number | null
@@ -2485,6 +2488,7 @@ export type Database = {
           total_used?: number
           updated_at?: string
           usd_rate?: number | null
+          webhook_url?: string | null
         }
         Update: {
           api_key?: string
@@ -2493,6 +2497,7 @@ export type Database = {
           id?: string
           last_heartbeat_at?: string | null
           name?: string
+          pull_api_key?: string | null
           stats_accounts_active?: number | null
           stats_accounts_disabled?: number | null
           stats_accounts_inactive?: number | null
@@ -2520,6 +2525,7 @@ export type Database = {
           total_used?: number
           updated_at?: string
           usd_rate?: number | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
