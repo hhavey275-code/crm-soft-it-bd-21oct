@@ -66,63 +66,12 @@ Deno.serve(async (req) => {
   try {
     switch (action) {
       case "heartbeat": {
-        const stats = (body as any).stats ?? (payload as any)?.stats ?? null;
-        const updates: any = { last_heartbeat_at: new Date().toISOString() };
-
-        if (stats && typeof stats === "object") {
-          const num = (v: any) => Number(v ?? 0) || 0;
-          const int = (v: any) => Math.trunc(Number(v ?? 0)) || 0;
-          const cache = {
-            stats_updated_at: new Date().toISOString(),
-            stats_accounts_total: int(stats.accounts_total),
-            stats_accounts_active: int(stats.accounts_active),
-            stats_accounts_disabled: int(stats.accounts_disabled),
-            stats_accounts_inactive: int(stats.accounts_inactive),
-            stats_spend_today: num(stats.spend_today),
-            stats_spend_yesterday: num(stats.spend_yesterday),
-            stats_spend_month: num(stats.spend_this_month ?? stats.spend_month),
-            stats_spend_last_30d: num(stats.spend_last_30d),
-            stats_spend_lifetime: num(stats.spend_lifetime),
-            stats_orders_today: int(stats.orders_today),
-            stats_orders_yesterday: int(stats.orders_yesterday),
-            stats_total_wallet: num(stats.total_wallet_balance ?? stats.total_wallet),
-            stats_total_clients: int(stats.total_clients),
-            stats_active_clients_today: int(stats.active_clients_today),
-            stats_topups_today_count: int(stats.topups_today_count),
-            stats_topups_today_amount: num(stats.topups_today_amount),
-            stats_topups_pending: int(stats.topups_pending_count ?? stats.topups_pending),
-            stats_top_accounts: Array.isArray(stats.top_accounts) ? stats.top_accounts.slice(0, 100) : [],
-          };
-          Object.assign(updates, cache);
-
-          try {
-            await supabase.from("tenant_stats_snapshots").insert({
-              tenant_id: tenant.id,
-              accounts_total: cache.stats_accounts_total,
-              accounts_active: cache.stats_accounts_active,
-              accounts_disabled: cache.stats_accounts_disabled,
-              accounts_inactive: cache.stats_accounts_inactive,
-              spend_today: cache.stats_spend_today,
-              spend_yesterday: cache.stats_spend_yesterday,
-              spend_this_month: cache.stats_spend_month,
-              spend_last_30d: cache.stats_spend_last_30d,
-              spend_lifetime: cache.stats_spend_lifetime,
-              orders_today: cache.stats_orders_today,
-              orders_yesterday: cache.stats_orders_yesterday,
-              total_wallet_balance: cache.stats_total_wallet,
-              total_clients: cache.stats_total_clients,
-              active_clients_today: cache.stats_active_clients_today,
-              topups_today_count: cache.stats_topups_today_count,
-              topups_today_amount: cache.stats_topups_today_amount,
-              topups_pending_count: cache.stats_topups_pending,
-              raw: stats,
-            } as any);
-          } catch (snapErr) {
-            console.warn("snapshot insert failed:", (snapErr as any)?.message);
-          }
-        }
-
-        await supabase.from("tenants").update(updates).eq("id", tenant.id);
+        // Heartbeat is license-only. Stats are pulled on-demand via "pull_stats"
+        // so we don't bombard Meta with extra API calls every 5 minutes.
+        await supabase
+          .from("tenants")
+          .update({ last_heartbeat_at: new Date().toISOString() })
+          .eq("id", tenant.id);
         return json({
           status: tenant.status ?? "active",
           system_limit: tenant.system_limit ?? null,
@@ -132,6 +81,143 @@ Deno.serve(async (req) => {
           subscription_fee: tenant.subscription_fee ?? 0,
           usd_rate: tenant.usd_rate ?? 0,
         });
+      }
+
+      case "pull_stats":
+      case "pull-stats": {
+        // Aggregate stats from tenant's own database. Does NOT call Meta API.
+        // Tenant should run its own "Update All from Meta" periodically to keep
+        // ad_account_insights fresh; this endpoint just reads what's there.
+        // BD timezone day boundaries
+        const bdMs = Date.now() + 6 * 60 * 60 * 1000;
+        const todayBD = new Date(bdMs).toISOString().slice(0, 10);
+        const monthStart = new Date(bdMs);
+        monthStart.setUTCDate(1);
+        const monthStartISO = monthStart.toISOString().slice(0, 10);
+
+        const num = (v: any) => Number(v ?? 0) || 0;
+        const int = (v: any) => Math.trunc(Number(v ?? 0)) || 0;
+
+        try {
+          // 1) ad accounts
+          const { data: accounts } = await supabase
+            .from("ad_accounts")
+            .select("id, account_name, account_id, status");
+          const accountsArr = (accounts as any[]) || [];
+          const acctMap: Record<string, any> = {};
+          accountsArr.forEach((a) => { acctMap[a.id] = a; });
+
+          const accounts_total = accountsArr.length;
+          const accounts_active = accountsArr.filter((a) => a.status === "active").length;
+          const accounts_disabled = accountsArr.filter((a) => a.status === "disabled").length;
+          const accounts_inactive = accountsArr.filter(
+            (a) => a.status !== "active" && a.status !== "disabled"
+          ).length;
+
+          // 2) insights (chunked because of 1000-row Supabase default limit)
+          const accountIds = accountsArr.map((a) => a.id);
+          const insightsAll: any[] = [];
+          for (let i = 0; i < accountIds.length; i += 500) {
+            const chunk = accountIds.slice(i, i + 500);
+            if (chunk.length === 0) break;
+            const { data: ins } = await supabase
+              .from("ad_account_insights")
+              .select("ad_account_id, today_spend, yesterday_spend, today_orders, yesterday_orders, balance, last_spend_date")
+              .in("ad_account_id", chunk);
+            if (ins) insightsAll.push(...(ins as any[]));
+          }
+
+          let spend_today = 0, spend_yesterday = 0;
+          let orders_today = 0, orders_yesterday = 0;
+          let total_account_balance = 0;
+          insightsAll.forEach((r) => {
+            spend_today += num(r.today_spend);
+            spend_yesterday += num(r.yesterday_spend);
+            orders_today += int(r.today_orders);
+            orders_yesterday += int(r.yesterday_orders);
+            total_account_balance += num(r.balance);
+          });
+
+          // 3) lifetime spend from ad_accounts.amount_spent
+          const { data: spendRows } = await supabase
+            .from("ad_accounts")
+            .select("amount_spent");
+          const spend_lifetime = (spendRows as any[] || []).reduce(
+            (s, r) => s + num(r.amount_spent), 0
+          );
+
+          // 4) month-to-date spend from client_daily_stats (already aggregated per day)
+          const { data: monthStats } = await supabase
+            .from("client_daily_stats")
+            .select("stat_date, total_spend")
+            .gte("stat_date", monthStartISO);
+          const spend_this_month = (monthStats as any[] || []).reduce(
+            (s, r) => s + num(r.total_spend), 0
+          );
+
+          // 5) wallets
+          const { data: wallets } = await supabase
+            .from("wallets")
+            .select("balance");
+          const total_wallet_balance = (wallets as any[] || []).reduce(
+            (s, r) => s + num(r.balance), 0
+          );
+
+          // 6) clients (profiles count)
+          const { count: clientCount } = await supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true });
+          const total_clients = clientCount ?? 0;
+
+          // 7) top-up requests today
+          const { data: tups } = await supabase
+            .from("top_up_requests")
+            .select("amount, status, created_at")
+            .gte("created_at", `${todayBD}T00:00:00Z`);
+          const tupsArr = (tups as any[]) || [];
+          const topups_today_count = tupsArr.length;
+          const topups_today_amount = tupsArr.reduce((s, r) => s + num(r.amount), 0);
+
+          const { count: pendingCount } = await supabase
+            .from("top_up_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "pending");
+          const topups_pending = pendingCount ?? 0;
+
+          // 8) top 50 accounts by today_spend
+          const top_accounts = insightsAll
+            .map((r) => {
+              const a = acctMap[r.ad_account_id] || {};
+              return {
+                id: r.ad_account_id,
+                name: a.account_name || "—",
+                external_id: a.account_id || "",
+                status: a.status || "unknown",
+                spend_today: num(r.today_spend),
+                yesterday_spend: num(r.yesterday_spend),
+                balance: num(r.balance),
+                last_spend_date: r.last_spend_date || null,
+              };
+            })
+            .sort((a, b) => b.spend_today - a.spend_today)
+            .slice(0, 50);
+
+          const stats = {
+            accounts_total, accounts_active, accounts_disabled, accounts_inactive,
+            spend_today, spend_yesterday, spend_this_month, spend_lifetime,
+            orders_today, orders_yesterday,
+            total_wallet_balance, total_account_balance,
+            total_clients,
+            topups_today_count, topups_today_amount, topups_pending,
+            top_accounts,
+            collected_at: new Date().toISOString(),
+          };
+
+          return json({ ok: true, stats });
+        } catch (e: any) {
+          console.error("pull_stats failed:", e);
+          return json({ error: e?.message ?? "pull_stats failed" }, 500);
+        }
       }
 
       case "chat_message": {
