@@ -2279,6 +2279,86 @@ export type Database = {
           },
         ]
       }
+      tenant_stats_snapshots: {
+        Row: {
+          accounts_active: number | null
+          accounts_disabled: number | null
+          accounts_inactive: number | null
+          accounts_total: number | null
+          active_clients_today: number | null
+          id: string
+          orders_today: number | null
+          orders_yesterday: number | null
+          raw: Json | null
+          snapshot_at: string
+          spend_last_30d: number | null
+          spend_lifetime: number | null
+          spend_this_month: number | null
+          spend_today: number | null
+          spend_yesterday: number | null
+          tenant_id: string
+          topups_pending_count: number | null
+          topups_today_amount: number | null
+          topups_today_count: number | null
+          total_clients: number | null
+          total_wallet_balance: number | null
+        }
+        Insert: {
+          accounts_active?: number | null
+          accounts_disabled?: number | null
+          accounts_inactive?: number | null
+          accounts_total?: number | null
+          active_clients_today?: number | null
+          id?: string
+          orders_today?: number | null
+          orders_yesterday?: number | null
+          raw?: Json | null
+          snapshot_at?: string
+          spend_last_30d?: number | null
+          spend_lifetime?: number | null
+          spend_this_month?: number | null
+          spend_today?: number | null
+          spend_yesterday?: number | null
+          tenant_id: string
+          topups_pending_count?: number | null
+          topups_today_amount?: number | null
+          topups_today_count?: number | null
+          total_clients?: number | null
+          total_wallet_balance?: number | null
+        }
+        Update: {
+          accounts_active?: number | null
+          accounts_disabled?: number | null
+          accounts_inactive?: number | null
+          accounts_total?: number | null
+          active_clients_today?: number | null
+          id?: string
+          orders_today?: number | null
+          orders_yesterday?: number | null
+          raw?: Json | null
+          snapshot_at?: string
+          spend_last_30d?: number | null
+          spend_lifetime?: number | null
+          spend_this_month?: number | null
+          spend_today?: number | null
+          spend_yesterday?: number | null
+          tenant_id?: string
+          topups_pending_count?: number | null
+          topups_today_amount?: number | null
+          topups_today_count?: number | null
+          total_clients?: number | null
+          total_wallet_balance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_stats_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_withdraw_requests: {
         Row: {
           ad_account_external_id: string
@@ -2343,6 +2423,25 @@ export type Database = {
           id: string
           last_heartbeat_at: string | null
           name: string
+          stats_accounts_active: number | null
+          stats_accounts_disabled: number | null
+          stats_accounts_inactive: number | null
+          stats_accounts_total: number | null
+          stats_active_clients_today: number | null
+          stats_orders_today: number | null
+          stats_orders_yesterday: number | null
+          stats_spend_last_30d: number | null
+          stats_spend_lifetime: number | null
+          stats_spend_month: number | null
+          stats_spend_today: number | null
+          stats_spend_yesterday: number | null
+          stats_top_accounts: Json | null
+          stats_topups_pending: number | null
+          stats_topups_today_amount: number | null
+          stats_topups_today_count: number | null
+          stats_total_clients: number | null
+          stats_total_wallet: number | null
+          stats_updated_at: string | null
           status: string
           subscription_fee: number | null
           subscription_paid_until: string | null
@@ -2359,6 +2458,25 @@ export type Database = {
           id?: string
           last_heartbeat_at?: string | null
           name: string
+          stats_accounts_active?: number | null
+          stats_accounts_disabled?: number | null
+          stats_accounts_inactive?: number | null
+          stats_accounts_total?: number | null
+          stats_active_clients_today?: number | null
+          stats_orders_today?: number | null
+          stats_orders_yesterday?: number | null
+          stats_spend_last_30d?: number | null
+          stats_spend_lifetime?: number | null
+          stats_spend_month?: number | null
+          stats_spend_today?: number | null
+          stats_spend_yesterday?: number | null
+          stats_top_accounts?: Json | null
+          stats_topups_pending?: number | null
+          stats_topups_today_amount?: number | null
+          stats_topups_today_count?: number | null
+          stats_total_clients?: number | null
+          stats_total_wallet?: number | null
+          stats_updated_at?: string | null
           status?: string
           subscription_fee?: number | null
           subscription_paid_until?: string | null
@@ -2375,6 +2493,25 @@ export type Database = {
           id?: string
           last_heartbeat_at?: string | null
           name?: string
+          stats_accounts_active?: number | null
+          stats_accounts_disabled?: number | null
+          stats_accounts_inactive?: number | null
+          stats_accounts_total?: number | null
+          stats_active_clients_today?: number | null
+          stats_orders_today?: number | null
+          stats_orders_yesterday?: number | null
+          stats_spend_last_30d?: number | null
+          stats_spend_lifetime?: number | null
+          stats_spend_month?: number | null
+          stats_spend_today?: number | null
+          stats_spend_yesterday?: number | null
+          stats_top_accounts?: Json | null
+          stats_topups_pending?: number | null
+          stats_topups_today_amount?: number | null
+          stats_topups_today_count?: number | null
+          stats_total_clients?: number | null
+          stats_total_wallet?: number | null
+          stats_updated_at?: string | null
           status?: string
           subscription_fee?: number | null
           subscription_paid_until?: string | null
