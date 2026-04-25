@@ -622,6 +622,158 @@ export default function TenantDetailPage() {
             </Card>
           </TabsContent>
 
+          {/* Ad Accounts Tab — top accounts reported by tenant */}
+          <TabsContent value="accounts" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <MonitorSmartphone className="h-4 w-4" />
+                    Top Ad Accounts ({Array.isArray(tenant.stats_top_accounts) ? tenant.stats_top_accounts.length : 0})
+                  </div>
+                  <div className="relative w-40 sm:w-56">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <Input
+                      className="pl-7 h-8 text-xs"
+                      placeholder="Search account…"
+                      value={accountSearch}
+                      onChange={(e) => setAccountSearch(e.target.value)}
+                    />
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                {!Array.isArray(tenant.stats_top_accounts) || tenant.stats_top_accounts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">
+                    Tenant এখনো ad account list পাঠায়নি। heartbeat-এ stats যুক্ত হলে এখানে দেখা যাবে।
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(tenant.stats_top_accounts as any[])
+                      .filter((a: any) => {
+                        if (!accountSearch.trim()) return true;
+                        const q = accountSearch.toLowerCase();
+                        return (
+                          (a.name || "").toLowerCase().includes(q) ||
+                          (a.external_id || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .map((acc: any, idx: number) => (
+                        <div key={acc.external_id || idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-muted/30 border">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium truncate">{acc.name || "—"}</p>
+                              <Badge
+                                variant={acc.status === "active" || acc.status === 1 ? "default" : "secondary"}
+                                className="text-[10px]"
+                              >
+                                {String(acc.status ?? "—")}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground truncate">{acc.external_id || acc.account_id || "—"}</p>
+                          </div>
+                          <div className="flex items-center gap-3 sm:gap-4 text-xs">
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Today</p>
+                              <p className="font-semibold">${Number(acc.spend_today || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Lifetime</p>
+                              <p className="font-semibold">${Number(acc.spend_lifetime || acc.amount_spent || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Balance</p>
+                              <p className="font-semibold">${Number(acc.balance || 0).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {tenant.domain && (
+                  <p className="text-[11px] text-muted-foreground mt-3">
+                    Top 50 by spend দেখানো হচ্ছে। সম্পূর্ণ list-এর জন্য{" "}
+                    <a href={`https://${tenant.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                      tenant site <ExternalLink className="h-2.5 w-2.5" />
+                    </a>{" "}
+                    visit করুন।
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Spend trend mini chart */}
+            {snapshots.length > 1 && (
+              <Card>
+                <CardHeader className="p-3 sm:p-4 pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Spend Trend (last {snapshots.length} snapshots)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  {(() => {
+                    const series = [...snapshots].reverse();
+                    const max = Math.max(1, ...series.map((s: any) => Number(s.spend_today || 0)));
+                    return (
+                      <div className="flex items-end gap-1 h-24">
+                        {series.map((s: any, i: number) => {
+                          const v = Number(s.spend_today || 0);
+                          const h = (v / max) * 100;
+                          return (
+                            <div
+                              key={i}
+                              className="flex-1 bg-primary/70 hover:bg-primary rounded-t transition-colors"
+                              style={{ height: `${Math.max(2, h)}%` }}
+                              title={`${format(new Date(s.snapshot_at), "dd MMM HH:mm")} — $${v.toLocaleString()}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-[10px] text-muted-foreground mt-2">Each bar = today-spend value at that heartbeat.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Activity Tab — system_logs from tenant-webhook */}
+          <TabsContent value="activity" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Tenant Activity ({tenantActivity.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                {tenantActivity.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No activity logged yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
+                    {tenantActivity.map((log: any) => (
+                      <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/30 border-l-2 border-primary/40">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{log.action}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(log.created_at), "dd MMM yyyy, hh:mm:ss a")}
+                            {log.ip_address ? ` · ${log.ip_address}` : ""}
+                          </p>
+                          {log.details && Object.keys(log.details).length > 0 && (
+                            <pre className="text-[10px] text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap break-all">
+                              {JSON.stringify(log.details, null, 0).slice(0, 240)}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Info Tab */}
           <TabsContent value="info" className="space-y-3">
             <Card>
