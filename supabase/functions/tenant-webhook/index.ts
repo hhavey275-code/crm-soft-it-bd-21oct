@@ -254,6 +254,83 @@ Deno.serve(async (req) => {
         await logSystem("submit_payment", {
           payment_id: data.id, amount, payment_type, limit_amount,
         });
+
+        // Forward proof to Telegram group (best-effort, non-blocking failure)
+        if (proof_url) {
+          try {
+            // Resolve target group: bank-specific first, then global fallback
+            let targetGroupId = "";
+            if (bank_account_id) {
+              const { data: bank } = await supabase
+                .from("bank_accounts")
+                .select("telegram_group_id")
+                .eq("id", bank_account_id)
+                .maybeSingle();
+              if (bank?.telegram_group_id) targetGroupId = bank.telegram_group_id;
+            }
+            if (!targetGroupId) {
+              const { data: gRow } = await supabase
+                .from("site_settings")
+                .select("value")
+                .eq("key", "tenant_forward_group_id")
+                .maybeSingle();
+              targetGroupId = gRow?.value || "";
+            }
+            if (!targetGroupId) {
+              const { data: gRow2 } = await supabase
+                .from("site_settings")
+                .select("value")
+                .eq("key", "telegram_forward_group_id")
+                .maybeSingle();
+              targetGroupId = gRow2?.value || "";
+            }
+
+            const { data: tokRow } = await supabase
+              .from("site_settings")
+              .select("value")
+              .eq("key", "telegram_bot_token")
+              .maybeSingle();
+            const botToken = tokRow?.value || "";
+
+            if (targetGroupId && botToken) {
+              const amtLine = `💰 ৳${Number(amount).toLocaleString("en-IN")}`;
+              const limitLine = limit_amount
+                ? `\n📈 Limit: $${Number(limit_amount).toLocaleString()}`
+                : "";
+              const refLine = payment_reference ? `\n🔖 Ref: ${payment_reference}` : "";
+              const typeLabel = payment_type === "subscription" ? "Subscription" : "Limit Purchase";
+              const caption =
+                `🏢 <b>Tenant Payment</b> (${typeLabel})\n` +
+                `🏷 ${tenant.name}\n` +
+                `${amtLine}${limitLine}${refLine}`;
+              const tgRes = await fetch(
+                `https://api.telegram.org/bot${botToken}/sendPhoto`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: targetGroupId,
+                    photo: proof_url,
+                    caption,
+                    parse_mode: "HTML",
+                  }),
+                },
+              );
+              const tgJson = await tgRes.json().catch(() => ({}));
+              if (!tgJson.ok) {
+                console.warn("Tenant proof Telegram forward failed:", tgJson);
+              }
+            } else {
+              console.warn("Tenant proof forward skipped: missing token or group", {
+                hasToken: !!botToken,
+                hasGroup: !!targetGroupId,
+              });
+            }
+          } catch (fwdErr) {
+            console.error("Tenant proof forward error:", fwdErr);
+          }
+        }
+
         return json({ ok: true, payment_id: data.id });
       }
 
