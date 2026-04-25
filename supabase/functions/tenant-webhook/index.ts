@@ -260,13 +260,17 @@ Deno.serve(async (req) => {
           try {
             // Resolve target group: bank-specific first, then global fallback
             let targetGroupId = "";
+            let groupSource = "";
             if (bank_account_id) {
               const { data: bank } = await supabase
                 .from("bank_accounts")
-                .select("telegram_group_id")
+                .select("telegram_group_id, bank_name, account_number")
                 .eq("id", bank_account_id)
                 .maybeSingle();
-              if (bank?.telegram_group_id) targetGroupId = bank.telegram_group_id;
+              if (bank?.telegram_group_id) {
+                targetGroupId = String(bank.telegram_group_id).trim();
+                groupSource = `bank:${bank.bank_name ?? bank_account_id}`;
+              }
             }
             if (!targetGroupId) {
               const { data: gRow } = await supabase
@@ -274,7 +278,10 @@ Deno.serve(async (req) => {
                 .select("value")
                 .eq("key", "tenant_forward_group_id")
                 .maybeSingle();
-              targetGroupId = gRow?.value || "";
+              if (gRow?.value) {
+                targetGroupId = String(gRow.value).trim();
+                groupSource = "site_settings:tenant_forward_group_id";
+              }
             }
             if (!targetGroupId) {
               const { data: gRow2 } = await supabase
@@ -282,7 +289,10 @@ Deno.serve(async (req) => {
                 .select("value")
                 .eq("key", "telegram_forward_group_id")
                 .maybeSingle();
-              targetGroupId = gRow2?.value || "";
+              if (gRow2?.value) {
+                targetGroupId = String(gRow2.value).trim();
+                groupSource = "site_settings:telegram_forward_group_id";
+              }
             }
 
             const { data: tokRow } = await supabase
@@ -303,22 +313,100 @@ Deno.serve(async (req) => {
                 `🏢 <b>Tenant Payment</b> (${typeLabel})\n` +
                 `🏷 ${tenant.name}\n` +
                 `${amtLine}${limitLine}${refLine}`;
-              const tgRes = await fetch(
-                `https://api.telegram.org/bot${botToken}/sendPhoto`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chat_id: targetGroupId,
-                    photo: proof_url,
-                    caption,
-                    parse_mode: "HTML",
-                  }),
-                },
-              );
-              const tgJson = await tgRes.json().catch(() => ({}));
-              if (!tgJson.ok) {
-                console.warn("Tenant proof Telegram forward failed:", tgJson);
+              // Retry up to 4 times with exponential backoff so transient
+              // Telegram errors / rate limits don't drop the proof when a
+              // bank-specific group is configured.
+              const maxAttempts = 4;
+              let delivered = false;
+              let lastErr: any = null;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  // Try sendPhoto first; if Telegram can't fetch the photo URL
+                  // (some storage URLs return non-image content-type), fall
+                  // back to sendMessage with the link so the proof is never
+                  // silently lost.
+                  const tgRes = await fetch(
+                    `https://api.telegram.org/bot${botToken}/sendPhoto`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        chat_id: targetGroupId,
+                        photo: proof_url,
+                        caption,
+                        parse_mode: "HTML",
+                      }),
+                    },
+                  );
+                  const tgJson = await tgRes.json().catch(() => ({}));
+                  if (tgJson?.ok) {
+                    delivered = true;
+                    console.log(
+                      `Tenant proof forwarded (attempt ${attempt}) → ${groupSource} (${targetGroupId})`,
+                    );
+                    break;
+                  }
+                  lastErr = tgJson;
+                  // Honor Telegram retry_after for 429s
+                  const retryAfter = Number(tgJson?.parameters?.retry_after);
+                  const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+                    ? retryAfter * 1000
+                    : Math.min(8000, 500 * 2 ** (attempt - 1));
+                  console.warn(
+                    `Tenant proof forward attempt ${attempt}/${maxAttempts} failed; retrying in ${waitMs}ms`,
+                    tgJson,
+                  );
+                  if (attempt < maxAttempts) {
+                    await new Promise((r) => setTimeout(r, waitMs));
+                  }
+                } catch (netErr) {
+                  lastErr = netErr;
+                  const waitMs = Math.min(8000, 500 * 2 ** (attempt - 1));
+                  console.warn(
+                    `Tenant proof forward attempt ${attempt}/${maxAttempts} threw; retrying in ${waitMs}ms`,
+                    netErr,
+                  );
+                  if (attempt < maxAttempts) {
+                    await new Promise((r) => setTimeout(r, waitMs));
+                  }
+                }
+              }
+
+              // Final fallback: send a plain text message with the proof link
+              // so the group always sees the payment even if the photo upload
+              // keeps failing.
+              if (!delivered) {
+                try {
+                  const fbRes = await fetch(
+                    `https://api.telegram.org/bot${botToken}/sendMessage`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        chat_id: targetGroupId,
+                        text: `${caption}\n\n🖼 Proof: ${proof_url}`,
+                        parse_mode: "HTML",
+                        disable_web_page_preview: false,
+                      }),
+                    },
+                  );
+                  const fbJson = await fbRes.json().catch(() => ({}));
+                  if (fbJson?.ok) {
+                    console.log(
+                      `Tenant proof forwarded via text fallback → ${groupSource} (${targetGroupId})`,
+                    );
+                  } else {
+                    console.error(
+                      "Tenant proof forward FAILED after retries + fallback",
+                      { lastErr, fallback: fbJson, group: targetGroupId },
+                    );
+                  }
+                } catch (fbErr) {
+                  console.error(
+                    "Tenant proof forward fallback threw",
+                    { lastErr, fbErr, group: targetGroupId },
+                  );
+                }
               }
             } else {
               console.warn("Tenant proof forward skipped: missing token or group", {
