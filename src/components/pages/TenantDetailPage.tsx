@@ -426,14 +426,15 @@ export default function TenantDetailPage() {
                   <Badge variant="secondary" className="text-[10px]">No data yet</Badge>
                 )}
               </div>
-              <Button size="sm" variant="ghost" className="h-7"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
-                  queryClient.invalidateQueries({ queryKey: ["tenant-stats-snapshots", tenantId] });
-                  toast.success("Refreshed");
-                }}
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7"
+                disabled={refreshStatsMutation.isPending}
+                onClick={() => refreshStatsMutation.mutate()}
               >
-                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                <RefreshCw className={cn("h-3 w-3 mr-1", refreshStatsMutation.isPending && "animate-spin")} />
+                {refreshStatsMutation.isPending ? "Pulling…" : "Refresh Stats from Tenant"}
               </Button>
             </CardTitle>
           </CardHeader>
