@@ -329,6 +329,9 @@ export function AdminAdAccounts() {
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
+      // Refresh ad_accounts so fresh spend_cap/amount_spent (written by
+      // get-account-insights) flow into the Remaining column / progress bar.
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
   });

@@ -388,6 +388,9 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user?.id] });
       refetchInsights();
       // Invalidate dashboard queries so dashboard picks up fresh data
+      // Also invalidate ad_accounts query so fresh spend_cap / amount_spent
+      // (written by get-account-insights) flow into Remaining/SpendProgressBar.
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-daily-stats"] });
@@ -419,6 +422,9 @@ export function ClientAdAccounts() {
       }
       refetchInsights();
       setSelectedIds(new Set());
+      // Refresh ad_accounts so spend_cap/amount_spent update in Remaining UI
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
     },
     onError: (err: any) => {
       if (err.message !== "cooldown") toast.error(err.message || "Failed to refresh");
