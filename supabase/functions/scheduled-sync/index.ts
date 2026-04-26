@@ -1,72 +1,72 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track the last proxy IP used for Meta API calls
+// Track route + IP used for the most recent Meta API call (per request).
+// `lastMetaVia` tells you whether the call actually went via proxy or direct,
+// independent of whether we managed to capture an IP. `lastMetaProxyIp` keeps
+// the legacy variable name used in log strings further down in this file.
+let lastMetaVia = "direct";
 let lastMetaProxyIp = "direct";
 async function metaFetch(url, options = {}) {
   if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET");
-  const proxyUrl = Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL;
+  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
+  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
   if (proxySecret && proxyUrl) {
     try {
       const headers = new Headers(options.headers ?? {});
       const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
       const method = options.method ?? "GET";
       const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
+      // 8s timeout so a hung proxy can't block this background job.
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
       const proxyRes = await fetch(proxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-proxy-secret": proxySecret
         },
-        body: JSON.stringify({
-          url,
-          method,
-          body,
-          contentType
-        })
-      });
-      // Capture proxy IP from response header
-      try {
-        const proxyIp = proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp && typeof lastMetaProxyIp !== "undefined") lastMetaProxyIp = proxyIp;
-      } catch  {}
+        body: JSON.stringify({ url, method, body, contentType }),
+        signal: ctl.signal,
+      }).finally(() => clearTimeout(timer));
       const text = await proxyRes.text();
       const trimmed = text.trimStart();
       const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      // Detect proxy-level errors (proxy server reporting its own failure,
-      // not a Meta API error). Proxy errors look like {"error":"string"};
+      // Detect proxy-level errors. Proxy errors look like {"error":"string"};
       // Meta errors look like {"error":{"message":...,"code":...}}.
       let isProxyOwnError = false;
-      if (proxyRes.status >= 500 && proxyRes.status < 600 && trimmed.startsWith("{")) {
+      if (trimmed.startsWith("{")) {
         try {
           const parsed = JSON.parse(text);
           if (parsed && typeof parsed.error === "string") {
             isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta API:", parsed.error);
+            console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
           }
-        } catch  {}
+        } catch {}
       }
-      if (!looksLikeHtml && !isProxyOwnError) {
+      // Fallback on ANY non-2xx, HTML body, or proxy-shape error.
+      const shouldFallback = looksLikeHtml || isProxyOwnError || proxyRes.status < 200 || proxyRes.status >= 300;
+      if (!shouldFallback) {
+        // Proxy succeeded — capture egress IP (proxy returns x-egress-ip;
+        // older proxies may use x-proxy-ip, so check both).
+        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
+        lastMetaVia = "proxy";
+        lastMetaProxyIp = proxyIp || "proxy";
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers
         });
       }
-      if (looksLikeHtml) {
-        console.warn("Proxy returned HTML, falling back to direct Meta API call");
-      }
+      console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
     } catch (proxyErr) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr);
+      console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
     }
   }
-  if (typeof lastMetaProxyIp !== "undefined") {
-    try {
-      lastMetaProxyIp = "direct";
-    } catch  {}
-  }
+  lastMetaVia = "direct";
+  lastMetaProxyIp = "direct";
   return fetch(url, options);
 }
 async function decryptToken(stored, secret) {
