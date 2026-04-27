@@ -611,10 +611,13 @@ Deno.serve(async (req)=>{
     // ============================================
     // STEP 4: Update DB spend cap
     // ============================================
-    const currentAmountSpent = Number(account.amount_spent);
+    // Use LIVE amount_spent (read in STEP 2a) instead of stale DB value
+    // so the UI's "Remaining Balance" is accurate immediately.
+    const currentAmountSpent = liveAmountSpentDollars;
     const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
     await supabase.from("ad_accounts").update({
       spend_cap: newSpendCapDollars,
+      amount_spent: currentAmountSpent,
       balance_after_topup: remainingAfterTopup
     }).eq("id", ad_account_id);
     // Log success
