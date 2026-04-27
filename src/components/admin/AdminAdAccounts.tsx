@@ -1310,7 +1310,23 @@ export function AdminAdAccounts() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
               const ids = Array.from(selectedIds);
-              await supabase.from("ad_account_insights").delete().in("ad_account_id", ids);
+              // Clean ALL referencing rows first to avoid FK violations.
+              // - bm_access_requests / top_up_requests / ad_account_requests use NO ACTION FK
+              //   so we must delete (or null) them explicitly.
+              // - The rest (insights, user_ad_accounts, failed_topups, auto_topup_rules,
+              //   ad_campaign_rules, external_topup_requests, card_assignments,
+              //   last_known_state, notes) cascade automatically — but we still clear
+              //   insights explicitly for backwards-compat with older FK setups.
+              try {
+                await Promise.all([
+                  (supabase as any).from("bm_access_requests").delete().in("ad_account_id", ids),
+                  (supabase as any).from("top_up_requests").delete().in("ad_account_id", ids),
+                  (supabase as any).from("ad_account_requests").update({ assigned_ad_account_id: null }).in("assigned_ad_account_id", ids),
+                  supabase.from("ad_account_insights").delete().in("ad_account_id", ids),
+                ]);
+              } catch (cleanupErr: any) {
+                console.warn("Pre-delete cleanup warning:", cleanupErr?.message || cleanupErr);
+              }
               const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
               if (error) { toast.error(error.message); } else {
                 const deleteNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
