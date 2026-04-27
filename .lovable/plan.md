@@ -1,116 +1,94 @@
-## Problem
+# Tenant Payment → Seller Ledger + Telegram Total Fix
 
-`spend-cap-update` edge function top-up amount calculate করার সময় **CRM DB-তে stored পুরাতন `spend_cap`** কে base ধরছে — Meta-তে real-time যা আছে সেটা না।
+## সমস্যা যা পেলাম
 
-```ts
-// Current buggy logic (line 319-320)
-const oldSpendCapDollars = Number(account.spend_cap);  // ← stale DB value
-const newSpendCapDollars = oldSpendCapDollars + amount;
+1. **Tenant payment approve হলে seller ledger এ entry যাচ্ছে না** — `AdminTopUp.tsx` এ tenant payment branch (line 280-323) শুধু `tenants` table update করে আর system log লেখে। `seller_transactions` এ insert নাই, `forward-proof`/`forward-seller-proof` ও call হয় না। ফলে seller এর "shit" (ledger sheet) এ payment count হচ্ছে না।
+2. **Telegram এ Total amount missing** — Tenant proof forward হয় শুধু **submit** এর সময় (`tenant-webhook` line 397-559) — সেখানে seller এর running total/Due-Advance line নাই। Approve এর সময় আবার কোনো forward-ই হয় না।
+3. **Bank এ seller assigned না থাকলে কিছুই হবে না** — DB তে অনেক approved tenant payment `city bank` এ আছে যেটার `seller_id = NULL`। Seller assigned না হলে ledger entry impossible।
+4. **Historical backfill দরকার** — এখন পর্যন্ত যে ২টা approved tenant payment seller-assigned bank এ আছে (Dutch Bangla Bank, seller `e5670168...`), সেগুলা ledger এ insert করা দরকার (Tk 25,600 + Tk 12,800 = Tk 38,400)।
+
+## যা পরিবর্তন হবে
+
+### ১) Database migration
+
+- `seller_transactions` table এ নতুন column: `tenant_payment_id uuid` (nullable, FK → `tenant_payments.id` ON DELETE SET NULL)
+- Unique partial index: `(tenant_payment_id) WHERE tenant_payment_id IS NOT NULL` — same tenant payment দুইবার ledger এ insert আটকাবে (idempotency)
+- `seller_transactions.type` এ existing values এর পাশাপাশি `'tenant_payment'` value allow করতে check constraint relax (যদি থাকে); description field দিয়ে differentiate
+
+### ২) `AdminTopUp.tsx` — tenant approve flow এ যোগ করা হবে
+
+Approve সফল হওয়ার পর:
+
+- যদি `bank_account_id` থাকে এবং সেই bank এর `seller_id` থাকে → `seller_transactions` এ এই row insert:
+  - `type: 'tenant_payment'` (নতুন type, "+bdt" treat হবে — Advance বাড়াবে)
+  - `bdt_amount: tp.amount`
+  - `tenant_payment_id: tp.id`
+  - `bank_account_id`, `proof_url`, `reviewed_by`, `entry_by_name = "Tenant: <name>"`
+  - `status: 'approved'`
+- এর পরে `forward-seller-proof` call করা হবে যাতে Telegram group এ Total সহ approved notification যায়
+- যদি bank এ seller না থাকে → silently skip + console warning (existing behavior)
+
+### ৩) `forward-proof` ও `forward-seller-proof` — `tenant_payment` type recognize
+
+দুই function এর `computeDueAdvance()` এ `tenant_payment` কে `bdt_payment` এর মতো +bdt treat করবে। এতে seller এর running Total সঠিক হবে।
+
+### ৪) `tenant-webhook` submit forward — Total line যোগ
+
+Tenant payment submit এর সময় যে Telegram caption যায় সেখানে seller (যদি bank assigned থাকে) এর current Due/Advance Total line দেখানো হবে। Approve হওয়ার পরের forward এ updated Total দেখাবে।
+
+### ৫) Historical Backfill (one-time script run)
+
+Approved tenant payments যেগুলার bank এ seller assigned আছে কিন্তু `seller_transactions` এ এখনো entry নাই — সেগুলা insert করা হবে। আজকে এমন ২টা পেমেন্ট আছে (Tk 38,400 মোট, seller `e5670168...`)। Future এ যদি নতুন কোনো বের হয় সেগুলাও cover হবে।
+
+## টেকনিক্যাল ডিটেইল
+
+```sql
+ALTER TABLE seller_transactions
+  ADD COLUMN tenant_payment_id uuid REFERENCES tenant_payments(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX seller_transactions_tenant_payment_unique 
+  ON seller_transactions (tenant_payment_id) 
+  WHERE tenant_payment_id IS NOT NULL;
 ```
 
-ফলে যখনই কেউ Meta-তে manually spend cap change করে কিন্তু CRM-এ "Update from Meta" দেয় না — পরের top-up সম্পূর্ণ ভুল amount-এ set হয়ে যায়।
-
----
-
-## Fix: "Read live from Meta before write"
-
-Top-up এর POST call করার ঠিক আগে Meta থেকে current `spend_cap` GET করে সেটার উপর top-up amount add করা হবে।
-
-### Files to change
-
-1. **`supabase/functions/spend-cap-update/index.ts`** (main fix)
-2. **`supabase/functions/spend-cap-withdraw/index.ts`** (একই bug সম্ভবত)
-3. **`supabase/functions/retry-failed-topup/index.ts`** (failed retry-এও same issue)
-4. **`supabase/functions/scheduled-sync/index.ts`** (auto top-up — সাজেদুল ভাইয়ের ঘটনা; এখানেও same fix)
-
-### Changes per file
-
-**A. নতুন helper function** (spend-cap-update এ define, বাকিগুলোয় copy):
+`forward-proof` & `forward-seller-proof` এর `computeDueAdvance`:
 
 ```ts
-async function fetchLiveSpendCap(actId, bmToken) {
-  try {
-    const res = await metaFetch(
-      `https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`,
-      { method: "GET" }
-    );
-    const data = await res.json();
-    if (!res.ok || data?.error) {
-      return { ok: false, error: data?.error?.message || `HTTP ${res.status}` };
-    }
-    return {
-      ok: true,
-      spendCapDollars: centsToDollars(Number(data.spend_cap || 0)),
-      amountSpentDollars: centsToDollars(Number(data.amount_spent || 0)),
-    };
-  } catch (e) {
-    return { ok: false, error: e?.message || "network error" };
-  }
+if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
+  running += Number(t.bdt_amount || 0);
 }
 ```
 
-**B. Handler-এ POST call এর আগে inject:**
+`AdminTopUp.tsx` tenant approve এর শেষে:
 
 ```ts
-// BEFORE the existing POST block:
-const live = await fetchLiveSpendCap(actId, bmToken);
-
-if (!live.ok) {
-  // Refund wallet if it was deducted
-  if (shouldDeductWallet) {
-    await supabase.from("wallets").update({ balance: Number(wallet.balance) }).eq("id", walletId);
-    await supabase.from("transactions").insert({
-      user_id: walletUserId, amount: amount, balance_after: Number(wallet.balance),
-      type: "refund", description: `Auto-refund: could not read live spend cap (${live.error})`,
-      reference_id: ad_account_id,
+if (action === "approved" && requestRow.bank_account_id) {
+  const { data: bank } = await supabase.from("bank_accounts")
+    .select("seller_id").eq("id", requestRow.bank_account_id).single();
+  if (bank?.seller_id) {
+    await supabase.from("seller_transactions").insert({
+      seller_id: bank.seller_id,
+      type: "tenant_payment",
+      bdt_amount: Number(requestRow._original_amount || 0),
+      tenant_payment_id: id,
+      bank_account_id: requestRow.bank_account_id,
+      proof_url: requestRow.proof_url,
+      status: "approved",
+      reviewed_by: user!.id,
+      reviewed_at: new Date().toISOString(),
+      entry_by_name: `Tenant: ${tenant?.name || "Unknown"}`,
+      description: `Tenant payment approved — ${requestRow._payment_type}`,
     });
+    await supabase.functions.invoke("forward-seller-proof", { body: { ... } });
   }
-  return json({ error: `Cannot read live spend cap from Meta: ${live.error}. Top-up cancelled, wallet refunded.` }, 400);
 }
-
-const dbSpendCap = Number(account.spend_cap);
-const liveSpendCap = live.spendCapDollars;
-const drift = liveSpendCap - dbSpendCap;
-
-// Drift warning log (helps you spot accounts with frequent manual changes)
-if (Math.abs(drift) > 1) {
-  await supabase.from("system_logs").insert({
-    user_id: userId, user_name: userName,
-    action: "Spend Cap Drift Detected",
-    details: `${account.account_name} (${actId.replace(/^act_/, '')}) — DB=$${dbSpendCap.toFixed(2)}, Meta=$${liveSpendCap.toFixed(2)}, drift=$${drift.toFixed(2)}. Top-up calculated from Meta value.`
-  });
-}
-
-// Use LIVE value as base, not DB
-const newSpendCapDollars = liveSpendCap + amount;
 ```
 
-**C. Success path-এ DB sync:**
-POST success হওয়ার পর `ad_accounts` table update করার সময় `amount_spent` ও sync করা হবে (Meta থেকে live পাওয়া value দিয়ে), যাতে UI-র "Remaining Balance" ও সঠিক থাকে।
+## ইম্প্যাক্ট
 
----
+- নতুন approve: ledger automatic + Telegram Total সহ ✅
+- Past 2 payment (Tk 38,400) ledger এ চলে আসবে → seller balance সঠিক
+- Bank এ seller না থাকলে warning দেবে, যাতে আপনি seller assign করতে পারেন, সব ব্যাংক সেলার এর নয়,আমাদের ব্যাংক ও আছে যেগুলা তে ফরওয়াররড দরকার হবে না.যে ব্যাংক গুলাতে সেলার এসাইন আছে সেগুলা এন্ট্রি দিলেই হবে.
+- Duplicate insert impossible (unique index)
 
-## Side Benefits
-
-- Manually change করা spend cap auto-detect → আর "Update from Meta" manually চাপতে হবে না।
-- Drift log থেকে admin বুঝবে কোন accounts frequent manually edit হচ্ছে।
-- Auto top-up (scheduled-sync) ও safer হবে — সাজেদুল ভাইয়ের case-এ এটাই হয়তো হচ্ছিল।
-- "Remaining Balance" UI সাথে সাথে accurate হবে।
-
-## Trade-off
-
-প্রতিটা top-up এ extra 1টা Meta GET call (~200-400ms latency বাড়বে)। কিন্তু money-correctness > speed।
-
----
-
-## Confirmation needed
-
-1. **Live read fail করলে কি করবো?**
-   - **(recommended)** Top-up cancel করে wallet refund — safe
-   - DB value ব্যবহার করে fallback — current behavior, ঝুঁকিপূর্ণ
-
-2. **Drift threshold $1** ঠিক আছে নাকি ছোট করবো ($0.10)?
-
-3. সব ৪টা function (spend-cap-update, spend-cap-withdraw, retry-failed-topup, scheduled-sync) একসাথে fix করে দেবো?
-
-Approve করলে implement শুরু করছি।
+## আপনার approve পেলে আমি migration লিখব → তারপর code changes → তারপর backfill script চালাব। তিনটাই sequentially।
