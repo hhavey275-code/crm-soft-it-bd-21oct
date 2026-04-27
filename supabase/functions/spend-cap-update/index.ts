@@ -347,12 +347,62 @@ Deno.serve(async (req)=>{
     // ============================================
     const bm = account.business_managers;
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
-    const oldSpendCapDollars = Number(account.spend_cap);
-    const newSpendCapDollars = oldSpendCapDollars + amount;
     const actId = account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`;
+    // ============================================
+    // STEP 2a: READ LIVE spend_cap from Meta (drift-safe)
+    // ============================================
+    // CRITICAL: We must use the live Meta value as the base, NOT the DB
+    // value. Otherwise, if someone manually changes the cap in Ads Manager
+    // without "Update from Meta", the next top-up will be calculated from
+    // a stale base and set the wrong final cap.
+    const dbSpendCapDollars = Number(account.spend_cap);
+    const live = await fetchLiveSpendCap(actId, bmToken);
+    if (!live.ok) {
+      // Refund wallet if it was deducted
+      if (shouldDeductWallet && walletId !== null) {
+        const { data: walletNow } = await supabase.from("wallets").select("balance").eq("id", walletId).single();
+        const refundedBalance = Number(walletNow?.balance ?? newBalance) + amount;
+        await supabase.from("wallets").update({ balance: refundedBalance }).eq("id", walletId);
+        await supabase.from("transactions").insert({
+          user_id: walletUserId,
+          amount: amount,
+          balance_after: refundedBalance,
+          type: "refund",
+          description: `Auto-refund: could not read live spend cap from Meta (${live.error})`,
+          reference_id: ad_account_id,
+          processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+        });
+      }
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "Top-Up Cancelled",
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — Could not read live spend cap from Meta: ${live.error}. Top-up cancelled${shouldDeductWallet ? ", wallet refunded" : ""}.`,
+      });
+      return json({
+        error: `Cannot read live spend cap from Meta: ${live.error}. Top-up cancelled${shouldDeductWallet ? " and wallet refunded" : ""}.`,
+      }, 400);
+    }
+    const liveSpendCapDollars = live.spendCapDollars;
+    const liveAmountSpentDollars = live.amountSpentDollars;
+    // Drift detection — log when DB and Meta disagree by more than $1
+    const drift = liveSpendCapDollars - dbSpendCapDollars;
+    if (Math.abs(drift) > 1) {
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "Spend Cap Drift Detected",
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — DB=$${dbSpendCapDollars.toFixed(2)}, Meta=$${liveSpendCapDollars.toFixed(2)}, drift=$${drift.toFixed(2)}. Top-up calculated from live Meta value.`,
+      });
+    }
+    // Use LIVE value as base — this is the fix
+    const oldSpendCapDollars = liveSpendCapDollars;
+    const newSpendCapDollars = liveSpendCapDollars + amount;
     console.log("Spend cap update attempt", {
       actId,
       bmId: bm.bm_id,
+      dbSpendCapDollars,
+      liveSpendCapDollars,
       oldSpendCapDollars,
       amountDollars: amount,
       newSpendCapDollars,
