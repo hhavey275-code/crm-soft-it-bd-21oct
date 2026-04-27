@@ -1,101 +1,116 @@
-## Goal
+## Problem
 
-Master admin এ tenant monitoring থাকবে, কিন্তু **Meta API কে কোনো extra/automatic call হবে না**। Stats শুধু তখনই refresh হবে যখন master admin manually button চাপবে — এবং তখনও tenant er Meta api  থেকে ডাটা আসবে
+`spend-cap-update` edge function top-up amount calculate করার সময় **CRM DB-তে stored পুরাতন `spend_cap`** কে base ধরছে — Meta-তে real-time যা আছে সেটা না।
 
-## Architecture (Updated)
+```ts
+// Current buggy logic (line 319-320)
+const oldSpendCapDollars = Number(account.spend_cap);  // ← stale DB value
+const newSpendCapDollars = oldSpendCapDollars + amount;
+```
 
-### দুটো আলাদা Channel
+ফলে যখনই কেউ Meta-তে manually spend cap change করে কিন্তু CRM-এ "Update from Meta" দেয় না — পরের top-up সম্পূর্ণ ভুল amount-এ set হয়ে যায়।
 
-**1. Heartbeat (automatic, 5 min) — অপরিবর্তিত**
+---
 
-- Tenant এর `useTenantLicense.ts` শুধু license status check করবে (frozen/active/limit)
-- কোনো stats পাঠাবে না
-- কোনো Meta call নেই
+## Fix: "Read live from Meta before write"
 
-**2. Stats Pull (on-demand, manual)**
+Top-up এর POST call করার ঠিক আগে Meta থেকে current `spend_cap` GET করে সেটার উপর top-up amount add করা হবে।
 
-- Master admin `TenantDetailPage` এ "Refresh Stats" button চাপলে trigger হবে
-- Master → Tenant এর `tenant-webhook` কে call করবে `action: "pull_stats"` দিয়ে
-- Tenant তার **own Supabase tables** (`ad_accounts`, `ad_account_insights`, `wallets`, `top_up_requests`, `profiles`) থেকে aggregate করে JSON return করবে
-- **Meta API কে কোনো call নেই** — tenant এর data যেটা ইতিমধ্যে তার own "Update All from Meta" দিয়ে populate হয়েছে, সেটাই use হবে
-- Master সেটা `tenants.stats_*` columns আর `tenant_stats_snapshots` এ save করবে
+### Files to change
 
-### Data freshness model
+1. **`supabase/functions/spend-cap-update/index.ts`** (main fix)
+2. **`supabase/functions/spend-cap-withdraw/index.ts`** (একই bug সম্ভবত)
+3. **`supabase/functions/retry-failed-topup/index.ts`** (failed retry-এও same issue)
+4. **`supabase/functions/scheduled-sync/index.ts`** (auto top-up — সাজেদুল ভাইয়ের ঘটনা; এখানেও same fix)
 
-Tenant detail page এ "Last refreshed: 2 hours ago" দেখাবে — আর "Refresh Stats" button পাশে থাকবে। Master admin যখন চাইবে তখনই fresh data টানবে। Auto polling নেই।
+### Changes per file
 
-## Changes Required
+**A. নতুন helper function** (spend-cap-update এ define, বাকিগুলোয় copy):
 
-### A. Master CRM (এই project)
+```ts
+async function fetchLiveSpendCap(actId, bmToken) {
+  try {
+    const res = await metaFetch(
+      `https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`,
+      { method: "GET" }
+    );
+    const data = await res.json();
+    if (!res.ok || data?.error) {
+      return { ok: false, error: data?.error?.message || `HTTP ${res.status}` };
+    }
+    return {
+      ok: true,
+      spendCapDollars: centsToDollars(Number(data.spend_cap || 0)),
+      amountSpentDollars: centsToDollars(Number(data.amount_spent || 0)),
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message || "network error" };
+  }
+}
+```
 
-**1. Edge Function update — `supabase/functions/tenant-webhook/index.ts**`
+**B. Handler-এ POST call এর আগে inject:**
 
-- Heartbeat handler থেকে stats parsing/snapshot logic **remove** করব (যেটা আগের iteration এ যোগ হয়েছিল)
-- Heartbeat আবার শুধু license status return করবে (পুরোনো behavior)
-- কারণ stats আর heartbeat এ আসবে না
+```ts
+// BEFORE the existing POST block:
+const live = await fetchLiveSpendCap(actId, bmToken);
 
-**2. নতুন Edge Function — `supabase/functions/tenant-pull-stats/index.ts**`
+if (!live.ok) {
+  // Refund wallet if it was deducted
+  if (shouldDeductWallet) {
+    await supabase.from("wallets").update({ balance: Number(wallet.balance) }).eq("id", walletId);
+    await supabase.from("transactions").insert({
+      user_id: walletUserId, amount: amount, balance_after: Number(wallet.balance),
+      type: "refund", description: `Auto-refund: could not read live spend cap (${live.error})`,
+      reference_id: ad_account_id,
+    });
+  }
+  return json({ error: `Cannot read live spend cap from Meta: ${live.error}. Top-up cancelled, wallet refunded.` }, 400);
+}
 
-- Master admin → এই function call করবে `tenant_id` দিয়ে
-- Function সেই tenant এর `master_url` + tenant এর own API key বের করে (master CRM এ তো store করা নেই — তাই master কে tenant এর webhook URL জানতে হবে)
-- **Approach**: Master এ `tenants` table এ ইতিমধ্যে `webhook_url` (tenant এর Supabase URL) আর `api_key` (master → tenant call করার জন্য shared secret) থাকা উচিত। যদি না থাকে, migration এ add করব
-- Function tenant এর `pull_stats` endpoint কে hit করবে, response নিয়ে `tenants.stats_*` + `tenant_stats_snapshots` update করবে
-- Return করবে fresh stats master UI কে
+const dbSpendCap = Number(account.spend_cap);
+const liveSpendCap = live.spendCapDollars;
+const drift = liveSpendCap - dbSpendCap;
 
-**3. UI update — `src/components/pages/TenantDetailPage.tsx**`
+// Drift warning log (helps you spot accounts with frequent manual changes)
+if (Math.abs(drift) > 1) {
+  await supabase.from("system_logs").insert({
+    user_id: userId, user_name: userName,
+    action: "Spend Cap Drift Detected",
+    details: `${account.account_name} (${actId.replace(/^act_/, '')}) — DB=$${dbSpendCap.toFixed(2)}, Meta=$${liveSpendCap.toFixed(2)}, drift=$${drift.toFixed(2)}. Top-up calculated from Meta value.`
+  });
+}
 
-- যা আগের iteration এ build হয়েছে (metric cards, ad accounts tab, spend trend, activity tab) সব রাখব
-- শুধু "Last sync" indicator এর পাশে **"Refresh Stats from Tenant"** button যোগ হবে
-- Auto-refetch interval সরিয়ে দেব — শুধু button চাপলে refetch হবে
-- Loading state দেখাবে button চাপলে
+// Use LIVE value as base, not DB
+const newSpendCapDollars = liveSpendCap + amount;
+```
 
-**4. Migration (small)**
+**C. Success path-এ DB sync:**
+POST success হওয়ার পর `ad_accounts` table update করার সময় `amount_spent` ও sync করা হবে (Meta থেকে live পাওয়া value দিয়ে), যাতে UI-র "Remaining Balance" ও সঠিক থাকে।
 
-- `tenants` table এ `webhook_url` (text) আর `pull_api_key` (text) column যদি না থাকে — add করব
-- (আগের `stats_*` columns আর `tenant_stats_snapshots` table আগেই create হয়েছে, untouched থাকবে)
+---
 
-### B. Tenant Project Patch (আপনাকে দিতে হবে দুটো tenant এ)
+## Side Benefits
 
-**1. নতুন file — `src/lib/collectTenantStats.ts**`
+- Manually change করা spend cap auto-detect → আর "Update from Meta" manually চাপতে হবে না।
+- Drift log থেকে admin বুঝবে কোন accounts frequent manually edit হচ্ছে।
+- Auto top-up (scheduled-sync) ও safer হবে — সাজেদুল ভাইয়ের case-এ এটাই হয়তো হচ্ছিল।
+- "Remaining Balance" UI সাথে সাথে accurate হবে।
 
-- Tenant এর own Supabase থেকে query করে aggregate করবে:
-  - `ad_accounts`: total / active / disabled / inactive count
-  - `ad_account_insights`: today_spend sum, today_orders sum, monthly spend
-  - `wallets`: total wallet balance (all clients)
-  - `top_up_requests`: today count + amount, pending count
-  - `profiles`: total clients, today active clients
-  - Top 50 accounts by today_spend
-- **কোনো Meta call নেই** — শুধু own DB read
+## Trade-off
 
-**2. নতুন Edge Function — `supabase/functions/tenant-pull-stats/index.ts` (tenant side)**
+প্রতিটা top-up এ extra 1টা Meta GET call (~200-400ms latency বাড়বে)। কিন্তু money-correctness > speed।
 
-- Master থেকে call আসবে `x-pull-key` header দিয়ে
-- Validate করবে key, তারপর `collectTenantStats()` চালিয়ে JSON return করবে
-- Lightweight, fast (1-2 sec, just DB queries)
+---
 
-**3. `useTenantLicense.ts` — অপরিবর্তিত থাকবে**
+## Confirmation needed
 
-- আগের iteration এ যদি `stats` heartbeat এ পাঠানোর change হয়ে থাকে, সেটা **revert** করতে হবে
-- Heartbeat আবার শুধু `{ action: "heartbeat" }` পাঠাবে
+1. **Live read fail করলে কি করবো?**
+   - **(recommended)** Top-up cancel করে wallet refund — safe
+   - DB value ব্যবহার করে fallback — current behavior, ঝুঁকিপূর্ণ
 
-আমি এই দুটো file এর exact content `TENANT_STATS_PATCH.md` এ লিখে দেব master project এ — আপনি copy করে দুই tenant project এ paste করবেন।
+2. **Drift threshold $1** ঠিক আছে নাকি ছোট করবো ($0.10)?
 
-## Meta API Impact
+3. সব ৪টা function (spend-cap-update, spend-cap-withdraw, retry-failed-topup, scheduled-sync) একসাথে fix করে দেবো?
 
-
-| Action                                   | Meta calls (before) | Meta calls (after)       |
-| ---------------------------------------- | ------------------- | ------------------------ |
-| Tenant heartbeat (5 min auto)            | 0                   | **0** ✅                  |
-| Master "Refresh Stats" button            | —                   | **0** ✅ (tenant DB only) |
-| Tenant "Update All from Meta" (existing) | N                   | N (অপরিবর্তিত)           |
-
-
-মানে monitoring এর জন্য **Meta এ একটাও extra call হবে না**।
-
-## Implementation Order
-
-1. Migration: `tenants` এ `webhook_url`, `pull_api_key` column add (যদি না থাকে)
-2. Master edge function `tenant-pull-stats` create
-3. `tenant-webhook` heartbeat থেকে stats logic revert
-4. `TenantDetailPage` এ "Refresh Stats" button + manual fetch logic
-5. `TENANT_STATS_PATCH.md` update — tenant side patch (collectTenantStats + tenant-pull-stats edge function + heartbeat revert)
+Approve করলে implement শুরু করছি।
