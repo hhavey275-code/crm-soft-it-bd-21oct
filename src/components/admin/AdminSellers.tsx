@@ -402,7 +402,7 @@ export function AdminSellers() {
       (acc: any, t: any) => {
         const status = t.status || "approved";
         if (status !== "approved") return acc;
-        if (t.type === "bdt_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
+        if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
           acc.totalUsdt += Number(t.usdt_amount || 0);
           acc.totalConvertedBdt += Number(t.usdt_amount || 0) * Number(t.rate || 0);

@@ -38,7 +38,7 @@ export function computeRunningTotalsByBank(transactions: any[]): Map<string, num
     }
 
     let delta = 0;
-    if (t.type === "bdt_payment" || t.type === "client_topup") {
+    if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
       delta = Number(t.bdt_amount || 0);
     } else if (t.type === "usdt_received") {
       delta = 0;
@@ -80,7 +80,7 @@ export function computeDueAdvanceRunning(transactions: any[]): Map<string, numbe
       continue;
     }
 
-    if (t.type === "bdt_payment" || t.type === "client_topup") {
+    if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
       running += Number(t.bdt_amount || 0);
     } else if (t.type === "usdt_received") {
       // USDT given to client — convert to BDT cost and subtract
@@ -113,7 +113,7 @@ export function computeTransactionDelta(t: any): number {
   if (!t) return 0;
   const status = (t.status || "approved").toLowerCase();
   if (status !== "approved") return 0;
-  if (t.type === "bdt_payment" || t.type === "client_topup") {
+  if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
     return Number(t.bdt_amount || 0);
   }
   if (t.type === "withdraw") {
