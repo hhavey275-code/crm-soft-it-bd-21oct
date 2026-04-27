@@ -35,6 +35,7 @@ import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { fetchPeriodSpendFromMeta } from "@/lib/fetchPeriodSpend";
 import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
+import { logSystemAction } from "@/lib/systemLog";
 
 export default function ClientDetailPage() {
   const params = useParams<{ userId?: string; id?: string }>();
