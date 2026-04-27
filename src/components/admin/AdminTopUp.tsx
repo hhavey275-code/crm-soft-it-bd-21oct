@@ -314,6 +314,71 @@ export function AdminTopUp() {
               subscription_type: "subscription_with_limit",
             }).eq("id", tenantId);
           }
+
+          // Auto-sync to seller ledger if the receiving bank has a seller assigned.
+          // Mirrors client top-up flow so tenant payments show up in the seller's
+          // sheet/Telegram running total.
+          const bankAccountId = requestRow.bank_account_id || requestRow._bank_account_id || null;
+          const tenantBdtAmount = Number(requestRow._original_amount || requestRow.bdt_amount || 0);
+          const tenantProofUrl = requestRow.proof_url || requestRow._proof_url || null;
+          const tenantPaymentRef = requestRow.payment_reference || requestRow._payment_reference || null;
+          if (bankAccountId && tenantBdtAmount > 0) {
+            try {
+              const { data: bankRow } = await (supabase as any)
+                .from("bank_accounts")
+                .select("seller_id, bank_name, account_number, telegram_group_id")
+                .eq("id", bankAccountId)
+                .single();
+              if (bankRow?.seller_id) {
+                // Insert ledger entry (idempotent: unique index on tenant_payment_id)
+                const { error: ledgerErr } = await (supabase as any)
+                  .from("seller_transactions")
+                  .insert({
+                    seller_id: bankRow.seller_id,
+                    type: "tenant_payment",
+                    bdt_amount: tenantBdtAmount,
+                    usdt_amount: 0,
+                    rate: 0,
+                    description: `Tenant payment approved — ${tenant?.name || "Tenant"} (${requestRow._payment_type || "payment"})`,
+                    bank_account_id: bankAccountId,
+                    tenant_payment_id: id,
+                    proof_url: tenantProofUrl,
+                    status: "approved",
+                    reviewed_by: user?.id,
+                    reviewed_at: new Date().toISOString(),
+                    entry_by_name: `Tenant: ${tenant?.name || "Unknown"}`,
+                  });
+                if (ledgerErr && !String(ledgerErr.message || "").toLowerCase().includes("duplicate")) {
+                  console.error("Tenant → seller ledger insert failed:", ledgerErr);
+                }
+
+                // Forward to Telegram with running Total line (uses computeDueAdvance
+                // which now recognises 'tenant_payment')
+                if (tenantProofUrl) {
+                  try {
+                    await supabase.functions.invoke("forward-seller-proof", {
+                      body: {
+                        proof_url: tenantProofUrl,
+                        seller_name: `Tenant: ${tenant?.name || "Unknown"}`,
+                        seller_id: bankRow.seller_id,
+                        bdt_amount: tenantBdtAmount,
+                        bank_account_id: bankAccountId,
+                        reference: tenantPaymentRef || `tenant:${id.slice(0, 8)}`,
+                      },
+                    });
+                  } catch (fwdErr) {
+                    console.error("Tenant → Telegram forward failed:", fwdErr);
+                  }
+                }
+              } else {
+                console.warn(
+                  `Tenant payment ${id} approved but bank ${bankAccountId} has no seller_id — skipping ledger sync`,
+                );
+              }
+            } catch (e) {
+              console.error("Tenant → seller ledger sync threw:", e);
+            }
+          }
         }
 
         const tenantName = requestRow._tenant?.name || "Tenant";
