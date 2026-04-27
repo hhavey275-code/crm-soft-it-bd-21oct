@@ -170,9 +170,51 @@ async function processAutoTopups(supabase, serviceKey) {
       // Call Meta API to update spend cap
       const bm = account.business_managers;
       const bmToken = await decryptToken(bm.access_token, serviceKey);
-      const oldSpendCap = Number(account.spend_cap);
-      const newSpendCap = oldSpendCap + rule.topup_amount;
       const actId = account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`;
+      // CRITICAL: read LIVE spend_cap from Meta first. Avoid drift caused by
+      // manual edits in Ads Manager that haven't been synced to CRM.
+      const dbSpendCap = Number(account.spend_cap);
+      let liveSpendCap: number | null = null;
+      let liveAmountSpent: number | null = null;
+      try {
+        const liveRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`, { method: "GET" });
+        const liveData = await liveRes.json();
+        if (liveData?.spend_cap !== undefined) liveSpendCap = centsToDollars(Number(liveData.spend_cap));
+        if (liveData?.amount_spent !== undefined) liveAmountSpent = centsToDollars(Number(liveData.amount_spent));
+      } catch (e) {
+        console.warn(`Auto top-up live read failed for ${actId}:`, e);
+      }
+      if (liveSpendCap === null) {
+        // Refund the wallet — we already deducted above
+        await supabase.from("wallets").update({ balance: Number(wallet.balance) }).eq("id", wallet.id);
+        await supabase.from("transactions").insert({
+          user_id: rule.user_id,
+          amount: rule.topup_amount,
+          balance_after: Number(wallet.balance),
+          type: "refund",
+          description: `Auto Top-Up Cancelled (could not read Meta)\n${account.account_name}`,
+          reference_id: rule.ad_account_id,
+          processed_by: `auto:${rule.user_id}`
+        });
+        await supabase.from("system_logs").insert({
+          user_id: rule.user_id,
+          user_name: userName,
+          action: "Auto Top-Up Cancelled",
+          details: `${account.account_name} (${cleanAccountId}) — Could not read live spend cap. Wallet refunded.`
+        });
+        continue;
+      }
+      // Drift log
+      if (Math.abs(liveSpendCap - dbSpendCap) > 1) {
+        await supabase.from("system_logs").insert({
+          user_id: rule.user_id,
+          user_name: userName,
+          action: "Spend Cap Drift Detected (Auto)",
+          details: `${account.account_name} (${cleanAccountId}) — DB=$${dbSpendCap.toFixed(2)}, Meta=$${liveSpendCap.toFixed(2)}, drift=$${(liveSpendCap - dbSpendCap).toFixed(2)}. Auto top-up calculated from live Meta value.`
+        });
+      }
+      const oldSpendCap = liveSpendCap;
+      const newSpendCap = liveSpendCap + rule.topup_amount;
       const metaRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}`, {
         method: "POST",
         headers: {
@@ -264,10 +306,11 @@ async function processAutoTopups(supabase, serviceKey) {
         continue;
       }
       // Success — update DB
-      const currentAmountSpent = Number(account.amount_spent);
+      const currentAmountSpent = liveAmountSpent ?? Number(account.amount_spent);
       const remainingAfterTopup = newSpendCap - currentAmountSpent;
       await supabase.from("ad_accounts").update({
         spend_cap: newSpendCap,
+        amount_spent: currentAmountSpent,
         balance_after_topup: remainingAfterTopup
       }).eq("id", rule.ad_account_id);
       // Update last_triggered_at
