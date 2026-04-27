@@ -131,6 +131,37 @@ async function verifySpendCap(actId, bmToken) {
   }
   return { ok: false, dollars: null, error: "verify exhausted" };
 }
+// Read LIVE spend_cap + amount_spent from Meta. Used as base for top-up
+// calculations so manual changes in Ads Manager don't cause drift.
+async function fetchLiveSpendCap(actId, bmToken) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await delay(2000);
+    try {
+      const res = await metaFetch(
+        `https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`,
+        { method: "GET" }
+      );
+      let data = null;
+      try { data = await res.json(); } catch { data = null; }
+      if (res.ok && !data?.error && data?.spend_cap !== undefined) {
+        return {
+          ok: true,
+          spendCapDollars: centsToDollars(Number(data.spend_cap || 0)),
+          amountSpentDollars: centsToDollars(Number(data.amount_spent || 0)),
+          error: null,
+        };
+      }
+      if (attempt === 1) {
+        return { ok: false, error: data?.error?.message || `Live read HTTP ${res.status}` };
+      }
+    } catch (err) {
+      if (attempt === 1) {
+        return { ok: false, error: err instanceof Error ? err.message : "live read network error" };
+      }
+    }
+  }
+  return { ok: false, error: "live read exhausted" };
+}
 function isMetaRateLimited(status, data) {
   const message = String(data?.error?.message ?? "").toLowerCase();
   return status === 429 || data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4 || message.includes("user request limit reached") || message.includes("request limit");
