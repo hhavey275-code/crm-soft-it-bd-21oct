@@ -38,6 +38,9 @@ const ACTION_COLORS: Record<string, string> = {
   "Auto Top-Up": "bg-emerald-500/10 text-emerald-700 border-emerald-200",
   "Auto Top-Up Failed": "bg-red-500/10 text-red-700 border-red-200",
   "Top-Up Failed": "bg-red-500/10 text-red-700 border-red-200",
+  "Due Limit Set": "bg-amber-500/10 text-amber-700 border-amber-200",
+  "Due Limit Updated": "bg-amber-500/10 text-amber-700 border-amber-200",
+  "Due Limit Removed": "bg-zinc-500/10 text-zinc-700 border-zinc-200",
 };
 
 // Extract IP from details string. Supports formats:
