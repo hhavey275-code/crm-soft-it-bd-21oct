@@ -944,6 +944,23 @@ export default function ClientDetailPage() {
                                   set_at = new Date().toISOString();
                                 }
                                 saveProfileMutation.mutate({ due_limit: amt, due_limit_expires_at: expires_at, due_limit_set_at: set_at } as any);
+                                // Log who set/changed the due limit
+                                const prev = Number((profile as any)?.due_limit ?? 0);
+                                const next = Number(amt ?? 0);
+                                const clientName = (profile as any)?.full_name || (profile as any)?.email || "Unknown client";
+                                const adminName = (currentUser as any)?.user_metadata?.full_name || currentUser?.email || "Admin";
+                                const expiryLabel = dueLimitExpiry === "never" || !expires_at
+                                  ? "never expires"
+                                  : `expires ${format(new Date(expires_at), "dd MMM yyyy, hh:mm a")}`;
+                                const action = prev === 0 && next > 0
+                                  ? "Due Limit Set"
+                                  : next === 0
+                                    ? "Due Limit Removed"
+                                    : "Due Limit Updated";
+                                const details = next === 0
+                                  ? `${clientName} — Due limit removed (was $${prev.toLocaleString()}) by ${adminName}`
+                                  : `${clientName} — Due limit $${prev.toLocaleString()} → $${next.toLocaleString()} (${expiryLabel}) by ${adminName}`;
+                                void logSystemAction(action, details, currentUser?.id ?? null, adminName);
                                 setEditingDueLimit(false);
                               }}><Save className="h-3 w-3" /></Button>
                               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDueLimit(false)}><XCircle className="h-3 w-3" /></Button>
