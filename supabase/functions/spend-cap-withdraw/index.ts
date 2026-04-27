@@ -156,9 +156,10 @@ Deno.serve(async (req) => {
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const actId = account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`;
 
-    const currentSpendCap = Number(account.spend_cap ?? 0);
+    const dbSpendCap = Number(account.spend_cap ?? 0);
     const fallbackSpent = Number(account.amount_spent ?? 0);
     let realAmountSpent = fallbackSpent;
+    let liveSpendCap: number | null = null;
 
     try {
       const insightsRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=amount_spent,spend_cap&access_token=${encodeURIComponent(bmToken)}`, { method: "GET" });
@@ -166,9 +167,28 @@ Deno.serve(async (req) => {
       if (insightsData?.amount_spent !== undefined) {
         realAmountSpent = centsToDollars(Number(insightsData.amount_spent));
       }
+      if (insightsData?.spend_cap !== undefined) {
+        liveSpendCap = centsToDollars(Number(insightsData.spend_cap));
+      }
     } catch (err) {
       console.warn("Withdraw preflight read failed, using DB snapshot", err);
     }
+
+    // CRITICAL: Use live Meta spend_cap as the base. If Meta read failed,
+    // abort the withdraw so we don't compute from a stale value.
+    if (liveSpendCap === null) {
+      return json({ error: "Cannot read live spend cap from Meta. Withdraw cancelled to avoid incorrect calculation." }, 400);
+    }
+    // Drift logging
+    if (Math.abs(liveSpendCap - dbSpendCap) > 1) {
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "Spend Cap Drift Detected",
+        details: `${account.account_name} (${actId.replace(/^act_/, "")}) — DB=$${dbSpendCap.toFixed(2)}, Meta=$${liveSpendCap.toFixed(2)}, drift=$${(liveSpendCap - dbSpendCap).toFixed(2)}. Withdraw calculated from live Meta value.`,
+      });
+    }
+    const currentSpendCap = liveSpendCap;
 
     const maxWithdrawable = Math.max(0, currentSpendCap - realAmountSpent);
     if (dry_run) {
@@ -224,6 +244,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("ad_accounts").update({
       spend_cap: newSpendCap,
+      amount_spent: realAmountSpent,
       balance_after_topup: Number((newSpendCap - fallbackSpent).toFixed(2)),
     }).eq("id", ad_account_id);
 

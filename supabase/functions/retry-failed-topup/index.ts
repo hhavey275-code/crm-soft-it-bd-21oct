@@ -160,47 +160,59 @@ Deno.serve(async (req)=>{
     const userName = userProfile?.full_name || "Unknown";
     const bm = account.business_managers;
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
-    const newSpendCapDollars = Number(failedTopup.old_spend_cap) + Number(failedTopup.amount);
     const actId = account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`;
-    console.log("Retry failed topup", {
-      actId,
-      newSpendCapDollars,
-      failedTopupId: failed_topup_id
-    });
-    // PRE-CHECK: Verify if the spend cap was already updated (from a previous attempt that falsely reported failure)
+    // CRITICAL: read LIVE spend_cap and amount_spent from Meta. Use LIVE value
+    // as base so we don't apply the top-up on top of a stale snapshot.
+    let liveSpendCapDollars = null;
+    let liveAmountSpentDollars = null;
     try {
-      const { response: preCheckRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
+      const { response: preCheckRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`, {
         method: "GET"
       });
       const preCheckData = await preCheckRes.json();
-      if (preCheckData?.spend_cap !== undefined) {
-        const currentCapDollars = centsToDollars(Number(preCheckData.spend_cap));
-        if (isCapEffectivelyApplied(currentCapDollars, newSpendCapDollars)) {
-          console.log(`Pre-check: cap already at $${currentCapDollars}. Marking as resolved without re-posting.`);
-          const currentAmountSpent = Number(account.amount_spent);
-          const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
-          await supabase.from("ad_accounts").update({
-            spend_cap: newSpendCapDollars,
-            balance_after_topup: remainingAfterTopup
-          }).eq("id", failedTopup.ad_account_id);
-          await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
-          await supabase.from("system_logs").insert({
-            user_id: userId,
-            user_name: userName,
-            action: "Failed Top-Up Auto-Resolved",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — Cap already correct`
-          });
-          return json({
-            success: true,
-            new_spend_cap: newSpendCapDollars,
-            auto_resolved: true,
-            via: "precheck",
-            source_ip: null
-          });
-        }
-      }
+      if (preCheckData?.spend_cap !== undefined) liveSpendCapDollars = centsToDollars(Number(preCheckData.spend_cap));
+      if (preCheckData?.amount_spent !== undefined) liveAmountSpentDollars = centsToDollars(Number(preCheckData.amount_spent));
     } catch (preErr) {
-      console.warn("Pre-check GET failed, proceeding with retry", preErr);
+      console.warn("Pre-check GET failed", preErr);
+    }
+    if (liveSpendCapDollars === null) {
+      return json({
+        error: "Cannot read live spend cap from Meta. Retry cancelled — verify the account in Ads Manager first."
+      }, 400);
+    }
+    const snapshotExpected = Number(failedTopup.old_spend_cap) + Number(failedTopup.amount);
+    const newSpendCapDollars = liveSpendCapDollars + Number(failedTopup.amount);
+    console.log("Retry failed topup", {
+      actId,
+      liveSpendCapDollars,
+      newSpendCapDollars,
+      snapshotExpected,
+      failedTopupId: failed_topup_id
+    });
+    // Auto-resolve if the previous attempt actually succeeded
+    if (isCapEffectivelyApplied(liveSpendCapDollars, snapshotExpected)) {
+      console.log(`Pre-check: cap already at $${liveSpendCapDollars} (snapshot expected $${snapshotExpected}). Marking as resolved without re-posting.`);
+      const currentAmountSpent = liveAmountSpentDollars ?? Number(account.amount_spent);
+      const remainingAfterTopup = liveSpendCapDollars - currentAmountSpent;
+          await supabase.from("ad_accounts").update({
+        spend_cap: liveSpendCapDollars,
+        amount_spent: currentAmountSpent,
+        balance_after_topup: remainingAfterTopup
+      }).eq("id", failedTopup.ad_account_id);
+      await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "Failed Top-Up Auto-Resolved",
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — Cap already correct`
+      });
+      return json({
+        success: true,
+        new_spend_cap: liveSpendCapDollars,
+        auto_resolved: true,
+        via: "precheck",
+        source_ip: null
+      });
     }
     // Call Meta API
     const { response: metaRes, via: postVia, sourceIp: postIp } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}`, {
@@ -274,10 +286,11 @@ Deno.serve(async (req)=>{
       }
     }
     // SUCCESS — update spend cap in DB, remove failed topup
-    const currentAmountSpent = Number(account.amount_spent);
+    const currentAmountSpent = liveAmountSpentDollars ?? Number(account.amount_spent);
     const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
     await supabase.from("ad_accounts").update({
       spend_cap: newSpendCapDollars,
+      amount_spent: currentAmountSpent,
       balance_after_topup: remainingAfterTopup
     }).eq("id", failedTopup.ad_account_id);
     await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
