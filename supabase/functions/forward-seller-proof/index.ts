@@ -20,7 +20,7 @@ function computeDueAdvance(txns: any[]): number {
   );
   for (const t of sorted) {
     if ((t.status || 'approved') !== 'approved') continue;
-    if (t.type === 'bdt_payment' || t.type === 'client_topup') {
+    if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
       running += Number(t.bdt_amount || 0);
     } else if (t.type === 'withdraw') {
       running -= Number(t.bdt_amount || 0);

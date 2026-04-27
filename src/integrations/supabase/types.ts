@@ -1764,6 +1764,7 @@ export type Database = {
           reviewed_by: string | null
           seller_id: string
           status: string
+          tenant_payment_id: string | null
           top_up_request_id: string | null
           type: string
           usdt_amount: number
@@ -1782,6 +1783,7 @@ export type Database = {
           reviewed_by?: string | null
           seller_id: string
           status?: string
+          tenant_payment_id?: string | null
           top_up_request_id?: string | null
           type: string
           usdt_amount?: number
@@ -1800,6 +1802,7 @@ export type Database = {
           reviewed_by?: string | null
           seller_id?: string
           status?: string
+          tenant_payment_id?: string | null
           top_up_request_id?: string | null
           type?: string
           usdt_amount?: number
@@ -1810,6 +1813,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_transactions_tenant_payment_id_fkey"
+            columns: ["tenant_payment_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_payments"
             referencedColumns: ["id"]
           },
           {
