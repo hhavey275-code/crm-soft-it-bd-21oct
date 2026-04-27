@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { chunkedMetaSync } from "@/lib/chunkedMetaSync";
 import { useNavigate } from "@/lib/router-compat";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { StatusBadge } from "@/components/StatusBadge";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { getInactiveDays } from "@/lib/inactiveDays";
-import { Search, ChevronRight, ExternalLink, User, Package } from "lucide-react";
+import { Search, ChevronRight, ExternalLink, User, Package, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tier = "15" | "30" | "45" | "unknown";
@@ -40,9 +43,31 @@ const UNASSIGNED_KEY = "__unassigned__";
 
 export function AdminUnusedAccountsView({ accounts, isLoading }: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tier>("15");
   const [search, setSearch] = useState("");
   const [openClients, setOpenClients] = useState<Set<string>>(new Set());
+  const [syncingKey, setSyncingKey] = useState<string | null>(null);
+
+  const syncGroup = async (groupKey: string, accountIds: string[], groupLabel: string) => {
+    if (!accountIds.length) return;
+    setSyncingKey(groupKey);
+    try {
+      const { insights, failed_account_ids, failed_chunks } = await chunkedMetaSync(accountIds);
+      const synced = Object.keys(insights || {}).length;
+      if (failed_chunks > 0) {
+        toast.warning(`${groupLabel}: synced ${synced}/${accountIds.length} (${failed_account_ids.length} failed)`);
+      } else {
+        toast.success(`${groupLabel}: synced ${synced} account(s)`);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Sync failed");
+    } finally {
+      setSyncingKey(null);
+    }
+  };
 
   const enrichedAll = useMemo(() => {
     return accounts.map((a) => ({
@@ -193,6 +218,19 @@ export function AdminUnusedAccountsView({ accounts, isLoading }: Props) {
                         <Badge variant="secondary" className="text-xs">
                           {g.accounts.length} account{g.accounts.length !== 1 ? "s" : ""}
                         </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          disabled={syncingKey === g.key}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            syncGroup(g.key, g.accounts.map((a) => a.id), g.name);
+                          }}
+                          title="Sync this client's accounts from Meta"
+                        >
+                          <RefreshCw className={cn("h-3 w-3", syncingKey === g.key && "animate-spin")} />
+                        </Button>
                         {!isUnassigned && g.user_id && (
                           <Button
                             size="sm"
