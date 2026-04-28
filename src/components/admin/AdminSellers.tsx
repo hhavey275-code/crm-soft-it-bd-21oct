@@ -1004,19 +1004,16 @@ export function AdminSellers() {
           {/* Others Bank Telegram Group */}
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground whitespace-nowrap">Others TG Group:</Label>
-            <Input
-              className="h-7 text-xs max-w-xs"
-              placeholder="Telegram Group ID for Others Bank"
-              defaultValue={(selectedSeller as any).others_telegram_group_id || ""}
-              onBlur={async (e) => {
-                const val = e.target.value.trim();
-                if (val !== ((selectedSeller as any).others_telegram_group_id || "")) {
-                  const { error } = await supabase.from("profiles").update({ others_telegram_group_id: val || null } as any).eq("user_id", selectedSeller.user_id);
-                  if (error) { toast.error("Failed to save"); return; }
-                  toast.success("Others TG Group saved");
-                  setSelectedSeller({ ...selectedSeller, others_telegram_group_id: val || null });
-                  queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
-                }
+            <OthersTgGroupField
+              key={selectedSeller.user_id}
+              value={(selectedSeller as any).others_telegram_group_id || ""}
+              onSave={async (val) => {
+                const { error } = await supabase.from("profiles").update({ others_telegram_group_id: val || null } as any).eq("user_id", selectedSeller.user_id);
+                if (error) { toast.error("Failed to save"); return false; }
+                toast.success("Others TG Group saved");
+                setSelectedSeller({ ...selectedSeller, others_telegram_group_id: val || null });
+                queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
+                return true;
               }}
             />
           </div>
