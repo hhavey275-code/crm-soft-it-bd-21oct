@@ -397,7 +397,8 @@ Deno.serve(async (req) => {
         // Forward proof to Telegram group (best-effort, non-blocking failure)
         if (proof_url) {
           try {
-            // Resolve target group: bank-specific first, then global fallback
+            // Resolve target group strictly from the selected bank only.
+            // Never fall back to a global group: that can leak one bank/seller proof into another group.
             let targetGroupId = "";
             let groupSource = "";
             if (bank_account_id) {
@@ -411,28 +412,7 @@ Deno.serve(async (req) => {
                 groupSource = `bank:${bank.bank_name ?? bank_account_id}`;
               }
             }
-            if (!targetGroupId) {
-              const { data: gRow } = await supabase
-                .from("site_settings")
-                .select("value")
-                .eq("key", "tenant_forward_group_id")
-                .maybeSingle();
-              if (gRow?.value) {
-                targetGroupId = String(gRow.value).trim();
-                groupSource = "site_settings:tenant_forward_group_id";
-              }
-            }
-            if (!targetGroupId) {
-              const { data: gRow2 } = await supabase
-                .from("site_settings")
-                .select("value")
-                .eq("key", "telegram_forward_group_id")
-                .maybeSingle();
-              if (gRow2?.value) {
-                targetGroupId = String(gRow2.value).trim();
-                groupSource = "site_settings:telegram_forward_group_id";
-              }
-            }
+            if (!targetGroupId) console.log("Tenant proof forward skipped: selected bank has no Telegram group ID", bank_account_id);
 
             const { data: tokRow } = await supabase
               .from("site_settings")
