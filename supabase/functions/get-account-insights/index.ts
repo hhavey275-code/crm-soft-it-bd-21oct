@@ -2,7 +2,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   metaFetch,
   resetMetaCounters,
-  metaCallSummary as sharedMetaCallSummary,
   getLastMetaIp,
   getLastMetaVia,
   getMetaProxyCount,
