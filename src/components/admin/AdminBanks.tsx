@@ -308,7 +308,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").insert(insertData);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); clearLogo(); },
+    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] }); queryClient.invalidateQueries({ queryKey: ["all-active-banks"] }); setShowAdd(false); setForm(emptyForm); clearLogo(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -324,7 +324,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").update(updateData).eq("id", editingBank.id);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); clearLogo(); },
+    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] }); queryClient.invalidateQueries({ queryKey: ["all-active-banks"] }); setEditingBank(null); setForm(emptyForm); clearLogo(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -333,7 +333,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").update({ status: "inactive" }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Deactivated", "Bank set to inactive"); toast.success("Bank deactivated"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
+    onSuccess: () => { logSystemAction("Bank Deactivated", "Bank set to inactive"); toast.success("Bank deactivated"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] }); queryClient.invalidateQueries({ queryKey: ["all-active-banks"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -342,7 +342,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").update({ status: "active" }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Reactivated", "Bank set to active"); toast.success("Bank reactivated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
+    onSuccess: () => { logSystemAction("Bank Reactivated", "Bank set to active"); toast.success("Bank reactivated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] }); queryClient.invalidateQueries({ queryKey: ["all-active-banks"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
