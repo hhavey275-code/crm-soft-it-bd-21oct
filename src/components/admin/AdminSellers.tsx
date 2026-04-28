@@ -38,6 +38,51 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "custom", label: "Custom" },
 ];
 
+function OthersTgGroupField({ value, onSave }: { value: string; onSave: (val: string) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(!value);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { setDraft(value); setEditing(!value); }, [value]);
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs px-2 py-1 rounded bg-muted max-w-xs truncate">{value}</span>
+        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        className="h-7 text-xs max-w-xs"
+        placeholder="Telegram Group ID for Others Bank"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        onClick={async () => {
+          const val = draft.trim();
+          if (val === value) { if (value) setEditing(false); return; }
+          const ok = await onSave(val);
+          if (ok && val) setEditing(false);
+        }}
+      >
+        Save
+      </Button>
+      {value && (
+        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(value); setEditing(false); }}>
+          Cancel
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function getPresetRange(preset: DatePreset): { from: Date; to: Date } | null {
   const now = new Date();
   switch (preset) {
@@ -1004,19 +1049,16 @@ export function AdminSellers() {
           {/* Others Bank Telegram Group */}
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground whitespace-nowrap">Others TG Group:</Label>
-            <Input
-              className="h-7 text-xs max-w-xs"
-              placeholder="Telegram Group ID for Others Bank"
-              defaultValue={(selectedSeller as any).others_telegram_group_id || ""}
-              onBlur={async (e) => {
-                const val = e.target.value.trim();
-                if (val !== ((selectedSeller as any).others_telegram_group_id || "")) {
-                  const { error } = await supabase.from("profiles").update({ others_telegram_group_id: val || null } as any).eq("user_id", selectedSeller.user_id);
-                  if (error) { toast.error("Failed to save"); return; }
-                  toast.success("Others TG Group saved");
-                  setSelectedSeller({ ...selectedSeller, others_telegram_group_id: val || null });
-                  queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
-                }
+            <OthersTgGroupField
+              key={selectedSeller.user_id}
+              value={(selectedSeller as any).others_telegram_group_id || ""}
+              onSave={async (val) => {
+                const { error } = await supabase.from("profiles").update({ others_telegram_group_id: val || null } as any).eq("user_id", selectedSeller.user_id);
+                if (error) { toast.error("Failed to save"); return false; }
+                toast.success("Others TG Group saved");
+                setSelectedSeller({ ...selectedSeller, others_telegram_group_id: val || null });
+                queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
+                return true;
               }}
             />
           </div>
