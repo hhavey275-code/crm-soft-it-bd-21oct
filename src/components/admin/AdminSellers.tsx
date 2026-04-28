@@ -38,6 +38,51 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "custom", label: "Custom" },
 ];
 
+function OthersTgGroupField({ value, onSave }: { value: string; onSave: (val: string) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(!value);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { setDraft(value); setEditing(!value); }, [value]);
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs px-2 py-1 rounded bg-muted max-w-xs truncate">{value}</span>
+        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        className="h-7 text-xs max-w-xs"
+        placeholder="Telegram Group ID for Others Bank"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        onClick={async () => {
+          const val = draft.trim();
+          if (val === value) { if (value) setEditing(false); return; }
+          const ok = await onSave(val);
+          if (ok && val) setEditing(false);
+        }}
+      >
+        Save
+      </Button>
+      {value && (
+        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(value); setEditing(false); }}>
+          Cancel
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function getPresetRange(preset: DatePreset): { from: Date; to: Date } | null {
   const now = new Date();
   switch (preset) {
