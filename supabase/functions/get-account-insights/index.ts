@@ -34,9 +34,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track route + IP used for the most recent Meta API call (per request)
+// Track route + IP used for Meta API calls (per request) — counters are reset
+// at the start of each Deno.serve handler invocation.
 let lastMetaVia = "direct";
 let lastMetaIp: string | null = null;
+let metaProxyCount = 0;
+let metaDirectCount = 0;
+let metaProxyFailReasons: string[] = [];
+function resetMetaCounters() {
+  lastMetaVia = "direct";
+  lastMetaIp = null;
+  metaProxyCount = 0;
+  metaDirectCount = 0;
+  metaProxyFailReasons = [];
+}
+function recordProxyFail(reason: string) {
+  if (metaProxyFailReasons.length < 5 && !metaProxyFailReasons.includes(reason)) {
+    metaProxyFailReasons.push(reason);
+  }
+}
 // Bangladesh timezone helpers (UTC+6, no DST). Day rollover at 00:00 BD time.
 function bdDateString(date = new Date()) {
   const bdMs = date.getTime() + 6 * 60 * 60 * 1000;
@@ -87,11 +103,13 @@ async function metaFetch(url, options = {}) {
           if (parsed && typeof parsed.error === "string") {
             isProxyOwnError = true;
             console.warn("Proxy returned own error, falling back to direct Meta API:", parsed.error);
+            recordProxyFail(`proxy_error:${parsed.error}`);
           }
         } catch  {}
       }
       if (!looksLikeHtml && !isProxyOwnError) {
         lastMetaVia = "proxy";
+        metaProxyCount += 1;
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers
@@ -99,13 +117,15 @@ async function metaFetch(url, options = {}) {
       }
       if (looksLikeHtml) {
         console.warn("Proxy returned HTML, falling back to direct Meta API call");
+        recordProxyFail(`proxy_html(status=${proxyRes.status})`);
       }
     } catch (proxyErr) {
       console.warn("Proxy failed, falling back to direct call:", proxyErr);
+      recordProxyFail(`proxy_throw:${(proxyErr as any)?.message || proxyErr}`);
     }
   }
   lastMetaVia = "direct";
-  lastMetaIp = null;
+  metaDirectCount += 1;
   return fetch(url, options);
 }
 function chunk(arr, size) {
