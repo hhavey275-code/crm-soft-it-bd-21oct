@@ -382,6 +382,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -504,6 +505,17 @@ Deno.serve(async (req)=>{
     // Process auto top-up rules after sync
     const autoTopupResult = await processAutoTopups(supabase, serviceKey);
     console.log(`Auto top-up: ${autoTopupResult.triggered}/${autoTopupResult.processed} rules triggered`);
+    // Summary log: capture proxy/direct counts and IP for this sync run
+    try {
+      await supabase.from("system_logs").insert({
+        user_id: null,
+        user_name: "system",
+        action: "Scheduled Sync",
+        details: `Synced ${totalSynced}/${autoTopupAccountIds.length} auto-topup account(s); auto_topup_triggered=${autoTopupResult.triggered}/${autoTopupResult.processed} | ${metaCallSummary()}`,
+      });
+    } catch (logErr) {
+      console.warn("scheduled-sync summary log failed:", logErr);
+    }
     // Enforce ad campaign spend rules (auto-pause)
     let ruleEnforcement = {
       checked: 0,
