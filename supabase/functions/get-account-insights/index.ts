@@ -5,6 +5,9 @@ import {
   metaCallSummary as sharedMetaCallSummary,
   getLastMetaIp,
   getLastMetaVia,
+  getMetaProxyCount,
+  getMetaDirectCount,
+  getMetaProxyFailReasons,
 } from "../_shared/meta-fetch.ts";
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
