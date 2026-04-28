@@ -1,13 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch,
+  resetMetaCounters,
+  getLastMetaVia,
+  getLastMetaIp,
+} from "../_shared/meta-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-let lastMetaVia = "direct";
-let lastMetaIp: string | null = null;
 
 async function decryptToken(stored: string, secret: string) {
   if (!stored.startsWith("enc:")) return stored;
@@ -34,70 +36,13 @@ function centsToDollars(cents: number) {
   return cents / 100;
 }
 
-async function metaFetch(url: string, options: RequestInit = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 8000);
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-proxy-secret": proxySecret,
-        },
-        body: JSON.stringify({ url, method, body, contentType }),
-        signal: ctl.signal,
-      }).finally(() => clearTimeout(timer));
-      try {
-        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp) lastMetaIp = proxyIp;
-      } catch {}
-      const text = await proxyRes.text();
-      const trimmed = text.trimStart();
-      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      let isProxyOwnError = false;
-      if (trimmed.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed && typeof parsed.error === "string") {
-            isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
-          }
-        } catch {}
-      }
-      // Only fall back when the PROXY itself is unhealthy. Meta's own 4xx
-      // responses (validation errors, etc.) must pass through as-is so we
-      // don't silently switch to direct IP for legitimate API errors.
-      const shouldFallback =
-        looksLikeHtml ||
-        isProxyOwnError ||
-        proxyRes.status >= 500 ||
-        proxyRes.status === 0;
-      if (!shouldFallback) {
-        lastMetaVia = "proxy";
-        return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
-      }
-      console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
-    } catch (proxyErr: any) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
-    }
-  }
-  lastMetaVia = "direct";
-  lastMetaIp = null;
-  return fetch(url, options);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Reset shared meta counters at the start of each invocation
+  resetMetaCounters();
 
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
     status,
