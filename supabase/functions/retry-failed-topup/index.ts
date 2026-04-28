@@ -60,6 +60,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   const json = (body, status = 200)=>new Response(JSON.stringify(body), {
       status,
       headers: {
