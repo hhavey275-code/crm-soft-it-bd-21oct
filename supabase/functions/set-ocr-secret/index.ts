@@ -52,14 +52,33 @@ serve(async (req) => {
     if (!sbToken || !projectRef) {
       return new Response(JSON.stringify({ error: "management token not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const mgmtResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+    // Try POST first; if it fails because the secret already exists, try DELETE then POST.
+    let mgmtResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
       method: "POST",
       headers: { Authorization: `Bearer ${sbToken}`, "Content-Type": "application/json" },
       body: JSON.stringify([{ name: secretName, value: api_key }]),
     });
+    let mgmtBody = await mgmtResp.text();
+    console.log(`[set-ocr-secret] POST ${secretName} -> ${mgmtResp.status}: ${mgmtBody.slice(0, 300)}`);
     if (!mgmtResp.ok) {
-      const t = await mgmtResp.text();
-      return new Response(JSON.stringify({ error: `failed to save secret: ${t.slice(0, 200)}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Attempt delete + recreate
+      const delResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sbToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify([secretName]),
+      });
+      const delBody = await delResp.text();
+      console.log(`[set-ocr-secret] DELETE ${secretName} -> ${delResp.status}: ${delBody.slice(0, 200)}`);
+      mgmtResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sbToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify([{ name: secretName, value: api_key }]),
+      });
+      mgmtBody = await mgmtResp.text();
+      console.log(`[set-ocr-secret] POST retry ${secretName} -> ${mgmtResp.status}: ${mgmtBody.slice(0, 300)}`);
+      if (!mgmtResp.ok) {
+        return new Response(JSON.stringify({ error: `failed to save secret (${mgmtResp.status}): ${mgmtBody.slice(0, 200)}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // Mirror flag in site_settings
