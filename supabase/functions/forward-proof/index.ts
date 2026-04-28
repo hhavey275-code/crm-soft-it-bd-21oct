@@ -102,15 +102,7 @@ Deno.serve(async (req) => {
       if (bankData?.seller_id) sellerId = bankData.seller_id;
     }
     if (!targetGroupId) {
-      const { data: globalGroup } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'telegram_forward_group_id')
-        .single();
-      targetGroupId = globalGroup?.value || '';
-    }
-    if (!targetGroupId) {
-      return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_group_id' }), {
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_bank_group_id' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

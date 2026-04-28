@@ -92,15 +92,6 @@ Deno.serve(async (req) => {
       bankName = bankData?.bank_name || 'Unknown';
       accountNumber = bankData?.account_number || 'N/A';
       if (!resolvedSellerId && bankData?.seller_id) resolvedSellerId = bankData.seller_id;
-
-      if (!groupId) {
-        const { data: globalGroup } = await supabase
-          .from('site_settings')
-          .select('value')
-          .eq('key', 'telegram_forward_group_id')
-          .single();
-        groupId = globalGroup?.value || null;
-      }
     } else if (others_telegram_group_id) {
       groupId = others_telegram_group_id;
       bankName = otherBankName || 'Others Bank';
