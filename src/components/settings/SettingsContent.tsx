@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useColorTheme, type ColorTheme } from "@/contexts/ColorThemeContext";
+import { OcrFallbackSection } from "@/components/settings/OcrFallbackSection";
 
 const COLOR_THEMES: { id: ColorTheme; name: string; swatch: string; ring: string }[] = [
   { id: "blue",   name: "Ocean Blue",   swatch: "bg-[hsl(214,100%,44%)]", ring: "ring-[hsl(214,100%,44%)]" },
@@ -643,6 +644,9 @@ export default function SettingsPage() {
 
         {/* ─── ADMIN: API Secrets Section ─── */}
         {isAdmin && <AdminSecretsSection />}
+
+        {/* ─── ADMIN: OCR Fallback Providers ─── */}
+        {isAdmin && <OcrFallbackSection />}
 
         {/* ─── Notification Section (All users) ─── */}
         <div className="space-y-5">
