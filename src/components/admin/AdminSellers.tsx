@@ -137,18 +137,33 @@ export function AdminSellers() {
       // Now call OCR
       setOcrUploading(false);
       setOcrProcessing(true);
-      const { data, error } = await supabase.functions.invoke("ocr-seller-payment", {
-        body: { image_url: publicUrl },
-      });
-      if (error) throw error;
-      setOcrResult({
-        bdt_amount: data.bdt_amount?.toString() || "",
-        date: data.date || "",
-        reference: data.reference || "",
-        bank_name: data.bank_name || "",
-        account_number: data.receiver_account_number || data.account_numbers?.[data.account_numbers.length - 1] || "",
-        account_holder_name: data.receiver_account_name || data.account_holder_name || "",
-      });
+      try {
+        const { data, error } = await supabase.functions.invoke("ocr-seller-payment", {
+          body: { image_url: publicUrl },
+        });
+        if (error) throw error;
+        setOcrResult({
+          bdt_amount: data.bdt_amount?.toString() || "",
+          date: data.date || "",
+          reference: data.reference || "",
+          bank_name: data.bank_name || "",
+          account_number: data.receiver_account_number || data.account_numbers?.[data.account_numbers.length - 1] || "",
+          account_holder_name: data.receiver_account_name || data.account_holder_name || "",
+        });
+      } catch (ocrErr: any) {
+        // OCR failed (e.g. AI credits exhausted). Keep the uploaded image and let the
+        // admin fill in details manually so the proof still gets forwarded to the seller.
+        const msg = ocrErr?.message || "OCR unavailable";
+        toast.warning(`OCR failed (${msg}). Please enter details manually.`);
+        setOcrResult({
+          bdt_amount: "",
+          date: new Date().toISOString().slice(0, 10),
+          reference: "",
+          bank_name: "",
+          account_number: "",
+          account_holder_name: "",
+        });
+      }
     } catch (e: any) {
       toast.error(e.message || "Upload/OCR failed");
       resetOcr();
