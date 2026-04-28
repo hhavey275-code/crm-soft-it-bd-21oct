@@ -72,7 +72,14 @@ async function metaFetch(url: string, options: RequestInit = {}) {
           }
         } catch {}
       }
-      const shouldFallback = looksLikeHtml || isProxyOwnError || proxyRes.status < 200 || proxyRes.status >= 300;
+      // Only fall back when the PROXY itself is unhealthy. Meta's own 4xx
+      // responses (validation errors, etc.) must pass through as-is so we
+      // don't silently switch to direct IP for legitimate API errors.
+      const shouldFallback =
+        looksLikeHtml ||
+        isProxyOwnError ||
+        proxyRes.status >= 500 ||
+        proxyRes.status === 0;
       if (!shouldFallback) {
         lastMetaVia = "proxy";
         return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
