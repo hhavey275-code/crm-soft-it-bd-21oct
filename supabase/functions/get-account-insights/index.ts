@@ -1091,16 +1091,19 @@ Deno.serve(async (req)=>{
           : date
             ? date
             : "today/yesterday";
-        const totalCalls = metaProxyCount + metaDirectCount;
-        const proxyPct = totalCalls > 0 ? Math.round((metaProxyCount / totalCalls) * 100) : 0;
-        const failNote = metaProxyFailReasons.length
-          ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
+        const proxyCalls = getMetaProxyCount();
+        const directCalls = getMetaDirectCount();
+        const totalCalls = proxyCalls + directCalls;
+        const proxyPct = totalCalls > 0 ? Math.round((proxyCalls / totalCalls) * 100) : 0;
+        const failReasons = getMetaProxyFailReasons();
+        const failNote = failReasons.length
+          ? ` | proxy_fails=[${failReasons.join("; ")}]`
           : "";
         await logMetaCall(supabase, {
           userId: callerUserId,
           userName,
           action: "Meta Insights Refresh",
-          details: `Refreshed ${accountCount} ad account(s) [range=${rangeLabel}] | calls=${totalCalls} (proxy=${metaProxyCount} ${proxyPct}%, direct=${metaDirectCount}) | proxy_ip=${lastMetaIp ?? "n/a"}${failNote}`,
+          details: `Refreshed ${accountCount} ad account(s) [range=${rangeLabel}] | calls=${totalCalls} (proxy=${proxyCalls} ${proxyPct}%, direct=${directCalls}) | proxy_ip=${getLastMetaIp() ?? "n/a"}${failNote}`,
         });
       } catch (logErr) {
         console.warn("system_logs insert (Meta Insights Refresh) failed:", logErr);
@@ -1113,8 +1116,8 @@ Deno.serve(async (req)=>{
     return new Response(JSON.stringify({
       insights,
       rate_limited: rateLimited,
-      via: lastMetaVia,
-      proxy_ip: lastMetaIp,
+      via: getLastMetaVia(),
+      proxy_ip: getLastMetaIp(),
     }), {
       headers: {
         ...corsHeaders,
