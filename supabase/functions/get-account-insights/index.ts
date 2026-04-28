@@ -1,4 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch,
+  resetMetaCounters,
+  metaCallSummary as sharedMetaCallSummary,
+  getLastMetaIp,
+  getLastMetaVia,
+} from "../_shared/meta-fetch.ts";
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
   try {
