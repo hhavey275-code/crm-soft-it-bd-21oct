@@ -244,7 +244,7 @@ async function processAutoTopups(supabase, serviceKey) {
           user_id: rule.user_id,
           user_name: userName,
           action: "Auto Top-Up Failed",
-          details: `${account.account_name} (${cleanAccountId}) — $${rule.topup_amount} — ${metaData?.error?.message || 'Verification failed'} [via=${lastMetaVia} IP: ${lastMetaProxyIp}]`
+          details: `${account.account_name} (${cleanAccountId}) — $${rule.topup_amount} — ${metaData?.error?.message || 'Verification failed'} ${sharedMetaCallSummary("")}`
         });
         continue;
       }
@@ -273,7 +273,7 @@ async function processAutoTopups(supabase, serviceKey) {
         user_id: rule.user_id,
         user_name: userName,
         action: "Auto Top-Up",
-        details: `${account.account_name} (${cleanAccountId}) — $${oldSpendCap} → $${newSpendCap} (triggered at balance $${currentBalance.toFixed(2)}, threshold $${rule.threshold_balance}) [via=${lastMetaVia} IP: ${lastMetaProxyIp}]`
+        details: `${account.account_name} (${cleanAccountId}) — $${oldSpendCap} → $${newSpendCap} (triggered at balance $${currentBalance.toFixed(2)}, threshold $${rule.threshold_balance}) ${sharedMetaCallSummary("")}`
       });
       console.log(`Auto top-up SUCCESS: ${actId} $${oldSpendCap} → $${newSpendCap}`);
       triggered++;
