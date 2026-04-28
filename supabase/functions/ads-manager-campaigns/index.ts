@@ -189,15 +189,15 @@ Deno.serve(async (req) => {
       user_id: userId,
       user_name: userName,
       action: "Ads Manager Campaign Fetch",
-      details: `Fetched ${campaigns.length} campaigns for ${(account as any).account_name} (${actId}) via ${lastMetaVia}${lastMetaIp ? ` [IP: ${lastMetaIp}]` : ""}`,
+      details: `Fetched ${campaigns.length} campaigns for ${(account as any).account_name} (${actId}) via ${getLastMetaVia()}${getLastMetaIp() ? ` [IP: ${getLastMetaIp()}]` : ""}`,
     } as any);
 
     return new Response(
       JSON.stringify({
         campaigns,
         fetchedAt: new Date().toISOString(),
-        proxyIp: lastMetaIp,
-        via: lastMetaVia,
+        proxyIp: getLastMetaIp(),
+        via: getLastMetaVia(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
