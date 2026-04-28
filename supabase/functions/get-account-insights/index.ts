@@ -40,26 +40,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track route + IP used for Meta API calls (per request) — counters are reset
-// at the start of each Deno.serve handler invocation.
-let lastMetaVia = "direct";
-let lastMetaIp: string | null = null;
-let metaProxyCount = 0;
-let metaDirectCount = 0;
-let metaProxyFailReasons: string[] = [];
-function resetMetaCounters() {
-  lastMetaVia = "direct";
-  lastMetaIp = null;
-  metaProxyCount = 0;
-  metaDirectCount = 0;
-  metaProxyFailReasons = [];
-}
-function recordProxyFail(reason: string) {
-  if (metaProxyFailReasons.length < 5 && !metaProxyFailReasons.includes(reason)) {
-    metaProxyFailReasons.push(reason);
-  }
-}
 // Bangladesh timezone helpers (UTC+6, no DST). Day rollover at 00:00 BD time.
 function bdDateString(date = new Date()) {
   const bdMs = date.getTime() + 6 * 60 * 60 * 1000;
@@ -68,72 +48,6 @@ function bdDateString(date = new Date()) {
 function bdYesterdayString(date = new Date()) {
   const bdMs = date.getTime() + 6 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000;
   return new Date(bdMs).toISOString().slice(0, 10);
-}
-async function metaFetch(url, options = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-proxy-secret": proxySecret
-        },
-        body: JSON.stringify({
-          url,
-          method,
-          body,
-          contentType
-        })
-      });
-      // Capture proxy IP from response header
-      try {
-        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp) lastMetaIp = proxyIp;
-      } catch  {}
-      const text = await proxyRes.text();
-      const trimmed = text.trimStart();
-      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      // Detect proxy-level errors (proxy server reporting its own failure,
-      // not a Meta API error). Proxy errors look like {"error":"string"};
-      // Meta errors look like {"error":{"message":...,"code":...}}.
-      let isProxyOwnError = false;
-      if (proxyRes.status >= 500 && proxyRes.status < 600 && trimmed.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed && typeof parsed.error === "string") {
-            isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta API:", parsed.error);
-            recordProxyFail(`proxy_error:${parsed.error}`);
-          }
-        } catch  {}
-      }
-      if (!looksLikeHtml && !isProxyOwnError) {
-        lastMetaVia = "proxy";
-        metaProxyCount += 1;
-        return new Response(text, {
-          status: proxyRes.status,
-          headers: proxyRes.headers
-        });
-      }
-      if (looksLikeHtml) {
-        console.warn("Proxy returned HTML, falling back to direct Meta API call");
-        recordProxyFail(`proxy_html(status=${proxyRes.status})`);
-      }
-    } catch (proxyErr) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr);
-      recordProxyFail(`proxy_throw:${(proxyErr as any)?.message || proxyErr}`);
-    }
-  }
-  lastMetaVia = "direct";
-  metaDirectCount += 1;
-  return fetch(url, options);
 }
 function chunk(arr, size) {
   const chunks = [];
