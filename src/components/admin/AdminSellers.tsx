@@ -1300,12 +1300,15 @@ export function AdminSellers() {
                             </td>
                             {(() => {
                               const da = formatDueAdvance(runningTotals.get(t.id) || 0);
+                              const isPending = (t.status || "approved").toLowerCase() !== "approved";
                               return (
                                 <td className={cn(
                                   "border border-border px-3 py-1.5 text-right font-extrabold tabular-nums whitespace-nowrap",
-                                  da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
+                                  isPending ? "text-muted-foreground/60 italic" :
+                                    da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                                 )}>
                                   {da.text}
+                                  {isPending && <div className="text-[10px] font-normal not-italic text-amber-600 dark:text-amber-400">(pending — not counted)</div>}
                                 </td>
                               );
                             })()}
