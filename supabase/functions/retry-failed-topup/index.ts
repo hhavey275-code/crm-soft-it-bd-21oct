@@ -30,7 +30,12 @@ async function metaFetch(url, options = {}) {
       }).finally(() => clearTimeout(t));
       const ct = proxyRes.headers.get("content-type") || "";
       const egressIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-forwarded-for") || null;
-      if (proxyRes.ok && (ct.includes("application/json") || proxyRes.status === 200)) {
+      // Treat the proxy as healthy unless it returned a transport-level
+      // failure (5xx) or a non-JSON HTML body. Meta's own 4xx errors must
+      // pass through as-is so we never silently switch to direct IP for
+      // legitimate API errors (which would risk account holds).
+      const proxyHealthy = proxyRes.status < 500 && proxyRes.status > 0;
+      if (proxyHealthy) {
         const text = await proxyRes.text();
         if (!text.trimStart().startsWith("<!") && !text.trimStart().startsWith("<html")) {
           // Detect proxy-level error JSON (no Meta-shaped body)
@@ -56,7 +61,7 @@ async function metaFetch(url, options = {}) {
           console.warn("Proxy returned HTML, falling back to direct Meta API call");
         }
       } else {
-        console.warn(`Proxy returned status ${proxyRes.status}, falling back to direct call`);
+        console.warn(`Proxy unhealthy (status=${proxyRes.status}), falling back to direct call`);
       }
     } catch (proxyErr) {
       console.warn("Proxy fetch failed, falling back to direct Meta API call:", proxyErr);

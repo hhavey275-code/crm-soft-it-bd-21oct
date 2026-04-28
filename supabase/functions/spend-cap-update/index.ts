@@ -7,6 +7,21 @@ const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
 // Track route + IP used for the most recent Meta API call (per request)
 let lastMetaVia = "direct";
 let lastMetaIp = null;
+let metaProxyCount = 0;
+let metaDirectCount = 0;
+let metaProxyFailReasons: string[] = [];
+function resetMetaCounters() {
+  lastMetaVia = "direct";
+  lastMetaIp = null;
+  metaProxyCount = 0;
+  metaDirectCount = 0;
+  metaProxyFailReasons = [];
+}
+function recordProxyFail(reason: string) {
+  if (metaProxyFailReasons.length < 5 && !metaProxyFailReasons.includes(reason)) {
+    metaProxyFailReasons.push(reason);
+  }
+}
 async function metaFetch(url, options = {}) {
   if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
   const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
@@ -46,22 +61,36 @@ async function metaFetch(url, options = {}) {
           if (parsed && typeof parsed.error === "string") {
             isProxyOwnError = true;
             console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
+            recordProxyFail(`proxy_error:${parsed.error}`);
           }
         } catch {}
       }
-      // Fallback on ANY non-2xx, HTML body, or proxy-shape error
-      const shouldFallback = looksLikeHtml || isProxyOwnError || proxyRes.status < 200 || proxyRes.status >= 300;
+      // CRITICAL: Only fall back when the PROXY itself is unhealthy.
+      // Meta returning a valid 4xx (e.g. validation error, spend cap rejection)
+      // must be passed through as-is — otherwise sensitive write operations
+      // like Auto Top-Up silently switch to direct IP and accounts get held.
+      // 5xx is treated as proxy/upstream failure since Meta rarely returns 5xx
+      // for normal API errors.
+      const shouldFallback =
+        looksLikeHtml ||
+        isProxyOwnError ||
+        proxyRes.status >= 500 ||
+        proxyRes.status === 0;
       if (!shouldFallback) {
         lastMetaVia = "proxy";
+        metaProxyCount += 1;
         return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
       }
+      if (looksLikeHtml) recordProxyFail(`proxy_html(status=${proxyRes.status})`);
+      if (!isProxyOwnError && proxyRes.status >= 500) recordProxyFail(`proxy_5xx(status=${proxyRes.status})`);
       console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
     } catch (proxyErr) {
       console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
+      recordProxyFail(`proxy_throw:${proxyErr?.message || proxyErr}`);
     }
   }
   lastMetaVia = "direct";
-  lastMetaIp = null;
+  metaDirectCount += 1;
   return fetch(url, options);
 }
 async function decryptToken(stored, secret) {
@@ -216,6 +245,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   const json = (body, status = 200)=>new Response(JSON.stringify(body), {
       status,
       headers: {
@@ -223,6 +253,13 @@ Deno.serve(async (req)=>{
         "Content-Type": "application/json"
       }
     });
+  const metaCallSummary = () => {
+    const total = metaProxyCount + metaDirectCount;
+    const failNote = metaProxyFailReasons.length
+      ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
+      : "";
+    return ` [meta: ${total} call(s) — proxy=${metaProxyCount}, direct=${metaDirectCount}, ip=${lastMetaIp ?? "n/a"}${failNote}]`;
+  };
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization");
@@ -459,7 +496,7 @@ Deno.serve(async (req)=>{
             user_id: userId,
             user_name: userName,
             action: "Spend Cap Updated",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from POST error) [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from POST error)${metaCallSummary()}`
           });
           return json({
             success: true,
@@ -480,7 +517,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}${metaCallSummary()}`
         });
         const errorCode = rateLimited ? "META_RATE_LIMIT" : "META_API_ERROR";
         return json({
@@ -510,7 +547,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${safeMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${safeMsg}${metaCallSummary()}`
         });
         return json({
           error: `${safeMsg} Amount deducted from wallet.`,
@@ -536,7 +573,7 @@ Deno.serve(async (req)=>{
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}${metaCallSummary()}`
         });
         return json({
           error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -563,7 +600,7 @@ Deno.serve(async (req)=>{
             user_id: userId,
             user_name: userName,
             action: "Spend Cap Updated",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg}) [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg})${metaCallSummary()}`
           });
           return json({
             success: true,
@@ -588,7 +625,7 @@ Deno.serve(async (req)=>{
         user_id: userId,
         user_name: userName,
         action: "Top-Up Failed",
-        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}${metaCallSummary()}`
       });
       return json({
         error: `Meta API error: ${metaErrorMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -625,7 +662,7 @@ Deno.serve(async (req)=>{
       user_id: userId,
       user_name: userName,
       action: "Spend Cap Updated",
-      details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`
+      details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars}${metaCallSummary()}`
     });
     // ============================================
     // STEP 4.5: Post-update health check — diagnostic
