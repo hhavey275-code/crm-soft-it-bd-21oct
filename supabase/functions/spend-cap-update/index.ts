@@ -172,13 +172,7 @@ Deno.serve(async (req)=>{
         "Content-Type": "application/json"
       }
     });
-  const metaCallSummary = () => {
-    const total = metaProxyCount + metaDirectCount;
-    const failNote = metaProxyFailReasons.length
-      ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
-      : "";
-    return ` [meta: ${total} call(s) — proxy=${metaProxyCount}, direct=${metaDirectCount}, ip=${lastMetaIp ?? "n/a"}${failNote}]`;
-  };
+  const metaCallSummary = () => sharedMetaCallSummary(" ");
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization");
