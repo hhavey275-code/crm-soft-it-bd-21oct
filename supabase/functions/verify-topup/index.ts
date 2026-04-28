@@ -72,15 +72,7 @@ async function forwardProofToTelegram(
       if (bankData?.telegram_group_id) targetGroupId = bankData.telegram_group_id;
     }
     if (!targetGroupId) {
-      const { data: groupIdSetting } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'telegram_forward_group_id')
-        .single();
-      targetGroupId = groupIdSetting?.value || '';
-    }
-    if (!targetGroupId) {
-      console.log('Telegram forward skipped: no group ID. bankAccountId:', bankAccountId);
+      console.log('Telegram forward skipped: selected bank has no Telegram group ID. bankAccountId:', bankAccountId);
       return false;
     }
     const resp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/sendPhoto`, {
