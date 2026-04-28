@@ -1,0 +1,1 @@
+INSERT INTO public.site_settings (key, value, updated_at) VALUES ('ocr_gemini_configured', 'true', now()), ('ocr_openai_configured', 'true', now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();

@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Small public test image with some text
-const DEFAULT_TEST_IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Sample_invoice.jpg/320px-Sample_invoice.jpg";
+const DEFAULT_TEST_IMAGE = "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
