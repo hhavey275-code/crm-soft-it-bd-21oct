@@ -245,6 +245,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   const json = (body, status = 200)=>new Response(JSON.stringify(body), {
       status,
       headers: {
@@ -252,6 +253,13 @@ Deno.serve(async (req)=>{
         "Content-Type": "application/json"
       }
     });
+  const metaCallSummary = () => {
+    const total = metaProxyCount + metaDirectCount;
+    const failNote = metaProxyFailReasons.length
+      ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
+      : "";
+    return ` [meta: ${total} call(s) — proxy=${metaProxyCount}, direct=${metaDirectCount}, ip=${lastMetaIp ?? "n/a"}${failNote}]`;
+  };
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization");
