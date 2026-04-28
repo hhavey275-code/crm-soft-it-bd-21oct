@@ -601,6 +601,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   // Auth check
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -1169,11 +1170,16 @@ Deno.serve(async (req)=>{
           : date
             ? date
             : "today/yesterday";
+        const totalCalls = metaProxyCount + metaDirectCount;
+        const proxyPct = totalCalls > 0 ? Math.round((metaProxyCount / totalCalls) * 100) : 0;
+        const failNote = metaProxyFailReasons.length
+          ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
+          : "";
         await logMetaCall(supabase, {
           userId: callerUserId,
           userName,
           action: "Meta Insights Refresh",
-          details: `Refreshed ${accountCount} ad account(s) [range=${rangeLabel}] via ${lastMetaVia} [IP: ${lastMetaIp ?? "direct"}]`,
+          details: `Refreshed ${accountCount} ad account(s) [range=${rangeLabel}] | calls=${totalCalls} (proxy=${metaProxyCount} ${proxyPct}%, direct=${metaDirectCount}) | proxy_ip=${lastMetaIp ?? "n/a"}${failNote}`,
         });
       } catch (logErr) {
         console.warn("system_logs insert (Meta Insights Refresh) failed:", logErr);
