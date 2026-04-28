@@ -1,116 +1,83 @@
-# Plan: BYO API Key fallback for OCR (Lovable → Gemini → OpenAI)
+# সব Meta API call → Vercel Proxy দিয়ে যাবে (Unified)
 
-## লক্ষ্য
+## বর্তমান অবস্থা
 
-Lovable AI credit শেষ হলে / rate-limit হলে OCR যেন automatically আপনার নিজের Gemini বা OpenAI API key দিয়ে চলতে থাকে। Settings এ key দিতে পারবেন এবং fallback priority order ঠিক করতে পারবেন।
+ভালো খবর: সব Meta Graph API call already `metaFetch()` wrapper দিয়ে যাচ্ছে — কোথাও bare `fetch("https://graph.facebook.com/...")` নেই।
 
-## ১. Supabase Secrets (storage)
+খারাপ খবর: **৭ টা আলাদা ফাইলে ৭ টা আলাদা `metaFetch` implementation** আছে এবং তাদের behavior inconsistent:
 
-৩টা নতুন secret add করব (Lovable secrets manager দিয়ে):
+| File | Proxy timeout? | Fallback rule | সমস্যা |
+|------|---------------|---------------|--------|
+| `spend-cap-update` | ✅ 8s | 5xx/HTML/proxy-error → fallback | ✅ Correct |
+| `spend-cap-withdraw` | ❓ | ❓ | check করা দরকার |
+| `scheduled-sync` | ❓ | ❓ | check করা দরকার |
+| `get-account-insights` | ❌ no timeout | শুধু HTML/proxy-own-error fallback | hung proxy = function timeout |
+| `retry-failed-topup` | ✅ 8s | < 500 = healthy | OK |
+| `ocr-seller-payment` (uses `_shared/ocr-fallback.ts`) | n/a | n/a | Meta call নেই |
+| `ads-manager-campaigns` edge | ❓ | ❓ | check করা দরকার |
+| `src/routes/api.ads-manager.campaigns.ts` | ❌ no timeout | catch only on throw | proxy slow হলে hang |
 
-- `OPENAI_API_KEY` — আপনার OpenAI key
-- `GEMINI_API_KEY_USER` — আপনার Gemini key (existing `GEMINI_API_KEY` Lovable-managed হতে পারে, তাই আলাদা নাম)
-- (ঐচ্ছিক) `OCR_FALLBACK_PRIORITY` — না, এটা DB তে রাখব যাতে UI থেকে edit করা যায়
+`api.meta-proxy.ts` (`/api/meta-proxy`) — এটা নিজে Vercel-side proxy route, allowedHosts এ `graph.facebook.com` আছে। ✅
 
-Settings এ key দেওয়ার সময় edge function call করে Supabase Vault এ লিখব। Frontend এ raw key কখনো প্রদর্শন করব না, শুধু "configured / not configured" status দেখাব।
+## যা করব
 
-## ২. Database — site_settings এ priority field
+### Step 1: একটা shared `metaFetch` module তৈরি
+File: `supabase/functions/_shared/meta-fetch.ts`
 
-Existing site_settings table এ একটা JSON field যোগ করব:
+একটাই canonical implementation যেটা **সব edge function** import করবে:
+- Proxy-first (POST to `META_PROXY_URL` with `META_PROXY_SECRET`)
+- 8-second AbortController timeout — proxy hang হলে দ্রুত fallback
+- Fallback **শুধু** এই cases এ:
+  - Network throw / timeout
+  - HTTP 5xx response
+  - HTML body (proxy down page)
+  - Proxy-own-error JSON (`{"error": "string"}`)
+- Meta এর 4xx/200 valid responses পাস-থ্রু (যেমন rate limit, validation error) — direct fallback **না**, কারণ same IP rotation safe রাখা দরকার
+- Per-request counters: proxy call count, direct call count, last egress IP, fail reasons
+- Helper: `getMetaCallSummary()` for logging
 
-```sql
-ocr_fallback_priority text[] DEFAULT ARRAY['lovable','gemini','openai']
-ocr_openai_configured boolean DEFAULT false  -- mirror flag, key value নয়
-ocr_gemini_configured boolean DEFAULT false
-```
+### Step 2: প্রতিটা edge function refactor
 
-Settings page থেকে read/write করা হবে। Actual key DB তে যাবে না — শুধু "configured আছে কিনা" এর flag।
+প্রতিটা ফাইলের local `metaFetch` মুছে shared module থেকে import করব:
+- `supabase/functions/spend-cap-update/index.ts`
+- `supabase/functions/spend-cap-withdraw/index.ts`
+- `supabase/functions/scheduled-sync/index.ts`
+- `supabase/functions/get-account-insights/index.ts`
+- `supabase/functions/retry-failed-topup/index.ts`
+- `supabase/functions/ads-manager-campaigns/index.ts`
 
-## ৩. Settings UI (নতুন section)
+ফলাফল: behavior 100% consistent — **কোনো Meta call direct যাবে না, যদি proxy reachable থাকে এবং valid response দেয়**।
 
-`SettingsContent.tsx` এ "OCR Fallback Providers" section:
+### Step 3: Vercel-side route (`src/routes/api.ads-manager.campaigns.ts`)
 
-```
-┌─ OCR Fallback Providers ────────────────────────────┐
-│ Lovable AI credit শেষ হলে এই keys দিয়ে fallback হবে │
-│                                                     │
-│ Priority order: [Lovable] [Gemini] [OpenAI] (drag) │
-│                                                     │
-│ Gemini API Key      [●●●●●●●●●● configured] [Update]│
-│ OpenAI API Key      [Not configured]        [Add]   │
-│                                                     │
-│ [Test fallback chain]                               │
-└─────────────────────────────────────────────────────┘
-```
+এখানেও `metaFetch` আছে কিন্তু behavior weak। একই rule apply করব (timeout + smart fallback)। Vercel route গুলোর জন্য আলাদা shared util: `src/lib/server/meta-fetch.server.ts` (server-only)।
 
-- Drag-and-drop দিয়ে priority reorder
-- "Update" বাটন → modal এ key paste → edge function `set-ocr-secret` call → Supabase secret update + flag true
-- "Test" → দুম্মি image দিয়ে chain test, কোনটা কাজ করছে দেখাবে
+### Step 4: Verification logging
 
-## ৪. Shared OCR helper (নতুন)
+প্রতিটা successful Meta call এ response header `x-egress-ip` capture করে log এ লিখব। User dashboard / system_logs এ যাচাই করা যাবে — সব call same proxy IP দিয়ে যাচ্ছে কিনা।
 
-`supabase/functions/_shared/ocr-fallback.ts` — সব OCR function এ ব্যবহার হবে:
+## বাস্তবায়ন প্রভাব
 
-```ts
-export async function runOcrWithFallback(imageUrl, prompt, schema) {
-  const priority = await getPriority(); // from site_settings
-  const errors: Record<string, string> = {};
-  
-  for (const provider of priority) {
-    try {
-      if (provider === 'lovable') return await callLovable(...);
-      if (provider === 'gemini') return await callGemini(...);   // user key
-      if (provider === 'openai') return await callOpenAI(...);
-    } catch (e) {
-      errors[provider] = e.message;
-      // Lovable 402/429 → next provider; অন্য error → next provider
-      // Auth/network issue with user key → next provider
-      continue;
-    }
-  }
-  throw new Error(`All OCR providers failed: ${JSON.stringify(errors)}`);
-}
-```
+- ✅ সব Meta call (spend cap update/withdraw, insights, scheduled sync, campaigns, retries) proxy-first
+- ✅ Same egress IP — Facebook এর কাছে ১টাই IP দেখাবে → "different IP" anti-fraud signal কমবে
+- ✅ Proxy fail হলে automatic direct fallback — feature কখনো broken হবে না
+- ✅ Timeout protection — hung proxy 8s এর বেশি block করবে না
+- ✅ একটা shared file edit করলেই সব function এ effect — future maintenance সহজ
 
-Each provider function returns same shape: `{ bdt_amount, date, reference, bank_name, account_number, account_holder_name }`। Gemini/OpenAI উভয়ই vision API দিয়ে image_url accept করে, structured output (tool calling / response_format json) ব্যবহার করব।
+## কোনো breaking change নেই
 
-## ৫. OCR edge functions
+- API surface unchanged
+- Database/UI unchanged
+- শুধু internal Meta routing উন্নত হবে
 
-বর্তমানে যেগুলো Lovable AI direct call করে — সেগুলো এই helper ব্যবহার করবে:
-- `ocr-seller-payment` (deployed but not in repo — recreate করব)
-- যদি আরো ocr function থাকে (client/tenant এর জন্য), একই helper plug করব
+## Approve করলে এই ফাইলগুলো বদলাবে
 
-System log এও entry লিখব: `OCR via gemini (lovable failed: 402)` — আপনি দেখতে পারবেন কোনটা use হলো।
-
-## ৬. New edge functions
-
-- `set-ocr-secret` — admin/superadmin only, body: `{provider: 'openai'|'gemini', api_key: string}`. Supabase Management API দিয়ে secret update করবে এবং site_settings এর `ocr_*_configured` flag true করবে। Key validate করতে একটা test call করবে আগে save করার আগে।
-- `test-ocr-fallback` — chain run করে কোন provider working সেটা return করবে।
-
-## ৭. Migration
-
-```sql
-ALTER TABLE site_settings 
-  ADD COLUMN ocr_fallback_priority text[] DEFAULT ARRAY['lovable','gemini','openai'],
-  ADD COLUMN ocr_openai_configured boolean DEFAULT false,
-  ADD COLUMN ocr_gemini_configured boolean DEFAULT false;
-```
-
-RLS: শুধু superadmin read/update পারবে এই columns।
-
-## ৮. Frontend OCR caller updates
-
-`AdminSellers`, `ClientTopUp`, `TenantSystemTopUp`, `TenantSubscriptions` — এগুলোর কোডে কিছু পরিবর্তন লাগবে না (একই edge function call করছে)। শুধু error message update করব যাতে user বোঝে fallback chain run হয়েছে।
-
-## প্রশ্ন একটাই বাকি
-
-Settings page এ এই section টা **শুধু superadmin দেখবে** নাকি **সব admin** দেখবে? আমার suggestion: শুধু superadmin (কারণ keys global হবে এবং সব admin এর জন্য একই use হবে)। যদি ভিন্ন চান বলবেন।
-
-## Deliverables
-
-- 1 migration (3 columns site_settings এ)
-- 2 new edge functions (`set-ocr-secret`, `test-ocr-fallback`)
-- 1 shared helper (`_shared/ocr-fallback.ts`)
-- 1 (re)created OCR function (`ocr-seller-payment` with fallback)
-- Settings page এ "OCR Fallback Providers" section
-- Secrets: `OPENAI_API_KEY`, `GEMINI_API_KEY_USER` add করার prompt আসবে আপনাকে
+1. **New:** `supabase/functions/_shared/meta-fetch.ts`
+2. **New:** `src/lib/server/meta-fetch.server.ts`
+3. **Edit:** `supabase/functions/spend-cap-update/index.ts`
+4. **Edit:** `supabase/functions/spend-cap-withdraw/index.ts`
+5. **Edit:** `supabase/functions/scheduled-sync/index.ts`
+6. **Edit:** `supabase/functions/get-account-insights/index.ts`
+7. **Edit:** `supabase/functions/retry-failed-topup/index.ts`
+8. **Edit:** `supabase/functions/ads-manager-campaigns/index.ts`
+9. **Edit:** `src/routes/api.ads-manager.campaigns.ts`

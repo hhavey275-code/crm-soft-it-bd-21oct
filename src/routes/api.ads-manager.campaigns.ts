@@ -67,6 +67,8 @@ async function metaFetch(url: string, options: RequestInit = {}) {
             ? options.body
             : undefined;
 
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
       const proxyRes = await fetch(proxyUrl, {
         method: "POST",
         headers: {
@@ -74,18 +76,31 @@ async function metaFetch(url: string, options: RequestInit = {}) {
           "x-proxy-secret": proxySecret,
         },
         body: JSON.stringify({ url, method, body, contentType }),
-      });
+        signal: ctl.signal,
+      }).finally(() => clearTimeout(timer));
 
       const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-      lastMetaVia = "proxy";
-      lastMetaIp = proxyIp;
-      console.log("[ads-manager] proxy response", { status: proxyRes.status, proxyIp });
       const text = await proxyRes.text();
-      return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
+      const trimmed = text.trimStart();
+      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
+      let isProxyOwnError = false;
+      if (trimmed.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed.error === "string") isProxyOwnError = true;
+        } catch {}
+      }
+      const shouldFallback =
+        looksLikeHtml || isProxyOwnError || proxyRes.status >= 500 || proxyRes.status === 0;
+      if (!shouldFallback) {
+        lastMetaVia = "proxy";
+        lastMetaIp = proxyIp;
+        console.log("[ads-manager] proxy response", { status: proxyRes.status, proxyIp });
+        return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
+      }
+      console.warn(`[ads-manager] proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
     } catch (err) {
       console.error("[ads-manager] proxy fetch threw", err);
-      lastMetaVia = "direct";
-      lastMetaIp = null;
     }
   }
 

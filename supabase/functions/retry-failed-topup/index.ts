@@ -1,74 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch as sharedMetaFetch,
+  resetMetaCounters,
+  getLastMetaVia,
+  getLastMetaIp,
+} from "../_shared/meta-fetch.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-async function metaFetch(url, options = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) {
-    const r = await fetch(url, options);
-    return { response: r, via: "direct", sourceIp: null };
-  }
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-proxy-secret": proxySecret
-        },
-        body: JSON.stringify({ url, method, body, contentType }),
-        signal: ctrl.signal,
-      }).finally(() => clearTimeout(t));
-      const ct = proxyRes.headers.get("content-type") || "";
-      const egressIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-forwarded-for") || null;
-      // Treat the proxy as healthy unless it returned a transport-level
-      // failure (5xx) or a non-JSON HTML body. Meta's own 4xx errors must
-      // pass through as-is so we never silently switch to direct IP for
-      // legitimate API errors (which would risk account holds).
-      const proxyHealthy = proxyRes.status < 500 && proxyRes.status > 0;
-      if (proxyHealthy) {
-        const text = await proxyRes.text();
-        if (!text.trimStart().startsWith("<!") && !text.trimStart().startsWith("<html")) {
-          // Detect proxy-level error JSON (no Meta-shaped body)
-          try {
-            const parsed = JSON.parse(text);
-            if (parsed && parsed.error && typeof parsed.error === "string") {
-              console.warn("Proxy returned error JSON, falling back to direct:", parsed.error);
-            } else {
-              return {
-                response: new Response(text, { status: proxyRes.status, headers: proxyRes.headers }),
-                via: "proxy",
-                sourceIp: egressIp,
-              };
-            }
-          } catch {
-            return {
-              response: new Response(text, { status: proxyRes.status, headers: proxyRes.headers }),
-              via: "proxy",
-              sourceIp: egressIp,
-            };
-          }
-        } else {
-          console.warn("Proxy returned HTML, falling back to direct Meta API call");
-        }
-      } else {
-        console.warn(`Proxy unhealthy (status=${proxyRes.status}), falling back to direct call`);
-      }
-    } catch (proxyErr) {
-      console.warn("Proxy fetch failed, falling back to direct Meta API call:", proxyErr);
-    }
-  }
-  const r = await fetch(url, options);
-  return { response: r, via: "direct", sourceIp: null };
+// Adapter: existing call sites destructure { response, via, sourceIp }.
+// Wrap shared metaFetch to preserve that contract without rewriting call sites.
+async function metaFetch(url: string, options: RequestInit = {}) {
+  const response = await sharedMetaFetch(url, options);
+  return { response, via: getLastMetaVia(), sourceIp: getLastMetaIp() };
 }
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
@@ -115,6 +60,7 @@ Deno.serve(async (req)=>{
       headers: corsHeaders
     });
   }
+  resetMetaCounters();
   const json = (body, status = 200)=>new Response(JSON.stringify(body), {
       status,
       headers: {

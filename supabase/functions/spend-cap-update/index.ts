@@ -1,98 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch,
+  resetMetaCounters,
+  metaCallSummary as sharedMetaCallSummary,
+  getLastMetaIp,
+  getMetaProxyCount,
+  getMetaDirectCount,
+  getMetaProxyFailReasons,
+} from "../_shared/meta-fetch.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track route + IP used for the most recent Meta API call (per request)
-let lastMetaVia = "direct";
-let lastMetaIp = null;
-let metaProxyCount = 0;
-let metaDirectCount = 0;
-let metaProxyFailReasons: string[] = [];
-function resetMetaCounters() {
-  lastMetaVia = "direct";
-  lastMetaIp = null;
-  metaProxyCount = 0;
-  metaDirectCount = 0;
-  metaProxyFailReasons = [];
-}
-function recordProxyFail(reason: string) {
-  if (metaProxyFailReasons.length < 5 && !metaProxyFailReasons.includes(reason)) {
-    metaProxyFailReasons.push(reason);
-  }
-}
-async function metaFetch(url, options = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
-      // 8s timeout so a hung proxy can't block the function
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 8000);
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-proxy-secret": proxySecret
-        },
-        body: JSON.stringify({ url, method, body, contentType }),
-        signal: ctl.signal,
-      }).finally(() => clearTimeout(timer));
-      // Capture proxy IP from response header
-      try {
-        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-        if (proxyIp) lastMetaIp = proxyIp;
-      } catch {}
-      const text = await proxyRes.text();
-      const trimmed = text.trimStart();
-      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      // Detect proxy-level errors. Proxy errors look like {"error":"string"};
-      // Meta errors look like {"error":{"message":...,"code":...}}.
-      let isProxyOwnError = false;
-      if (trimmed.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed && typeof parsed.error === "string") {
-            isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
-            recordProxyFail(`proxy_error:${parsed.error}`);
-          }
-        } catch {}
-      }
-      // CRITICAL: Only fall back when the PROXY itself is unhealthy.
-      // Meta returning a valid 4xx (e.g. validation error, spend cap rejection)
-      // must be passed through as-is — otherwise sensitive write operations
-      // like Auto Top-Up silently switch to direct IP and accounts get held.
-      // 5xx is treated as proxy/upstream failure since Meta rarely returns 5xx
-      // for normal API errors.
-      const shouldFallback =
-        looksLikeHtml ||
-        isProxyOwnError ||
-        proxyRes.status >= 500 ||
-        proxyRes.status === 0;
-      if (!shouldFallback) {
-        lastMetaVia = "proxy";
-        metaProxyCount += 1;
-        return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
-      }
-      if (looksLikeHtml) recordProxyFail(`proxy_html(status=${proxyRes.status})`);
-      if (!isProxyOwnError && proxyRes.status >= 500) recordProxyFail(`proxy_5xx(status=${proxyRes.status})`);
-      console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
-    } catch (proxyErr) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
-      recordProxyFail(`proxy_throw:${proxyErr?.message || proxyErr}`);
-    }
-  }
-  lastMetaVia = "direct";
-  metaDirectCount += 1;
-  return fetch(url, options);
-}
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
   try {
@@ -253,13 +172,7 @@ Deno.serve(async (req)=>{
         "Content-Type": "application/json"
       }
     });
-  const metaCallSummary = () => {
-    const total = metaProxyCount + metaDirectCount;
-    const failNote = metaProxyFailReasons.length
-      ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
-      : "";
-    return ` [meta: ${total} call(s) — proxy=${metaProxyCount}, direct=${metaDirectCount}, ip=${lastMetaIp ?? "n/a"}${failNote}]`;
-  };
+  const metaCallSummary = () => sharedMetaCallSummary(" ");
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization");

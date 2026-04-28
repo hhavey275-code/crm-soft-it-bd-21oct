@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch,
+  resetMetaCounters,
+  getLastMetaVia,
+  getLastMetaIp,
+} from "../_shared/meta-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,10 +14,6 @@ const corsHeaders = {
 
 const META_API_VERSION = "v25.0";
 const GRAPH_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-
-let lastMetaVia: "proxy" | "direct" = "direct";
-let lastMetaIp: string | null = null;
 
 async function decryptToken(stored: string, secret: string) {
   if (!stored.startsWith("enc:")) return stored;
@@ -46,60 +48,13 @@ async function decryptToken(stored: string, secret: string) {
   }
 }
 
-async function metaFetch(url: string, options: RequestInit = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) {
-    lastMetaVia = "direct";
-    return fetch(url, options);
-  }
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body =
-        options.body instanceof URLSearchParams
-          ? options.body.toString()
-          : typeof options.body === "string"
-            ? options.body
-            : undefined;
-
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-proxy-secret": proxySecret },
-        body: JSON.stringify({ url, method, body, contentType }),
-      });
-
-      const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-      if (proxyIp) lastMetaIp = proxyIp;
-
-      const text = await proxyRes.text();
-      const trimmed = text.trimStart();
-      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      if (!looksLikeHtml) {
-        lastMetaVia = "proxy";
-        return new Response(text, { status: proxyRes.status, headers: proxyRes.headers });
-      }
-    } catch (err) {
-      console.warn("proxy fetch failed, falling back to direct:", err);
-    }
-  }
-
-  lastMetaVia = "direct";
-  lastMetaIp = null;
-  return fetch(url, options);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Reset per-request tracking
-  lastMetaVia = "direct";
-  lastMetaIp = null;
+  // Reset shared meta counters per invocation
+  resetMetaCounters();
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -234,15 +189,15 @@ Deno.serve(async (req) => {
       user_id: userId,
       user_name: userName,
       action: "Ads Manager Campaign Fetch",
-      details: `Fetched ${campaigns.length} campaigns for ${(account as any).account_name} (${actId}) via ${lastMetaVia}${lastMetaIp ? ` [IP: ${lastMetaIp}]` : ""}`,
+      details: `Fetched ${campaigns.length} campaigns for ${(account as any).account_name} (${actId}) via ${getLastMetaVia()}${getLastMetaIp() ? ` [IP: ${getLastMetaIp()}]` : ""}`,
     } as any);
 
     return new Response(
       JSON.stringify({
         campaigns,
         fetchedAt: new Date().toISOString(),
-        proxyIp: lastMetaIp,
-        via: lastMetaVia,
+        proxyIp: getLastMetaIp(),
+        via: getLastMetaVia(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

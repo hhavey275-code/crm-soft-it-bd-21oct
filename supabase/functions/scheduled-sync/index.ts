@@ -1,106 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  metaFetch,
+  resetMetaCounters,
+  metaCallSummary as sharedMetaCallSummary,
+} from "../_shared/meta-fetch.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
-const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-// Track route + IP used for the most recent Meta API call (per request).
-// `lastMetaVia` tells you whether the call actually went via proxy or direct,
-// independent of whether we managed to capture an IP. `lastMetaProxyIp` keeps
-// the legacy variable name used in log strings further down in this file.
-let lastMetaVia = "direct";
-let lastMetaProxyIp = "direct";
-let metaProxyCount = 0;
-let metaDirectCount = 0;
-let metaProxyFailReasons: string[] = [];
-function resetMetaCounters() {
-  lastMetaVia = "direct";
-  lastMetaProxyIp = "direct";
-  metaProxyCount = 0;
-  metaDirectCount = 0;
-  metaProxyFailReasons = [];
-}
-function recordProxyFail(reason: string) {
-  if (metaProxyFailReasons.length < 5 && !metaProxyFailReasons.includes(reason)) {
-    metaProxyFailReasons.push(reason);
-  }
-}
+// Local wrapper preserves existing log call sites (`metaCallSummary()`).
 function metaCallSummary() {
-  const total = metaProxyCount + metaDirectCount;
-  const failNote = metaProxyFailReasons.length
-    ? ` | proxy_fails=[${metaProxyFailReasons.join("; ")}]`
-    : "";
-  return `meta: ${total} call(s) — proxy=${metaProxyCount}, direct=${metaDirectCount}, ip=${lastMetaProxyIp}${failNote}`;
-}
-async function metaFetch(url, options = {}) {
-  if (!url.startsWith("https://graph.facebook.com/")) return fetch(url, options);
-  const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
-  if (proxySecret && proxyUrl) {
-    try {
-      const headers = new Headers(options.headers ?? {});
-      const contentType = headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
-      const body = options.body instanceof URLSearchParams ? options.body.toString() : typeof options.body === "string" ? options.body : undefined;
-      // 8s timeout so a hung proxy can't block this background job.
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 8000);
-      const proxyRes = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-proxy-secret": proxySecret
-        },
-        body: JSON.stringify({ url, method, body, contentType }),
-        signal: ctl.signal,
-      }).finally(() => clearTimeout(timer));
-      const text = await proxyRes.text();
-      const trimmed = text.trimStart();
-      const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
-      // Detect proxy-level errors. Proxy errors look like {"error":"string"};
-      // Meta errors look like {"error":{"message":...,"code":...}}.
-      let isProxyOwnError = false;
-      if (trimmed.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed && typeof parsed.error === "string") {
-            isProxyOwnError = true;
-            console.warn("Proxy returned own error, falling back to direct Meta:", parsed.error);
-            recordProxyFail(`proxy_error:${parsed.error}`);
-          }
-        } catch {}
-      }
-      // Only fall back when the PROXY itself is unhealthy.
-      // Meta returning a valid 4xx must pass through unchanged so we don't
-      // silently switch to direct IP for legitimate API errors.
-      const shouldFallback =
-        looksLikeHtml ||
-        isProxyOwnError ||
-        proxyRes.status >= 500 ||
-        proxyRes.status === 0;
-      if (!shouldFallback) {
-        // Proxy succeeded — capture egress IP (proxy returns x-egress-ip;
-        // older proxies may use x-proxy-ip, so check both).
-        const proxyIp = proxyRes.headers.get("x-egress-ip") || proxyRes.headers.get("x-proxy-ip");
-        lastMetaVia = "proxy";
-        lastMetaProxyIp = proxyIp || "proxy";
-        metaProxyCount += 1;
-        return new Response(text, {
-          status: proxyRes.status,
-          headers: proxyRes.headers
-        });
-      }
-      if (looksLikeHtml) recordProxyFail(`proxy_html(status=${proxyRes.status})`);
-      if (!isProxyOwnError && proxyRes.status >= 500) recordProxyFail(`proxy_5xx(status=${proxyRes.status})`);
-      console.warn(`Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`);
-    } catch (proxyErr) {
-      console.warn("Proxy failed, falling back to direct call:", proxyErr?.message || proxyErr);
-      recordProxyFail(`proxy_throw:${proxyErr?.message || proxyErr}`);
-    }
-  }
-  lastMetaVia = "direct";
-  metaDirectCount += 1;
-  return fetch(url, options);
+  return sharedMetaCallSummary("");
 }
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
@@ -334,7 +244,7 @@ async function processAutoTopups(supabase, serviceKey) {
           user_id: rule.user_id,
           user_name: userName,
           action: "Auto Top-Up Failed",
-          details: `${account.account_name} (${cleanAccountId}) — $${rule.topup_amount} — ${metaData?.error?.message || 'Verification failed'} [via=${lastMetaVia} IP: ${lastMetaProxyIp}]`
+          details: `${account.account_name} (${cleanAccountId}) — $${rule.topup_amount} — ${metaData?.error?.message || 'Verification failed'} ${sharedMetaCallSummary("")}`
         });
         continue;
       }
@@ -363,7 +273,7 @@ async function processAutoTopups(supabase, serviceKey) {
         user_id: rule.user_id,
         user_name: userName,
         action: "Auto Top-Up",
-        details: `${account.account_name} (${cleanAccountId}) — $${oldSpendCap} → $${newSpendCap} (triggered at balance $${currentBalance.toFixed(2)}, threshold $${rule.threshold_balance}) [via=${lastMetaVia} IP: ${lastMetaProxyIp}]`
+        details: `${account.account_name} (${cleanAccountId}) — $${oldSpendCap} → $${newSpendCap} (triggered at balance $${currentBalance.toFixed(2)}, threshold $${rule.threshold_balance}) ${sharedMetaCallSummary("")}`
       });
       console.log(`Auto top-up SUCCESS: ${actId} $${oldSpendCap} → $${newSpendCap}`);
       triggered++;
