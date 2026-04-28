@@ -149,8 +149,8 @@ Deno.serve(async (req) => {
         current_spend_cap: currentSpendCap,
         real_amount_spent: realAmountSpent,
         max_withdrawable: Number(maxWithdrawable.toFixed(2)),
-        via: lastMetaVia,
-        source_ip: lastMetaIp,
+        via: getLastMetaVia(),
+        source_ip: getLastMetaIp(),
       });
     }
 
@@ -218,8 +218,8 @@ Deno.serve(async (req) => {
           description: `Withdraw credit\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
           reference_id: ad_account_id,
           processed_by: isAdmin ? `admin:${userId}` : `client:${userId}`,
-          via: lastMetaVia,
-          source_ip: lastMetaIp,
+          via: getLastMetaVia(),
+          source_ip: getLastMetaIp(),
         });
         creditedWallet = true;
       }
@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
       user_id: userId,
       user_name: userName,
       action: "Withdraw",
-      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? "Wallet credited" : "No client assigned"} [via=${lastMetaVia} IP: ${lastMetaIp ?? "n/a"}]`,
+      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? "Wallet credited" : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
     });
 
     return json({
@@ -251,8 +251,8 @@ Deno.serve(async (req) => {
       wallet_credited: creditedWallet,
       credited_user_id: creditedUserId,
       new_balance: newBalance,
-      via: lastMetaVia,
-      source_ip: lastMetaIp,
+      via: getLastMetaVia(),
+      source_ip: getLastMetaIp(),
     });
   } catch (err) {
     console.error("spend-cap-withdraw error:", err);
