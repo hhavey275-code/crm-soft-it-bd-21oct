@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarIcon, ArrowUpDown, BarChart3, Loader2, RefreshCw } from "lucide-react";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
-import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
@@ -34,60 +33,50 @@ const DATE_PRESETS = [
 export default function ClientSpendReportPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  // Restore last-checked range from localStorage so the previously fetched
-  // data stays visible until the user manually picks a new range / refreshes.
-  const STORAGE_KEY = "client-spend-report:last-range";
-  const initialRange = (() => {
+  // ----- Persisted snapshot of the LAST manually-fetched Meta result -----
+  // Reload / re-login: shows previous snapshot. NO API call until user clicks Update.
+  type Snapshot = {
+    from: string; // YYYY-MM-DD
+    to: string;
+    rows: { user_id: string; total_spend: number }[];
+    meta_calls: number;
+    proxy_ip: string | null;
+    fetched_at: string; // ISO
+  };
+  const STORAGE_KEY = "client-spend-report:snapshot";
+  const initialSnapshot: Snapshot | null = (() => {
     if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.from || !parsed?.to) return null;
-      return { from: new Date(parsed.from), to: new Date(parsed.to) } as DateRange;
+      return JSON.parse(raw) as Snapshot;
     } catch {
       return null;
     }
   })();
-  const initialPreset = (() => {
-    if (typeof window === "undefined") return "Today";
-    try {
-      return localStorage.getItem(STORAGE_KEY + ":preset") || (initialRange ? "" : "Today");
-    } catch {
-      return initialRange ? "" : "Today";
-    }
-  })();
 
-  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(
-    initialRange ?? { from: new Date(), to: new Date() },
-  );
-  const [selectedPreset, setSelectedPreset] = useState(initialPreset);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(initialSnapshot);
+
+  // Date range state: defaults to snapshot range, else Today
+  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(() => {
+    if (initialSnapshot) {
+      return { from: new Date(initialSnapshot.from), to: new Date(initialSnapshot.to) };
+    }
+    return { from: new Date(), to: new Date() };
+  });
+  const [selectedPreset, setSelectedPreset] = useState<string>(initialSnapshot ? "" : "Today");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
 
-  const isAllTime = selectedPreset === "All Time" && !dateRange;
   const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
   const toStr = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
 
-  // Persist current range so next visit shows the same data without refetch.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      if (dateRange?.from && dateRange?.to) {
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }),
-        );
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      localStorage.setItem(STORAGE_KEY + ":preset", selectedPreset || "");
-    } catch {
-      /* ignore */
-    }
-  }, [dateRange, selectedPreset]);
+  // The selected range may differ from the snapshot range (user picked new dates
+  // but hasn't pressed Update yet). We still show snapshot data in that case.
+  const rangeMatchesSnapshot =
+    !!snapshot && fromStr === snapshot.from && toStr === snapshot.to;
 
   // Fetch user_ad_accounts assignments (shared by both modes)
   const { data: userAccounts } = useQuery({
@@ -99,71 +88,39 @@ export default function ClientSpendReportPage() {
     staleTime: 2 * 60_000,
   });
 
-  // All Time query: from ad_accounts.amount_spent
-  const { data: allTimeRows, isLoading: allTimeLoading } = useQuery({
-    queryKey: ["client-spend-report-alltime"],
-    queryFn: async () => {
-      if (!userAccounts?.length) return [];
-      const accountIds = userAccounts.map(ua => ua.ad_account_id);
-      const { data: accounts } = await supabase
-        .from("ad_accounts")
-        .select("id, amount_spent")
-        .in("id", accountIds);
-
-      const accountSpendMap: Record<string, number> = {};
-      accounts?.forEach((a: any) => { accountSpendMap[a.id] = Number(a.amount_spent) || 0; });
-
-      const byUser: Record<string, number> = {};
-      userAccounts.forEach((ua: any) => {
-        if (!byUser[ua.user_id]) byUser[ua.user_id] = 0;
-        byUser[ua.user_id] += accountSpendMap[ua.ad_account_id] || 0;
-      });
-
-      return Object.entries(byUser).map(([userId, spend]) => ({
-        user_id: userId,
-        total_spend: spend,
-      }));
-    },
-    enabled: isAllTime && !!userAccounts?.length,
-  });
-
-  // Date range query: LIVE from Meta API via chunkedMetaSync
-  const { data: metaRows, isLoading: metaLoading, isFetching: metaFetching, refetch: refetchMeta } = useQuery({
-    queryKey: ["client-spend-report-meta", fromStr, toStr],
-    queryFn: async () => {
-      if (!fromStr || !toStr || !userAccounts?.length) return { rows: [], meta_calls: 0, proxy_ip: null as string | null };
-
-      // Build user -> accountIds map
+  // Manual fetch — only runs when user clicks Update.
+  const handleUpdate = async () => {
+    if (!fromStr || !toStr || !userAccounts?.length || isFetching) return;
+    setIsFetching(true);
+    try {
       const userAccountMap: Record<string, string[]> = {};
       userAccounts.forEach((ua: any) => {
         if (!userAccountMap[ua.user_id]) userAccountMap[ua.user_id] = [];
         userAccountMap[ua.user_id].push(ua.ad_account_id);
       });
-
-      // Get all unique ad account IDs
       const allAccountIds = [...new Set(userAccounts.map((ua: any) => ua.ad_account_id))];
-
-      // Lightweight spend-only batch fetch (Meta Batch API: ~50 accounts per HTTP call)
       const { spend: accountSpend, meta_calls, proxy_ip } = await fetchSpendOnly(allAccountIds, {
         date_from: fromStr,
         date_to: toStr,
       });
-
-      // Aggregate per user
-      const rows = Object.entries(userAccountMap).map(([userId, accIds]) => ({
-        user_id: userId,
+      const rows = Object.entries(userAccountMap).map(([user_id, accIds]) => ({
+        user_id,
         total_spend: accIds.reduce((sum, id) => sum + (accountSpend[id] || 0), 0),
       }));
-      return { rows, meta_calls: meta_calls ?? 0, proxy_ip: proxy_ip ?? null };
-    },
-    enabled: !isAllTime && !!fromStr && !!toStr && !!userAccounts?.length,
-    // Keep last fetched data visible until user manually refreshes / changes range.
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
+      const next: Snapshot = {
+        from: fromStr,
+        to: toStr,
+        rows,
+        meta_calls: meta_calls ?? 0,
+        proxy_ip: proxy_ip ?? null,
+        fetched_at: new Date().toISOString(),
+      };
+      setSnapshot(next);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles-report"],
@@ -174,10 +131,10 @@ export default function ClientSpendReportPage() {
     staleTime: 5 * 60_000,
   });
 
-  const isLoading = isAllTime ? allTimeLoading : metaLoading;
-  const rawRows = isAllTime ? allTimeRows : metaRows?.rows;
-  const metaCalls = !isAllTime ? metaRows?.meta_calls ?? null : null;
-  const proxyIp = !isAllTime ? metaRows?.proxy_ip ?? null : null;
+  const rawRows = snapshot?.rows ?? [];
+  const metaCalls = snapshot?.meta_calls ?? null;
+  const proxyIp = snapshot?.proxy_ip ?? null;
+  const fetchedAt = snapshot?.fetched_at ?? null;
 
   const aggregated = useMemo(() => {
     if (!rawRows?.length || !profiles?.length) return [];
@@ -202,11 +159,10 @@ export default function ClientSpendReportPage() {
 
   const handlePresetChange = (presetLabel: string) => {
     setSelectedPreset(presetLabel);
-    if (presetLabel === "All Time") {
-      setDateRange(null);
-    } else {
-      const preset = DATE_PRESETS.find(p => p.label === presetLabel);
-      if (preset) setDateRange(preset.getValue());
+    const preset = DATE_PRESETS.find(p => p.label === presetLabel);
+    if (preset) {
+      const v = preset.getValue();
+      setDateRange(v ?? { from: new Date(), to: new Date() });
     }
   };
 
@@ -225,13 +181,11 @@ export default function ClientSpendReportPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2 w-full sm:w-auto", !dateRange && !isAllTime && "text-muted-foreground")}>
+                  <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2 w-full sm:w-auto", !dateRange && "text-muted-foreground")}>
                     <CalendarIcon className="h-4 w-4" />
-                    {isAllTime
-                      ? "All Time"
-                      : dateRange?.from && dateRange?.to
-                        ? `${format(dateRange.from, "MMM d, yyyy")} – ${format(dateRange.to, "MMM d, yyyy")}`
-                        : "Select date range"}
+                    {dateRange?.from && dateRange?.to
+                      ? `${format(dateRange.from, "MMM d, yyyy")} – ${format(dateRange.to, "MMM d, yyyy")}`
+                      : "Select date range"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start" side="bottom">
@@ -288,18 +242,16 @@ export default function ClientSpendReportPage() {
                 </PopoverContent>
               </Popover>
 
-              {!isAllTime && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchMeta()}
-                  disabled={metaFetching}
-                  className="gap-1"
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", metaFetching && "animate-spin")} />
-                  <span className="text-xs">Update</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUpdate}
+                disabled={isFetching || !fromStr || !toStr || !userAccounts?.length}
+                className="gap-1"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+                <span className="text-xs">Update</span>
+              </Button>
 
               <div className="flex items-center gap-4">
                 <div>
@@ -310,17 +262,27 @@ export default function ClientSpendReportPage() {
                   <p className="text-xs text-muted-foreground">Clients</p>
                   <p className="text-lg font-bold">{aggregated.length}</p>
                 </div>
-                {!isAllTime && metaCalls !== null && !isLoading && (
+                {metaCalls !== null && (
                   <div>
                     <p className="text-xs text-muted-foreground">Meta API calls</p>
                     <p className="text-lg font-bold">{metaCalls}</p>
                     {proxyIp && (
                       <p className="text-[10px] text-muted-foreground">via {proxyIp}</p>
                     )}
+                    {fetchedAt && (
+                      <p className="text-[10px] text-muted-foreground">
+                        updated {format(new Date(fetchedAt), "MMM d, HH:mm")}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
+            {snapshot && !rangeMatchesSnapshot && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
+                Showing data for {format(new Date(snapshot.from), "MMM d, yyyy")} – {format(new Date(snapshot.to), "MMM d, yyyy")}. Click <b>Update</b> to fetch the new range.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -335,13 +297,15 @@ export default function ClientSpendReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isFetching ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {!isAllTime ? "Fetching live data from Meta..." : "Loading..."}
+                Fetching live data from Meta...
               </div>
             ) : aggregated.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No spend data for this period</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {snapshot ? "No spend data for this period" : "Select a date range and click Update to fetch data"}
+              </p>
             ) : isMobile ? (
               <div className="space-y-2">
                 {aggregated.map((row, i) => (
