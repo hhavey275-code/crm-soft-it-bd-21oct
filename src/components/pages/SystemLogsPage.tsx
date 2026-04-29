@@ -47,8 +47,22 @@ const ACTION_COLORS: Record<string, string> = {
 //   "... [IP: 1.2.3.4]"
 //   "... [via=proxy IP: 1.2.3.4]"
 //   "... [via=direct IP: n/a]"
+//   "... [meta: 3 call(s) — proxy=3, direct=0, ip=1.2.3.4 | proxy_fails=[...]]"
 function extractIp(details: string | null): { ip: string | null; cleanDetails: string } {
   if (!details) return { ip: null, cleanDetails: details || "" };
+
+  // Format 1: [meta: ... ip=1.2.3.4 ...]
+  const metaMatch = details.match(/\s*\[meta:[^\]]*?\bip=([^\s\]|]+)[^\]]*\]/i);
+  if (metaMatch) {
+    const raw = metaMatch[1].trim();
+    const ip = raw && raw.toLowerCase() !== "n/a" ? raw : null;
+    return {
+      ip,
+      cleanDetails: details.replace(metaMatch[0], "").trim(),
+    };
+  }
+
+  // Format 2: [IP: ...] or [via=... IP: ...]
   const match = details.match(/\s*\[(?:via=[^\s\]]+\s+)?IP:\s*([^\]]+)\]/i);
   if (match) {
     const raw = match[1].trim();
@@ -189,7 +203,7 @@ export default function SystemLogsPage() {
                       <TableCell>
                         <Badge variant="outline" className={ACTION_COLORS[log.action] || ""}>{log.action}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">{cleanDetails || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-pre-wrap break-words min-w-[320px] max-w-[640px]">{cleanDetails || "—"}</TableCell>
                       <TableCell>
                         {ip ? (
                           <span className="inline-flex items-center gap-1 text-xs font-mono text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
