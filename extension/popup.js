@@ -77,23 +77,45 @@ async function extractFbAccessToken(tabId) {
     target: { tabId },
     world: "MAIN",
     func: () => {
-      // Facebook's Ads Manager embeds an access token in inline scripts. The
-      // most reliable pattern: it's a string starting with "EAA" inside a
-      // JSON-like blob. We scan all script tags.
-      const scripts = Array.from(document.querySelectorAll("script"));
+      // Scan EVERYTHING — script tags, inline JSON, and the full HTML —
+      // for tokens. Facebook keeps moving where the token lives so we
+      // try many patterns and pick the longest valid-looking one.
       const tokens = new Set();
-      for (const s of scripts) {
-        const t = s.textContent || "";
-        // Match "accessToken":"EAA...","
-        const re1 = /"accessToken":"(EAA[^"]+)"/g;
-        let m;
-        while ((m = re1.exec(t))) tokens.add(m[1]);
-        // Match "access_token":"EAA..."
-        const re2 = /"access_token":"(EAA[^"]+)"/g;
-        while ((m = re2.exec(t))) tokens.add(m[1]);
+      const patterns = [
+        /EAAG\w{50,}/g,          // Graph API user tokens often start with EAAG
+        /EAAB\w{50,}/g,          // Some BM tokens
+        /EAA[A-Za-z0-9]{80,}/g,  // Generic long EAA token
+      ];
+      const sources = [];
+      // 1. All script tags
+      for (const s of document.querySelectorAll("script")) {
+        if (s.textContent) sources.push(s.textContent);
       }
-      // Prefer the longest token (typically the user-bound one with full perms)
-      return Array.from(tokens).sort((a, b) => b.length - a.length)[0] || null;
+      // 2. Full HTML (catches tokens in attributes, JSON islands, etc.)
+      try { sources.push(document.documentElement.outerHTML); } catch {}
+      // 3. window.__additionalDataLoaded / require payloads if available
+      try {
+        if (window.require) {
+          // not directly readable, skip
+        }
+      } catch {}
+
+      for (const src of sources) {
+        for (const re of patterns) {
+          let m;
+          while ((m = re.exec(src)) !== null) {
+            // Strip trailing punctuation like ", \, etc.
+            let tok = m[0].replace(/["'\\,;}\]].*$/, "");
+            if (tok.length >= 80) tokens.add(tok);
+          }
+        }
+      }
+      const sorted = Array.from(tokens).sort((a, b) => b.length - a.length);
+      return {
+        token: sorted[0] || null,
+        candidates: sorted.length,
+        url: location.href,
+      };
     },
   });
   return result;
@@ -223,12 +245,27 @@ $("sync-btn").addEventListener("click", async () => {
     $("progress-bar").style.width = "35%";
 
     let token = null;
-    for (let i = 0; i < 3 && !token; i++) {
-      token = await extractFbAccessToken(tab.id);
-      if (!token) await new Promise((r) => setTimeout(r, 2000));
+    let lastInfo = null;
+    for (let i = 0; i < 4 && !token; i++) {
+      const info = await extractFbAccessToken(tab.id);
+      lastInfo = info;
+      token = info?.token || null;
+      if (!token) {
+        // Force-focus + reload the tab once on attempt 2 to make Facebook
+        // re-emit its inline scripts with a fresh token.
+        if (i === 1) {
+          try { await chrome.tabs.reload(tab.id); } catch {}
+          await new Promise((r) => setTimeout(r, 5000));
+        } else {
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+      }
     }
     if (!token) {
-      throw new Error("Could not find Facebook access token. Make sure you're logged into Facebook with admin access, then try again.");
+      throw new Error(
+        `Could not find Facebook access token (scanned ${lastInfo?.candidates ?? 0} candidates on ${lastInfo?.url || "the tab"}). ` +
+        `Try this: open https://business.facebook.com/adsmanager/manage/accounts in a NEW tab, wait until it fully loads (the accounts table is visible), then click Sync again.`,
+      );
     }
 
     $("progress-text").textContent = "Fetching all ad accounts from Facebook...";
