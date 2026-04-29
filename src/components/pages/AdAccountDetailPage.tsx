@@ -23,6 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
+import { AdAccountSyncedCards } from "@/components/admin/AdAccountSyncedCards";
 import { CardHistoryTimeline } from "@/components/admin/CardHistoryTimeline";
 import { HackRecoveryPanel } from "@/components/admin/HackRecoveryPanel";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
@@ -654,6 +655,9 @@ export default function AdAccountDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* === Synced Payment Methods (from extension) === */}
+        {!isTikTok && id && <AdAccountSyncedCards adAccountId={id} />}
 
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (
