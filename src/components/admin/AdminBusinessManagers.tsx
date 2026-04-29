@@ -241,6 +241,26 @@ export function AdminBusinessManagers() {
     importMutation.mutate(toImport);
   };
 
+  const manualAddMutation = useMutation({
+    mutationFn: async () => {
+      if (!manualBmId || !manualAdAccountId.trim()) throw new Error("Select a BM and enter an Ad Account ID");
+      return invokeBmFunction<{ account?: any }>("add-ad-account-manual", {
+        business_manager_id: manualBmId,
+        ad_account_id: manualAdAccountId.trim(),
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(`Ad account added: ${res?.account?.account_name ?? manualAdAccountId}`);
+      setManualAddOpen(false);
+      setManualAdAccountId("");
+      setManualBmId("");
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const filteredSyncedAccounts = useMemo(() => {
     const q = importSearch.toLowerCase();
     return syncedAccounts.filter((a) => {
