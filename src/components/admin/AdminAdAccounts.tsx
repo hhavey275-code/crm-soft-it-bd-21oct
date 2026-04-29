@@ -266,8 +266,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? assignedAccounts.length;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} account(s) could not be updated (network/server issue). Click Update again to retry just those.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} updated (${autoRetried} auto-retried successfully)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} account(s) rate-limited by Meta. Please retry after a few minutes.`);
       } else {
@@ -298,8 +304,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? unassignedAccounts.length;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} inventory account(s) could not be updated.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} inventory updated · ${failed} failed`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} inventory updated (${autoRetried} auto-retried)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} inventory account(s) rate-limited by Meta.`);
       } else {
@@ -322,8 +334,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? selectedIds.size;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} of ${selectedIds.size} account(s) could not be updated. Click Update again to retry.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} updated (${autoRetried} auto-retried)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} of ${selectedIds.size} account(s) rate-limited. Please retry after a few minutes.`);
       } else {
