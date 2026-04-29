@@ -702,6 +702,48 @@ export function AdminBusinessManagers() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <Dialog open={manualAddOpen} onOpenChange={setManualAddOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Ad Account Manually</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Business Manager (token to use)</Label>
+                  <Select value={manualBmId} onValueChange={setManualBmId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a BM" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bms?.map((bm: any) => (
+                        <SelectItem key={bm.id} value={bm.id}>{bm.name} ({bm.bm_id})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ad Account ID</Label>
+                  <Input
+                    value={manualAdAccountId}
+                    onChange={(e) => setManualAdAccountId(e.target.value)}
+                    placeholder="1234567890 or act_1234567890"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The selected BM's token must have access to this account. Details will be fetched from Meta.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setManualAddOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => manualAddMutation.mutate()}
+                  disabled={!manualBmId || !manualAdAccountId.trim() || manualAddMutation.isPending}
+                >
+                  {manualAddMutation.isPending ? "Adding..." : "Add Account"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
