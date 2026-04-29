@@ -227,6 +227,7 @@ async function init() {
   const stored = await getStored(["apiUrl", "anonKey", "email", "jwt", "userEmail"]);
   if (stored.jwt && stored.userEmail) {
     await showMainView(stored.userEmail);
+    await refreshAutoSyncUi();
   } else {
     await showSetupView(stored);
   }
@@ -353,5 +354,63 @@ $("sync-btn").addEventListener("click", async () => {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// ---------- Auto-sync UI ----------
+function timeAgo(ts) {
+  if (!ts) return "never";
+  const sec = Math.floor((Date.now() - ts) / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)} hr ago`;
+  return `${Math.floor(sec / 86400)} day(s) ago`;
+}
+
+async function refreshAutoSyncUi() {
+  const s = await getStored([
+    "autoSyncEnabled",
+    "lastSyncStatus",
+    "lastSyncAt",
+    "lastSyncSaved",
+    "lastSyncReceived",
+    "lastSyncError",
+  ]);
+  const enabled = s.autoSyncEnabled !== false; // default ON
+  const toggle = $("auto-sync-toggle");
+  if (toggle) {
+    toggle.checked = enabled;
+    $("auto-sync-label").textContent = enabled ? "On" : "Off";
+  }
+  const statusEl = $("auto-sync-status");
+  if (!statusEl) return;
+  if (!enabled) {
+    statusEl.textContent = "Disabled";
+    return;
+  }
+  const when = timeAgo(s.lastSyncAt);
+  if (s.lastSyncStatus === "success") {
+    statusEl.textContent = `Last: ${when} · saved ${s.lastSyncSaved}/${s.lastSyncReceived}`;
+  } else if (s.lastSyncStatus === "error") {
+    statusEl.textContent = `Last: ${when} · error: ${(s.lastSyncError || "").slice(0, 60)}`;
+  } else if (s.lastSyncStatus === "running") {
+    statusEl.textContent = `Running... (started ${when})`;
+  } else {
+    statusEl.textContent = "Waiting for first run";
+  }
+}
+
+const autoSyncToggleEl = $("auto-sync-toggle");
+if (autoSyncToggleEl) {
+  autoSyncToggleEl.addEventListener("change", async (e) => {
+    const enabled = e.target.checked;
+    await setStored({ autoSyncEnabled: enabled });
+    await refreshAutoSyncUi();
+    if (enabled) {
+      try { chrome.runtime.sendMessage({ type: "ensure-alarm" }); } catch {}
+    }
+  });
+}
+
+// Refresh status periodically while popup is open
+setInterval(() => { refreshAutoSyncUi().catch(() => {}); }, 5000);
 
 init();
