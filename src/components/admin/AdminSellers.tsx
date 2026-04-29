@@ -1991,6 +1991,107 @@ export function AdminSellers() {
         onOpenChange={setShowUsdtBanksDialog}
         seller={usdtBanksTargetSeller}
       />
+
+      {/* Close Month Confirmation */}
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close {selectedSeller ? monthLabel(activeBucket) : ""}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>This will lock the month and carry forward the closing balance to next month.</p>
+                <div className="rounded-md border p-3 bg-muted/40 space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Opening:</span><span className="font-mono">{activeOpening >= 0 ? "+" : "−"}৳{Math.abs(activeOpening).toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">BDT In:</span><span className="font-mono">৳{(activeMonthAgg.bdtIn + activeMonthAgg.clientBdt).toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">USDT Given (BDT):</span><span className="font-mono">−৳{activeMonthAgg.convertedBdt.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Withdraw:</span><span className="font-mono">−৳{activeMonthAgg.withdrawBdt.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-semibold border-t pt-1"><span>Closing:</span><span className="font-mono">{activeClosingLive >= 0 ? "+" : "−"}৳{Math.abs(activeClosingLive).toFixed(2)}</span></div>
+                </div>
+                <p className="text-xs text-muted-foreground">You can Reopen later if you need to fix anything.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => closeMonthMutation.mutate()} disabled={closeMonthMutation.isPending}>
+              {closeMonthMutation.isPending ? "Closing…" : "Close Month"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Monthly Excel Export with column selection */}
+      <Dialog open={showMonthlyExport} onOpenChange={setShowMonthlyExport}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Excel Export</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Month</Label>
+              <Select
+                value={`${exportBucket.year}-${exportBucket.month}`}
+                onValueChange={(v) => {
+                  const [y, m] = v.split("-").map(Number);
+                  setExportBucket({ year: y, month: m });
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map(b => (
+                    <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                      {monthLabel(b)}{closingFor(b) ? " 🔒" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs">Columns to include</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => setExportCols([...ALL_EXPORT_COLS])}
+                  >Select all</button>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => setExportCols([])}
+                  >Clear</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto border rounded-md p-2">
+                {ALL_EXPORT_COLS.map(col => {
+                  const checked = exportCols.includes(col);
+                  return (
+                    <label key={col} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          if (v) setExportCols(prev => ALL_EXPORT_COLS.filter(c => prev.includes(c) || c === col) as ExportCol[]);
+                          else setExportCols(prev => prev.filter(c => c !== col));
+                        }}
+                      />
+                      <span>{col}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Opening Balance row + transactions + Closing Balance row will be included.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
+            <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
+              <Download className="h-4 w-4 mr-1" /> Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
