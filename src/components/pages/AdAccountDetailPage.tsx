@@ -576,11 +576,18 @@ export default function AdAccountDetailPage() {
                     {limitData ? (
                       <>
                         <div className="text-2xl font-bold mt-1">
-                          {formatMetaMoney(limitData.daily_spend_limit, limitData.currency)}
+                          {formatMetaMoney(limitData.daily_spend_limit, limitData.daily_spend_limit_currency || limitData.currency)}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                           {(limitData.daily_spend_limit ?? 0) > 0
-                            ? <span>Meta-set per day limit</span>
+                            ? (
+                              <span>
+                                Daily Spending Limit
+                                {limitData.daily_spend_limit_synced_at && (
+                                  <> · synced {formatDistanceToNow(new Date(limitData.daily_spend_limit_synced_at), { addSuffix: true })}</>
+                                )}
+                              </span>
+                            )
                             : <span>{limitData.unavailable_reason || "Daily limit is not exposed by Meta for this account"}</span>}
                           <span>·</span>
                           <span>Fetched {formatDistanceToNow(new Date(limitData.fetched_at), { addSuffix: true })}</span>
@@ -616,7 +623,15 @@ export default function AdAccountDetailPage() {
                       </>
                     ) : (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Fetch the latest supported account limit data directly from Meta (via proxy IP).
+                        Click Refresh to load Daily Spending Limit and balance/spend data.
+                      </div>
+                    )}
+                    {isAdmin && (
+                      <div className="text-[11px] text-muted-foreground mt-2">
+                        Daily Spending Limit comes from the Chrome extension.{" "}
+                        <a href="/dsl-sync-extension.zip" download className="underline text-primary">
+                          Download extension
+                        </a>
                       </div>
                     )}
                   </div>
