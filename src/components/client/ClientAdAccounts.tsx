@@ -651,6 +651,11 @@ export function ClientAdAccounts() {
           </Button>
         </div>
       </div>
+      {lastSyncCalls !== null && (
+        <div className="text-xs text-muted-foreground -mt-2">
+          Last sync used <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
