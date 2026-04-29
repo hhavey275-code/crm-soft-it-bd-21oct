@@ -288,6 +288,19 @@ export default function ClientSpendReportPage() {
                 </PopoverContent>
               </Popover>
 
+              {!isAllTime && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchMeta()}
+                  disabled={metaFetching}
+                  className="gap-1"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", metaFetching && "animate-spin")} />
+                  <span className="text-xs">Update</span>
+                </Button>
+              )}
+
               <div className="flex items-center gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Total Spend</p>
