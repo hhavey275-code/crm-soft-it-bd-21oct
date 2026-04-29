@@ -529,6 +529,68 @@ export default function AdAccountDetailPage() {
           />
         </div>
 
+        {/* === Daily Spending Limit (on-demand Meta fetch) === */}
+        {!isTikTok && (
+          <Card className="border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Gauge className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">Daily Spending Limit</div>
+                    {limitData ? (
+                      <>
+                        <div className="text-2xl font-bold mt-1">
+                          {limitData.daily_spend_limit > 0
+                            ? `${limitData.currency === "USD" ? "$" : ""}${limitData.daily_spend_limit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${limitData.currency !== "USD" ? ` ${limitData.currency}` : ""}`
+                            : "—"}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {limitData.daily_spend_limit > 0
+                            ? <span>Meta-set per day limit</span>
+                            : <span>Not set by Meta for this account</span>}
+                          <span>·</span>
+                          <span>Fetched {formatDistanceToNow(new Date(limitData.fetched_at), { addSuffix: true })}</span>
+                          {limitData.ip && (
+                            <>
+                              <span>·</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Globe className="h-3 w-3" />
+                                IP: <code className="text-[11px]">{limitData.ip}</code>
+                                {limitData.via === "proxy" && <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">proxy</Badge>}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Click the button to fetch the latest daily spending limit directly from Meta (via proxy IP).
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={limitData ? "outline" : "default"}
+                  onClick={fetchLimits}
+                  disabled={limitLoading}
+                  className="shrink-0"
+                >
+                  {limitLoading ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Gauge className="h-4 w-4 mr-2" />
+                  )}
+                  {limitLoading ? "Fetching..." : limitData ? "Refresh Limit" : "Check Limit"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-start gap-3">
