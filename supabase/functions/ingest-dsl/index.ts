@@ -20,6 +20,14 @@ type DslRow = {
   currency?: string;
 };
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -75,11 +83,15 @@ Deno.serve(async (req: Request) => {
     // "act_<id>" but the extension sends bare "<id>". Query both forms.
     const bareIds = Array.from(incomingMap.keys());
     const prefixedIds = bareIds.map((k) => `act_${k}`);
-    const { data: existing, error: lookupErr } = await supabase
-      .from("ad_accounts")
-      .select("id, account_id, platform")
-      .in("account_id", [...bareIds, ...prefixedIds]);
-    if (lookupErr) return json({ error: lookupErr.message }, 500);
+    const existing: any[] = [];
+    for (const idChunk of chunk([...bareIds, ...prefixedIds], 80)) {
+      const { data, error: lookupErr } = await supabase
+        .from("ad_accounts")
+        .select("id, account_id, platform")
+        .in("account_id", idChunk);
+      if (lookupErr) return json({ error: lookupErr.message }, 500);
+      existing.push(...(data ?? []));
+    }
 
     const now = new Date().toISOString();
     const updates: any[] = [];
@@ -105,10 +117,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (updates.length > 0) {
-      const { error: upsertErr } = await supabase
-        .from("ad_account_insights")
-        .upsert(updates, { onConflict: "ad_account_id" });
-      if (upsertErr) return json({ error: upsertErr.message }, 500);
+      for (const updateChunk of chunk(updates, 100)) {
+        const { error: upsertErr } = await supabase
+          .from("ad_account_insights")
+          .upsert(updateChunk, { onConflict: "ad_account_id" });
+        if (upsertErr) return json({ error: upsertErr.message }, 500);
+      }
     }
 
     return json({
