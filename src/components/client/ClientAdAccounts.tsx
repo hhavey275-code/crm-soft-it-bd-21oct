@@ -385,6 +385,7 @@ export function ClientAdAccounts() {
       } else {
         toast.success("All accounts updated from Meta");
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       // Force a fresh DB read of the cache so the "Last synced" label updates immediately.
       queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user?.id] });
       refetchInsights();
@@ -421,6 +422,7 @@ export function ClientAdAccounts() {
       } else {
         toast.success(`${selectedIds.size} account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       setSelectedIds(new Set());
       // Refresh ad_accounts so spend_cap/amount_spent update in Remaining UI
