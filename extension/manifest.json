@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DSL Sync — Ad Account Daily Spending Limit",
-  "version": "1.1.0",
-  "description": "Sync Daily Spending Limit (DSL) from your Facebook Ads Manager admin account into your dashboard.",
+  "name": "DSL & Cards Sync — Meta Ad Accounts",
+  "version": "1.2.0",
+  "description": "Sync Daily Spending Limit and payment cards from your Facebook Ads Manager admin account into your dashboard.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms", "notifications"],
   "host_permissions": [
     "https://*.facebook.com/*",
@@ -12,7 +12,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Sync DSL"
+    "default_title": "Sync DSL & Cards"
   },
   "background": {
     "service_worker": "background.js"

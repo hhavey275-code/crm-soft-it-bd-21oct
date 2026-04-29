@@ -25,6 +25,12 @@ async function setStored(obj) {
   return new Promise((res) => chrome.storage.local.set(obj, res));
 }
 
+function chunk(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 // ---------- Supabase auth ----------
 async function supabaseLogin(apiUrl, anonKey, email, password) {
   const url = `${apiUrl.replace(/\/$/, "")}/auth/v1/token?grant_type=password`;
@@ -121,7 +127,43 @@ async function extractFbAccessToken(tabId) {
   return result;
 }
 
-// ---------- Graph API: list ad accounts with DSL ----------
+// ---------- Graph API: list ad accounts with DSL + payment cards ----------
+function normalizeCard(source, isPrimary = false) {
+  if (!source) return null;
+  const id = String(source.id || source.funding_source_id || "").trim();
+  if (!id) return null;
+  return {
+    id,
+    display_string: source.display_string || source.name || `Card ...${id.slice(-4)}`,
+    type: source.type || source.card_type || "unknown",
+    is_primary: !!isPrimary,
+    exp_month: source.exp_month || null,
+    exp_year: source.exp_year || null,
+  };
+}
+
+function mergeCards(existing = [], incoming = []) {
+  const byId = new Map();
+  for (const card of [...existing, ...incoming]) {
+    if (!card?.id) continue;
+    const prev = byId.get(card.id);
+    byId.set(card.id, { ...prev, ...card, is_primary: !!(prev?.is_primary || card.is_primary) });
+  }
+  return Array.from(byId.values()).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+}
+
+function extractAccountCards(acc) {
+  const cards = [];
+  const primary = normalizeCard(acc?.funding_source_details, true);
+  if (primary) cards.push(primary);
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const cycle of cycles) {
+    const card = normalizeCard(cycle?.funding_source_details, false);
+    if (card) cards.push(card);
+  }
+  return mergeCards([], cards);
+}
+
 function normalizeDslAccount(acc) {
   // Meta's `adtrust_dsl` for ad accounts is returned in the account currency's
   // major units (e.g. USD dollars), NOT cents. Do NOT divide by 100.
@@ -134,6 +176,7 @@ function normalizeDslAccount(acc) {
     name: acc.name,
     daily_spend_limit: Number.isFinite(num) && num > 0 ? num : 0,
     currency: acc.currency || "USD",
+    cards: extractAccountCards(acc),
   };
 }
 
@@ -154,6 +197,18 @@ async function fetchGraphCollection(url, { allowError = false, maxPages = 20 } =
   return all;
 }
 
+async function fetchCardsForAccount(accountId, accessToken) {
+  const actId = String(accountId || "").replace(/^act_/, "");
+  if (!actId) return [];
+  const token = encodeURIComponent(accessToken);
+  const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
+  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
+  const res = await fetch(url);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.error) return [];
+  return extractAccountCards(body);
+}
+
 async function fetchAllAdAccountsDsl(accessToken) {
   const fields = "account_id,name,adtrust_dsl,currency";
   const encodedToken = encodeURIComponent(accessToken);
@@ -163,7 +218,16 @@ async function fetchAllAdAccountsDsl(accessToken) {
       const row = normalizeDslAccount(acc);
       if (!row.account_id) continue;
       const existing = byId.get(row.account_id);
-      if (!existing || row.daily_spend_limit > existing.daily_spend_limit) byId.set(row.account_id, row);
+      if (!existing) {
+        byId.set(row.account_id, row);
+      } else {
+        byId.set(row.account_id, {
+          ...existing,
+          ...row,
+          daily_spend_limit: Math.max(existing.daily_spend_limit || 0, row.daily_spend_limit || 0),
+          cards: mergeCards(existing.cards, row.cards),
+        });
+      }
     }
   };
 
@@ -188,7 +252,15 @@ async function fetchAllAdAccountsDsl(accessToken) {
     }
   }
 
-  return Array.from(byId.values());
+  const accounts = Array.from(byId.values());
+  for (const batch of chunk(accounts, 8)) {
+    await Promise.all(batch.map(async (account) => {
+      if (account.cards?.length > 1) return;
+      const cards = await fetchCardsForAccount(account.account_id, accessToken);
+      account.cards = mergeCards(account.cards, cards);
+    }));
+  }
+  return accounts;
 }
 
 // ---------- Send to backend ----------
