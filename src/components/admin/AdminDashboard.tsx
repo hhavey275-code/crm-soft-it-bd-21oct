@@ -665,6 +665,12 @@ export function AdminDashboard() {
                 {dateSpendCalls !== null && !dateSpendLoading && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
+                    {dateSpendProxyIp && <> · via {dateSpendProxyIp}</>}
+                  </p>
+                )}
+                {dateSpendCached && dateSpend !== null && !dateSpendLoading && dateSpendCalls === null && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    cached — click "Update" for live data
                   </p>
                 )}
               </div>
