@@ -925,49 +925,70 @@ Deno.serve(async (req)=>{
     const rateLimited = [];
     const adAccountUpdates = [];
     const syncErrors = {};
-    // Process in small batches with delay to avoid Meta rate limits
-    const accountBatches = chunk(accounts ?? [], META_BATCH_SIZE);
+    // Multi-account batching: pack 10 accounts (~40-50 sub-requests) into a single
+    // Meta `?batch=` POST. Group by access token first (Meta requires one token per
+    // batch). Process batches with limited concurrency. 320 accounts → ~32 HTTP calls.
+    const allAccounts = accounts ?? [];
+    // Decrypt + group accounts by token
+    const tokenGroups = new Map<string, any[]>();
+    const skippedAccounts: any[] = [];
+    const decryptCache = new Map<string, string>();
+    for (const acc of allAccounts) {
+      const rawTok = acc.business_managers?.access_token;
+      if (!rawTok) { skippedAccounts.push(acc); continue; }
+      let plain = decryptCache.get(rawTok);
+      if (!plain) {
+        try {
+          plain = await decryptToken(rawTok, serviceKey);
+          decryptCache.set(rawTok, plain);
+        } catch {
+          skippedAccounts.push(acc);
+          continue;
+        }
+      }
+      if (!tokenGroups.has(plain)) tokenGroups.set(plain, []);
+      tokenGroups.get(plain)!.push(acc);
+    }
+    // Skipped accounts → empty insight + sync error
+    for (const acc of skippedAccounts) {
+      insights[acc.id] = { ...EMPTY_INSIGHT };
+      syncErrors[acc.id] = "missing or undecryptable BM token";
+    }
+    // Build the list of (token, accountsBatch) tasks. Each task = ONE Meta HTTP call.
+    // Pack: 10 accounts × ~5 sub-req = 50 sub-req per batch (Meta hard limit).
+    const ACCS_PER_BATCH = 10;
+    type BatchTask = { token: string; accs: any[] };
+    const tasks: BatchTask[] = [];
+    for (const [token, accs] of tokenGroups.entries()) {
+      for (let i = 0; i < accs.length; i += ACCS_PER_BATCH) {
+        tasks.push({ token, accs: accs.slice(i, i + ACCS_PER_BATCH) });
+      }
+    }
     let hitRateLimit = false;
-    console.log(`Processing ${accounts?.length ?? 0} accounts in ${accountBatches.length} batches of ${META_BATCH_SIZE}`);
-    for(let i = 0; i < accountBatches.length; i++){
-      const batch = accountBatches[i];
-      // If we already hit a rate limit, skip remaining Meta calls and return empty
-      if (hitRateLimit) {
-        for (const account of batch){
-          insights[account.id] = {
-            today_spend: 0,
-            yesterday_spend: 0,
-            today_orders: 0,
-            yesterday_orders: 0,
-            active_campaigns: 0,
-            today_messages: 0,
-            yesterday_messages: 0,
-            balance: 0,
-            daily_spend_limit: 0,
-            billing_threshold: 0,
-            cards: []
-          };
-        }
-        continue;
-      }
-      // Process batch concurrently (small batch = safe)
-      const results = await Promise.all(batch.map((account)=>processAccount(account, serviceKey, date, date_from, date_to)));
-      for (const result of results){
-        insights[result.id] = result.insight;
-        if (result.rateLimit) {
-          rateLimited.push(result.rateLimit);
-          hitRateLimit = true;
-        }
-        if (result.adAccountUpdate) {
-          adAccountUpdates.push(result.adAccountUpdate);
-        }
-        if (result.syncError) {
-          syncErrors[result.id] = result.syncError;
+    console.log(`Processing ${allAccounts.length} accounts as ${tasks.length} batched Meta call(s) (${tokenGroups.size} token group[s])`);
+    // Run with limited concurrency (4 parallel HTTP calls)
+    const CONCURRENCY = 4;
+    let nextIdx = 0;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, async () => {
+      while (true) {
+        if (hitRateLimit) return;
+        const i = nextIdx++;
+        if (i >= tasks.length) return;
+        const task = tasks[i];
+        const results = await processAccountsBatched(task.accs, task.token, date, date_from, date_to);
+        for (const result of results) {
+          insights[result.id] = result.insight;
+          if (result.rateLimit) { rateLimited.push(result.rateLimit); hitRateLimit = true; }
+          if (result.adAccountUpdate) adAccountUpdates.push(result.adAccountUpdate);
+          if (result.syncError) syncErrors[result.id] = result.syncError;
         }
       }
-      // Add delay between batches (skip after last batch)
-      if (i < accountBatches.length - 1 && !hitRateLimit) {
-        await delay(META_BATCH_DELAY_MS);
+    });
+    await Promise.all(workers);
+    // For any accounts skipped due to early rate-limit, set empty insight
+    for (const acc of allAccounts) {
+      if (!(acc.id in insights)) {
+        insights[acc.id] = { ...EMPTY_INSIGHT };
       }
     }
     // Upsert all insights into DB (only for non-date queries)
