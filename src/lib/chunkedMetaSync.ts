@@ -24,11 +24,12 @@ export async function chunkedMetaSync(
     date_to?: string;
     onProgress?: (synced: number, total: number) => void;
   }
-): Promise<{ insights: Record<string, any>; rate_limited: any[]; failed_account_ids: string[]; failed_chunks: number }> {
+): Promise<{ insights: Record<string, any>; rate_limited: any[]; failed_account_ids: string[]; failed_chunks: number; meta_calls: number }> {
   const allInsights: Record<string, any> = {};
   const allRateLimited: any[] = [];
   const failedAccountIds: string[] = [];
   let failedChunks = 0;
+  let metaCalls = 0;
   const total = ids.length;
 
   for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
@@ -59,6 +60,7 @@ export async function chunkedMetaSync(
             if (retry.error) throw retry.error;
             if (retry.data?.insights) Object.assign(allInsights, retry.data.insights);
             if (retry.data?.rate_limited?.length) allRateLimited.push(...retry.data.rate_limited);
+            if (retry.data?.meta_calls?.total) metaCalls += Number(retry.data.meta_calls.total) || 0;
             success = true;
             break;
           }
@@ -68,6 +70,7 @@ export async function chunkedMetaSync(
 
         if (data?.insights) Object.assign(allInsights, data.insights);
         if (data?.rate_limited?.length) allRateLimited.push(...data.rate_limited);
+        if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
         success = true;
         break;
       } catch (err: any) {
@@ -90,5 +93,5 @@ export async function chunkedMetaSync(
     }
   }
 
-  return { insights: allInsights, rate_limited: allRateLimited, failed_account_ids: failedAccountIds, failed_chunks: failedChunks };
+  return { insights: allInsights, rate_limited: allRateLimited, failed_account_ids: failedAccountIds, failed_chunks: failedChunks, meta_calls: metaCalls };
 }

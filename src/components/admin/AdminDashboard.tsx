@@ -55,6 +55,8 @@ export function AdminDashboard() {
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
   const [monthSyncLoading, setMonthSyncLoading] = useState(false);
   const [graphMonth, setGraphMonth] = useState(new Date());
+  const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
+  const [dateSpendCalls, setDateSpendCalls] = useState<number | null>(null);
   const [tenantTestMode, setTenantTestMode] = useState(() => {
     try { return localStorage.getItem("tenant_test_mode") === "true"; } catch { return false; }
   });
@@ -380,6 +382,7 @@ export function AdminDashboard() {
       // Daily breakdown isn't needed for the date-range card — the monthly
       // chart has its own dedicated sync button (handleSyncMonthSpend).
       setDateSpend(total);
+      setDateSpendCalls(result.meta_calls ?? null);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
         dateFrom: dateRange.from.toISOString(),
@@ -409,6 +412,7 @@ export function AdminDashboard() {
       if (result.rate_limited.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
       }
+      setMonthSyncCalls(result.meta_calls ?? null);
 
       // Aggregate per-day spend across all accounts for the chart bars
       const dailyMap: Record<string, number> = {};
@@ -650,6 +654,11 @@ export function AdminDashboard() {
                       ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                 </p>
+                {dateSpendCalls !== null && !dateSpendLoading && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -683,6 +692,11 @@ export function AdminDashboard() {
               </Button>
             </span>
           </CardTitle>
+          {monthSyncCalls !== null && !monthSyncLoading && (
+            <p className="text-[10px] text-muted-foreground">
+              Last sync used <span className="font-semibold text-foreground">{monthSyncCalls}</span> Meta API call{monthSyncCalls === 1 ? "" : "s"}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {!monthlySpendData?.length ? (

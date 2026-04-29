@@ -94,6 +94,7 @@ export function AdminAdAccounts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
+  const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
@@ -271,6 +272,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${assignedAccounts.length} assigned account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       // Record the time of this full sync — header timestamp updates only here
       const now = Date.now();
       writeLastFullSync(now);
@@ -302,6 +304,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${unassignedAccounts.length} inventory account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
@@ -325,6 +328,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${selectedIds.size} account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
@@ -608,6 +612,11 @@ export function AdminAdAccounts() {
           )}
         </div>
       </div>
+      {lastSyncCalls !== null && (
+        <div className="text-xs text-muted-foreground -mt-2">
+          Last sync used <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+        </div>
+      )}
 
       {/* View tabs: Active vs Inventory vs Unused */}
       <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as "active" | "inventory" | "unused")}>

@@ -17,8 +17,9 @@ export async function fetchSpendOnly(
   daily: Record<string, { date: string; spend: number }[]>;
   rate_limited: string[];
   total: number;
+  meta_calls: number;
 }> {
-  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], total: 0 };
+  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], total: 0, meta_calls: 0 };
 
   // Internal chunking — keep payloads small even though the edge function
   // groups by BM internally. 500 ids per invocation is well within limits.
@@ -26,6 +27,7 @@ export async function fetchSpendOnly(
   const merged: Record<string, number> = {};
   const mergedDaily: Record<string, { date: string; spend: number }[]> = {};
   const allRate: string[] = [];
+  let metaCalls = 0;
 
   for (let i = 0; i < ids.length; i += CHUNK) {
     const slice = ids.slice(i, i + CHUNK);
@@ -38,10 +40,11 @@ export async function fetchSpendOnly(
     if (data?.spend) Object.assign(merged, data.spend);
     if (data?.daily) Object.assign(mergedDaily, data.daily);
     if (Array.isArray(data?.rate_limited)) allRate.push(...data.rate_limited);
+    if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
   }
 
   const total =
     Math.round(Object.values(merged).reduce((s, v) => s + (Number(v) || 0), 0) * 100) / 100;
 
-  return { spend: merged, daily: mergedDaily, rate_limited: allRate, total };
+  return { spend: merged, daily: mergedDaily, rate_limited: allRate, total, meta_calls: metaCalls };
 }

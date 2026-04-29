@@ -37,6 +37,7 @@ export default function ClientSpendReportPage() {
   const [selectedPreset, setSelectedPreset] = useState("All Time");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
+  const [metaCalls, setMetaCalls] = useState<number | null>(null);
 
   const isAllTime = selectedPreset === "All Time" && !dateRange;
   const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
@@ -97,10 +98,11 @@ export default function ClientSpendReportPage() {
       const allAccountIds = [...new Set(userAccounts.map((ua: any) => ua.ad_account_id))];
 
       // Lightweight spend-only batch fetch (Meta Batch API: ~50 accounts per HTTP call)
-      const { spend: accountSpend } = await fetchSpendOnly(allAccountIds, {
+      const { spend: accountSpend, meta_calls } = await fetchSpendOnly(allAccountIds, {
         date_from: fromStr,
         date_to: toStr,
       });
+      setMetaCalls(meta_calls ?? 0);
 
       // Aggregate per user
       return Object.entries(userAccountMap).map(([userId, accIds]) => ({
@@ -242,6 +244,12 @@ export default function ClientSpendReportPage() {
                   <p className="text-xs text-muted-foreground">Clients</p>
                   <p className="text-lg font-bold">{aggregated.length}</p>
                 </div>
+                {!isAllTime && metaCalls !== null && !isLoading && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Meta API calls</p>
+                    <p className="text-lg font-bold">{metaCalls}</p>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>

@@ -52,6 +52,7 @@ export function ClientAdAccounts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
+  const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -384,6 +385,7 @@ export function ClientAdAccounts() {
       } else {
         toast.success("All accounts updated from Meta");
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       // Force a fresh DB read of the cache so the "Last synced" label updates immediately.
       queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user?.id] });
       refetchInsights();
@@ -420,6 +422,7 @@ export function ClientAdAccounts() {
       } else {
         toast.success(`${selectedIds.size} account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       setSelectedIds(new Set());
       // Refresh ad_accounts so spend_cap/amount_spent update in Remaining UI
@@ -648,6 +651,11 @@ export function ClientAdAccounts() {
           </Button>
         </div>
       </div>
+      {lastSyncCalls !== null && (
+        <div className="text-xs text-muted-foreground -mt-2">
+          Last sync used <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">

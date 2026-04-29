@@ -1120,6 +1120,11 @@ Deno.serve(async (req)=>{
       rate_limited: rateLimited,
       via: getLastMetaVia(),
       proxy_ip: getLastMetaIp(),
+      meta_calls: {
+        proxy: getMetaProxyCount(),
+        direct: getMetaDirectCount(),
+        total: getMetaProxyCount() + getMetaDirectCount(),
+      },
     }), {
       headers: {
         ...corsHeaders,
