@@ -24,6 +24,21 @@ import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdt
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
+import {
+  getMonthBucket,
+  isSameMonth,
+  monthLabel,
+  prevMonth,
+  filterMonth,
+  aggregateMonth,
+  computeRunningWithOpening,
+  closeMonth as closeMonthApi,
+  reopenMonth as reopenMonthApi,
+  type MonthBucket,
+  type MonthlyClosing,
+} from "@/lib/sellerMonthlyClose";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, Unlock } from "lucide-react";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
