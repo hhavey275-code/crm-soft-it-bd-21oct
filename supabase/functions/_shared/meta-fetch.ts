@@ -90,7 +90,12 @@ export async function metaFetch(
   }
 
   const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
-  const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
+  const rawProxyUrl = (Deno.env.get("META_PROXY_URL") || "").trim();
+  // Guard against placeholder / invalid secret values that would otherwise
+  // make every Meta call fail with "Invalid URL". Fall back to the default.
+  const isValidProxyUrl =
+    rawProxyUrl.startsWith("http://") || rawProxyUrl.startsWith("https://");
+  const proxyUrl = isValidProxyUrl ? rawProxyUrl : DEFAULT_META_PROXY_URL;
   // Strict mode: when the proxy secret is set, FAIL the call rather than
   // silently falling back to the direct (Worker) IP. This protects accounts
   // from sudden IP rotation that Facebook may flag. Disable explicitly by
