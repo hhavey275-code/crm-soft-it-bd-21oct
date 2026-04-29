@@ -845,9 +845,11 @@ export function AdminDashboard() {
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="text-xs gap-1">
                       <CalendarIcon className="h-3 w-3" />
-                      {topSpenderRange?.from && topSpenderRange?.to
-                        ? `${format(topSpenderRange.from, "MMM d")} – ${format(topSpenderRange.to, "MMM d")}`
-                        : "All Time"}
+                      {topSpenderPreset
+                        ? topSpenderPreset
+                        : topSpenderRange?.from && topSpenderRange?.to
+                          ? `${format(topSpenderRange.from, "MMM d")} – ${format(topSpenderRange.to, "MMM d")}`
+                          : "Pick range"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end" side="bottom">
@@ -855,20 +857,12 @@ export function AdminDashboard() {
                       <div className="space-y-0.5">
                         <RadioGroup value={topSpenderPreset} onValueChange={(val) => {
                           setTopSpenderPreset(val);
-                          if (val === "all") {
-                            setTopSpenderRange(undefined);
-                          } else {
-                            const preset = DATE_PRESETS.find(p => p.label === val);
-                            if (preset) {
-                              const range = preset.getValue();
-                              setTopSpenderRange({ from: range.from, to: range.to });
-                            }
+                          const preset = DATE_PRESETS.find(p => p.label === val);
+                          if (preset) {
+                            const range = preset.getValue();
+                            setTopSpenderRange({ from: range.from, to: range.to });
                           }
                         }} className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                          <div className="flex items-center space-x-1.5">
-                            <RadioGroupItem value="all" id="ts-all" className="h-3 w-3" />
-                            <Label htmlFor="ts-all" className="text-xs cursor-pointer font-normal">All Time</Label>
-                          </div>
                           {DATE_PRESETS.map((preset) => (
                             <div key={preset.label} className="flex items-center space-x-1.5">
                               <RadioGroupItem value={preset.label} id={`ts-${preset.label}`} className="h-3 w-3" />
@@ -891,23 +885,29 @@ export function AdminDashboard() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <Button variant="outline" size="sm" onClick={handleUpdateFromMeta} disabled={metaLoading} className="text-xs">
-                  <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
-                  {metaLoading ? "..." : "Meta"}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUpdateTopSpenders}
+                  disabled={topSpenderFetching || !topSpenderFromStr || !topSpenderToStr}
+                  className="text-xs gap-1"
+                >
+                  <RefreshCw className={cn("h-3 w-3", topSpenderFetching && "animate-spin")} />
+                  {topSpenderFetching ? "..." : "Update"}
                 </Button>
-                {metaSyncStatus && (
-                  <span className={`text-[10px] ml-1 ${metaSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                    {metaSyncStatus.success}/{metaSyncStatus.total}
-                    {metaSyncStatus.failed > 0 && ` · ${metaSyncStatus.failed} fail`}
-                    {metaSyncStatus.failed === 0 && metaSyncStatus.autoRetried > 0 && ` · ${metaSyncStatus.autoRetried} retried`}
-                  </span>
-                )}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {topThree.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No spending data yet</p>
+            {topSpenderFetching ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Fetching live data from Meta...
+              </div>
+            ) : topThree.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                {topSpenderSnapshot ? "No spending data for this range" : "Pick a date range and click Update to fetch."}
+              </p>
             ) : (
               <div className="space-y-3 md:space-y-4">
                 {topThree.map((spender, i) => {
@@ -934,6 +934,18 @@ export function AdminDashboard() {
                     </div>
                   );
                 })}
+                {topSpenderSnapshot && (
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Meta API calls: {topSpenderSnapshot.meta_calls}
+                    {topSpenderSnapshot.proxy_ip ? ` • via ${topSpenderSnapshot.proxy_ip}` : ""}
+                    {` • updated ${format(new Date(topSpenderSnapshot.fetched_at), "MMM d, HH:mm")}`}
+                  </p>
+                )}
+                {topSpenderSnapshot && !topSpenderRangeMatchesSnapshot && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                    Showing data for {format(new Date(topSpenderSnapshot.from), "MMM d, yyyy")} – {format(new Date(topSpenderSnapshot.to), "MMM d, yyyy")}. Click <b>Update</b> for the new range.
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
