@@ -902,6 +902,10 @@ export function AdminBusinessManagers() {
                           <ShieldCheck className={cn("mr-2 h-4 w-4", checkingPermBmId === bm.id && "animate-spin")} />
                           Check Permission
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setInviteDialogBm({ id: bm.id, name: bm.name })}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Invite User
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setRecoveryDialogBmId(bm.id)} className="text-destructive focus:text-destructive">
                           <ShieldAlert className="mr-2 h-4 w-4" />
                           Silent Recovery
