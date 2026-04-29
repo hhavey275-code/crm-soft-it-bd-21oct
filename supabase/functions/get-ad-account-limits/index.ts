@@ -115,9 +115,11 @@ Deno.serve(async (req: Request) => {
     const actId = (account as any).account_id as string;
 
     // --- Meta call (proxy via metaFetch) ---
-    // Meta removed the old adtrust_dsl field from current Marketing API versions.
-    // Request only supported fields so the button returns useful account-limit data instead of #100.
-    const url = `https://graph.facebook.com/v23.0/${actId}?fields=min_daily_budget,currency,balance,spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`;
+    // adtrust_dsl (Meta-imposed Daily Spending Limit) is only exposed on older
+    // Graph API versions. v19.0 still returns it for accounts that have one.
+    // Newer (v20+) versions silently dropped this field.
+    const fields = "adtrust_dsl,min_daily_budget,currency,balance,spend_cap,amount_spent";
+    const url = `https://graph.facebook.com/v19.0/${actId}?fields=${fields}&access_token=${encodeURIComponent(bmToken)}`;
     const res = await metaFetch(url, { method: "GET" });
     const body = await res.json().catch(() => ({}));
 
@@ -134,7 +136,7 @@ Deno.serve(async (req: Request) => {
       }, 502);
     }
 
-    const dailySpendLimit = null;
+    const dailySpendLimit = normalizeAmount(body?.adtrust_dsl);
     const minDailyBudget = normalizeAmount(body?.min_daily_budget);
     const currency = body?.currency || "USD";
     const balance = normalizeAmount(body?.balance);
@@ -144,9 +146,12 @@ Deno.serve(async (req: Request) => {
     return json({
       ok: true,
       data: {
-        daily_spend_limit: dailySpendLimit,
-        daily_spend_limit_available: false,
-        unavailable_reason: "Meta no longer exposes the old daily spending limit field through the current Marketing API.",
+        daily_spend_limit: dailySpendLimit > 0 ? dailySpendLimit : null,
+        daily_spend_limit_available: dailySpendLimit > 0,
+        unavailable_reason: dailySpendLimit > 0
+          ? null
+          : "Meta has not set a daily spending limit on this ad account, or the account is on monthly invoicing.",
+        raw_adtrust_dsl: body?.adtrust_dsl ?? null,
         min_daily_budget: minDailyBudget,
         currency,
         balance,
