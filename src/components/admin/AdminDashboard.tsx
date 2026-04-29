@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
 
 
 const DATE_PRESETS = [
