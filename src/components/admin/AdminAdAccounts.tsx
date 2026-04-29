@@ -819,6 +819,34 @@ export function AdminAdAccounts() {
         </Button>
       </div>
 
+      {lastBillingVisit && (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <button
+            type="button"
+            onClick={handleJumpToLastBilling}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary hover:bg-primary/20 transition-colors"
+            title="Scroll to the last ad account whose billing you opened"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="font-medium">Last billing:</span>
+            <span className="truncate max-w-[180px]">{lastBillingVisit.accountName}</span>
+            <span className="text-muted-foreground">· {formatVisitAge(lastBillingVisit.visitedAt)}</span>
+          </button>
+          {billingVisits.length > 1 && (
+            <span className="text-muted-foreground">
+              +{billingVisits.length - 1} more recent
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearBillingVisits}
+            className="text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Mobile Card Layout */}
       {isMobile ? (
         <div className="space-y-3">
