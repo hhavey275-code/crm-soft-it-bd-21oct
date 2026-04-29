@@ -403,21 +403,18 @@ export function AdminDashboard() {
       const monthEnd = min([endOfMonth(graphMonth), new Date()]);
       const fromStr = format(monthStart, "yyyy-MM-dd");
       const toStr = format(monthEnd, "yyyy-MM-dd");
-      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-      const result = await chunkedMetaSync(ids, { date_from: fromStr, date_to: toStr });
-      if (result.rate_limited?.length) {
+      // Lightweight batch call — only `spend` field, ~50 accounts per HTTP request.
+      const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
+      const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
+      if (result.rate_limited.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
       }
-      const insights = result.insights ?? {};
 
+      // Aggregate per-day spend across all accounts for the chart bars
       const dailyMap: Record<string, number> = {};
-      Object.values(insights).forEach((ins: any) => {
-        if (ins?.daily_breakdown && Array.isArray(ins.daily_breakdown)) {
-          for (const day of ins.daily_breakdown) {
-            if (day.date) {
-              dailyMap[day.date] = (dailyMap[day.date] || 0) + (Number(day.spend) || 0);
-            }
-          }
+      Object.values(result.daily).forEach((days) => {
+        for (const d of days) {
+          if (d?.date) dailyMap[d.date] = (dailyMap[d.date] || 0) + (Number(d.spend) || 0);
         }
       });
 
