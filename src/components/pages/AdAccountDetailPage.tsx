@@ -53,6 +53,40 @@ export default function AdAccountDetailPage() {
   const [showExternalTopUp, setShowExternalTopUp] = useState(false);
   const [showSilentRecovery, setShowSilentRecovery] = useState(false);
 
+  // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
+  const [limitData, setLimitData] = useState<{
+    daily_spend_limit: number;
+    currency: string;
+    fetched_at: string;
+    via?: string;
+    ip?: string | null;
+  } | null>(null);
+  const [limitLoading, setLimitLoading] = useState(false);
+
+  const fetchLimits = async () => {
+    if (!id) return;
+    setLimitLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("get-ad-account-limits", {
+        body: { ad_account_id: id },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Failed to fetch limit");
+      setLimitData({
+        daily_spend_limit: data.data.daily_spend_limit ?? 0,
+        currency: data.data.currency || "USD",
+        fetched_at: data.data.fetched_at,
+        via: data.meta?.via,
+        ip: data.meta?.ip ?? null,
+      });
+      toast.success("Daily limit refreshed from Meta");
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err) || "Failed to fetch daily limit");
+    } finally {
+      setLimitLoading(false);
+    }
+  };
+
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
     queryFn: async () => {
