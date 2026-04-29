@@ -799,31 +799,89 @@ export function AdminBusinessManagers() {
                       )}
                     </div>
                   </div>
-                  {/* Mobile action buttons - icon only */}
-                  <div className="flex items-center gap-1.5 pl-6" onClick={(e) => e.stopPropagation()}>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => {
-                      setEditBmId(bm.id); setEditName(bm.name); setEditMetaId(bm.bm_id); setEditAccessToken(""); setEditOpen(true);
-                    }}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteBmId(bm.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setShowLogs(isShowingLogs ? null : bm.id)}>
-                      <Clock className="h-3 w-3" />
-                    </Button>
+                  {/* Recovery / status badges (mobile) */}
+                  <div className="flex items-center gap-1.5 pl-6 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    {bm.recovery_ready === true ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+                        <ShieldCheck className="h-2.5 w-2.5" /> Ready
+                      </span>
+                    ) : bm.recovery_ready === false ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                        <ShieldAlert className="h-2.5 w-2.5" /> Need Admin
+                      </span>
+                    ) : null}
+                  </div>
+                  {/* Mobile action buttons */}
+                  <div className="flex items-center gap-1.5 pl-6 flex-wrap" onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 w-7 p-0"
+                      className="h-7 px-2 text-[11px]"
                       onClick={() => syncMutation.mutate(bm.id)}
                       disabled={syncMutation.isPending}
                     >
-                      <RefreshCw className={cn("h-3 w-3", syncingBmId === bm.id && syncMutation.isPending && "animate-spin")} />
+                      <RefreshCw className={cn("h-3 w-3 mr-1", syncingBmId === bm.id && syncMutation.isPending && "animate-spin")} />
+                      Sync
                     </Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setRevokeSingleId(bm.id)}>
-                      <KeyRound className="h-3 w-3" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]">
+                          <MoreHorizontal className="h-3 w-3 mr-1" />
+                          More
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          disabled={checkingPermBmId === bm.id}
+                          onClick={async () => {
+                            setCheckingPermBmId(bm.id);
+                            try {
+                              const { data, error } = await supabase.functions.invoke("bm-check-admin-permission", { body: { bm_id: bm.id } });
+                              if (error) throw error;
+                              const r = data?.results?.[0];
+                              if (r?.ready) toast.success(`${bm.name}: Recovery Ready ✅`);
+                              else toast.error(`${bm.name}: ${r?.error ?? "Need admin role on token"}`);
+                              queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+                            } catch (e: any) {
+                              toast.error(e.message);
+                            } finally {
+                              setCheckingPermBmId(null);
+                            }
+                          }}
+                        >
+                          <ShieldCheck className={cn("mr-2 h-4 w-4", checkingPermBmId === bm.id && "animate-spin")} />
+                          Check Permission
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setInviteDialogBm({ id: bm.id, name: bm.name })}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Invite User
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setRecoveryDialogBmId(bm.id)} className="text-destructive focus:text-destructive">
+                          <ShieldAlert className="mr-2 h-4 w-4" />
+                          Silent Recovery
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => {
+                          setEditBmId(bm.id); setEditName(bm.name); setEditMetaId(bm.bm_id); setEditAccessToken(""); setEditOpen(true);
+                        }}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setShowLogs(isShowingLogs ? null : bm.id)}>
+                          <Clock className="mr-2 h-4 w-4" />
+                          {isShowingLogs ? "Hide Logs" : "View Logs"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setRevokeSingleId(bm.id)} className="text-destructive focus:text-destructive">
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Revoke Token
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDeleteBmId(bm.id)} className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove BM
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ) : (
