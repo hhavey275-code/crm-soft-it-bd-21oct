@@ -55,12 +55,11 @@ async function decryptToken(stored: string, secret: string): Promise<string> {
   }
 }
 
-// Meta returns money in minor units (cents). Convert if integer & big enough.
+// Meta returns these account money fields in minor units (cents).
 function normalizeAmount(raw: unknown): number {
   if (raw === null || raw === undefined) return 0;
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  // adtrust_dsl is documented in cents; balance/spend_cap are also in cents.
   return n / 100;
 }
 
@@ -116,7 +115,9 @@ Deno.serve(async (req: Request) => {
     const actId = (account as any).account_id as string;
 
     // --- Meta call (proxy via metaFetch) ---
-    const url = `https://graph.facebook.com/v23.0/${actId}?fields=adtrust_dsl,min_daily_budget,currency,balance,spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`;
+    // Meta removed the old adtrust_dsl field from current Marketing API versions.
+    // Request only supported fields so the button returns useful account-limit data instead of #100.
+    const url = `https://graph.facebook.com/v23.0/${actId}?fields=min_daily_budget,currency,balance,spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`;
     const res = await metaFetch(url, { method: "GET" });
     const body = await res.json().catch(() => ({}));
 
@@ -133,26 +134,19 @@ Deno.serve(async (req: Request) => {
       }, 502);
     }
 
-    const dailySpendLimit = normalizeAmount(body?.adtrust_dsl);
+    const dailySpendLimit = null;
     const minDailyBudget = normalizeAmount(body?.min_daily_budget);
     const currency = body?.currency || "USD";
     const balance = normalizeAmount(body?.balance);
     const spendCap = normalizeAmount(body?.spend_cap);
     const amountSpent = normalizeAmount(body?.amount_spent);
 
-    // --- Side effect: persist daily_spend_limit so future visits can show cached value ---
-    try {
-      await supabase.from("ad_accounts")
-        .update({ daily_spend_limit: dailySpendLimit })
-        .eq("id", ad_account_id);
-    } catch (_e) {
-      // non-fatal
-    }
-
     return json({
       ok: true,
       data: {
         daily_spend_limit: dailySpendLimit,
+        daily_spend_limit_available: false,
+        unavailable_reason: "Meta no longer exposes the old daily spending limit field through the current Marketing API.",
         min_daily_budget: minDailyBudget,
         currency,
         balance,

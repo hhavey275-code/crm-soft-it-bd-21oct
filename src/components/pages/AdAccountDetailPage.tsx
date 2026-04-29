@@ -55,13 +55,25 @@ export default function AdAccountDetailPage() {
 
   // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
   const [limitData, setLimitData] = useState<{
-    daily_spend_limit: number;
+    daily_spend_limit: number | null;
+    daily_spend_limit_available?: boolean;
+    unavailable_reason?: string;
+    min_daily_budget?: number;
+    balance?: number;
+    spend_cap?: number;
+    amount_spent?: number;
     currency: string;
     fetched_at: string;
     via?: string;
     ip?: string | null;
   } | null>(null);
   const [limitLoading, setLimitLoading] = useState(false);
+
+  const formatMetaMoney = (amount?: number | null, currency = "USD") => {
+    if (!amount || amount <= 0) return "—";
+    const value = amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return currency === "USD" ? `$${value}` : `${value} ${currency}`;
+  };
 
   const fetchLimits = async () => {
     if (!id) return;
@@ -83,13 +95,19 @@ export default function AdAccountDetailPage() {
         throw new Error(data?.error || "Failed to fetch daily limit");
       }
       setLimitData({
-        daily_spend_limit: data.data.daily_spend_limit ?? 0,
+        daily_spend_limit: data.data.daily_spend_limit ?? null,
+        daily_spend_limit_available: data.data.daily_spend_limit_available ?? data.data.daily_spend_limit != null,
+        unavailable_reason: data.data.unavailable_reason,
+        min_daily_budget: data.data.min_daily_budget ?? 0,
+        balance: data.data.balance ?? 0,
+        spend_cap: data.data.spend_cap ?? 0,
+        amount_spent: data.data.amount_spent ?? 0,
         currency: data.data.currency || "USD",
         fetched_at: data.data.fetched_at,
         via: data.meta?.via,
         ip: data.meta?.ip ?? null,
       });
-      toast.success("Daily limit refreshed from Meta");
+      toast.success("Meta account limit data refreshed");
     } catch (err: any) {
       const msg = err?.message || String(err ?? "");
       toast.error(msg || "Failed to fetch daily limit");
@@ -550,18 +568,16 @@ export default function AdAccountDetailPage() {
                     <Gauge className="h-5 w-5 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium">Daily Spending Limit</div>
+                    <div className="text-sm font-medium">Meta Account Limits</div>
                     {limitData ? (
                       <>
                         <div className="text-2xl font-bold mt-1">
-                          {limitData.daily_spend_limit > 0
-                            ? `${limitData.currency === "USD" ? "$" : ""}${limitData.daily_spend_limit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${limitData.currency !== "USD" ? ` ${limitData.currency}` : ""}`
-                            : "—"}
+                          {formatMetaMoney(limitData.daily_spend_limit, limitData.currency)}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                          {limitData.daily_spend_limit > 0
+                          {(limitData.daily_spend_limit ?? 0) > 0
                             ? <span>Meta-set per day limit</span>
-                            : <span>Not set by Meta for this account</span>}
+                            : <span>{limitData.unavailable_reason || "Daily limit is not exposed by Meta for this account"}</span>}
                           <span>·</span>
                           <span>Fetched {formatDistanceToNow(new Date(limitData.fetched_at), { addSuffix: true })}</span>
                           {limitData.ip && (
@@ -575,10 +591,28 @@ export default function AdAccountDetailPage() {
                             </>
                           )}
                         </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <div className="text-muted-foreground">Spend Cap</div>
+                            <div className="font-semibold">{formatMetaMoney(limitData.spend_cap, limitData.currency)}</div>
+                          </div>
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <div className="text-muted-foreground">Amount Spent</div>
+                            <div className="font-semibold">{formatMetaMoney(limitData.amount_spent, limitData.currency)}</div>
+                          </div>
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <div className="text-muted-foreground">Balance</div>
+                            <div className="font-semibold">{formatMetaMoney(limitData.balance, limitData.currency)}</div>
+                          </div>
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <div className="text-muted-foreground">Min Daily Budget</div>
+                            <div className="font-semibold">{formatMetaMoney(limitData.min_daily_budget, limitData.currency)}</div>
+                          </div>
+                        </div>
                       </>
                     ) : (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Click the button to fetch the latest daily spending limit directly from Meta (via proxy IP).
+                        Fetch the latest supported account limit data directly from Meta (via proxy IP).
                       </div>
                     )}
                   </div>
