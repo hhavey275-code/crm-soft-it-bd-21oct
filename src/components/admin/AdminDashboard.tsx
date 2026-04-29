@@ -382,6 +382,7 @@ export function AdminDashboard() {
       // Daily breakdown isn't needed for the date-range card — the monthly
       // chart has its own dedicated sync button (handleSyncMonthSpend).
       setDateSpend(total);
+      setDateSpendCalls(result.meta_calls ?? null);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
         dateFrom: dateRange.from.toISOString(),
