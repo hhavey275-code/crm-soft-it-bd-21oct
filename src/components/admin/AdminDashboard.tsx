@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
 
 
 const DATE_PRESETS = [
@@ -221,81 +222,111 @@ export function AdminDashboard() {
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const remainingLimit = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
-  // Top Spenders date filtering
-  const [topSpenderRange, setTopSpenderRange] = useState<DateRange | undefined>(undefined);
-  const [topSpenderPreset, setTopSpenderPreset] = useState<string>("");
+  // Top Spenders — proxy-based live fetch (Spend Report style), persisted snapshot.
+  type TopSpenderSnapshot = {
+    from: string;
+    to: string;
+    rows: { user_id: string; total: number }[];
+    meta_calls: number;
+    proxy_ip: string | null;
+    fetched_at: string;
+  };
+  const TOP_SPENDER_STORAGE_KEY = "admin-dashboard-top-spenders:v1";
+  const [topSpenderSnapshot, setTopSpenderSnapshot] = useState<TopSpenderSnapshot | null>(() => {
+    try {
+      const raw = localStorage.getItem(TOP_SPENDER_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as TopSpenderSnapshot) : null;
+    } catch { return null; }
+  });
+  const [topSpenderRange, setTopSpenderRange] = useState<DateRange | undefined>(() => {
+    try {
+      const raw = localStorage.getItem(TOP_SPENDER_STORAGE_KEY);
+      if (raw) {
+        const snap = JSON.parse(raw) as TopSpenderSnapshot;
+        return { from: new Date(snap.from), to: new Date(snap.to) };
+      }
+    } catch { /* ignore */ }
+    return { from: startOfMonth(new Date()), to: new Date() };
+  });
+  const [topSpenderPreset, setTopSpenderPreset] = useState<string>(() => {
+    try {
+      return localStorage.getItem(TOP_SPENDER_STORAGE_KEY) ? "" : "This month";
+    } catch { return "This month"; }
+  });
   const [topSpenderPickerOpen, setTopSpenderPickerOpen] = useState(false);
+  const [topSpenderFetching, setTopSpenderFetching] = useState(false);
 
   const topSpenderFromStr = topSpenderRange?.from ? format(topSpenderRange.from, "yyyy-MM-dd") : null;
   const topSpenderToStr = topSpenderRange?.to ? format(topSpenderRange.to, "yyyy-MM-dd") : null;
+  const topSpenderRangeMatchesSnapshot = !!topSpenderSnapshot &&
+    topSpenderFromStr === topSpenderSnapshot.from &&
+    topSpenderToStr === topSpenderSnapshot.to;
 
-  const { data: topSpenderStats } = useQuery({
-    queryKey: ["top-spender-stats", topSpenderFromStr, topSpenderToStr],
-    queryFn: async () => {
-      if (!topSpenderFromStr || !topSpenderToStr) return null;
-      const { data } = await (supabase as any)
-        .from("client_daily_stats")
-        .select("user_id, total_spend")
-        .gte("stat_date", topSpenderFromStr)
-        .lte("stat_date", topSpenderToStr);
-      return (data as any[]) ?? [];
-    },
-    enabled: !!topSpenderFromStr && !!topSpenderToStr,
-    staleTime: 0,
-  });
+  const handleUpdateTopSpenders = async () => {
+    if (!topSpenderFromStr || !topSpenderToStr || topSpenderFetching) return;
+    if (!userAdAccounts?.length) {
+      toast.error("No ad account assignments loaded yet.");
+      return;
+    }
+    setTopSpenderFetching(true);
+    try {
+      // Map ad_account_id → first assigned user (dedupe so each account counts once)
+      const accountToUser: Record<string, string> = {};
+      userAdAccounts.forEach((ua: any) => {
+        if (!accountToUser[ua.ad_account_id]) accountToUser[ua.ad_account_id] = ua.user_id;
+      });
+      const allAccountIds = Object.keys(accountToUser);
+      if (!allAccountIds.length) {
+        toast.error("No ad accounts assigned to clients.");
+        setTopSpenderFetching(false);
+        return;
+      }
+      const { spend, meta_calls, proxy_ip } = await fetchSpendOnly(allAccountIds, {
+        date_from: topSpenderFromStr,
+        date_to: topSpenderToStr,
+      });
+      const byUser: Record<string, number> = {};
+      Object.entries(spend).forEach(([accId, amount]) => {
+        const uid = accountToUser[accId];
+        if (!uid) return;
+        byUser[uid] = (byUser[uid] || 0) + Number(amount || 0);
+      });
+      const rows = Object.entries(byUser).map(([user_id, total]) => ({
+        user_id,
+        total: Math.round(total * 100) / 100,
+      }));
+      const next: TopSpenderSnapshot = {
+        from: topSpenderFromStr,
+        to: topSpenderToStr,
+        rows,
+        meta_calls: meta_calls ?? 0,
+        proxy_ip: proxy_ip ?? null,
+        fetched_at: new Date().toISOString(),
+      };
+      setTopSpenderSnapshot(next);
+      try { localStorage.setItem(TOP_SPENDER_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      toast.success(`Updated · ${meta_calls} Meta calls${proxy_ip ? ` · ${proxy_ip}` : ""}`);
+    } catch (err: any) {
+      toast.error("Failed to fetch spend: " + (err?.message || "Unknown error"));
+    } finally {
+      setTopSpenderFetching(false);
+    }
+  };
 
   const { spenderChart, topThree } = useMemo(() => {
-    // If date filter is active, use client_daily_stats
-    if (topSpenderStats && topSpenderRange?.from) {
-      if (!profiles?.length) return { spenderChart: [], topThree: [] };
-      const byUser: Record<string, number> = {};
-      topSpenderStats.forEach((r: any) => {
-        byUser[r.user_id] = (byUser[r.user_id] || 0) + (Number(r.total_spend) || 0);
-      });
-      const profileMap: Record<string, any> = {};
-      profiles.forEach((p: any) => { profileMap[p.user_id] = p; });
-      const sorted = Object.entries(byUser)
-        .map(([userId, spent]) => ({
-          userId,
-          name: profileMap[userId]?.full_name || profileMap[userId]?.email || "Unknown",
-          value: Math.round(spent * 100) / 100,
-        }))
-        .sort((a, b) => b.value - a.value);
-      return { spenderChart: sorted.slice(0, 8), topThree: sorted.slice(0, 3) };
-    }
-
-    // Default: all-time from ad_accounts. Dedupe — each account contributes to ONE client only.
-    if (!adAccounts?.length || !profiles?.length || !userAdAccounts?.length) return { spenderChart: [], topThree: [] };
-
-    // Map each ad_account_id → first assigned user (1-to-1, no duplication)
-    const accountToUser: Record<string, string> = {};
-    userAdAccounts.forEach((ua: any) => {
-      if (!accountToUser[ua.ad_account_id]) {
-        accountToUser[ua.ad_account_id] = ua.user_id;
-      }
-    });
-
-    const spendByUser: Record<string, number> = {};
-    adAccounts.forEach((a: any) => {
-      const userId = accountToUser[a.id];
-      if (!userId) return; // skip unassigned accounts
-      const spent = Number(a.amount_spent) || 0;
-      spendByUser[userId] = (spendByUser[userId] || 0) + spent;
-    });
-
+    if (!topSpenderSnapshot || !profiles?.length) return { spenderChart: [], topThree: [] };
     const profileMap: Record<string, any> = {};
     profiles.forEach((p: any) => { profileMap[p.user_id] = p; });
-
-    const sorted = Object.entries(spendByUser)
-      .map(([userId, spent]) => ({
-        userId,
-        name: profileMap[userId]?.full_name || profileMap[userId]?.email || "Unknown",
-        value: spent,
+    const sorted = topSpenderSnapshot.rows
+      .filter(r => r.total > 0)
+      .map(r => ({
+        userId: r.user_id,
+        name: profileMap[r.user_id]?.full_name || profileMap[r.user_id]?.email || "Unknown",
+        value: r.total,
       }))
       .sort((a, b) => b.value - a.value);
-
     return { spenderChart: sorted.slice(0, 8), topThree: sorted.slice(0, 3) };
-  }, [adAccounts, profiles, userAdAccounts, topSpenderStats, topSpenderRange]);
+  }, [topSpenderSnapshot, profiles]);
 
   const handleUpdateFromMeta = async () => {
     if (!adAccounts?.length) return;
@@ -814,9 +845,11 @@ export function AdminDashboard() {
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="text-xs gap-1">
                       <CalendarIcon className="h-3 w-3" />
-                      {topSpenderRange?.from && topSpenderRange?.to
-                        ? `${format(topSpenderRange.from, "MMM d")} – ${format(topSpenderRange.to, "MMM d")}`
-                        : "All Time"}
+                      {topSpenderPreset
+                        ? topSpenderPreset
+                        : topSpenderRange?.from && topSpenderRange?.to
+                          ? `${format(topSpenderRange.from, "MMM d")} – ${format(topSpenderRange.to, "MMM d")}`
+                          : "Pick range"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end" side="bottom">
@@ -824,20 +857,12 @@ export function AdminDashboard() {
                       <div className="space-y-0.5">
                         <RadioGroup value={topSpenderPreset} onValueChange={(val) => {
                           setTopSpenderPreset(val);
-                          if (val === "all") {
-                            setTopSpenderRange(undefined);
-                          } else {
-                            const preset = DATE_PRESETS.find(p => p.label === val);
-                            if (preset) {
-                              const range = preset.getValue();
-                              setTopSpenderRange({ from: range.from, to: range.to });
-                            }
+                          const preset = DATE_PRESETS.find(p => p.label === val);
+                          if (preset) {
+                            const range = preset.getValue();
+                            setTopSpenderRange({ from: range.from, to: range.to });
                           }
                         }} className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                          <div className="flex items-center space-x-1.5">
-                            <RadioGroupItem value="all" id="ts-all" className="h-3 w-3" />
-                            <Label htmlFor="ts-all" className="text-xs cursor-pointer font-normal">All Time</Label>
-                          </div>
                           {DATE_PRESETS.map((preset) => (
                             <div key={preset.label} className="flex items-center space-x-1.5">
                               <RadioGroupItem value={preset.label} id={`ts-${preset.label}`} className="h-3 w-3" />
@@ -860,23 +885,29 @@ export function AdminDashboard() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <Button variant="outline" size="sm" onClick={handleUpdateFromMeta} disabled={metaLoading} className="text-xs">
-                  <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
-                  {metaLoading ? "..." : "Meta"}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUpdateTopSpenders}
+                  disabled={topSpenderFetching || !topSpenderFromStr || !topSpenderToStr}
+                  className="text-xs gap-1"
+                >
+                  <RefreshCw className={cn("h-3 w-3", topSpenderFetching && "animate-spin")} />
+                  {topSpenderFetching ? "..." : "Update"}
                 </Button>
-                {metaSyncStatus && (
-                  <span className={`text-[10px] ml-1 ${metaSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                    {metaSyncStatus.success}/{metaSyncStatus.total}
-                    {metaSyncStatus.failed > 0 && ` · ${metaSyncStatus.failed} fail`}
-                    {metaSyncStatus.failed === 0 && metaSyncStatus.autoRetried > 0 && ` · ${metaSyncStatus.autoRetried} retried`}
-                  </span>
-                )}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {topThree.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No spending data yet</p>
+            {topSpenderFetching ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Fetching live data from Meta...
+              </div>
+            ) : topThree.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                {topSpenderSnapshot ? "No spending data for this range" : "Pick a date range and click Update to fetch."}
+              </p>
             ) : (
               <div className="space-y-3 md:space-y-4">
                 {topThree.map((spender, i) => {
@@ -903,6 +934,18 @@ export function AdminDashboard() {
                     </div>
                   );
                 })}
+                {topSpenderSnapshot && (
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Meta API calls: {topSpenderSnapshot.meta_calls}
+                    {topSpenderSnapshot.proxy_ip ? ` • via ${topSpenderSnapshot.proxy_ip}` : ""}
+                    {` • updated ${format(new Date(topSpenderSnapshot.fetched_at), "MMM d, HH:mm")}`}
+                  </p>
+                )}
+                {topSpenderSnapshot && !topSpenderRangeMatchesSnapshot && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                    Showing data for {format(new Date(topSpenderSnapshot.from), "MMM d, yyyy")} – {format(new Date(topSpenderSnapshot.to), "MMM d, yyyy")}. Click <b>Update</b> for the new range.
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
