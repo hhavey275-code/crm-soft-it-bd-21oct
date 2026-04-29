@@ -481,8 +481,12 @@ export function AdminSellers() {
         return isWithinInterval(d, { start: range!.from, end: range!.to });
       });
     }
+    // Month view restricts to active month bucket
+    if (monthView) {
+      result = result.filter((t: any) => isSameMonth(getMonthBucket(t.created_at), activeBucket));
+    }
     return result;
-  }, [sellerTxns, typeFilter, bankFilter, datePreset, customFrom, customTo]);
+  }, [sellerTxns, typeFilter, bankFilter, datePreset, customFrom, customTo, monthView, activeBucket]);
 
   // Calculate totals from filtered data — only approved (or legacy) entries
   const sellerTotals = useMemo(() => {
