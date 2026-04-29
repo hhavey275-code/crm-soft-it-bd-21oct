@@ -524,6 +524,159 @@ export function AdminSellers() {
   // Running Due/Advance balance per row (computed from full unfiltered set so each row reflects its true historical balance)
   const runningTotals = useMemo(() => computeDueAdvanceRunning(sellerTxns || []), [sellerTxns]);
 
+  // ===== Month-to-month closing =====
+  const { data: closings } = useQuery({
+    queryKey: ["admin-seller-closings", selectedSeller?.user_id],
+    enabled: !!selectedSeller,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("seller_monthly_closings")
+        .select("*")
+        .eq("seller_id", selectedSeller.user_id)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
+      return (data as MonthlyClosing[]) ?? [];
+    },
+  });
+
+  const closingFor = (b: MonthBucket): MonthlyClosing | undefined =>
+    closings?.find(c => c.year === b.year && c.month === b.month);
+
+  // Opening balance for a bucket: previous month's closing or 0
+  const openingFor = (b: MonthBucket): number => {
+    const prev = prevMonth(b);
+    const rec = closingFor(prev);
+    return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+  };
+
+  const activeOpening = openingFor(activeBucket);
+  const activeMonthAgg = useMemo(
+    () => aggregateMonth(sellerTxns || [], activeBucket),
+    [sellerTxns, activeBucket]
+  );
+  const activeClosingLive = activeOpening + activeMonthAgg.delta;
+  const activeClosingRecord = closingFor(activeBucket);
+
+  // When in month view, restrict the displayed transactions to the active month
+  const monthFilteredTxns = useMemo(() => {
+    if (!monthView) return filteredTxns;
+    return filterMonth(filteredTxns, activeBucket);
+  }, [monthView, filteredTxns, activeBucket]);
+
+  // Running totals for current view: month view uses opening; all-time view uses cumulative
+  const viewRunningTotals = useMemo(() => {
+    if (!monthView) return runningTotals;
+    return computeRunningWithOpening(filterMonth(sellerTxns || [], activeBucket), activeOpening);
+  }, [monthView, sellerTxns, activeBucket, activeOpening, runningTotals]);
+
+  const closeMonthMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSeller) throw new Error("No seller");
+      return await closeMonthApi({
+        sellerId: selectedSeller.user_id,
+        bucket: activeBucket,
+        txns: sellerTxns || [],
+        closedBy: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      toast.success(`Closed ${monthLabel(activeBucket)}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+      setShowCloseConfirm(false);
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to close month"),
+  });
+
+  const reopenMonthMutation = useMutation({
+    mutationFn: async () => {
+      const rec = activeClosingRecord;
+      if (!rec) throw new Error("Not closed");
+      await reopenMonthApi(rec.id);
+    },
+    onSuccess: () => {
+      toast.success(`Reopened ${monthLabel(activeBucket)}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to reopen"),
+  });
+
+  // Build available months: union of all txn months + existing closings + current month
+  const availableMonths = useMemo<MonthBucket[]>(() => {
+    const set = new Map<string, MonthBucket>();
+    const add = (b: MonthBucket) => set.set(`${b.year}-${b.month}`, b);
+    add({ year: today.getFullYear(), month: today.getMonth() + 1 });
+    (sellerTxns || []).forEach((t: any) => add(getMonthBucket(t.created_at)));
+    (closings || []).forEach(c => add({ year: c.year, month: c.month }));
+    return Array.from(set.values()).sort((a, b) =>
+      b.year !== a.year ? b.year - a.year : b.month - a.month
+    );
+  }, [sellerTxns, closings]);
+
+  const exportMonthlyToExcel = () => {
+    if (!selectedSeller) return;
+    const monthTxns = filterMonth(sellerTxns || [], exportBucket);
+    if (!monthTxns.length) {
+      toast.error("No transactions in selected month");
+      return;
+    }
+    const opening = openingFor(exportBucket);
+    const running = computeRunningWithOpening(monthTxns, opening);
+    // Sort ascending for export readability
+    const sorted = [...monthTxns].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const buildRow = (t: any): Record<string, any> => {
+      const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const full: Record<ExportCol, any> = {
+        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
+        "Type": getTypeLabel(t.type),
+        "Status": (t.status || "approved").toUpperCase(),
+        "BDT Amount": Number(t.bdt_amount || 0),
+        "USDT Amount": Number(t.usdt_amount || 0),
+        "Rate": Number(t.rate || 0),
+        "Converted (BDT)": Number(convBdt.toFixed(2)),
+        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
+        "Account Name": t.bank_accounts?.account_name || "",
+        "Due/Advance (BDT)": Number((running.get(t.id) || 0).toFixed(2)),
+        "Description": t.description || "",
+        "Proof URL": t.proof_url || "",
+      };
+      const picked: Record<string, any> = {};
+      for (const c of exportCols) picked[c] = full[c];
+      return picked;
+    };
+    const rows: any[] = [];
+    // Opening row
+    const openingRow: Record<string, any> = {};
+    exportCols.forEach(c => { openingRow[c] = ""; });
+    if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
+    if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (carry-forward)`;
+    if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
+    rows.push(openingRow);
+    sorted.forEach(t => rows.push(buildRow(t)));
+    // Closing row
+    const agg = aggregateMonth(sellerTxns || [], exportBucket);
+    const closing = opening + agg.delta;
+    const closingRow: Record<string, any> = {};
+    exportCols.forEach(c => { closingRow[c] = ""; });
+    if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
+    if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
+    if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
+    if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
+    if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
+    if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
+    rows.push(closingRow);
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
+    const wb = XLSX.utils.book_new();
+    const sheetName = `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    XLSX.writeFile(wb, `${sellerSlug}-${sheetName}-ledger.xlsx`);
+    toast.success(`Exported ${monthLabel(exportBucket)}`);
+    setShowMonthlyExport(false);
+  };
+
   const hasActiveFilter = typeFilter !== "all" || bankFilter || datePreset !== "all";
   const clearAllFilters = () => { setTypeFilter("all"); setBankFilter(null); setDatePreset("all"); setCustomFrom(undefined); setCustomTo(undefined); };
   const toggleTypeFilter = (type: TypeFilter) => setTypeFilter(prev => prev === type ? "all" : type);
