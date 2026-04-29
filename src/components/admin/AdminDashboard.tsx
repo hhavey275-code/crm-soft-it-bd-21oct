@@ -654,6 +654,11 @@ export function AdminDashboard() {
                       ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                 </p>
+                {dateSpendCalls !== null && !dateSpendLoading && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
