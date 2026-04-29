@@ -336,7 +336,10 @@ Deno.serve(async (req) => {
       system_user_id: systemUserId,
       owned: ownedAccounts.length,
       client: clientAccounts.length,
-      last_synced_at: now
+      last_synced_at: now,
+      invites_accepted: invitesAccepted,
+      invites_applied: invitesApplied,
+      invite_errors: inviteErrors,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("sync-bm-accounts error:", err);
