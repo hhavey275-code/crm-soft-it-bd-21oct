@@ -74,19 +74,24 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-function parseSpendFromBatchBody(body: string): number {
+function parseSpendFromBatchBody(body: string): { total: number; daily: { date: string; spend: number }[] } {
   try {
     const parsed = JSON.parse(body);
     const rows = parsed?.data;
-    if (!Array.isArray(rows)) return 0;
+    if (!Array.isArray(rows)) return { total: 0, daily: [] };
     let total = 0;
+    const daily: { date: string; spend: number }[] = [];
     for (const r of rows) {
       const s = Number(r?.spend);
-      if (Number.isFinite(s)) total += s;
+      if (Number.isFinite(s)) {
+        total += s;
+        const date = r?.date_start || r?.date_stop;
+        if (date) daily.push({ date, spend: Math.round(s * 100) / 100 });
+      }
     }
-    return Math.round(total * 100) / 100;
+    return { total: Math.round(total * 100) / 100, daily };
   } catch {
-    return 0;
+    return { total: 0, daily: [] };
   }
 }
 
@@ -150,11 +155,12 @@ Deno.serve(async (req) => {
     }
 
     const spendMap: Record<string, number> = {};
+    const dailyMap: Record<string, { date: string; spend: number }[]> = {};
     const rateLimited: string[] = [];
 
     // Initialise zero so caller always gets every requested id back
-    for (const a of accounts) spendMap[a.id] = 0;
-    for (const a of noToken) spendMap[a.id] = 0;
+    for (const a of accounts) { spendMap[a.id] = 0; dailyMap[a.id] = []; }
+    for (const a of noToken) { spendMap[a.id] = 0; dailyMap[a.id] = []; }
 
     // Fire batches in parallel within a group, but cap concurrency to 4
     // to stay polite to Meta and the proxy.
@@ -205,7 +211,9 @@ Deno.serve(async (req) => {
               const item = json[i];
               if (!item) continue;
               if (item.code && item.code >= 200 && item.code < 300 && typeof item.body === "string") {
-                spendMap[c[i].id] = parseSpendFromBatchBody(item.body);
+                const parsed = parseSpendFromBatchBody(item.body);
+                spendMap[c[i].id] = parsed.total;
+                dailyMap[c[i].id] = parsed.daily;
               } else {
                 rateLimited.push(c[i].id);
               }
@@ -235,7 +243,7 @@ Deno.serve(async (req) => {
     );
 
     return new Response(
-      JSON.stringify({ spend: spendMap, rate_limited: rateLimited }),
+      JSON.stringify({ spend: spendMap, daily: dailyMap, rate_limited: rateLimited }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
