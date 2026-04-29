@@ -144,6 +144,19 @@ export function AdminSellers() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [bankFilter, setBankFilter] = useState<string | null>(null);
 
+  // Month-to-month closing state
+  const today = new Date();
+  const [monthView, setMonthView] = useState<boolean>(false);
+  const [activeBucket, setActiveBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showMonthlyExport, setShowMonthlyExport] = useState(false);
+  const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const ALL_EXPORT_COLS = [
+    "Date","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Due/Advance (BDT)","Description","Proof URL",
+  ] as const;
+  type ExportCol = typeof ALL_EXPORT_COLS[number];
+  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","BDT Amount","USDT Amount","Rate","Due/Advance (BDT)"]);
+
   // Inline edit states
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState("");
