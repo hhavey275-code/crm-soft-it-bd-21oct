@@ -53,6 +53,7 @@ export function AdminDashboard() {
   const isMobile = useIsMobile();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
+  const [metaSyncStatus, setMetaSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
   const [monthSyncLoading, setMonthSyncLoading] = useState(false);
   const [graphMonth, setGraphMonth] = useState(new Date());
   const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
