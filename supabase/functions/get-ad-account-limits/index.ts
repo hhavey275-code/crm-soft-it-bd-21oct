@@ -104,7 +104,7 @@ Deno.serve(async (req: Request) => {
     // --- Fetch ad account + BM token ---
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
-      .select("id, account_id, business_managers!inner(access_token)")
+      .select("id, account_id, spend_cap, amount_spent, business_managers!inner(access_token)")
       .eq("id", ad_account_id)
       .single();
     if (accErr || !account) return json({ error: "Ad account not found" }, 404);
@@ -115,43 +115,48 @@ Deno.serve(async (req: Request) => {
     const actId = (account as any).account_id as string;
 
     // --- Meta call (proxy via metaFetch) ---
-    // adtrust_dsl (Meta-imposed Daily Spending Limit) is only exposed on older
-    // Graph API versions. v19.0 still returns it for accounts that have one.
-    // Newer (v20+) versions silently dropped this field.
-    const fields = "adtrust_dsl,min_daily_budget,currency,balance,spend_cap,amount_spent";
-    const url = `https://graph.facebook.com/v19.0/${actId}?fields=${fields}&access_token=${encodeURIComponent(bmToken)}`;
+    // Never request adtrust_dsl together with supported fields: if Meta rejects
+    // that deprecated field, the whole response fails. Fetch supported account
+    // spending-limit fields first, then try adtrust_dsl separately as optional.
+    const safeFields = "min_daily_budget,currency,balance,spend_cap,amount_spent";
+    const url = `https://graph.facebook.com/v23.0/${actId}?fields=${safeFields}&access_token=${encodeURIComponent(bmToken)}`;
     const res = await metaFetch(url, { method: "GET" });
     const body = await res.json().catch(() => ({}));
 
-    if (!res.ok || body?.error) {
-      return json({
-        error: body?.error?.message || `Meta returned ${res.status}`,
-        meta: {
-          via: getLastMetaVia(),
-          ip: getLastMetaIp(),
-          proxy_calls: getMetaProxyCount(),
-          direct_calls: getMetaDirectCount(),
-          proxy_fails: getMetaProxyFailReasons(),
-        },
-      }, 502);
+    const safeFieldsError = !res.ok || body?.error
+      ? (body?.error?.message || `Meta returned ${res.status}`)
+      : null;
+
+    let rawAdtrustDsl: unknown = null;
+    for (const version of ["v19.0", "v18.0", "v17.0"]) {
+      const dslUrl = `https://graph.facebook.com/${version}/${actId}?fields=adtrust_dsl&access_token=${encodeURIComponent(bmToken)}`;
+      const dslRes = await metaFetch(dslUrl, { method: "GET" });
+      const dslBody = await dslRes.json().catch(() => ({}));
+      if (dslRes.ok && !dslBody?.error && dslBody?.adtrust_dsl !== undefined) {
+        rawAdtrustDsl = dslBody.adtrust_dsl;
+        break;
+      }
     }
 
-    const dailySpendLimit = normalizeAmount(body?.adtrust_dsl);
-    const minDailyBudget = normalizeAmount(body?.min_daily_budget);
+    const adtrustDailyLimit = normalizeAmount(rawAdtrustDsl);
+    const minDailyBudget = safeFieldsError ? 0 : normalizeAmount(body?.min_daily_budget);
     const currency = body?.currency || "USD";
-    const balance = normalizeAmount(body?.balance);
-    const spendCap = normalizeAmount(body?.spend_cap);
-    const amountSpent = normalizeAmount(body?.amount_spent);
+    const balance = safeFieldsError ? 0 : normalizeAmount(body?.balance);
+    const spendCap = safeFieldsError ? Number((account as any).spend_cap ?? 0) : (normalizeAmount(body?.spend_cap) || Number((account as any).spend_cap ?? 0));
+    const amountSpent = safeFieldsError ? Number((account as any).amount_spent ?? 0) : (normalizeAmount(body?.amount_spent) || Number((account as any).amount_spent ?? 0));
+    const dailySpendLimit = adtrustDailyLimit > 0 ? adtrustDailyLimit : spendCap;
+    const dailySpendLimitSource = adtrustDailyLimit > 0 ? "adtrust_dsl" : spendCap > 0 ? "spend_cap" : null;
 
     return json({
       ok: true,
       data: {
         daily_spend_limit: dailySpendLimit > 0 ? dailySpendLimit : null,
         daily_spend_limit_available: dailySpendLimit > 0,
+        daily_spend_limit_source: dailySpendLimitSource,
         unavailable_reason: dailySpendLimit > 0
           ? null
-          : "Meta has not set a daily spending limit on this ad account, or the account is on monthly invoicing.",
-        raw_adtrust_dsl: body?.adtrust_dsl ?? null,
+          : "Meta did not return any spending-limit value for this ad account.",
+        raw_adtrust_dsl: rawAdtrustDsl,
         min_daily_budget: minDailyBudget,
         currency,
         balance,
