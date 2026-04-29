@@ -14,7 +14,7 @@ import { CalendarIcon, ArrowUpDown, BarChart3, Loader2 } from "lucide-react";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { chunkedMetaSync } from "@/lib/chunkedMetaSync";
+import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
 import type { DateRange } from "react-day-picker";
 
 const DATE_PRESETS = [
@@ -96,24 +96,10 @@ export default function ClientSpendReportPage() {
       // Get all unique ad account IDs
       const allAccountIds = [...new Set(userAccounts.map((ua: any) => ua.ad_account_id))];
 
-      // Fetch from Meta API in one batch
-      const { insights } = await chunkedMetaSync(allAccountIds, {
+      // Lightweight spend-only batch fetch (Meta Batch API: ~50 accounts per HTTP call)
+      const { spend: accountSpend } = await fetchSpendOnly(allAccountIds, {
         date_from: fromStr,
         date_to: toStr,
-      });
-
-      // Map insights back to per-account spend
-      const accountSpend: Record<string, number> = {};
-      Object.entries(insights ?? {}).forEach(([accId, ins]: [string, any]) => {
-        let spend = 0;
-        if (typeof ins?.date_spend === "number") {
-          spend = ins.date_spend;
-        } else if (Array.isArray(ins?.daily_breakdown)) {
-          spend = ins.daily_breakdown.reduce((sum: number, d: any) => sum + (Number(d?.spend) || 0), 0);
-        } else {
-          spend = Number(ins?.today_spend) || 0;
-        }
-        accountSpend[accId] = spend;
       });
 
       // Aggregate per user
