@@ -525,8 +525,18 @@ export function AdminSellers() {
 
   const dueAdvance = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
 
-  // Running Due/Advance balance per row (computed from full unfiltered set so each row reflects its true historical balance)
-  const runningTotals = useMemo(() => computeDueAdvanceRunning(sellerTxns || []), [sellerTxns]);
+  // Running Due/Advance balance per row.
+  // - All-time view: cumulative from beginning (legacy behavior)
+  // - Month view: starts from previous month's closing balance (carry-forward)
+  const runningTotals = useMemo(() => {
+    if (!sellerTxns) return new Map<string, number>();
+    if (!monthView) return computeDueAdvanceRunning(sellerTxns);
+    // openingFor uses closings; recompute inline to avoid TDZ on activeOpening
+    const prev = prevMonth(activeBucket);
+    const rec = (closingsRef.current || []).find(c => c.year === prev.year && c.month === prev.month);
+    const opening = rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    return computeRunningWithOpening(filterMonth(sellerTxns, activeBucket), opening);
+  }, [sellerTxns, monthView, activeBucket, closings]);
 
   // ===== Month-to-month closing =====
   const { data: closings } = useQuery({
