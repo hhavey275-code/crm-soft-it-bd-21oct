@@ -55,6 +55,8 @@ export function AdminDashboard() {
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
   const [monthSyncLoading, setMonthSyncLoading] = useState(false);
   const [graphMonth, setGraphMonth] = useState(new Date());
+  const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
+  const [dateSpendCalls, setDateSpendCalls] = useState<number | null>(null);
   const [tenantTestMode, setTenantTestMode] = useState(() => {
     try { return localStorage.getItem("tenant_test_mode") === "true"; } catch { return false; }
   });
