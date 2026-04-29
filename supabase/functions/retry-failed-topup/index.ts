@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 // Adapter: existing call sites destructure { response, via, sourceIp }.
 // Wrap shared metaFetch to preserve that contract without rewriting call sites.
-async function metaFetch(url: string, options: RequestInit = {}) {
+async function metaFetch(url: string, options: RequestInit & { allowDirectFallback?: boolean } = {}) {
   const response = await sharedMetaFetch(url, options);
   return { response, via: getLastMetaVia(), sourceIp: getLastMetaIp() };
 }
@@ -118,7 +118,8 @@ Deno.serve(async (req)=>{
     let liveAmountSpentDollars = null;
     try {
       const { response: preCheckRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
+        method: "GET",
+        allowDirectFallback: true
       });
       const preCheckData = await preCheckRes.json();
       if (preCheckData?.spend_cap !== undefined) liveSpendCapDollars = centsToDollars(Number(preCheckData.spend_cap));
@@ -174,7 +175,8 @@ Deno.serve(async (req)=>{
       body: new URLSearchParams({
         spend_cap: String(newSpendCapDollars),
         access_token: bmToken
-      })
+      }),
+      allowDirectFallback: true
     });
     let metaData = null;
     try {
@@ -210,7 +212,8 @@ Deno.serve(async (req)=>{
     }
     // Verify with GET
     const { response: verifyRes } = await metaFetch(`https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-      method: "GET"
+      method: "GET",
+      allowDirectFallback: true
     });
     let verifyData = null;
     try {
