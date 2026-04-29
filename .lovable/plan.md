@@ -1,59 +1,58 @@
 ## Goal
-"Update all from Meta", Admin Dashboard er spend area, ar Spend Report — protita load er sesh e ekta choto line dekhabe: kotogula Meta API call holo ei action e (e.g. `Meta API calls: 12`).
-
-## Data flow
-Edge functions already counter rakhe (`getMetaProxyCount + getMetaDirectCount` from `supabase/functions/_shared/meta-fetch.ts`). Ekhon shudhu seta response e expose kore frontend e dekhate hobe.
+1. Spend Report ar Admin Dashboard er date-range spend cache theke noy — **proti bar live Meta theke fetch** korbe (jate counter o thik dekhabe ar real-time data ashe).
+2. Protita spend check action **system_logs** e likhbe — admin name, action, kotogula account, date range, total Meta API calls, proxy IP shoho. (Same pattern jeta `get-account-insights` already kore.)
 
 ## Changes
 
-### 1. Edge functions — return call count
-Both functions ekhono count kore but JSON response e pathay na.
+### 1. `supabase/functions/get-spend-only/index.ts` — system log add
+Just like `get-account-insights` does at line 1080-1112, add at the end of handler:
+- Read caller `user_id` from JWT (`Authorization` header) → lookup `profiles.full_name / email` → `userName`.
+- Insert into `system_logs`:
+  - **action**: `"Meta Spend Check"`
+  - **details**: `"Checked spend for N account(s) [range=YYYY-MM-DD..YYYY-MM-DD] | calls=X (proxy=P, direct=D) | proxy_ip=..."`
+  - **user_id / user_name**: from caller
+- Wrap in try/catch (same as existing function) so log failure never breaks the response.
+- Continue returning `meta_calls` in response (already done).
 
-- **`supabase/functions/get-spend-only/index.ts`**: response object e `meta_calls: { proxy, direct, total }` add koro (importing `getMetaProxyCount`, `getMetaDirectCount` already partially)
-- **`supabase/functions/get-account-insights/index.ts`**: same vabe `meta_calls` field add koro response e (proxyCalls/directCalls already calculated at line 1096-1098, just include in JSON return at line 1118)
+### 2. `src/lib/fetchSpendOnly.ts` — no cache
+Already fine (no internal cache). Caller controls cache via React Query.
 
-### 2. Client helpers — bubble up call count
+### 3. `src/components/pages/ClientSpendReportPage.tsx` — disable cache for date-range query
+Current: `staleTime: 0` but React Query still serves cached data instantly while refetching in the background → `queryFn` may not run when filters unchanged.
 
-- **`src/lib/fetchSpendOnly.ts`**: return type e `meta_calls: number` add koro. Internally each chunk er `data.meta_calls.total` jog koro.
-- **`src/lib/chunkedMetaSync.ts`**: return e `meta_calls: number` add koro — protita chunk er response e `meta_calls.total` accumulate koro.
+Change date-range query options to:
+- `staleTime: 0`
+- `gcTime: 0` (drop cache immediately)
+- `refetchOnMount: "always"`
+- `refetchOnWindowFocus: false` (avoid surprise refetches)
 
-### 3. UI — show counter after each action
+This guarantees: every time user lands on the page or changes date → fresh Meta call → counter updates correctly.
 
-**a) Admin → Ad Accounts ("Update all from Meta" button)** (`src/components/admin/AdminAdAccounts.tsx`)
-- `refreshAllMutation.onSuccess` e `data.meta_calls` capture kore state e rakho (`lastSyncCallCount`).
-- Button er niche choto muted text:  
-  `Last sync: {N} Meta API calls`  
-  Shudhu mutation success hole show korbe. Pending hole "Updating..." dekhabe (already ache).
-- Same pattern apply koro `refreshInventoryMutation` ar `refreshSelectedMutation` te (jodi user chai — common state).
+Also: store `metaCalls` from query data, not separate state. Do this by returning `{ rows, meta_calls }` from `queryFn` and reading `metaRows?.meta_calls` directly. Removes the stale `null` after navigation.
 
-**b) Client → Ad Accounts** (`src/components/client/ClientAdAccounts.tsx`) — same pattern, "Update All from Meta" button er niche.
+### 4. `src/components/admin/AdminDashboard.tsx` — same for date-range card
+`handleFetchDateRangeSpend` already runs only on button click (no cache issue). But:
+- Currently writes spend to `sessionStorage` and reads on mount → that's why old number shows with "0 calls" after reload.
+- Fix: when reading from `sessionStorage`, set `dateSpendCalls` to `null` AND show a small `(cached — click date to refetch live)` hint next to the number. This way user knows it's not a fresh call.
+- New live fetch via the button updates both spend + counter as today.
 
-**c) Admin Dashboard spend area** (`src/components/admin/AdminDashboard.tsx`)
-- Date-range spend card er niche (after `handleFetchDateRangeSpend` complete): choto text `Meta API calls: {N}` — state variable `dateSpendCalls`.
-- Monthly chart sync (`handleSyncMonthSpend`) er niche: same pattern, `monthSyncCalls`.
+### 5. Show proxy IP in UI counter (optional but helpful)
+Edge function already returns `meta_calls.total`. Extend response to include `proxy_ip` (already tracked via `getLastMetaIp()`). UI counter line becomes:
+- `Meta API calls: 7 (via proxy IP 1.2.3.4)` — when proxy used
+- `Meta API calls: 7 (direct)` — when proxy fallback happened
 
-**d) Spend Report** (`src/components/pages/ClientSpendReportPage.tsx`)
-- `fetchSpendOnly` er return e ekhon `meta_calls` thakbe.
-- Page e date range data load hole, ekta choto line dekhabe (table er niche or filter er pashe):  
-  `Meta API calls: {N}`
-
-### Counter line styling
-- `text-xs text-muted-foreground mt-1` — discreet, not distracting.
-- Format: `Meta API calls: 6` (just the number — total proxy + direct).
+Files: `get-spend-only/index.ts` (add `proxy_ip` to response), `fetchSpendOnly.ts` (bubble up), and the 3 UI files (`AdminDashboard.tsx`, `ClientSpendReportPage.tsx`, `AdminAdAccounts.tsx` + `ClientAdAccounts.tsx`) to display it.
 
 ## Files touched
-1. `supabase/functions/get-spend-only/index.ts` — add `meta_calls` to response
-2. `supabase/functions/get-account-insights/index.ts` — add `meta_calls` to response
-3. `src/lib/fetchSpendOnly.ts` — accumulate + return `meta_calls`
-4. `src/lib/chunkedMetaSync.ts` — accumulate + return `meta_calls`
-5. `src/components/admin/AdminAdAccounts.tsx` — show counter under "Update all from Meta"
-6. `src/components/client/ClientAdAccounts.tsx` — show counter under "Update All from Meta"
-7. `src/components/admin/AdminDashboard.tsx` — show counter for date-range card + monthly chart
-8. `src/components/pages/ClientSpendReportPage.tsx` — show counter after data load
+1. `supabase/functions/get-spend-only/index.ts` — add system_logs insert + `proxy_ip` in response
+2. `src/lib/fetchSpendOnly.ts` — return `proxy_ip` along with `meta_calls`
+3. `src/components/pages/ClientSpendReportPage.tsx` — disable cache, show counter from query data, show proxy IP
+4. `src/components/admin/AdminDashboard.tsx` — show "(cached)" hint when restored from sessionStorage, show proxy IP after live fetch
+5. `src/components/admin/AdminAdAccounts.tsx` + `src/components/client/ClientAdAccounts.tsx` — show proxy IP next to existing counter
 
-## What stays untouched
-- Proxy logic, batching, retries — kichu change na.
-- "Update all from Meta" er actual behavior — same. Just added a small line under it.
-- Other pages (BillingsPage, AdAccountDetailPage, etc.) — out of scope; user shudhu Spend Report + Dashboard + Update All button cheyeche.
+## Out of scope
+- Realtime subscription on a `spend_data` table — we don't store per-account spend in a table; spend is fetched live from Meta. Disabling React Query cache (above) achieves the "always live" behavior you want without needing Supabase realtime.
+- `get-account-insights` already logs to system_logs (no change needed).
+- Other pages that don't show spend.
 
-Approve hole ami implement kore dichi.
+Approve hole implement kore di.
