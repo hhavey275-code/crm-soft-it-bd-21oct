@@ -166,10 +166,30 @@ Deno.serve(async (req) => {
     const respJson = await res.json().catch(() => ({}));
 
     if (!res.ok || respJson?.error) {
-      const errMsg =
-        respJson?.error?.error_user_msg ||
-        respJson?.error?.message ||
+      const metaErr = respJson?.error || {};
+      const subcode = metaErr.error_subcode;
+      const code = metaErr.code;
+      let errMsg =
+        metaErr.error_user_msg ||
+        metaErr.message ||
         `Meta returned ${res.status}`;
+      let hint: string | null = null;
+
+      // Subcode 1752006 = "User cannot be added to business"
+      if (subcode === 1752006 || /cannot be added to the business/i.test(errMsg)) {
+        hint =
+          "এই email-টি Meta-তে invite করা যাচ্ছে না। সম্ভাব্য কারণ: " +
+          "(১) এই email already এই BM-এ আছে বা pending invite রয়েছে, " +
+          "(২) email-টি Facebook account-এর সাথে যুক্ত নয়, " +
+          "(৩) user অন্য একটি BM-এর সাথে এমনভাবে যুক্ত যা conflict করছে, " +
+          "অথবা (৪) BM access token-এ business_management permission নেই। " +
+          "Business Settings → People থেকে manually try করে দেখুন।";
+      } else if (code === 190) {
+        hint = "BM access token expired/invalid। নতুন token দিয়ে BM update করুন।";
+      } else if (code === 200) {
+        hint = "Token-এ যথেষ্ট permission নেই (business_management দরকার)।";
+      }
+
       // Save failed record for audit
       await supabase.from("bm_invitations").insert({
         business_manager_id: bm.id,
@@ -181,7 +201,7 @@ Deno.serve(async (req) => {
         invite_response: respJson,
         error_message: errMsg,
       });
-      return json({ error: errMsg, meta: respJson }, 400);
+      return json({ error: errMsg, hint, meta: respJson }, 200);
     }
 
     // Save pending invite

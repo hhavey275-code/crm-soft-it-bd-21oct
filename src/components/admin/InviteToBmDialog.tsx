@@ -161,7 +161,13 @@ export function InviteToBmDialog({ open, onOpenChange, bmId, bmName }: Props) {
         },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) {
+        toast.error(data.error, {
+          description: data.hint ?? undefined,
+          duration: 10000,
+        });
+        return;
+      }
 
       toast.success(data?.message ?? "Invite sent successfully");
       onOpenChange(false);
