@@ -22,6 +22,8 @@ import {
   metaCallSummary,
   getMetaProxyCount,
   getMetaDirectCount,
+  getLastMetaIp,
+  getMetaProxyFailReasons,
 } from "../_shared/meta-fetch.ts";
 
 const corsHeaders = {
@@ -107,6 +109,19 @@ Deno.serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(url, serviceKey);
+
+    // Resolve caller user id from JWT (best-effort, never fails the request)
+    let callerUserId: string | null = null;
+    try {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+      if (token) {
+        const { data: userRes } = await supabase.auth.getUser(token);
+        callerUserId = userRes?.user?.id ?? null;
+      }
+    } catch {
+      callerUserId = null;
+    }
 
     const body = await req.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body?.ad_account_ids) ? body.ad_account_ids : [];
@@ -244,6 +259,33 @@ Deno.serve(async (req) => {
       `get-spend-only: ${ids.length} accounts → ${tasks.length} batch call(s) in ${ms}ms${metaCallSummary(" ")}`,
     );
 
+    // Write to system_logs so admins can see who checked spend, when, and via which proxy IP.
+    try {
+      let userName: string | null = "system";
+      if (callerUserId) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("user_id", callerUserId)
+          .maybeSingle();
+        userName = prof?.full_name || prof?.email || "user";
+      }
+      const proxyCalls = getMetaProxyCount();
+      const directCalls = getMetaDirectCount();
+      const totalCalls = proxyCalls + directCalls;
+      const failReasons = getMetaProxyFailReasons();
+      const failNote = failReasons.length ? ` | proxy_fails=[${failReasons.join("; ")}]` : "";
+      const rangeLabel = `${since}..${until}`;
+      await supabase.from("system_logs").insert({
+        user_id: callerUserId,
+        user_name: userName,
+        action: "Meta Spend Check",
+        details: `Checked spend for ${ids.length} account(s) [range=${rangeLabel}] | calls=${totalCalls} (proxy=${proxyCalls}, direct=${directCalls}) | proxy_ip=${getLastMetaIp() ?? "n/a"}${failNote}`,
+      });
+    } catch (logErr) {
+      console.warn("system_logs insert (Meta Spend Check) failed:", logErr);
+    }
+
     return new Response(
       JSON.stringify({
         spend: spendMap,
@@ -253,6 +295,7 @@ Deno.serve(async (req) => {
           proxy: getMetaProxyCount(),
           direct: getMetaDirectCount(),
           total: getMetaProxyCount() + getMetaDirectCount(),
+          proxy_ip: getLastMetaIp(),
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -260,7 +303,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("get-spend-only error:", msg);
-    return new Response(JSON.stringify({ error: msg, spend: {}, rate_limited: [], meta_calls: { proxy: 0, direct: 0, total: 0 } }), {
+    return new Response(JSON.stringify({ error: msg, spend: {}, rate_limited: [], meta_calls: { proxy: 0, direct: 0, total: 0, proxy_ip: null } }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
