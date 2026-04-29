@@ -67,11 +67,23 @@ export default function AdAccountDetailPage() {
     if (!id) return;
     setLimitLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("get-ad-account-limits", {
-        body: { ad_account_id: id },
+      // Direct fetch so we can read the JSON error body even on non-2xx.
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-ad-account-limits`;
+      const res = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ ad_account_id: id }),
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Failed to fetch limit");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
       setLimitData({
         daily_spend_limit: data.data.daily_spend_limit ?? 0,
         currency: data.data.currency || "USD",
@@ -81,7 +93,8 @@ export default function AdAccountDetailPage() {
       });
       toast.success("Daily limit refreshed from Meta");
     } catch (err: any) {
-      toast.error(friendlyEdgeError(err) || "Failed to fetch daily limit");
+      const msg = err?.message || String(err ?? "");
+      toast.error(msg || "Failed to fetch daily limit");
     } finally {
       setLimitLoading(false);
     }
