@@ -167,8 +167,20 @@ async function fetchGraphCollection(url, { allowError = false, maxPages = 20 } =
   return all;
 }
 
+async function fetchCardsForAccount(accountId, accessToken) {
+  const actId = String(accountId || "").replace(/^act_/, "");
+  if (!actId) return [];
+  const token = encodeURIComponent(accessToken);
+  const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
+  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
+  const res = await fetch(url);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.error) return [];
+  return extractAccountCards(body);
+}
+
 async function fetchAllAdAccountsDsl(accessToken) {
-  const fields = "account_id,name,adtrust_dsl,currency";
+  const fields = "account_id,name,adtrust_dsl,currency,funding_source_details,adspaymentcycle{funding_source_details}";
   const encodedToken = encodeURIComponent(accessToken);
   const byId = new Map();
   const addAccounts = (accounts) => {
@@ -176,7 +188,16 @@ async function fetchAllAdAccountsDsl(accessToken) {
       const row = normalizeDslAccount(acc);
       if (!row.account_id) continue;
       const existing = byId.get(row.account_id);
-      if (!existing || row.daily_spend_limit > existing.daily_spend_limit) byId.set(row.account_id, row);
+      if (!existing) {
+        byId.set(row.account_id, row);
+      } else {
+        byId.set(row.account_id, {
+          ...existing,
+          ...row,
+          daily_spend_limit: Math.max(existing.daily_spend_limit || 0, row.daily_spend_limit || 0),
+          cards: mergeCards(existing.cards, row.cards),
+        });
+      }
     }
   };
 
@@ -198,7 +219,15 @@ async function fetchAllAdAccountsDsl(accessToken) {
     }
   }
 
-  return Array.from(byId.values());
+  const accounts = Array.from(byId.values());
+  for (const batch of chunk(accounts, 8)) {
+    await Promise.all(batch.map(async (account) => {
+      if (account.cards?.length > 1) return;
+      const cards = await fetchCardsForAccount(account.account_id, accessToken);
+      account.cards = mergeCards(account.cards, cards);
+    }));
+  }
+  return accounts;
 }
 
 // ---------- Backend ingest ----------
