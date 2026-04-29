@@ -74,6 +74,11 @@ export function AdminBusinessManagers() {
   const [checkingPermBmId, setCheckingPermBmId] = useState<string | null>(null);
   const [revokeSingleId, setRevokeSingleId] = useState<string | null>(null);
 
+  // Manual single ad-account add
+  const [manualAddOpen, setManualAddOpen] = useState(false);
+  const [manualAdAccountId, setManualAdAccountId] = useState("");
+  const [manualBmId, setManualBmId] = useState<string>("");
+
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
