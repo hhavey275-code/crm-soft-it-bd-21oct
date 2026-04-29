@@ -1,56 +1,119 @@
-## Problem
+## Seller Month-to-Month Closing System
 
-Ad Accounts page e onek account thake. Billing link (External Link icon ar "Old" link) e click korle Facebook billing hub notun tab e khole. CRM e fire ashar por kon account er billing dekhechilen ta mone thake na — sob row dekhte same lage.
+### Problem (Bangla)
 
-## Solution
+Ekhon `seller_transactions` er upor sob calculation suru theke (all-time) cumulative ভাবে hoy. Mas-er por mas data joma hocche → kono ek jaygay missing/bhul hole **puro history** abar milate hoy. Tumi chao:
 
-Last visited billing accounts ke `localStorage` e track kore CRM e visual marker dewa hobe — kono backend / DB change lage na. Per-user, per-browser cache.
+- Proti maser sheshe oy maser BDT/USDT lendend close hobe
+- Closing Due/Advance (signed BDT balance) porer maser **opening balance** hisebe carry forward hobe
+- Notun maser calculation ey opening + oy maser transactions = closing → erpor abar carry
+- Excel **month-by-month** download
+- Kono problem hole sudhu **running month** er data theke fix korlei cholbe (ager closed month untouched)
+- exel download korar somoy kon kon row lagbe seta select korte chaile seta slect kore download korte parbe.karon sobar sob row lagbe na .hoyto sudhu date,bdt ,usdt ,rate,total due /adv lagte pare
 
-### Behavior
+### Solution Overview
 
-1. **Track clicks** — billing icon ("New Billing" ExternalLink) ba "Old" link e click korlei oi `account.id` + click timestamp localStorage e save hobe (max 50 entries, FIFO).
+Ekta notun table `seller_monthly_closings` rakhbo. Proti seller × proti month er ekta row:
 
-2. **Visual markers on the row** —
-   - **Last clicked (most recent)**: account name er pashe ekta highlighted **dot indicator** + thin **left border** in primary color, ar account name er pashe ekta chhoto chip "Last visited • 2m ago".
-   - **Recently visited (top 5)**: account name er pashe just ekta soft dot (muted color) + tooltip e "Visited 5m ago".
-   - Older than 24h auto expire (visually clear, but stored entry remains until pruned).
+- `opening_due_advance_bdt` — oy maser shuru-r balance (= ager maser closing)
+- `month_bdt_in`, `month_client_bdt`, `month_usdt_given`, `month_converted_bdt`, `month_withdraw_bdt`
+- `closing_due_advance_bdt` — opening + (month delta)
+- `closed_at`, `closed_by`, `is_locked`
 
-3. **"Jump to last visited" shortcut** — page er top control bar e ekta chhoto button: "↩ Last billing: <account name>". Click korle list er moddhe oi row porjonto smooth scroll + brief flash highlight (2 sec).
+Ekta button **"Close This Month"** thakbe AdminSellers ey — admin click korle:
 
-4. **Manual clear** — small "Clear" link beside the shortcut button to wipe the history if needed.
+1. Oy seller-er shob approved transactions oy month-er (UTC+6) niye monthly aggregate calculate hobe
+2. Ager month-er `closing_due_advance_bdt` opening hisebe nibe (na thakle 0)
+3. Notun row insert / update hobe, `is_locked = true`
+4. Locked month er transactions ar edit/delete kora jabe na (frontend guard + RLS)
 
-### Where it applies
+### UI Changes — `AdminSellers.tsx`
 
-- Desktop table view + mobile card view both — `AdminAdAccounts.tsx` ar `ClientAdAccounts.tsx` ey same logic.
-- TikTok ad accounts e billing link nai (condition `a.platform !== "tiktok"`), so only Meta accounts will have the marker — natural.
+**1. New "Month View" toolbar:**
 
-### UX details
+- Month picker (default: current month)
+- "Opening Balance" pill: `+৳12,500 Advance` (ager month closing theke)
+- "This Month Net" pill: signed delta
+- "Closing Balance" pill: live calculation
+- "Close Month" button (only on past/current month, requires confirmation)
+- "Reopen Month" button (superadmin only) — unlocks for fixes
 
-- **Marker style** uses semantic tokens (`bg-primary`, `border-primary`, `text-primary`) — matches existing design system, works in both themes.
-- **No flicker** — initial state read synchronously from localStorage so on mount the marker is already visible.
-- **Cross-tab sync** — `storage` event listener so if billing clicked in tab A, tab B's CRM updates the marker too.
+**2. Running balance correction:**
+`computeDueAdvanceRunning` ekhon ekta `openingBalance` parameter nibe. Per-month view ey shob row oy maser opening theke suru hobe (na hole all-time)
 
-## Technical
+**3. Monthly Excel export:**
+Notun button **"Download Monthly"** — drop-down: Jan 2026, Dec 2025, Nov 2025… Each export ey:
 
-**New helper file**: `src/lib/billingVisitTracker.ts`
-- `recordBillingVisit(accountId: string, accountName: string)` — push entry, prune to last 50.
-- `useBillingVisits()` hook — returns `{ visits: VisitEntry[], lastVisit: VisitEntry | null, recordVisit, clearVisits }` and subscribes to `storage` events.
-- `VisitEntry = { accountId: string; accountName: string; visitedAt: number }`
-- localStorage key: `crm:billing-visits:v1`.
+- Header: Seller name, Month, Opening Balance
+- Transaction rows (ager moto column) with running balance starting from opening
+- Footer: Month totals + Closing Balance
+- Filename: `{seller}-{YYYY-MM}-ledger.xlsx`
 
-**Edits**:
-- `src/components/admin/AdminAdAccounts.tsx` — wire `onClick` of the two billing `<a>` tags to call `recordBillingVisit(a.id, a.account_name)` (keep `e.stopPropagation()`). Add visit indicator next to account name in both desktop row (line ~995) and mobile card (line ~825). Add the "Jump to last visited" button in the existing toolbar/header area.
-- `src/components/client/ClientAdAccounts.tsx` — same treatment.
+**Existing "Export All" button thakbe** — full history (current behavior preserved)
 
-**Marker component** (inline or `src/components/BillingVisitMarker.tsx`):
-```tsx
-// Renders: dot + optional "Last visited Xm ago" pill
-<BillingVisitMarker visit={visitForThisAccount} isMostRecent={...} />
+**4. Visual lock indicator:**
+Locked month er row gulo subtle gray background + lock icon, edit/delete button disabled
+
+### Database Schema
+
+```sql
+create table public.seller_monthly_closings (
+  id uuid primary key default gen_random_uuid(),
+  seller_id uuid not null references profiles(user_id) on delete cascade,
+  year int not null,
+  month int not null,  -- 1-12
+  opening_due_advance_bdt numeric not null default 0,
+  month_bdt_in numeric not null default 0,
+  month_client_bdt numeric not null default 0,
+  month_usdt_given numeric not null default 0,
+  month_converted_bdt numeric not null default 0,
+  month_withdraw_bdt numeric not null default 0,
+  closing_due_advance_bdt numeric not null default 0,
+  is_locked boolean not null default true,
+  closed_at timestamptz not null default now(),
+  closed_by uuid references auth.users(id),
+  note text,
+  unique (seller_id, year, month)
+);
 ```
 
-No DB / migration / edge function changes.
+RLS: only admin/superadmin select/insert/update; superadmin can delete (reopen).
 
-## Out of scope
+Optional safeguard trigger on `seller_transactions`: block insert/update/delete if `created_at` falls in a locked month — admin/superadmin override flag. (Recommend: warn-only in v1, add hard lock in v2 once you trust the workflow.)
 
-- Persisting across devices (would need DB table). Local-only is enough for the stated workflow.
-- Tracking which billing link variant ("New" vs "Old") was clicked — both treated as one visit.
+### Carry-Forward Logic
+
+```
+opening = previous_month.closing_due_advance_bdt  (or 0 if first month)
+
+month_delta =
+   sum(bdt_payment + client_topup + tenant_payment)  // +
+ - sum(usdt_amount * rate for usdt_received)         // -
+ - sum(withdraw bdt_amount)                          // -
+
+closing = opening + month_delta
+```
+
+Identical to existing `computeDueAdvanceRunning` formula — just bucketed per month.
+
+### Files
+
+**New:**
+
+- `src/lib/sellerMonthlyClose.ts` — `getMonthBucket(date)`, `aggregateMonth(txns)`, `computeRunningWithOpening(txns, opening)`, `closeMonth(sellerId, year, month)`, `getOpeningFor(sellerId, year, month)`
+- Migration: `seller_monthly_closings` table + RLS
+
+**Modified:**
+
+- `src/lib/sellerRunningTotal.ts` — add optional `openingBalance` param to `computeDueAdvanceRunning`
+- `src/components/admin/AdminSellers.tsx` — month picker, opening/closing pills, Close Month button, monthly Excel export, lock indicators
+
+### Out of Scope (v1)
+
+- Auto-close cron (admin click for now — predictable)
+- Hard DB-level lock on locked-month edits (warn only first)
+- Client-facing seller view changes
+
+### Approval Needed
+
+Approve korle ami migration + code change kore dibo. Default behavior (all-time view) thakbe — month closing optional layer, jokhon use korbe tokhon kaj korbe.
