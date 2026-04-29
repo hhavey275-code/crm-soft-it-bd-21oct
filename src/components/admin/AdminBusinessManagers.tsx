@@ -1383,6 +1383,14 @@ export function AdminBusinessManagers() {
         onOpenChange={(v) => !v && setRecoveryDialogBmId(null)}
         bmId={recoveryDialogBmId ?? undefined}
       />
+
+      {/* Invite User to BM Dialog */}
+      <InviteToBmDialog
+        open={!!inviteDialogBm}
+        onOpenChange={(v) => !v && setInviteDialogBm(null)}
+        bmId={inviteDialogBm?.id ?? null}
+        bmName={inviteDialogBm?.name}
+      />
     </div>
   );
 }
