@@ -866,6 +866,13 @@ export function AdminDashboard() {
                   <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
                   {metaLoading ? "..." : "Meta"}
                 </Button>
+                {metaSyncStatus && (
+                  <span className={`text-[10px] ml-1 ${metaSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {metaSyncStatus.success}/{metaSyncStatus.total}
+                    {metaSyncStatus.failed > 0 && ` · ${metaSyncStatus.failed} fail`}
+                    {metaSyncStatus.failed === 0 && metaSyncStatus.autoRetried > 0 && ` · ${metaSyncStatus.autoRetried} retried`}
+                  </span>
+                )}
               </span>
             </CardTitle>
           </CardHeader>
