@@ -210,7 +210,7 @@ async function fetchCardsForAccount(accountId, accessToken) {
 }
 
 async function fetchAllAdAccountsDsl(accessToken) {
-  const fields = "account_id,name,adtrust_dsl,currency,funding_source_details,adspaymentcycle{funding_source_details}";
+  const fields = "account_id,name,adtrust_dsl,currency";
   const encodedToken = encodeURIComponent(accessToken);
   const byId = new Map();
   const addAccounts = (accounts) => {
