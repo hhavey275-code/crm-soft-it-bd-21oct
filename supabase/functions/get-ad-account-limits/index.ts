@@ -123,18 +123,9 @@ Deno.serve(async (req: Request) => {
     const res = await metaFetch(url, { method: "GET" });
     const body = await res.json().catch(() => ({}));
 
-    if (!res.ok || body?.error) {
-      return json({
-        error: body?.error?.message || `Meta returned ${res.status}`,
-        meta: {
-          via: getLastMetaVia(),
-          ip: getLastMetaIp(),
-          proxy_calls: getMetaProxyCount(),
-          direct_calls: getMetaDirectCount(),
-          proxy_fails: getMetaProxyFailReasons(),
-        },
-      }, 502);
-    }
+    const safeFieldsError = !res.ok || body?.error
+      ? (body?.error?.message || `Meta returned ${res.status}`)
+      : null;
 
     let rawAdtrustDsl: unknown = null;
     for (const version of ["v19.0", "v18.0", "v17.0"]) {
@@ -148,11 +139,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const adtrustDailyLimit = normalizeAmount(rawAdtrustDsl);
-    const minDailyBudget = normalizeAmount(body?.min_daily_budget);
+    const minDailyBudget = safeFieldsError ? 0 : normalizeAmount(body?.min_daily_budget);
     const currency = body?.currency || "USD";
-    const balance = normalizeAmount(body?.balance);
-    const spendCap = normalizeAmount(body?.spend_cap) || Number((account as any).spend_cap ?? 0);
-    const amountSpent = normalizeAmount(body?.amount_spent) || Number((account as any).amount_spent ?? 0);
+    const balance = safeFieldsError ? 0 : normalizeAmount(body?.balance);
+    const spendCap = safeFieldsError ? Number((account as any).spend_cap ?? 0) : (normalizeAmount(body?.spend_cap) || Number((account as any).spend_cap ?? 0));
+    const amountSpent = safeFieldsError ? Number((account as any).amount_spent ?? 0) : (normalizeAmount(body?.amount_spent) || Number((account as any).amount_spent ?? 0));
     const dailySpendLimit = adtrustDailyLimit > 0 ? adtrustDailyLimit : spendCap;
     const dailySpendLimitSource = adtrustDailyLimit > 0 ? "adtrust_dsl" : spendCap > 0 ? "spend_cap" : null;
 
