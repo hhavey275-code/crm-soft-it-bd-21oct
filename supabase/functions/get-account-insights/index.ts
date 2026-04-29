@@ -110,6 +110,247 @@ async function batchSelect(supabase, table, column, ids, selectStr) {
   }
   return results;
 }
+
+const EMPTY_INSIGHT = {
+  today_spend: 0,
+  yesterday_spend: 0,
+  today_orders: 0,
+  yesterday_orders: 0,
+  active_campaigns: 0,
+  today_messages: 0,
+  yesterday_messages: 0,
+  balance: 0,
+  daily_spend_limit: 0,
+  billing_threshold: 0,
+  cards: []
+};
+
+// Strip Graph base URL + access_token query param so the URL can be used as a
+// batch sub-request relative_url.
+const stripGraphBase = (u: string) => u
+  .replace("https://graph.facebook.com/v23.0/", "")
+  .replace(/([?&])access_token=[^&]*/g, (_m, sep) => (sep === "?" ? "?" : ""))
+  .replace(/[?&]$/, "");
+
+/**
+ * Build the 4-5 Meta sub-request relative URLs for one account
+ * (today/yesterday insights, account fields, payment cycle, campaigns).
+ * Returns { subUrls, parseMeta } — pass parseMeta back into parseAccountBatchResults
+ * once the batch response is available.
+ */
+function buildAccountSubUrls(account: any, date?: string, date_from?: string, date_to?: string) {
+  const actId = account.account_id;
+  const isDateRange = !!(date_from && date_to);
+  const isSingleDate = !!(date && !isDateRange);
+  let todayUrl = "";
+  let yesterdayUrl = "";
+  let combinedTodayYesterday = false;
+  if (isDateRange) {
+    todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date_from}","until":"${date_to}"}&time_increment=1`;
+  } else if (isSingleDate) {
+    todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date}","until":"${date}"}`;
+    const d = new Date(date!);
+    d.setDate(d.getDate() - 1);
+    const prev = d.toISOString().split("T")[0];
+    yesterdayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${prev}","until":"${prev}"}`;
+  } else {
+    const todayStr = bdDateString();
+    const yesterdayStr = bdYesterdayString();
+    todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${yesterdayStr}","until":"${todayStr}"}&time_increment=1`;
+    combinedTodayYesterday = true;
+  }
+  const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
+  const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details`;
+  const campaignFilter = encodeURIComponent(JSON.stringify([
+    { field: "effective_status", operator: "IN", value: ["ACTIVE"] }
+  ]));
+  const campaignsUrl = `https://graph.facebook.com/v23.0/${actId}/campaigns?filtering=${campaignFilter}&summary=true&limit=0`;
+
+  const subUrls = [stripGraphBase(todayUrl)];
+  if (yesterdayUrl) subUrls.push(stripGraphBase(yesterdayUrl));
+  subUrls.push(stripGraphBase(accountFieldsUrl));
+  subUrls.push(stripGraphBase(paymentCycleUrl));
+  subUrls.push(stripGraphBase(campaignsUrl));
+  return {
+    subUrls,
+    parseMeta: { isDateRange, isSingleDate, combinedTodayYesterday, hasYesterdayUrl: !!yesterdayUrl }
+  };
+}
+
+/** Parse the consecutive batch result slice (4 or 5 entries) for one account. */
+function parseAccountBatchResults(account: any, batchResults: any[], parseMeta: any) {
+  const actId = account.account_id;
+  const { isDateRange, isSingleDate, combinedTodayYesterday, hasYesterdayUrl } = parseMeta;
+  let idx = 0;
+  const todayData = batchResults[idx++];
+  const yesterdayData = hasYesterdayUrl ? batchResults[idx++] : { data: [] };
+  const accountData = batchResults[idx++];
+  const paymentCycleData = batchResults[idx++];
+  const campaignsData = batchResults[idx++];
+  const activeCampaigns = campaignsData?.summary?.total_count ?? 0;
+  const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData) || checkRateLimit(paymentCycleData);
+  if (rlCode) {
+    return {
+      id: account.id,
+      insight: { ...EMPTY_INSIGHT },
+      rateLimit: { account_id: actId, account_name: account.account_name || actId, error_code: rlCode }
+    };
+  }
+  let todaySpend = 0;
+  let yesterdaySpend = 0;
+  if (combinedTodayYesterday && Array.isArray(todayData?.data)) {
+    const todayStr = bdDateString();
+    for (const row of todayData.data){
+      const rowDate = row.date_start?.split("T")[0] || "";
+      const spend = row.spend ? parseFloat(row.spend) : 0;
+      if (rowDate === todayStr) todaySpend = spend;
+      else yesterdaySpend = spend;
+    }
+  } else if (isDateRange && Array.isArray(todayData?.data)) {
+    todaySpend = todayData.data.reduce((sum: number, row: any) => sum + (row.spend ? parseFloat(row.spend) : 0), 0);
+  } else {
+    todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
+    yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
+  }
+  const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
+  const fsd = accountData?.funding_source_details;
+  let adAccountUpdate: any = undefined;
+  if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
+    const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
+    const rawSpendCap = accountData?.spend_cap;
+    const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
+    adAccountUpdate = { id: account.id, amount_spent: metaAmountSpent };
+    if (metaSpendCap > 0) adAccountUpdate.spend_cap = metaSpendCap;
+    const metaStatus = accountData?.account_status;
+    if (metaStatus !== undefined && metaStatus !== null) {
+      if (metaStatus === 1) adAccountUpdate.status = "active";
+      else if (metaStatus === 2) adAccountUpdate.status = "disabled";
+      else if (metaStatus === 3) adAccountUpdate.status = "unsettled";
+      else if (metaStatus === 101 || metaStatus === 100) adAccountUpdate.status = "disabled";
+      else adAccountUpdate.status = "hold";
+    }
+  }
+  const cards: any[] = [];
+  const seenCardIds = new Set();
+  const pushCard = (id: any, displayString: any, type: any, isPrimary: boolean) => {
+    const sid = String(id ?? "").trim();
+    if (!sid || seenCardIds.has(sid)) return;
+    seenCardIds.add(sid);
+    cards.push({
+      id: sid,
+      display_string: displayString || `Card ending ${sid.slice(-4) || "****"}`,
+      type: type ?? "unknown",
+      is_primary: isPrimary
+    });
+  };
+  if (fsd) pushCard(fsd.id, fsd.display_string, fsd.type, true);
+  if (paymentCycleData && !paymentCycleData.error && Array.isArray(paymentCycleData.data)) {
+    for (const cycle of paymentCycleData.data){
+      const source = cycle?.funding_source_details;
+      if (!source) continue;
+      pushCard(source.id, source.display_string, source.type, false);
+    }
+  } else if (paymentCycleData?.error) {
+    console.log(`adspaymentcycle for ${actId} error:`, JSON.stringify(paymentCycleData.error));
+  }
+  let dailyBreakdown: any;
+  if (isDateRange && todayData?.data && Array.isArray(todayData.data)) {
+    dailyBreakdown = todayData.data.map((row: any) => ({
+      date: row.date_start?.split("T")[0] || "",
+      spend: row.spend ? parseFloat(row.spend) : 0
+    }));
+  }
+  let todayOrders = 0, yesterdayOrders = 0, todayMessages = 0, yesterdayMessages = 0;
+  if (combinedTodayYesterday && Array.isArray(todayData?.data)) {
+    const todayStr = bdDateString();
+    for (const row of todayData.data){
+      const rowDate = row.date_start?.split("T")[0] || "";
+      const fakeData = { data: [row] };
+      if (rowDate === todayStr) {
+        todayOrders = extractOrders(fakeData);
+        todayMessages = extractMessages(fakeData);
+      } else {
+        yesterdayOrders = extractOrders(fakeData);
+        yesterdayMessages = extractMessages(fakeData);
+      }
+    }
+  } else {
+    todayOrders = extractOrders(todayData);
+    yesterdayOrders = extractOrders(yesterdayData);
+    todayMessages = extractMessages(todayData);
+    yesterdayMessages = extractMessages(yesterdayData);
+  }
+  const metaAccountStatus = accountData?.account_status ?? null;
+  const metaDisableReason = accountData?.disable_reason ?? null;
+  return {
+    id: account.id,
+    insight: {
+      today_spend: todaySpend,
+      yesterday_spend: yesterdaySpend,
+      date_spend: isSingleDate || isDateRange ? todaySpend : undefined,
+      daily_breakdown: dailyBreakdown,
+      today_orders: todayOrders,
+      yesterday_orders: yesterdayOrders,
+      active_campaigns: activeCampaigns,
+      today_messages: todayMessages,
+      yesterday_messages: yesterdayMessages,
+      balance,
+      daily_spend_limit: 0,
+      billing_threshold: 0,
+      cards,
+      account_status: metaAccountStatus,
+      disable_reason: metaDisableReason
+    },
+    adAccountUpdate
+  };
+}
+
+/**
+ * Multi-account batched processor: packs N accounts' sub-requests into a single
+ * Meta `?batch=` POST. Caller must keep accountsInBatch.length * subReqsPerAccount <= 50.
+ * All accounts MUST share the same access token.
+ */
+async function processAccountsBatched(
+  accountsInBatch: any[],
+  accessToken: string,
+  date?: string,
+  date_from?: string,
+  date_to?: string
+) {
+  const builds = accountsInBatch.map((acc) => buildAccountSubUrls(acc, date, date_from, date_to));
+  const allSubUrls: string[] = [];
+  const offsets: number[] = [];
+  for (const b of builds) {
+    offsets.push(allSubUrls.length);
+    allSubUrls.push(...b.subUrls);
+  }
+  let batchResults: any[];
+  try {
+    batchResults = await metaBatchGet(accessToken, allSubUrls);
+  } catch (err: any) {
+    // Whole batch failed (network/proxy). Return syncError per account.
+    return accountsInBatch.map((acc) => ({
+      id: acc.id,
+      insight: { ...EMPTY_INSIGHT },
+      syncError: String(err?.message || err || "batch fetch failed")
+    }));
+  }
+  const out: any[] = [];
+  for (let i = 0; i < accountsInBatch.length; i++) {
+    try {
+      const slice = batchResults.slice(offsets[i], offsets[i] + builds[i].subUrls.length);
+      out.push(parseAccountBatchResults(accountsInBatch[i], slice, builds[i].parseMeta));
+    } catch (err: any) {
+      out.push({
+        id: accountsInBatch[i].id,
+        insight: { ...EMPTY_INSIGHT },
+        syncError: String(err?.message || err || "parse failed")
+      });
+    }
+  }
+  return out;
+}
+
 function extractOrders(data) {
   const actions = data?.data?.[0]?.actions;
   if (!actions) return 0;
@@ -282,19 +523,7 @@ function extractCurrencyFromPayload(payload, field) {
 }
 // Process a single account's Meta API calls
 async function processAccount(account, serviceKey, date, date_from, date_to) {
-  const emptyInsight = {
-    today_spend: 0,
-    yesterday_spend: 0,
-    today_orders: 0,
-    yesterday_orders: 0,
-    active_campaigns: 0,
-    today_messages: 0,
-    yesterday_messages: 0,
-    balance: 0,
-    daily_spend_limit: 0,
-    billing_threshold: 0,
-    cards: []
-  };
+  const emptyInsight = { ...EMPTY_INSIGHT };
   const rawToken = account.business_managers?.access_token;
   const actId = account.account_id;
   if (!rawToken) {
@@ -696,49 +925,70 @@ Deno.serve(async (req)=>{
     const rateLimited = [];
     const adAccountUpdates = [];
     const syncErrors = {};
-    // Process in small batches with delay to avoid Meta rate limits
-    const accountBatches = chunk(accounts ?? [], META_BATCH_SIZE);
+    // Multi-account batching: pack 10 accounts (~40-50 sub-requests) into a single
+    // Meta `?batch=` POST. Group by access token first (Meta requires one token per
+    // batch). Process batches with limited concurrency. 320 accounts → ~32 HTTP calls.
+    const allAccounts = accounts ?? [];
+    // Decrypt + group accounts by token
+    const tokenGroups = new Map<string, any[]>();
+    const skippedAccounts: any[] = [];
+    const decryptCache = new Map<string, string>();
+    for (const acc of allAccounts) {
+      const rawTok = acc.business_managers?.access_token;
+      if (!rawTok) { skippedAccounts.push(acc); continue; }
+      let plain = decryptCache.get(rawTok);
+      if (!plain) {
+        try {
+          plain = await decryptToken(rawTok, serviceKey);
+          decryptCache.set(rawTok, plain);
+        } catch {
+          skippedAccounts.push(acc);
+          continue;
+        }
+      }
+      if (!tokenGroups.has(plain)) tokenGroups.set(plain, []);
+      tokenGroups.get(plain)!.push(acc);
+    }
+    // Skipped accounts → empty insight + sync error
+    for (const acc of skippedAccounts) {
+      insights[acc.id] = { ...EMPTY_INSIGHT };
+      syncErrors[acc.id] = "missing or undecryptable BM token";
+    }
+    // Build the list of (token, accountsBatch) tasks. Each task = ONE Meta HTTP call.
+    // Pack: 10 accounts × ~5 sub-req = 50 sub-req per batch (Meta hard limit).
+    const ACCS_PER_BATCH = 10;
+    type BatchTask = { token: string; accs: any[] };
+    const tasks: BatchTask[] = [];
+    for (const [token, accs] of tokenGroups.entries()) {
+      for (let i = 0; i < accs.length; i += ACCS_PER_BATCH) {
+        tasks.push({ token, accs: accs.slice(i, i + ACCS_PER_BATCH) });
+      }
+    }
     let hitRateLimit = false;
-    console.log(`Processing ${accounts?.length ?? 0} accounts in ${accountBatches.length} batches of ${META_BATCH_SIZE}`);
-    for(let i = 0; i < accountBatches.length; i++){
-      const batch = accountBatches[i];
-      // If we already hit a rate limit, skip remaining Meta calls and return empty
-      if (hitRateLimit) {
-        for (const account of batch){
-          insights[account.id] = {
-            today_spend: 0,
-            yesterday_spend: 0,
-            today_orders: 0,
-            yesterday_orders: 0,
-            active_campaigns: 0,
-            today_messages: 0,
-            yesterday_messages: 0,
-            balance: 0,
-            daily_spend_limit: 0,
-            billing_threshold: 0,
-            cards: []
-          };
-        }
-        continue;
-      }
-      // Process batch concurrently (small batch = safe)
-      const results = await Promise.all(batch.map((account)=>processAccount(account, serviceKey, date, date_from, date_to)));
-      for (const result of results){
-        insights[result.id] = result.insight;
-        if (result.rateLimit) {
-          rateLimited.push(result.rateLimit);
-          hitRateLimit = true;
-        }
-        if (result.adAccountUpdate) {
-          adAccountUpdates.push(result.adAccountUpdate);
-        }
-        if (result.syncError) {
-          syncErrors[result.id] = result.syncError;
+    console.log(`Processing ${allAccounts.length} accounts as ${tasks.length} batched Meta call(s) (${tokenGroups.size} token group[s])`);
+    // Run with limited concurrency (4 parallel HTTP calls)
+    const CONCURRENCY = 4;
+    let nextIdx = 0;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, async () => {
+      while (true) {
+        if (hitRateLimit) return;
+        const i = nextIdx++;
+        if (i >= tasks.length) return;
+        const task = tasks[i];
+        const results = await processAccountsBatched(task.accs, task.token, date, date_from, date_to);
+        for (const result of results) {
+          insights[result.id] = result.insight;
+          if (result.rateLimit) { rateLimited.push(result.rateLimit); hitRateLimit = true; }
+          if (result.adAccountUpdate) adAccountUpdates.push(result.adAccountUpdate);
+          if (result.syncError) syncErrors[result.id] = result.syncError;
         }
       }
-      // Add delay between batches (skip after last batch)
-      if (i < accountBatches.length - 1 && !hitRateLimit) {
-        await delay(META_BATCH_DELAY_MS);
+    });
+    await Promise.all(workers);
+    // For any accounts skipped due to early rate-limit, set empty insight
+    for (const acc of allAccounts) {
+      if (!(acc.id in insights)) {
+        insights[acc.id] = { ...EMPTY_INSIGHT };
       }
     }
     // Upsert all insights into DB (only for non-date queries)
