@@ -53,6 +53,7 @@ export function AdminDashboard() {
   const isMobile = useIsMobile();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
+  const [metaSyncStatus, setMetaSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
   const [monthSyncLoading, setMonthSyncLoading] = useState(false);
   const [graphMonth, setGraphMonth] = useState(new Date());
   const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
@@ -321,7 +322,18 @@ export function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph"] });
       // Populate client_daily_stats for all users after Meta sync
       import("@/lib/populateDailyStats").then(m => m.populateClientDailyStats()).catch(console.error);
-      toast.success("Meta data updated successfully");
+      const failed = result.failed_account_ids?.length ?? 0;
+      const attempted = result.attempted ?? ids.length;
+      const succeeded = result.succeeded ?? (attempted - failed);
+      const autoRetried = result.auto_retried ?? 0;
+      setMetaSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
+      if (failed > 0) {
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`Meta data updated (${autoRetried} auto-retried successfully)`);
+      } else {
+        toast.success("Meta data updated successfully");
+      }
     } catch (err: any) {
       toast.error("Failed to update from Meta: " + (err.message || "Unknown error"));
     } finally {
@@ -854,6 +866,13 @@ export function AdminDashboard() {
                   <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
                   {metaLoading ? "..." : "Meta"}
                 </Button>
+                {metaSyncStatus && (
+                  <span className={`text-[10px] ml-1 ${metaSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {metaSyncStatus.success}/{metaSyncStatus.total}
+                    {metaSyncStatus.failed > 0 && ` · ${metaSyncStatus.failed} fail`}
+                    {metaSyncStatus.failed === 0 && metaSyncStatus.autoRetried > 0 && ` · ${metaSyncStatus.autoRetried} retried`}
+                  </span>
+                )}
               </span>
             </CardTitle>
           </CardHeader>

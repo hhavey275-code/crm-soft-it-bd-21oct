@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 30;
+const CONCURRENCY = 3;
+const RETRY_CHUNK_SIZE = 10;
 const MAX_CHUNK_RETRIES = 2; // initial + 2 retries = 3 attempts per chunk
 const RETRY_DELAY_MS = 1500;
 
@@ -11,9 +13,28 @@ async function invokeChunk(body: any) {
 }
 
 /**
+ * Run an array of async tasks with a maximum concurrency.
+ */
+async function runPool<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      results[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/**
  * Fetch account insights from Meta API in chunks to avoid edge function timeout.
  * Each chunk is retried up to MAX_CHUNK_RETRIES times on transient failure
  * so a single bad chunk does NOT abort the entire "Update All" run.
+ * Chunks run in parallel (CONCURRENCY=3). After all chunks finish, any
+ * still-failed account ids are auto-retried once in smaller batches.
  * Returns merged insights, rate-limited list, and per-chunk failure info.
  */
 export async function chunkedMetaSync(
@@ -24,34 +45,42 @@ export async function chunkedMetaSync(
     date_to?: string;
     onProgress?: (synced: number, total: number) => void;
   }
-): Promise<{ insights: Record<string, any>; rate_limited: any[]; failed_account_ids: string[]; failed_chunks: number; meta_calls: number }> {
+): Promise<{
+  insights: Record<string, any>;
+  rate_limited: any[];
+  failed_account_ids: string[];
+  failed_chunks: number;
+  meta_calls: number;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  auto_retried: number;
+}> {
   const allInsights: Record<string, any> = {};
   const allRateLimited: any[] = [];
-  const failedAccountIds: string[] = [];
+  let failedAccountIds: string[] = [];
   let failedChunks = 0;
   let metaCalls = 0;
   const total = ids.length;
+  let synced = 0;
 
-  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-    const chunk = ids.slice(i, i + CHUNK_SIZE);
-    options?.onProgress?.(Math.min(i + CHUNK_SIZE, total), total);
-
+  const buildBody = (chunk: string[]) => {
     const body: any = { ad_account_ids: chunk, source: "meta" };
     if (options?.date) body.date = options.date;
     if (options?.date_from) body.date_from = options.date_from;
     if (options?.date_to) body.date_to = options.date_to;
+    return body;
+  };
 
-    let success = false;
+  // Process a single chunk with retries. Returns true on success.
+  async function processChunk(chunk: string[], maxRetries: number): Promise<boolean> {
+    const body = buildBody(chunk);
     let lastError: any = null;
-
-    for (let attempt = 0; attempt <= MAX_CHUNK_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const { data, error } = await invokeChunk(body);
-
         if (error) {
           const errMsg = typeof error === "object" && error?.message ? error.message : String(error);
-
-          // Auth expiry — refresh once and retry immediately (doesn't count as a regular retry)
           if (errMsg.includes("401") || errMsg.includes("Unauthorized")) {
             console.warn("Session expired during Meta sync. Refreshing...");
             const { error: refreshError } = await supabase.auth.refreshSession();
@@ -61,37 +90,72 @@ export async function chunkedMetaSync(
             if (retry.data?.insights) Object.assign(allInsights, retry.data.insights);
             if (retry.data?.rate_limited?.length) allRateLimited.push(...retry.data.rate_limited);
             if (retry.data?.meta_calls?.total) metaCalls += Number(retry.data.meta_calls.total) || 0;
-            success = true;
-            break;
+            return true;
           }
-
           throw error;
         }
-
         if (data?.insights) Object.assign(allInsights, data.insights);
         if (data?.rate_limited?.length) allRateLimited.push(...data.rate_limited);
         if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
-        success = true;
-        break;
+        return true;
       } catch (err: any) {
         lastError = err;
-        // Backoff before next attempt (except after the last attempt)
-        if (attempt < MAX_CHUNK_RETRIES) {
+        if (attempt < maxRetries) {
           await sleep(RETRY_DELAY_MS * (attempt + 1));
         }
       }
     }
+    console.error(`[chunkedMetaSync] Chunk of ${chunk.length} failed after ${maxRetries + 1} attempts:`, lastError);
+    return false;
+  }
 
-    if (!success) {
+  // Build initial chunks (size 30) and run in a parallel pool of CONCURRENCY.
+  const initialChunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    initialChunks.push(ids.slice(i, i + CHUNK_SIZE));
+  }
+
+  const tasks = initialChunks.map((chunk) => async () => {
+    const ok = await processChunk(chunk, MAX_CHUNK_RETRIES);
+    synced += chunk.length;
+    options?.onProgress?.(Math.min(synced, total), total);
+    if (!ok) {
       failedChunks++;
       failedAccountIds.push(...chunk);
-      console.error(
-        `[chunkedMetaSync] Chunk ${i / CHUNK_SIZE + 1} failed after ${MAX_CHUNK_RETRIES + 1} attempts:`,
-        lastError
-      );
-      // Continue with the next chunk — DO NOT throw, otherwise remaining accounts won't update
+    }
+  });
+
+  await runPool(tasks, CONCURRENCY);
+
+  // Auto-retry layer: smaller batches of 10, sequential to avoid hammering.
+  let autoRetried = 0;
+  if (failedAccountIds.length > 0) {
+    const toRetry = [...failedAccountIds];
+    failedAccountIds = [];
+    console.log(`[chunkedMetaSync] Auto-retrying ${toRetry.length} failed account(s) in smaller batches...`);
+    for (let i = 0; i < toRetry.length; i += RETRY_CHUNK_SIZE) {
+      const chunk = toRetry.slice(i, i + RETRY_CHUNK_SIZE);
+      const ok = await processChunk(chunk, 1);
+      if (ok) {
+        autoRetried += chunk.length;
+      } else {
+        failedAccountIds.push(...chunk);
+      }
     }
   }
 
-  return { insights: allInsights, rate_limited: allRateLimited, failed_account_ids: failedAccountIds, failed_chunks: failedChunks, meta_calls: metaCalls };
+  const failed = failedAccountIds.length;
+  const succeeded = total - failed;
+
+  return {
+    insights: allInsights,
+    rate_limited: allRateLimited,
+    failed_account_ids: failedAccountIds,
+    failed_chunks: failedChunks,
+    meta_calls: metaCalls,
+    attempted: total,
+    succeeded,
+    failed,
+    auto_retried: autoRetried,
+  };
 }

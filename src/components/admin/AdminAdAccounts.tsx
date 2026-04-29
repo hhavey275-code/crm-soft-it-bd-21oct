@@ -95,6 +95,7 @@ export function AdminAdAccounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
   const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
+  const [lastSyncStatus, setLastSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
@@ -265,8 +266,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? assignedAccounts.length;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} account(s) could not be updated (network/server issue). Click Update again to retry just those.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} updated (${autoRetried} auto-retried successfully)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} account(s) rate-limited by Meta. Please retry after a few minutes.`);
       } else {
@@ -297,8 +304,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? unassignedAccounts.length;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} inventory account(s) could not be updated.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} inventory updated · ${failed} failed`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} inventory updated (${autoRetried} auto-retried)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} inventory account(s) rate-limited by Meta.`);
       } else {
@@ -321,8 +334,14 @@ export function AdminAdAccounts() {
     onSuccess: (data) => {
       const rl = data?.rate_limited;
       const failed = data?.failed_account_ids?.length ?? 0;
+      const attempted = data?.attempted ?? selectedIds.size;
+      const succeeded = data?.succeeded ?? (attempted - failed);
+      const autoRetried = data?.auto_retried ?? 0;
+      setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
-        toast.warning(`⚠️ ${failed} of ${selectedIds.size} account(s) could not be updated. Click Update again to retry.`);
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`${attempted} updated (${autoRetried} auto-retried)`);
       } else if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} of ${selectedIds.size} account(s) rate-limited. Please retry after a few minutes.`);
       } else {
@@ -612,9 +631,20 @@ export function AdminAdAccounts() {
           )}
         </div>
       </div>
-      {lastSyncCalls !== null && (
-        <div className="text-xs text-muted-foreground -mt-2">
-          Last sync used <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+      {(lastSyncCalls !== null || lastSyncStatus !== null) && (
+        <div className="text-xs -mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {lastSyncStatus && (
+            <span className={lastSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : "text-emerald-600 dark:text-emerald-400 font-medium"}>
+              {lastSyncStatus.success}/{lastSyncStatus.total} updated
+              {lastSyncStatus.failed > 0 && ` · ${lastSyncStatus.failed} failed`}
+              {lastSyncStatus.failed === 0 && lastSyncStatus.autoRetried > 0 && ` · ${lastSyncStatus.autoRetried} auto-retried`}
+            </span>
+          )}
+          {lastSyncCalls !== null && (
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
       )}
 

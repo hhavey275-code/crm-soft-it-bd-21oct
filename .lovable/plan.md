@@ -1,58 +1,47 @@
 ## Goal
-1. Spend Report ar Admin Dashboard er date-range spend cache theke noy — **proti bar live Meta theke fetch** korbe (jate counter o thik dekhabe ar real-time data ashe).
-2. Protita spend check action **system_logs** e likhbe — admin name, action, kotogula account, date range, total Meta API calls, proxy IP shoho. (Same pattern jeta `get-account-insights` already kore.)
+"Update All from Meta" druto korbo + je accounts fail hobe automatic retry hobe + button er pase choto status text e success/fail count dekhabo. **System log e kichu likhbo na.**
 
 ## Changes
 
-### 1. `supabase/functions/get-spend-only/index.ts` — system log add
-Just like `get-account-insights` does at line 1080-1112, add at the end of handler:
-- Read caller `user_id` from JWT (`Authorization` header) → lookup `profiles.full_name / email` → `userName`.
-- Insert into `system_logs`:
-  - **action**: `"Meta Spend Check"`
-  - **details**: `"Checked spend for N account(s) [range=YYYY-MM-DD..YYYY-MM-DD] | calls=X (proxy=P, direct=D) | proxy_ip=..."`
-  - **user_id / user_name**: from caller
-- Wrap in try/catch (same as existing function) so log failure never breaks the response.
-- Continue returning `meta_calls` in response (already done).
+### 1. `src/lib/chunkedMetaSync.ts` — parallel + auto-retry
+- Chunk size: 50 → **30** (timeout buffer barbe)
+- Sequential loop er bodole **parallel pool concurrency=3** (Promise.all + simple limiter)
+- All chunks done howar por jodi `failedAccountIds.length > 0` hoy → automatic ekbar **smaller batch (size 10) e retry** korbe oi failed ids gulo. Retry successful gulo `allInsights` e merge hobe ar `failedAccountIds` theke remove hobe.
+- Return shape e notun field jog: `attempted`, `succeeded`, `failed` (number) — UI te dekhanor jonno.
+- `onProgress(synced, total)` parallel pool e o thik kaj korbe (jokhonji ekta chunk shesh hobe synced += chunk.length)
 
-### 2. `src/lib/fetchSpendOnly.ts` — no cache
-Already fine (no internal cache). Caller controls cache via React Query.
+### 2. `supabase/functions/get-account-insights/index.ts` — internal speedup
+- `META_BATCH_SIZE`: 20 → **30**
+- `META_BATCH_DELAY_MS`: 300 → **150**
+(Edge function call backe data tara tara return korbe → client side timeout risk komabe)
 
-### 3. `src/components/pages/ClientSpendReportPage.tsx` — disable cache for date-range query
-Current: `staleTime: 0` but React Query still serves cached data instantly while refetching in the background → `queryFn` may not run when filters unchanged.
+### 3. UI — button er pase choto status text (3 jaygaya)
+Files: `src/components/admin/AdminAdAccounts.tsx` (refreshAllMutation, refreshInventoryMutation, refreshSelectedMutation) + `src/components/admin/AdminDashboard.tsx` (2 ta refresh mutation)
 
-Change date-range query options to:
-- `staleTime: 0`
-- `gcTime: 0` (drop cache immediately)
-- `refetchOnMount: "always"`
-- `refetchOnWindowFocus: false` (avoid surprise refetches)
+- Mutation e notun state: `lastSyncStatus: { total, success, failed } | null`
+- `onSuccess` e set korbo
+- Header e existing "Synced X ago" / "Last sync used N calls" line er pasei choto text:
+  - All success: `364/364 updated · 7 calls` (green text)
+  - Partial: `350/364 updated · 14 failed (auto-retried)` (amber text)
+- Toast o existing 1 ta thakbe — but jodi auto-retry ke success kore tahole green toast: `364 updated (14 auto-retried successfully)`. Jodi tao failed hoy: `350 updated, 14 failed — click Update again to retry`.
 
-This guarantees: every time user lands on the page or changes date → fresh Meta call → counter updates correctly.
-
-Also: store `metaCalls` from query data, not separate state. Do this by returning `{ rows, meta_calls }` from `queryFn` and reading `metaRows?.meta_calls` directly. Removes the stale `null` after navigation.
-
-### 4. `src/components/admin/AdminDashboard.tsx` — same for date-range card
-`handleFetchDateRangeSpend` already runs only on button click (no cache issue). But:
-- Currently writes spend to `sessionStorage` and reads on mount → that's why old number shows with "0 calls" after reload.
-- Fix: when reading from `sessionStorage`, set `dateSpendCalls` to `null` AND show a small `(cached — click date to refetch live)` hint next to the number. This way user knows it's not a fresh call.
-- New live fetch via the button updates both spend + counter as today.
-
-### 5. Show proxy IP in UI counter (optional but helpful)
-Edge function already returns `meta_calls.total`. Extend response to include `proxy_ip` (already tracked via `getLastMetaIp()`). UI counter line becomes:
-- `Meta API calls: 7 (via proxy IP 1.2.3.4)` — when proxy used
-- `Meta API calls: 7 (direct)` — when proxy fallback happened
-
-Files: `get-spend-only/index.ts` (add `proxy_ip` to response), `fetchSpendOnly.ts` (bubble up), and the 3 UI files (`AdminDashboard.tsx`, `ClientSpendReportPage.tsx`, `AdminAdAccounts.tsx` + `ClientAdAccounts.tsx`) to display it.
+### 4. **NO system_logs entry** for Update All Meta
+Per user request — kono extra log entry hobe na. `logSystemAction` call add korbo na update all flow e.
 
 ## Files touched
-1. `supabase/functions/get-spend-only/index.ts` — add system_logs insert + `proxy_ip` in response
-2. `src/lib/fetchSpendOnly.ts` — return `proxy_ip` along with `meta_calls`
-3. `src/components/pages/ClientSpendReportPage.tsx` — disable cache, show counter from query data, show proxy IP
-4. `src/components/admin/AdminDashboard.tsx` — show "(cached)" hint when restored from sessionStorage, show proxy IP after live fetch
-5. `src/components/admin/AdminAdAccounts.tsx` + `src/components/client/ClientAdAccounts.tsx` — show proxy IP next to existing counter
+1. `src/lib/chunkedMetaSync.ts` — parallel pool + auto-retry layer + extended return
+2. `supabase/functions/get-account-insights/index.ts` — META_BATCH_SIZE 30, delay 150ms
+3. `src/components/admin/AdminAdAccounts.tsx` — status text near Update button (3 mutations)
+4. `src/components/admin/AdminDashboard.tsx` — status text near Update button (2 mutations)
+
+## Expected result
+- 364 acc update: ~8 min → **~2-3 min** (parallel × 3)
+- "2-3 hours ago" stale account drastically kombe (auto-retry layer)
+- Tumi button er pasei dekhte parba: kotogula update holo, kotogula fail holo
+- System logs tab e kono notun entry add hobe na
 
 ## Out of scope
-- Realtime subscription on a `spend_data` table — we don't store per-account spend in a table; spend is fetched live from Meta. Disabling React Query cache (above) achieves the "always live" behavior you want without needing Supabase realtime.
-- `get-account-insights` already logs to system_logs (no change needed).
-- Other pages that don't show spend.
+- Full background job (BullMQ/queue) — lagbe na ei muhurte
+- System log entries — user explicitly skip korte bolechen
 
 Approve hole implement kore di.
