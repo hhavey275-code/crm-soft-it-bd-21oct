@@ -216,7 +216,7 @@ Deno.serve(async (req: Request) => {
     for (const idChunk of chunk([...bareIds, ...prefixedIds], 80)) {
       const { data, error: lookupErr } = await supabase
         .from("ad_accounts")
-        .select("id, account_id, platform")
+        .select("id, account_id, platform, business_manager_id")
         .in("account_id", idChunk);
       if (lookupErr) return json({ error: lookupErr.message }, 500);
       existing.push(...(data ?? []));
