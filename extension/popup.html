@@ -140,6 +140,19 @@
         Make sure you're logged into Facebook with full BM admin access.
       </div>
 
+      <div class="card" style="padding:10px 12px;">
+        <div class="row" style="align-items:flex-start;">
+          <div style="min-width:0;">
+            <div style="font-weight:500;font-size:12px;">Auto-sync (hourly)</div>
+            <div class="muted" id="auto-sync-status" style="margin-top:2px;">Loading...</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted);margin:0;">
+            <input id="auto-sync-toggle" type="checkbox" style="width:auto;margin:0;" />
+            <span id="auto-sync-label">On</span>
+          </label>
+        </div>
+      </div>
+
       <div id="progress-wrap" class="hidden">
         <div class="progress"><div id="progress-bar" class="progress-bar"></div></div>
         <div class="muted" id="progress-text">Working...</div>
