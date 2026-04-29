@@ -659,6 +659,16 @@ export function AdminBusinessManagers() {
               {!isMobile && (syncAllMutation.isPending ? "Syncing All..." : "Sync All")}
             </Button>
           )}
+          {bms && bms.length > 0 && (
+            <Button
+              variant="outline"
+              size={isMobile ? "sm" : "default"}
+              onClick={() => { setManualBmId(bms[0]?.id ?? ""); setManualAddOpen(true); }}
+            >
+              <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
+              {isMobile ? "Add Acc" : "Add Ad Account"}
+            </Button>
+          )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size={isMobile ? "sm" : "default"}>
