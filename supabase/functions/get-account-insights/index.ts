@@ -59,6 +59,47 @@ function chunk(arr, size) {
   return chunks;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+
+/**
+ * Execute multiple Meta Graph API GET requests as a single batched POST.
+ * Each `relative_url` is the path + query (without leading slash, without access_token).
+ * Returns an array of parsed JSON bodies in the same order. On batch-level
+ * failure, returns an array of `{__batch_error: true, status, body}` for each entry.
+ * Counts as ONE outbound metaFetch call (one proxy hit, one IP usage).
+ */
+async function metaBatchGet(accessToken: string, relativeUrls: string[]): Promise<any[]> {
+  if (!relativeUrls.length) return [];
+  const batchPayload = relativeUrls.map((u) => ({ method: "GET", relative_url: u }));
+  const form = new URLSearchParams();
+  form.set("access_token", accessToken);
+  form.set("include_headers", "false");
+  form.set("batch", JSON.stringify(batchPayload));
+  const res = await metaFetch("https://graph.facebook.com/v23.0/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return relativeUrls.map(() => ({ __batch_error: true, status: res.status, body: text }));
+  }
+  const json = await res.json().catch(() => null);
+  if (!Array.isArray(json)) {
+    return relativeUrls.map(() => ({ __batch_error: true, status: res.status, body: "non-array response" }));
+  }
+  return json.map((item) => {
+    if (!item) return { __batch_error: true, status: 0, body: "null entry" };
+    if (item.code && item.code >= 200 && item.code < 300 && typeof item.body === "string") {
+      try { return JSON.parse(item.body); } catch { return { __batch_error: true, status: item.code, body: item.body }; }
+    }
+    // Non-2xx sub-response — try to parse body for the Meta error envelope
+    if (typeof item.body === "string") {
+      try { return JSON.parse(item.body); } catch { return { __batch_error: true, status: item.code ?? 0, body: item.body }; }
+    }
+    return { __batch_error: true, status: item.code ?? 0, body: "" };
+  });
+}
+
 async function batchSelect(supabase, table, column, ids, selectStr) {
   const batches = chunk(ids, 30);
   const results = [];
@@ -287,38 +328,35 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
       todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${yesterdayStr}","until":"${todayStr}"}&time_increment=1&access_token=${accessToken}`;
       combinedTodayYesterday = true;
     }
-    // Main account data fetch
-    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason&access_token=${accessToken}`;
-    // Backup/all linked cards via payment cycle endpoint (Meta only returns primary in funding_source_details)
-    const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details&access_token=${accessToken}`;
-    const fetchPromises = [
-      metaFetch(todayUrl),
-      metaFetch(accountFieldsUrl),
-      metaFetch(paymentCycleUrl),
-      fetchActiveCampaignCount(actId, accessToken).then((c)=>({
-          json: async ()=>c
-        }))
-    ];
-    if (yesterdayUrl) {
-      fetchPromises.splice(1, 0, metaFetch(yesterdayUrl));
-    }
-    const responses = await Promise.all(fetchPromises);
-    let todayData, yesterdayData, accountData, paymentCycleData, activeCampaigns;
-    if (yesterdayUrl) {
-      todayData = await responses[0].json();
-      yesterdayData = await responses[1].json();
-      accountData = await responses[2].json();
-      paymentCycleData = await responses[3].json();
-      activeCampaigns = await responses[4].json();
-    } else {
-      todayData = await responses[0].json();
-      yesterdayData = {
-        data: []
-      };
-      accountData = await responses[1].json();
-      paymentCycleData = await responses[2].json();
-      activeCampaigns = await responses[3].json();
-    }
+    // Build all sub-requests for a single batched Meta call (1 outbound HTTP hit instead of 4).
+    // relative_url MUST NOT include a leading slash and MUST NOT include access_token (the
+    // outer batch POST supplies the token). Strip the host + leading slash from the URL we'd
+    // otherwise pass to metaFetch.
+    const stripBase = (u: string) => u
+      .replace("https://graph.facebook.com/v23.0/", "")
+      .replace(/([?&])access_token=[^&]*/g, (m, sep) => (sep === "?" ? "?" : ""))
+      .replace(/[?&]$/, "");
+    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
+    const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details`;
+    const campaignFilter = encodeURIComponent(JSON.stringify([
+      { field: "effective_status", operator: "IN", value: ["ACTIVE"] }
+    ]));
+    const campaignsUrl = `https://graph.facebook.com/v23.0/${actId}/campaigns?filtering=${campaignFilter}&summary=true&limit=0`;
+
+    const subUrls = [stripBase(todayUrl)];
+    if (yesterdayUrl) subUrls.push(stripBase(yesterdayUrl));
+    subUrls.push(stripBase(accountFieldsUrl));
+    subUrls.push(stripBase(paymentCycleUrl));
+    subUrls.push(stripBase(campaignsUrl));
+
+    const batchResults = await metaBatchGet(accessToken, subUrls);
+    let idx = 0;
+    let todayData = batchResults[idx++];
+    let yesterdayData = yesterdayUrl ? batchResults[idx++] : { data: [] };
+    const accountData = batchResults[idx++];
+    const paymentCycleData = batchResults[idx++];
+    const campaignsData = batchResults[idx++];
+    const activeCampaigns = campaignsData?.summary?.total_count ?? 0;
     const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData) || checkRateLimit(paymentCycleData);
     if (rlCode) {
       return {

@@ -79,6 +79,11 @@ export async function metaFetch(
 
   const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
   const proxyUrl = (Deno.env.get("META_PROXY_URL") || DEFAULT_META_PROXY_URL).trim();
+  // Strict mode: when the proxy secret is set, FAIL the call rather than
+  // silently falling back to the direct (Worker) IP. This protects accounts
+  // from sudden IP rotation that Facebook may flag. Disable explicitly by
+  // setting META_PROXY_STRICT="false".
+  const strictMode = !!proxySecret && (Deno.env.get("META_PROXY_STRICT") ?? "true").toLowerCase() !== "false";
 
   if (proxySecret && proxyUrl) {
     try {
@@ -161,10 +166,29 @@ export async function metaFetch(
       console.warn(
         `Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`,
       );
+      if (strictMode) {
+        // Return a synthetic 502 so the caller treats it like a Meta error and
+        // never silently uses the worker's direct IP for sensitive accounts.
+        const reason = looksLikeHtml ? "proxy_html" : (isProxyOwnError ? "proxy_own_error" : `proxy_${proxyRes.status}`);
+        lastMetaVia = "proxy";
+        metaProxyCount += 1;
+        return new Response(
+          JSON.stringify({ error: { message: `Proxy unhealthy (${reason}); strict mode enabled — request blocked.`, type: "ProxyUnhealthy", code: 599 } }),
+          { status: 502, headers: { "Content-Type": "application/json" } },
+        );
+      }
     } catch (proxyErr) {
       const msg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
       recordProxyFail(`proxy_throw:${msg}`);
       console.warn("Proxy failed, falling back to direct call:", msg);
+      if (strictMode) {
+        lastMetaVia = "proxy";
+        metaProxyCount += 1;
+        return new Response(
+          JSON.stringify({ error: { message: `Proxy unreachable (${msg}); strict mode enabled — request blocked.`, type: "ProxyUnreachable", code: 599 } }),
+          { status: 502, headers: { "Content-Type": "application/json" } },
+        );
+      }
     }
   }
 
