@@ -106,6 +106,24 @@ export function AdminAdAccounts() {
   useEffect(() => { sessionStorage.setItem("adAccountsViewTab", viewTab); }, [viewTab]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(() => Number(sessionStorage.getItem("adAccountsPage")) || 1);
+  const { visits: billingVisits, lastVisit: lastBillingVisit, recordVisit: recordBillingVisit, clearVisits: clearBillingVisits } = useBillingVisits();
+  const billingVisitMap = useMemo(() => {
+    const m = new Map<string, { visit: BillingVisit; rank: number }>();
+    billingVisits.forEach((v, i) => m.set(v.accountId, { visit: v, rank: i }));
+    return m;
+  }, [billingVisits]);
+  const [flashAccountId, setFlashAccountId] = useState<string | null>(null);
+  const handleJumpToLastBilling = () => {
+    if (!lastBillingVisit) return;
+    const el = document.querySelector(`[data-account-row="${lastBillingVisit.accountId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setFlashAccountId(lastBillingVisit.accountId);
+      setTimeout(() => setFlashAccountId(null), 2000);
+    } else {
+      toast.info("Last visited account is not on this page (filtered or paginated).");
+    }
+  };
   useEffect(() => { sessionStorage.setItem("adAccountsSortField", sortField); }, [sortField]);
   useEffect(() => { sessionStorage.setItem("adAccountsSortDir", sortDir); }, [sortDir]);
   useEffect(() => { sessionStorage.setItem("adAccountsStatusFilter", statusFilter); }, [statusFilter]);
