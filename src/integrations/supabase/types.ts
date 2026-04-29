@@ -1749,6 +1749,66 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_monthly_closings: {
+        Row: {
+          closed_at: string
+          closed_by: string | null
+          closing_due_advance_bdt: number
+          created_at: string
+          id: string
+          is_locked: boolean
+          month: number
+          month_bdt_in: number
+          month_client_bdt: number
+          month_converted_bdt: number
+          month_usdt_given: number
+          month_withdraw_bdt: number
+          note: string | null
+          opening_due_advance_bdt: number
+          seller_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          closed_at?: string
+          closed_by?: string | null
+          closing_due_advance_bdt?: number
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          month: number
+          month_bdt_in?: number
+          month_client_bdt?: number
+          month_converted_bdt?: number
+          month_usdt_given?: number
+          month_withdraw_bdt?: number
+          note?: string | null
+          opening_due_advance_bdt?: number
+          seller_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string | null
+          closing_due_advance_bdt?: number
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          month?: number
+          month_bdt_in?: number
+          month_client_bdt?: number
+          month_converted_bdt?: number
+          month_usdt_given?: number
+          month_withdraw_bdt?: number
+          note?: string | null
+          opening_due_advance_bdt?: number
+          seller_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       seller_transactions: {
         Row: {
           admin_note: string | null

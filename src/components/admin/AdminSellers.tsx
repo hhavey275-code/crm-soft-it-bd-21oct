@@ -24,6 +24,21 @@ import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdt
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
+import {
+  getMonthBucket,
+  isSameMonth,
+  monthLabel,
+  prevMonth,
+  filterMonth,
+  aggregateMonth,
+  computeRunningWithOpening,
+  closeMonth as closeMonthApi,
+  reopenMonth as reopenMonthApi,
+  type MonthBucket,
+  type MonthlyClosing,
+} from "@/lib/sellerMonthlyClose";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, Unlock } from "lucide-react";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -128,6 +143,19 @@ export function AdminSellers() {
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [bankFilter, setBankFilter] = useState<string | null>(null);
+
+  // Month-to-month closing state
+  const today = new Date();
+  const [monthView, setMonthView] = useState<boolean>(false);
+  const [activeBucket, setActiveBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showMonthlyExport, setShowMonthlyExport] = useState(false);
+  const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const ALL_EXPORT_COLS = [
+    "Date","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Due/Advance (BDT)","Description","Proof URL",
+  ] as const;
+  type ExportCol = typeof ALL_EXPORT_COLS[number];
+  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","BDT Amount","USDT Amount","Rate","Due/Advance (BDT)"]);
 
   // Inline edit states
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -453,8 +481,12 @@ export function AdminSellers() {
         return isWithinInterval(d, { start: range!.from, end: range!.to });
       });
     }
+    // Month view restricts to active month bucket
+    if (monthView) {
+      result = result.filter((t: any) => isSameMonth(getMonthBucket(t.created_at), activeBucket));
+    }
     return result;
-  }, [sellerTxns, typeFilter, bankFilter, datePreset, customFrom, customTo]);
+  }, [sellerTxns, typeFilter, bankFilter, datePreset, customFrom, customTo, monthView, activeBucket]);
 
   // Calculate totals from filtered data — only approved (or legacy) entries
   const sellerTotals = useMemo(() => {
@@ -493,8 +525,158 @@ export function AdminSellers() {
 
   const dueAdvance = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
 
-  // Running Due/Advance balance per row (computed from full unfiltered set so each row reflects its true historical balance)
-  const runningTotals = useMemo(() => computeDueAdvanceRunning(sellerTxns || []), [sellerTxns]);
+  // ===== Month-to-month closing =====
+  const { data: closings } = useQuery({
+    queryKey: ["admin-seller-closings", selectedSeller?.user_id],
+    enabled: !!selectedSeller,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("seller_monthly_closings")
+        .select("*")
+        .eq("seller_id", selectedSeller.user_id)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
+      return (data as MonthlyClosing[]) ?? [];
+    },
+  });
+
+  const closingFor = (b: MonthBucket): MonthlyClosing | undefined =>
+    closings?.find(c => c.year === b.year && c.month === b.month);
+
+  // Running Due/Advance balance per row.
+  // - All-time view: cumulative from beginning (legacy behavior)
+  // - Month view: starts from previous month's closing balance (carry-forward)
+  const runningTotals = useMemo(() => {
+    if (!sellerTxns) return new Map<string, number>();
+    if (!monthView) return computeDueAdvanceRunning(sellerTxns);
+    const prev = prevMonth(activeBucket);
+    const rec = (closings || []).find((c: MonthlyClosing) => c.year === prev.year && c.month === prev.month);
+    const opening = rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    return computeRunningWithOpening(filterMonth(sellerTxns, activeBucket), opening);
+  }, [sellerTxns, monthView, activeBucket, closings]);
+
+  // Opening balance for a bucket: previous month's closing or 0
+  const openingFor = (b: MonthBucket): number => {
+    const prev = prevMonth(b);
+    const rec = closingFor(prev);
+    return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+  };
+
+  const activeOpening = openingFor(activeBucket);
+  const activeMonthAgg = useMemo(
+    () => aggregateMonth(sellerTxns || [], activeBucket),
+    [sellerTxns, activeBucket]
+  );
+  const activeClosingLive = activeOpening + activeMonthAgg.delta;
+  const activeClosingRecord = closingFor(activeBucket);
+
+  const closeMonthMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSeller) throw new Error("No seller");
+      return await closeMonthApi({
+        sellerId: selectedSeller.user_id,
+        bucket: activeBucket,
+        txns: sellerTxns || [],
+        closedBy: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      toast.success(`Closed ${monthLabel(activeBucket)}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+      setShowCloseConfirm(false);
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to close month"),
+  });
+
+  const reopenMonthMutation = useMutation({
+    mutationFn: async () => {
+      const rec = activeClosingRecord;
+      if (!rec) throw new Error("Not closed");
+      await reopenMonthApi(rec.id);
+    },
+    onSuccess: () => {
+      toast.success(`Reopened ${monthLabel(activeBucket)}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to reopen"),
+  });
+
+  // Build available months: union of all txn months + existing closings + current month
+  const availableMonths = useMemo<MonthBucket[]>(() => {
+    const set = new Map<string, MonthBucket>();
+    const add = (b: MonthBucket) => set.set(`${b.year}-${b.month}`, b);
+    add({ year: today.getFullYear(), month: today.getMonth() + 1 });
+    (sellerTxns || []).forEach((t: any) => add(getMonthBucket(t.created_at)));
+    (closings || []).forEach(c => add({ year: c.year, month: c.month }));
+    return Array.from(set.values()).sort((a, b) =>
+      b.year !== a.year ? b.year - a.year : b.month - a.month
+    );
+  }, [sellerTxns, closings]);
+
+  const exportMonthlyToExcel = () => {
+    if (!selectedSeller) return;
+    const monthTxns = filterMonth(sellerTxns || [], exportBucket);
+    if (!monthTxns.length) {
+      toast.error("No transactions in selected month");
+      return;
+    }
+    const opening = openingFor(exportBucket);
+    const running = computeRunningWithOpening(monthTxns, opening);
+    // Sort ascending for export readability
+    const sorted = [...monthTxns].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const buildRow = (t: any): Record<string, any> => {
+      const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const full: Record<ExportCol, any> = {
+        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
+        "Type": getTypeLabel(t.type),
+        "Status": (t.status || "approved").toUpperCase(),
+        "BDT Amount": Number(t.bdt_amount || 0),
+        "USDT Amount": Number(t.usdt_amount || 0),
+        "Rate": Number(t.rate || 0),
+        "Converted (BDT)": Number(convBdt.toFixed(2)),
+        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
+        "Account Name": t.bank_accounts?.account_name || "",
+        "Due/Advance (BDT)": Number((running.get(t.id) || 0).toFixed(2)),
+        "Description": t.description || "",
+        "Proof URL": t.proof_url || "",
+      };
+      const picked: Record<string, any> = {};
+      for (const c of exportCols) picked[c] = full[c];
+      return picked;
+    };
+    const rows: any[] = [];
+    // Opening row
+    const openingRow: Record<string, any> = {};
+    exportCols.forEach(c => { openingRow[c] = ""; });
+    if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
+    if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (carry-forward)`;
+    if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
+    rows.push(openingRow);
+    sorted.forEach(t => rows.push(buildRow(t)));
+    // Closing row
+    const agg = aggregateMonth(sellerTxns || [], exportBucket);
+    const closing = opening + agg.delta;
+    const closingRow: Record<string, any> = {};
+    exportCols.forEach(c => { closingRow[c] = ""; });
+    if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
+    if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
+    if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
+    if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
+    if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
+    if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
+    rows.push(closingRow);
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
+    const wb = XLSX.utils.book_new();
+    const sheetName = `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    XLSX.writeFile(wb, `${sellerSlug}-${sheetName}-ledger.xlsx`);
+    toast.success(`Exported ${monthLabel(exportBucket)}`);
+    setShowMonthlyExport(false);
+  };
 
   const hasActiveFilter = typeFilter !== "all" || bankFilter || datePreset !== "all";
   const clearAllFilters = () => { setTypeFilter("all"); setBankFilter(null); setDatePreset("all"); setCustomFrom(undefined); setCustomTo(undefined); };
@@ -835,7 +1017,104 @@ export function AdminSellers() {
                <Button size="sm" variant="outline" onClick={exportToExcel}>
                  <Download className="h-4 w-4 mr-1" /> Excel
                </Button>
+               <Button size="sm" variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
+                 <Download className="h-4 w-4 mr-1" /> Monthly Excel
+               </Button>
             </div>
+          </div>
+
+          {/* Month-to-month closing toolbar */}
+          <div className="rounded-xl border bg-muted/30 p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={monthView ? "default" : "outline"}
+                  onClick={() => setMonthView(v => !v)}
+                >
+                  {monthView ? "Month View: ON" : "Month View: OFF"}
+                </Button>
+                <Select
+                  value={`${activeBucket.year}-${activeBucket.month}`}
+                  onValueChange={(v) => {
+                    const [y, m] = v.split("-").map(Number);
+                    setActiveBucket({ year: y, month: m });
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {availableMonths.map(b => (
+                      <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                        {monthLabel(b)}{closingFor(b) ? " 🔒" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Pills */}
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-medium",
+                  activeOpening >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
+                                    : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900"
+                )}>
+                  Opening: {activeOpening >= 0 ? "+" : "−"}৳{Math.abs(activeOpening).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-medium",
+                  activeMonthAgg.delta >= 0 ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900"
+                                            : "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900"
+                )}>
+                  This Month Net: {activeMonthAgg.delta >= 0 ? "+" : "−"}৳{Math.abs(activeMonthAgg.delta).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-semibold",
+                  activeClosingLive >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+                                        : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
+                )}>
+                  Closing: {activeClosingLive >= 0 ? "+" : "−"}৳{Math.abs(activeClosingLive).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+
+                {activeClosingRecord ? (
+                  <>
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800 font-medium inline-flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Closed {format(new Date(activeClosingRecord.closed_at), "MMM d, HH:mm")}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => closeMonthMutation.mutate()}
+                      disabled={closeMonthMutation.isPending}
+                      title="Recalculate using current transactions"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" /> Recalc
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-rose-600"
+                      onClick={() => reopenMonthMutation.mutate()}
+                      disabled={reopenMonthMutation.isPending}
+                    >
+                      <Unlock className="h-3.5 w-3.5 mr-1" /> Reopen
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCloseConfirm(true)}
+                  >
+                    <Lock className="h-3.5 w-3.5 mr-1" /> Close Month
+                  </Button>
+                )}
+              </div>
+            </div>
+            {monthView && (
+              <p className="text-[11px] text-muted-foreground">
+                Showing only {monthLabel(activeBucket)} transactions. Running balance starts from opening (carry-forward from previous month's closing).
+              </p>
+            )}
           </div>
 
           {/* Summary — Clickable for filtering */}
@@ -1712,6 +1991,107 @@ export function AdminSellers() {
         onOpenChange={setShowUsdtBanksDialog}
         seller={usdtBanksTargetSeller}
       />
+
+      {/* Close Month Confirmation */}
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close {selectedSeller ? monthLabel(activeBucket) : ""}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>This will lock the month and carry forward the closing balance to next month.</p>
+                <div className="rounded-md border p-3 bg-muted/40 space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Opening:</span><span className="font-mono">{activeOpening >= 0 ? "+" : "−"}৳{Math.abs(activeOpening).toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">BDT In:</span><span className="font-mono">৳{(activeMonthAgg.bdtIn + activeMonthAgg.clientBdt).toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">USDT Given (BDT):</span><span className="font-mono">−৳{activeMonthAgg.convertedBdt.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Withdraw:</span><span className="font-mono">−৳{activeMonthAgg.withdrawBdt.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-semibold border-t pt-1"><span>Closing:</span><span className="font-mono">{activeClosingLive >= 0 ? "+" : "−"}৳{Math.abs(activeClosingLive).toFixed(2)}</span></div>
+                </div>
+                <p className="text-xs text-muted-foreground">You can Reopen later if you need to fix anything.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => closeMonthMutation.mutate()} disabled={closeMonthMutation.isPending}>
+              {closeMonthMutation.isPending ? "Closing…" : "Close Month"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Monthly Excel Export with column selection */}
+      <Dialog open={showMonthlyExport} onOpenChange={setShowMonthlyExport}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Excel Export</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Month</Label>
+              <Select
+                value={`${exportBucket.year}-${exportBucket.month}`}
+                onValueChange={(v) => {
+                  const [y, m] = v.split("-").map(Number);
+                  setExportBucket({ year: y, month: m });
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map(b => (
+                    <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                      {monthLabel(b)}{closingFor(b) ? " 🔒" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs">Columns to include</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => setExportCols([...ALL_EXPORT_COLS])}
+                  >Select all</button>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => setExportCols([])}
+                  >Clear</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto border rounded-md p-2">
+                {ALL_EXPORT_COLS.map(col => {
+                  const checked = exportCols.includes(col);
+                  return (
+                    <label key={col} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          if (v) setExportCols(prev => ALL_EXPORT_COLS.filter(c => prev.includes(c) || c === col) as ExportCol[]);
+                          else setExportCols(prev => prev.filter(c => c !== col));
+                        }}
+                      />
+                      <span>{col}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Opening Balance row + transactions + Closing Balance row will be included.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
+            <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
+              <Download className="h-4 w-4 mr-1" /> Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
