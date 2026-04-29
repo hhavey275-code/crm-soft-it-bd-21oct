@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +19,6 @@ import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
 import type { DateRange } from "react-day-picker";
 
 const DATE_PRESETS = [
-  { label: "All Time", getValue: () => null },
   { label: "Today", getValue: () => ({ from: new Date(), to: new Date() }) },
   { label: "Yesterday", getValue: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
   { label: "Last 7 days", getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
@@ -31,21 +30,18 @@ const DATE_PRESETS = [
   { label: "Last month", getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
 ];
 
+type SpendSnapshot = {
+  from: string;
+  to: string;
+  rows: { user_id: string; total: number }[];
+  meta_calls: number;
+  proxy_ip: string | null;
+  fetched_at: string;
+};
+
 export function AgencyDashboard() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-
-  // Default: This month
-  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(() => ({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  }));
-  const [selectedPreset, setSelectedPreset] = useState("This month");
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const isAllTime = selectedPreset === "All Time" && !dateRange;
-  const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
-  const toStr = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
 
   const { data: agency } = useQuery({
     queryKey: ["my-agency", user?.id],
@@ -55,6 +51,41 @@ export function AgencyDashboard() {
     },
     enabled: !!user,
   });
+
+  // Persisted snapshot (per agency) — restored on reload, NO auto fetch
+  const storageKey = agency?.id ? `agency-top-spenders:${agency.id}` : null;
+  const [snapshot, setSnapshot] = useState<SpendSnapshot | null>(null);
+
+  // Load snapshot once agency is known
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) setSnapshot(JSON.parse(raw) as SpendSnapshot);
+    } catch { /* ignore */ }
+  }, [storageKey]);
+
+  // Default range: snapshot range, else This month
+  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(() => ({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  }));
+  const [selectedPreset, setSelectedPreset] = useState("This month");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+
+  // When snapshot loads, sync the picker to its range
+  useEffect(() => {
+    if (snapshot) {
+      setDateRange({ from: new Date(snapshot.from), to: new Date(snapshot.to) });
+      setSelectedPreset("");
+    }
+  }, [snapshot?.from, snapshot?.to]);
+
+  const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
+  const toStr = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
+  const rangeMatchesSnapshot =
+    !!snapshot && fromStr === snapshot.from && toStr === snapshot.to;
 
   const { data: agencyWallet } = useQuery({
     queryKey: ["agency-wallet", agency?.id],
@@ -110,36 +141,11 @@ export function AgencyDashboard() {
     staleTime: 2 * 60_000,
   });
 
-  // All-Time spend: aggregate ad_accounts.amount_spent
-  const { data: allTimeSpenders, isLoading: allTimeLoading } = useQuery({
-    queryKey: ["agency-top-spenders-alltime", agency?.id, userAccounts?.length],
-    queryFn: async () => {
-      if (!userAccounts?.length) return [] as { user_id: string; total: number }[];
-      const accountIds = [...new Set(userAccounts.map(ua => ua.ad_account_id))];
-      const { data: accounts } = await supabase
-        .from("ad_accounts")
-        .select("id, amount_spent")
-        .in("id", accountIds);
-
-      const accSpend: Record<string, number> = {};
-      accounts?.forEach((a: any) => { accSpend[a.id] = Number(a.amount_spent) || 0; });
-
-      const byUser: Record<string, number> = {};
-      userAccounts.forEach((ua: any) => {
-        byUser[ua.user_id] = (byUser[ua.user_id] || 0) + (accSpend[ua.ad_account_id] || 0);
-      });
-      return Object.entries(byUser).map(([user_id, total]) => ({ user_id, total }));
-    },
-    enabled: isAllTime && !!userAccounts?.length,
-  });
-
-  // Date-range live spend: Meta Batch API via proxy (spend-only)
-  const { data: metaSpenders, isLoading: metaLoading, refetch: refetchMeta, isFetching: metaFetching } = useQuery({
-    queryKey: ["agency-top-spenders-meta", agency?.id, fromStr, toStr, userAccounts?.length],
-    queryFn: async () => {
-      if (!fromStr || !toStr || !userAccounts?.length) {
-        return { rows: [] as { user_id: string; total: number }[], meta_calls: 0, proxy_ip: null as string | null };
-      }
+  // Manual fetch (only when user clicks Update)
+  const handleUpdate = async () => {
+    if (!fromStr || !toStr || !userAccounts?.length || !storageKey || isFetching) return;
+    setIsFetching(true);
+    try {
       const userAccountMap: Record<string, string[]> = {};
       userAccounts.forEach((ua: any) => {
         if (!userAccountMap[ua.user_id]) userAccountMap[ua.user_id] = [];
@@ -154,19 +160,25 @@ export function AgencyDashboard() {
         user_id,
         total: accIds.reduce((s, id) => s + (accountSpend[id] || 0), 0),
       }));
-      return { rows, meta_calls: meta_calls ?? 0, proxy_ip: proxy_ip ?? null };
-    },
-    enabled: !isAllTime && !!fromStr && !!toStr && !!userAccounts?.length,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-  });
+      const next: SpendSnapshot = {
+        from: fromStr,
+        to: toStr,
+        rows,
+        meta_calls: meta_calls ?? 0,
+        proxy_ip: proxy_ip ?? null,
+        fetched_at: new Date().toISOString(),
+      };
+      setSnapshot(next);
+      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
-  const spendLoading = isAllTime ? allTimeLoading : metaLoading;
-  const spendRows = isAllTime ? allTimeSpenders : metaSpenders?.rows;
-  const metaCalls = !isAllTime ? metaSpenders?.meta_calls ?? null : null;
-  const proxyIp = !isAllTime ? metaSpenders?.proxy_ip ?? null : null;
+  const spendRows = snapshot?.rows ?? [];
+  const metaCalls = snapshot?.meta_calls ?? null;
+  const proxyIp = snapshot?.proxy_ip ?? null;
+  const fetchedAt = snapshot?.fetched_at ?? null;
 
   const topSpenders = useMemo(() => {
     if (!spendRows?.length) return [] as { name: string; total: number }[];
@@ -186,12 +198,8 @@ export function AgencyDashboard() {
 
   const handlePresetChange = (presetLabel: string) => {
     setSelectedPreset(presetLabel);
-    if (presetLabel === "All Time") {
-      setDateRange(null);
-    } else {
-      const preset = DATE_PRESETS.find(p => p.label === presetLabel);
-      if (preset) setDateRange(preset.getValue());
-    }
+    const preset = DATE_PRESETS.find(p => p.label === presetLabel);
+    if (preset) setDateRange(preset.getValue());
   };
 
   const COLORS = [
@@ -257,16 +265,14 @@ export function AgencyDashboard() {
             <div className="flex items-center gap-2">
               <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange && !isAllTime && "text-muted-foreground")}>
+                  <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange && "text-muted-foreground")}>
                     <CalendarIcon className="h-3.5 w-3.5" />
                     <span className="text-xs">
-                      {isAllTime
-                        ? "All Time"
-                        : selectedPreset && selectedPreset !== ""
-                          ? selectedPreset
-                          : dateRange?.from && dateRange?.to
-                            ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d")}`
-                            : "Date range"}
+                      {selectedPreset && selectedPreset !== ""
+                        ? selectedPreset
+                        : dateRange?.from && dateRange?.to
+                          ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d")}`
+                          : "Date range"}
                     </span>
                   </Button>
                 </PopoverTrigger>
@@ -323,22 +329,28 @@ export function AgencyDashboard() {
                   </div>
                 </PopoverContent>
               </Popover>
-              {!isAllTime && (
-                <Button variant="outline" size="sm" onClick={() => refetchMeta()} disabled={metaFetching} className="gap-1">
-                  <RefreshCw className={cn("h-3.5 w-3.5", metaFetching && "animate-spin")} />
-                  <span className="text-xs">Meta</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUpdate}
+                disabled={isFetching || !fromStr || !toStr || !userAccounts?.length}
+                className="gap-1"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+                <span className="text-xs">Update</span>
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {spendLoading ? (
+            {isFetching ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {!isAllTime ? "Fetching live data from Meta..." : "Loading..."}
+                Fetching live data from Meta...
               </div>
             ) : topSpenders.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No spending data</p>
+              <p className="text-muted-foreground text-sm">
+                {snapshot ? "No spending data" : "Pick a date range and click Update to fetch data."}
+              </p>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={250}>
@@ -353,9 +365,15 @@ export function AgencyDashboard() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                {!isAllTime && metaCalls !== null && (
+                {metaCalls !== null && (
                   <p className="text-[10px] text-muted-foreground mt-2">
                     Meta API calls: {metaCalls}{proxyIp ? ` • via ${proxyIp}` : ""}
+                    {fetchedAt ? ` • updated ${format(new Date(fetchedAt), "MMM d, HH:mm")}` : ""}
+                  </p>
+                )}
+                {snapshot && !rangeMatchesSnapshot && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                    Showing data for {format(new Date(snapshot.from), "MMM d, yyyy")} – {format(new Date(snapshot.to), "MMM d, yyyy")}. Click <b>Update</b> for the new range.
                   </p>
                 )}
               </>
@@ -369,7 +387,7 @@ export function AgencyDashboard() {
             <CardTitle className="text-base">Top 3 Clients</CardTitle>
           </CardHeader>
           <CardContent>
-            {spendLoading ? (
+            {isFetching ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading...
