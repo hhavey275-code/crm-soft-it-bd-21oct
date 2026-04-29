@@ -59,6 +59,47 @@ function chunk(arr, size) {
   return chunks;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+
+/**
+ * Execute multiple Meta Graph API GET requests as a single batched POST.
+ * Each `relative_url` is the path + query (without leading slash, without access_token).
+ * Returns an array of parsed JSON bodies in the same order. On batch-level
+ * failure, returns an array of `{__batch_error: true, status, body}` for each entry.
+ * Counts as ONE outbound metaFetch call (one proxy hit, one IP usage).
+ */
+async function metaBatchGet(accessToken: string, relativeUrls: string[]): Promise<any[]> {
+  if (!relativeUrls.length) return [];
+  const batchPayload = relativeUrls.map((u) => ({ method: "GET", relative_url: u }));
+  const form = new URLSearchParams();
+  form.set("access_token", accessToken);
+  form.set("include_headers", "false");
+  form.set("batch", JSON.stringify(batchPayload));
+  const res = await metaFetch("https://graph.facebook.com/v23.0/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return relativeUrls.map(() => ({ __batch_error: true, status: res.status, body: text }));
+  }
+  const json = await res.json().catch(() => null);
+  if (!Array.isArray(json)) {
+    return relativeUrls.map(() => ({ __batch_error: true, status: res.status, body: "non-array response" }));
+  }
+  return json.map((item) => {
+    if (!item) return { __batch_error: true, status: 0, body: "null entry" };
+    if (item.code && item.code >= 200 && item.code < 300 && typeof item.body === "string") {
+      try { return JSON.parse(item.body); } catch { return { __batch_error: true, status: item.code, body: item.body }; }
+    }
+    // Non-2xx sub-response — try to parse body for the Meta error envelope
+    if (typeof item.body === "string") {
+      try { return JSON.parse(item.body); } catch { return { __batch_error: true, status: item.code ?? 0, body: item.body }; }
+    }
+    return { __batch_error: true, status: item.code ?? 0, body: "" };
+  });
+}
+
 async function batchSelect(supabase, table, column, ids, selectStr) {
   const batches = chunk(ids, 30);
   const results = [];
