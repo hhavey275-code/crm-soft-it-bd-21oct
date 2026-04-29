@@ -272,6 +272,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${assignedAccounts.length} assigned account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       // Record the time of this full sync — header timestamp updates only here
       const now = Date.now();
       writeLastFullSync(now);
@@ -303,6 +304,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${unassignedAccounts.length} inventory account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
@@ -326,6 +328,7 @@ export function AdminAdAccounts() {
       } else {
         toast.success(`${selectedIds.size} account(s) updated from Meta`);
       }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
