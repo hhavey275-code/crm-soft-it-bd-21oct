@@ -129,6 +129,7 @@ Deno.serve(async (req: Request) => {
       const row = incomingMap.get(norm(acc.account_id));
       if (!row) continue;
       matched.push(acc.account_id);
+      const incomingCards = mergeCards([], Array.isArray(row.cards) ? row.cards : []);
       updates.push({
         ad_account_id: acc.id,
         daily_spend_limit: row.daily_spend_limit,
@@ -136,6 +137,7 @@ Deno.serve(async (req: Request) => {
         daily_spend_limit_synced_at: now,
         updated_at: now,
       });
+      (acc as any).incoming_cards = incomingCards;
     }
 
     const matchedSet = new Set(matched.map(norm));
@@ -151,6 +153,8 @@ Deno.serve(async (req: Request) => {
         if (upsertErr) return json({ error: upsertErr.message }, 500);
       }
     }
+
+    await syncIncomingCards(supabase, existing, now);
 
     return json({
       ok: true,
