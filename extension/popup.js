@@ -122,26 +122,67 @@ async function extractFbAccessToken(tabId) {
 }
 
 // ---------- Graph API: list ad accounts with DSL ----------
-async function fetchAllAdAccountsDsl(accessToken) {
-  const fields = "account_id,name,adtrust_dsl,currency";
-  let url = `https://graph.facebook.com/v19.0/me/adaccounts?fields=${fields}&limit=200&access_token=${encodeURIComponent(accessToken)}`;
-  const all = [];
-  let pages = 0;
-  while (url && pages < 20) {
-    const res = await fetch(url);
-    const body = await res.json();
-    if (body.error) throw new Error(`Facebook: ${body.error.message}`);
-    if (Array.isArray(body.data)) all.push(...body.data);
-    url = body.paging?.next || null;
-    pages++;
-  }
-  // Normalize: adtrust_dsl is in account currency MINOR units (cents).
-  return all.map((acc) => ({
+function normalizeDslAccount(acc) {
+  return {
     account_id: acc.account_id || acc.id?.replace(/^act_/, ""),
     name: acc.name,
     daily_spend_limit: acc.adtrust_dsl ? Number(acc.adtrust_dsl) / 100 : 0,
     currency: acc.currency || "USD",
-  }));
+  };
+}
+
+async function fetchGraphCollection(url, { allowError = false, maxPages = 20 } = {}) {
+  const all = [];
+  let pages = 0;
+  while (url && pages < maxPages) {
+    const res = await fetch(url);
+    const body = await res.json();
+    if (body.error) {
+      if (allowError) return all;
+      throw new Error(`Facebook: ${body.error.message}`);
+    }
+    if (Array.isArray(body.data)) all.push(...body.data);
+    url = body.paging?.next || null;
+    pages++;
+  }
+  return all;
+}
+
+async function fetchAllAdAccountsDsl(accessToken) {
+  const fields = "account_id,name,adtrust_dsl,currency";
+  const encodedToken = encodeURIComponent(accessToken);
+  const byId = new Map();
+  const addAccounts = (accounts) => {
+    for (const acc of accounts) {
+      const row = normalizeDslAccount(acc);
+      if (!row.account_id) continue;
+      const existing = byId.get(row.account_id);
+      if (!existing || row.daily_spend_limit > existing.daily_spend_limit) byId.set(row.account_id, row);
+    }
+  };
+
+  // 1) User-level ad accounts. Fast, but Facebook can omit some BM accounts here.
+  addAccounts(await fetchGraphCollection(
+    `https://graph.facebook.com/v19.0/me/adaccounts?fields=${fields}&limit=200&access_token=${encodedToken}`,
+  ));
+
+  // 2) Business Manager owned/client ad accounts. This catches accounts that
+  // are visible in Ads Manager/Billing but missing from /me/adaccounts.
+  const businesses = await fetchGraphCollection(
+    `https://graph.facebook.com/v19.0/me/businesses?fields=id,name&limit=100&access_token=${encodedToken}`,
+    { allowError: true, maxPages: 10 },
+  );
+  for (const biz of businesses) {
+    if (!biz.id) continue;
+    for (const edge of ["owned_ad_accounts", "client_ad_accounts"]) {
+      addAccounts(await fetchGraphCollection(
+        `https://graph.facebook.com/v19.0/${biz.id}/${edge}?fields=${fields}&limit=200&access_token=${encodedToken}`,
+        { allowError: true },
+      ));
+    }
+  }
+
+  return Array.from(byId.values());
 }
 
 // ---------- Send to backend ----------
