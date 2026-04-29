@@ -95,6 +95,7 @@ export function AdminAdAccounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
   const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
+  const [lastSyncStatus, setLastSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
