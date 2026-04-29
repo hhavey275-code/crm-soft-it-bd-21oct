@@ -14,15 +14,17 @@ export async function fetchSpendOnly(
   options?: { date_from?: string; date_to?: string },
 ): Promise<{
   spend: Record<string, number>;
+  daily: Record<string, { date: string; spend: number }[]>;
   rate_limited: string[];
   total: number;
 }> {
-  if (!ids.length) return { spend: {}, rate_limited: [], total: 0 };
+  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], total: 0 };
 
   // Internal chunking — keep payloads small even though the edge function
   // groups by BM internally. 500 ids per invocation is well within limits.
   const CHUNK = 500;
   const merged: Record<string, number> = {};
+  const mergedDaily: Record<string, { date: string; spend: number }[]> = {};
   const allRate: string[] = [];
 
   for (let i = 0; i < ids.length; i += CHUNK) {
@@ -34,11 +36,12 @@ export async function fetchSpendOnly(
     const { data, error } = await supabase.functions.invoke("get-spend-only", { body });
     if (error) throw error;
     if (data?.spend) Object.assign(merged, data.spend);
+    if (data?.daily) Object.assign(mergedDaily, data.daily);
     if (Array.isArray(data?.rate_limited)) allRate.push(...data.rate_limited);
   }
 
   const total =
     Math.round(Object.values(merged).reduce((s, v) => s + (Number(v) || 0), 0) * 100) / 100;
 
-  return { spend: merged, rate_limited: allRate, total };
+  return { spend: merged, daily: mergedDaily, rate_limited: allRate, total };
 }
