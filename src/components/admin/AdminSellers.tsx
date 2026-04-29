@@ -601,16 +601,30 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message || "Failed to reopen"),
   });
 
-  // Build available months: union of all txn months + existing closings + current month
+  // Build available months: continuous range from earliest activity → current month.
+  // No gaps — so every month can be closed in order, keeping the Due/Advance
+  // carry-forward chain intact even for months with zero transactions.
   const availableMonths = useMemo<MonthBucket[]>(() => {
-    const set = new Map<string, MonthBucket>();
-    const add = (b: MonthBucket) => set.set(`${b.year}-${b.month}`, b);
-    add({ year: today.getFullYear(), month: today.getMonth() + 1 });
-    (sellerTxns || []).forEach((t: any) => add(getMonthBucket(t.created_at)));
-    (closings || []).forEach(c => add({ year: c.year, month: c.month }));
-    return Array.from(set.values()).sort((a, b) =>
-      b.year !== a.year ? b.year - a.year : b.month - a.month
-    );
+    const current: MonthBucket = { year: today.getFullYear(), month: today.getMonth() + 1 };
+    let earliest: MonthBucket = current;
+    const consider = (b: MonthBucket) => {
+      if (b.year < earliest.year || (b.year === earliest.year && b.month < earliest.month)) {
+        earliest = b;
+      }
+    };
+    (sellerTxns || []).forEach((t: any) => consider(getMonthBucket(t.created_at)));
+    (closings || []).forEach(c => consider({ year: c.year, month: c.month }));
+
+    // Walk forward from earliest → current, inclusive
+    const list: MonthBucket[] = [];
+    let cur = { ...earliest };
+    while (cur.year < current.year || (cur.year === current.year && cur.month <= current.month)) {
+      list.push({ ...cur });
+      if (cur.month === 12) { cur = { year: cur.year + 1, month: 1 }; }
+      else { cur = { year: cur.year, month: cur.month + 1 }; }
+    }
+    // Newest first for the dropdown
+    return list.reverse();
   }, [sellerTxns, closings]);
 
   const exportMonthlyToExcel = () => {
