@@ -20,6 +20,8 @@ import {
   metaFetch,
   resetMetaCounters,
   metaCallSummary,
+  getMetaProxyCount,
+  getMetaDirectCount,
 } from "../_shared/meta-fetch.ts";
 
 const corsHeaders = {
@@ -243,13 +245,22 @@ Deno.serve(async (req) => {
     );
 
     return new Response(
-      JSON.stringify({ spend: spendMap, daily: dailyMap, rate_limited: rateLimited }),
+      JSON.stringify({
+        spend: spendMap,
+        daily: dailyMap,
+        rate_limited: rateLimited,
+        meta_calls: {
+          proxy: getMetaProxyCount(),
+          direct: getMetaDirectCount(),
+          total: getMetaProxyCount() + getMetaDirectCount(),
+        },
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("get-spend-only error:", msg);
-    return new Response(JSON.stringify({ error: msg, spend: {}, rate_limited: [] }), {
+    return new Response(JSON.stringify({ error: msg, spend: {}, rate_limited: [], meta_calls: { proxy: 0, direct: 0, total: 0 } }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
