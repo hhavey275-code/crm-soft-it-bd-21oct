@@ -1016,7 +1016,104 @@ export function AdminSellers() {
                <Button size="sm" variant="outline" onClick={exportToExcel}>
                  <Download className="h-4 w-4 mr-1" /> Excel
                </Button>
+               <Button size="sm" variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
+                 <Download className="h-4 w-4 mr-1" /> Monthly Excel
+               </Button>
             </div>
+          </div>
+
+          {/* Month-to-month closing toolbar */}
+          <div className="rounded-xl border bg-muted/30 p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={monthView ? "default" : "outline"}
+                  onClick={() => setMonthView(v => !v)}
+                >
+                  {monthView ? "Month View: ON" : "Month View: OFF"}
+                </Button>
+                <Select
+                  value={`${activeBucket.year}-${activeBucket.month}`}
+                  onValueChange={(v) => {
+                    const [y, m] = v.split("-").map(Number);
+                    setActiveBucket({ year: y, month: m });
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {availableMonths.map(b => (
+                      <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                        {monthLabel(b)}{closingFor(b) ? " 🔒" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Pills */}
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-medium",
+                  activeOpening >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
+                                    : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900"
+                )}>
+                  Opening: {activeOpening >= 0 ? "+" : "−"}৳{Math.abs(activeOpening).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-medium",
+                  activeMonthAgg.delta >= 0 ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900"
+                                            : "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900"
+                )}>
+                  This Month Net: {activeMonthAgg.delta >= 0 ? "+" : "−"}৳{Math.abs(activeMonthAgg.delta).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border font-semibold",
+                  activeClosingLive >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+                                        : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
+                )}>
+                  Closing: {activeClosingLive >= 0 ? "+" : "−"}৳{Math.abs(activeClosingLive).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+
+                {activeClosingRecord ? (
+                  <>
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800 font-medium inline-flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Closed {format(new Date(activeClosingRecord.closed_at), "MMM d, HH:mm")}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => closeMonthMutation.mutate()}
+                      disabled={closeMonthMutation.isPending}
+                      title="Recalculate using current transactions"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" /> Recalc
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-rose-600"
+                      onClick={() => reopenMonthMutation.mutate()}
+                      disabled={reopenMonthMutation.isPending}
+                    >
+                      <Unlock className="h-3.5 w-3.5 mr-1" /> Reopen
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCloseConfirm(true)}
+                  >
+                    <Lock className="h-3.5 w-3.5 mr-1" /> Close Month
+                  </Button>
+                )}
+              </div>
+            </div>
+            {monthView && (
+              <p className="text-[11px] text-muted-foreground">
+                Showing only {monthLabel(activeBucket)} transactions. Running balance starts from opening (carry-forward from previous month's closing).
+              </p>
+            )}
           </div>
 
           {/* Summary — Clickable for filtering */}
