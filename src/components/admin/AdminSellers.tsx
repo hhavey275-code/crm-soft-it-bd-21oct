@@ -570,18 +570,6 @@ export function AdminSellers() {
   const activeClosingLive = activeOpening + activeMonthAgg.delta;
   const activeClosingRecord = closingFor(activeBucket);
 
-  // When in month view, restrict the displayed transactions to the active month
-  const monthFilteredTxns = useMemo(() => {
-    if (!monthView) return filteredTxns;
-    return filterMonth(filteredTxns, activeBucket);
-  }, [monthView, filteredTxns, activeBucket]);
-
-  // Running totals for current view: month view uses opening; all-time view uses cumulative
-  const viewRunningTotals = useMemo(() => {
-    if (!monthView) return runningTotals;
-    return computeRunningWithOpening(filterMonth(sellerTxns || [], activeBucket), activeOpening);
-  }, [monthView, sellerTxns, activeBucket, activeOpening, runningTotals]);
-
   const closeMonthMutation = useMutation({
     mutationFn: async () => {
       if (!selectedSeller) throw new Error("No seller");
