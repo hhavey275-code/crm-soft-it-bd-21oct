@@ -603,24 +603,6 @@ export default function AdAccountDetailPage() {
                             </>
                           )}
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded-md bg-muted/50 p-2">
-                            <div className="text-muted-foreground">Spend Cap</div>
-                            <div className="font-semibold">{formatMetaMoney(limitData.spend_cap, limitData.currency)}</div>
-                          </div>
-                          <div className="rounded-md bg-muted/50 p-2">
-                            <div className="text-muted-foreground">Amount Spent</div>
-                            <div className="font-semibold">{formatMetaMoney(limitData.amount_spent, limitData.currency)}</div>
-                          </div>
-                          <div className="rounded-md bg-muted/50 p-2">
-                            <div className="text-muted-foreground">Balance</div>
-                            <div className="font-semibold">{formatMetaMoney(limitData.balance, limitData.currency)}</div>
-                          </div>
-                          <div className="rounded-md bg-muted/50 p-2">
-                            <div className="text-muted-foreground">Min Daily Budget</div>
-                            <div className="font-semibold">{formatMetaMoney(limitData.min_daily_budget, limitData.currency)}</div>
-                          </div>
-                        </div>
                       </>
                     ) : (
                       <div className="text-xs text-muted-foreground mt-1">
