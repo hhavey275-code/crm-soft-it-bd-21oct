@@ -1,119 +1,90 @@
-## Seller Month-to-Month Closing System
+# Daily Spending Limit — Meta API theke ana
 
-### Problem (Bangla)
+## Tumi ki chao
 
-Ekhon `seller_transactions` er upor sob calculation suru theke (all-time) cumulative ভাবে hoy. Mas-er por mas data joma hocche → kono ek jaygay missing/bhul hole **puro history** abar milate hoy. Tumi chao:
+Per ad account er **Daily Spending Limit** Meta API theke real-time ana, ar `AdAccountDetailPage` e admin + client dujonei dekhabe. Sob ad account er na — shudhu detail page e jokhon ekta account khulchi tokhon.
 
-- Proti maser sheshe oy maser BDT/USDT lendend close hobe
-- Closing Due/Advance (signed BDT balance) porer maser **opening balance** hisebe carry forward hobe
-- Notun maser calculation ey opening + oy maser transactions = closing → erpor abar carry
-- Excel **month-by-month** download
-- Kono problem hole sudhu **running month** er data theke fix korlei cholbe (ager closed month untouched)
-- exel download korar somoy kon kon row lagbe seta select korte chaile seta slect kore download korte parbe.karon sobar sob row lagbe na .hoyto sudhu date,bdt ,usdt ,rate,total due /adv lagte pare
+## Meta API te ki ache
 
-### Solution Overview
+Meta `/act_<id>` endpoint e duita related field expose kore:
 
-Ekta notun table `seller_monthly_closings` rakhbo. Proti seller × proti month er ekta row:
+- `**adtrust_dsl**` — Account-level Daily Spend Limit (Meta er trust-based limit; "$X tar beshi ek dine spend kora jabe na" — eta tomar exact target)
+- `**min_daily_budget**` — Currency er minimum daily budget (kom important)
 
-- `opening_due_advance_bdt` — oy maser shuru-r balance (= ager maser closing)
-- `month_bdt_in`, `month_client_bdt`, `month_usdt_given`, `month_converted_bdt`, `month_withdraw_bdt`
-- `closing_due_advance_bdt` — opening + (month delta)
-- `closed_at`, `closed_by`, `is_locked`
+`**adtrust_dsl` reliability:**
 
-Ekta button **"Close This Month"** thakbe AdminSellers ey — admin click korle:
+- Active spending account e mostly value asay (eg. 50, 250, 1000, 7500 — minor units e)
+- Nuton/unverified account e `null` ba `0` aste pare
+- Permission lage — `ads_read` / `ads_management` (already amader BM token e ache)
 
-1. Oy seller-er shob approved transactions oy month-er (UTC+6) niye monthly aggregate calculate hobe
-2. Ager month-er `closing_due_advance_bdt` opening hisebe nibe (na thakle 0)
-3. Notun row insert / update hobe, `is_locked = true`
-4. Locked month er transactions ar edit/delete kora jabe na (frontend guard + RLS)
+Mane: jeshob account e Facebook-er actual daily limit ache, oishob e value asbe. Baki gulo te `—` dekhabo.
 
-### UI Changes — `AdminSellers.tsx`
+## Approach: On-demand fetch (sob account er na)
 
-**1. New "Month View" toolbar:**
+Tumi bolso "sob account er na" — eta important. Duita option:
 
-- Month picker (default: current month)
-- "Opening Balance" pill: `+৳12,500 Advance` (ager month closing theke)
-- "This Month Net" pill: signed delta
-- "Closing Balance" pill: live calculation
-- "Close Month" button (only on past/current month, requires confirmation)
-- "Reopen Month" button (superadmin only) — unlocks for fixes
+**Option A (recommended):** Detail page jokhon open hoy, tokhon shei ekta account er jonno fresh `adtrust_dsl` fetch kora. Sob bulk sync e add korbo na — extra latency nei, ar always realtime/accurate.
 
-**2. Running balance correction:**
-`computeDueAdvanceRunning` ekhon ekta `openingBalance` parameter nibe. Per-month view ey shob row oy maser opening theke suru hobe (na hole all-time)
+**Option B:** Bulk sync e add kora (`get-account-insights` e). Eta jokhon "Update All" run hoy tokhon save hobe — kintu detail page ee realtime na, last sync er purono value dekhabe.
 
-**3. Monthly Excel export:**
-Notun button **"Download Monthly"** — drop-down: Jan 2026, Dec 2025, Nov 2025… Each export ey:
+Ami **Option A** suggest korchi — karon tumi bolecho "realtime and accurate". Detail page e jokhon ekta account dekhche, tokhon ekta light Meta call kore latest value ene dekhabo. Bulk sync untouched.
 
-- Header: Seller name, Month, Opening Balance
-- Transaction rows (ager moto column) with running balance starting from opening
-- Footer: Month totals + Closing Balance
-- Filename: `{seller}-{YYYY-MM}-ledger.xlsx`
+Option A koro,kintu auto fetch korar dorkar nai,limit check button [diyo.click](http://diyo.click) korle tokhon api realtime data [anbe.ad](http://anbe.ad) acc details page e dhukley jodi call hoy,api call barbe.button thkbr jeta jeta lagbe click kore dekhe nibe. kintu call jeno proxy diye jay, ip show koraba, 
 
-**Existing "Export All" button thakbe** — full history (current behavior preserved)
+## Plan
 
-**4. Visual lock indicator:**
-Locked month er row gulo subtle gray background + lock icon, edit/delete button disabled
+### 1. Notun edge function: `get-ad-account-limits`
 
-### Database Schema
+Choto ekta function — input: `ad_account_id` (DB row id). Eta korbe:
 
-```sql
-create table public.seller_monthly_closings (
-  id uuid primary key default gen_random_uuid(),
-  seller_id uuid not null references profiles(user_id) on delete cascade,
-  year int not null,
-  month int not null,  -- 1-12
-  opening_due_advance_bdt numeric not null default 0,
-  month_bdt_in numeric not null default 0,
-  month_client_bdt numeric not null default 0,
-  month_usdt_given numeric not null default 0,
-  month_converted_bdt numeric not null default 0,
-  month_withdraw_bdt numeric not null default 0,
-  closing_due_advance_bdt numeric not null default 0,
-  is_locked boolean not null default true,
-  closed_at timestamptz not null default now(),
-  closed_by uuid references auth.users(id),
-  note text,
-  unique (seller_id, year, month)
-);
-```
+1. DB theke `account_id` (act_xxxxx) ar BM `access_token` ber kore
+2. `metaFetch` diye proxy hoye call:
+  ```
+   GET /act_<id>?fields=adtrust_dsl,min_daily_budget,currency
+  ```
+3. `adtrust_dsl` parse — Meta minor units e dey, `/100` kore USD-e convert (currency check kore)
+4. Return: `{ daily_spend_limit: number, currency: string, fetched_at: ISO }`
+5. Side effect: `ad_accounts.daily_spend_limit` column o update kore dey (ja future bulk display e o kaje lage)
 
-RLS: only admin/superadmin select/insert/update; superadmin can delete (reopen).
+Auth check: caller authenticated user hote hobe; account access check (admin OR shei client jar account)
 
-Optional safeguard trigger on `seller_transactions`: block insert/update/delete if `created_at` falls in a locked month — admin/superadmin override flag. (Recommend: warn-only in v1, add hard lock in v2 once you trust the workflow.)
+### 2. `AdAccountDetailPage.tsx` — UI
 
-### Carry-Forward Logic
+Existing 4-card grid er nichee ekta notun small section ba 5th metric card add korbo:
 
 ```
-opening = previous_month.closing_due_advance_bdt  (or 0 if first month)
-
-month_delta =
-   sum(bdt_payment + client_topup + tenant_payment)  // +
- - sum(usdt_amount * rate for usdt_received)         // -
- - sum(withdraw bdt_amount)                          // -
-
-closing = opening + month_delta
+Daily Spending Limit
+$250.00            (Meta-set limit)
+auto-refresh on open
 ```
 
-Identical to existing `computeDueAdvanceRunning` formula — just bucketed per month.
+- Page load e immediately edge function call hobe
+- Loading state e skeleton/spinner
+- Value 0/null hole "Not set by Meta" subtitle dekhabo
+- Manual refresh button (icon) — recall korbe
 
-### Files
+Existing useQuery use kore cache + refetch handle korbo.
 
-**New:**
+### 3. Access — admin + client dujonei
 
-- `src/lib/sellerMonthlyClose.ts` — `getMonthBucket(date)`, `aggregateMonth(txns)`, `computeRunningWithOpening(txns, opening)`, `closeMonth(sellerId, year, month)`, `getOpeningFor(sellerId, year, month)`
-- Migration: `seller_monthly_closings` table + RLS
+`AdAccountDetailPage` already admin/client dujonei accessible (route guard + RLS already configured). Notun edge function eo:
 
-**Modified:**
+- Admin/superadmin: shob account
+- Client: shudhu nijer assigned account (`ad_accounts.client_id = auth.uid()`)
+- Agency: nijer agency er accounts
 
-- `src/lib/sellerRunningTotal.ts` — add optional `openingBalance` param to `computeDueAdvanceRunning`
-- `src/components/admin/AdminSellers.tsx` — month picker, opening/closing pills, Close Month button, monthly Excel export, lock indicators
+Eta ensure korbe je client jar partial access ache, oo daily limit dekhte parbe — ja tomar main pain point.
 
-### Out of Scope (v1)
+## Files to touch
 
-- Auto-close cron (admin click for now — predictable)
-- Hard DB-level lock on locked-month edits (warn only first)
-- Client-facing seller view changes
+- `supabase/functions/get-ad-account-limits/index.ts` — new edge function
+- `src/components/pages/AdAccountDetailPage.tsx` — notun metric card + fetch hook
+- (Optional) `src/lib/fetchAdAccountLimits.ts` — small client helper
 
-### Approval Needed
+## Risk / caveats
 
-Approve korle ami migration + code change kore dibo. Default behavior (all-time view) thakbe — month closing optional layer, jokhon use korbe tokhon kaj korbe.
+- Kichu account e Meta `null` return korbe — eta "limit nei" mane na, mane "Meta expose kortese na". UI te politely "—" ba "N/A" dekhabo, error noy.
+- Currency variation — jodi BDT account thake, USD convert kora jabe na directly. Currency field check kore "৳250" / "$250" properly format korbo.
+- Extra Meta call per detail-page-visit — proxy hoye jabe (existing `metaFetch`), Facebook IP rotation issue nei.
+
+Ami eke implement kori? Tumi ki Option A (on-demand, realtime — recommended) chao naki Option B (bulk sync e add)?
