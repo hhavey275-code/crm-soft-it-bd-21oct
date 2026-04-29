@@ -244,6 +244,12 @@ export default function ClientSpendReportPage() {
                   <p className="text-xs text-muted-foreground">Clients</p>
                   <p className="text-lg font-bold">{aggregated.length}</p>
                 </div>
+                {!isAllTime && metaCalls !== null && !isLoading && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Meta API calls</p>
+                    <p className="text-lg font-bold">{metaCalls}</p>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
