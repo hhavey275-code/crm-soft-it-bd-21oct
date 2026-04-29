@@ -204,7 +204,116 @@ Deno.serve(async (req) => {
       };
     });
 
-    const now = new Date().toISOString();
+    // ============================================================
+    // Auto-apply pending invitation permissions
+    // For each pending invitation on this BM, check if invitee has accepted
+    // (i.e., now appears in BM business_users). If yes, apply stored
+    // ad-account permissions and mark invitation as permissions_applied.
+    // ============================================================
+    let invitesApplied = 0;
+    let invitesAccepted = 0;
+    const inviteErrors: string[] = [];
+    try {
+      const { data: pendingInvites } = await supabase
+        .from("bm_invitations")
+        .select("*")
+        .eq("business_manager_id", bm.id)
+        .in("status", ["pending", "accepted"]);
+
+      if (pendingInvites && pendingInvites.length > 0) {
+        // Fetch current BM business users (accepted members) and pending invites from Meta
+        const [bmUsersRes, bmPendingRes] = await Promise.allSettled([
+          fetchAllPages(`${baseUrl}/business_users?fields=id,email,name,role&access_token=${bmAccessToken}&limit=200`),
+          fetchAllPages(`${baseUrl}/pending_users?fields=id,email,role&access_token=${bmAccessToken}&limit=200`)
+        ]);
+        const bmUsers = bmUsersRes.status === "fulfilled" ? bmUsersRes.value : [];
+        const bmPending = bmPendingRes.status === "fulfilled" ? bmPendingRes.value : [];
+        const acceptedByEmail = new Map<string, any>();
+        for (const u of bmUsers) {
+          if (u.email) acceptedByEmail.set(String(u.email).toLowerCase(), u);
+        }
+        const pendingEmails = new Set<string>(
+          bmPending.map((u: any) => String(u.email || "").toLowerCase()).filter(Boolean)
+        );
+
+        for (const invite of pendingInvites) {
+          const emailKey = String(invite.email).toLowerCase();
+          const acceptedUser = acceptedByEmail.get(emailKey);
+
+          if (!acceptedUser) {
+            // If no longer in pending list and not accepted, mark expired
+            if (invite.status === "pending" && !pendingEmails.has(emailKey)) {
+              await supabase.from("bm_invitations")
+                .update({ status: "expired" })
+                .eq("id", invite.id);
+            }
+            continue;
+          }
+
+          // User accepted. Mark accepted if still pending.
+          if (invite.status === "pending") {
+            await supabase.from("bm_invitations")
+              .update({ status: "accepted", accepted_at: now, meta_user_id: String(acceptedUser.id) })
+              .eq("id", invite.id);
+            invitesAccepted++;
+          }
+
+          const perms = invite.ad_account_permissions as any;
+          if (!perms || !Array.isArray(perms.accounts) || perms.accounts.length === 0) {
+            // Nothing to apply — mark applied
+            await supabase.from("bm_invitations")
+              .update({ status: "permissions_applied", permissions_applied_at: now })
+              .eq("id", invite.id);
+            continue;
+          }
+
+          // Apply each ad account permission via Meta API
+          let allOk = true;
+          const errs: string[] = [];
+          for (const acc of perms.accounts) {
+            const adAccountId = String(acc.account_id || "").replace(/^act_/, "");
+            const tasks: string[] = Array.isArray(acc.tasks) ? acc.tasks : [];
+            if (!adAccountId || tasks.length === 0) continue;
+            try {
+              const assignUrl = `https://graph.facebook.com/v23.0/act_${adAccountId}/assigned_users`;
+              const body = new URLSearchParams({
+                user: String(acceptedUser.id),
+                tasks: tasks.join(","),
+                access_token: bmAccessToken,
+              });
+              const r = await metaFetch(assignUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body.toString(),
+              });
+              const j = await r.json();
+              if (j.error) {
+                allOk = false;
+                errs.push(`act_${adAccountId}: ${j.error.message}`);
+              }
+            } catch (e) {
+              allOk = false;
+              errs.push(`act_${adAccountId}: ${e instanceof Error ? e.message : "unknown"}`);
+            }
+          }
+
+          await supabase.from("bm_invitations")
+            .update({
+              status: allOk ? "permissions_applied" : "accepted",
+              permissions_applied_at: allOk ? now : null,
+              error_message: errs.length > 0 ? errs.join("; ") : null,
+            })
+            .eq("id", invite.id);
+
+          if (allOk) invitesApplied++;
+          else inviteErrors.push(`${invite.email}: ${errs.join("; ")}`);
+        }
+      }
+    } catch (e) {
+      console.error("Auto-apply invitation permissions failed:", e);
+      inviteErrors.push(e instanceof Error ? e.message : "unknown");
+    }
+
     await Promise.all([
       supabase.from("business_managers").update({ last_synced_at: now, status: "active" }).eq("id", bm.id),
       supabase.from("sync_logs").insert({
