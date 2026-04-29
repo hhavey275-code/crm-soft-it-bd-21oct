@@ -631,9 +631,20 @@ export function AdminAdAccounts() {
           )}
         </div>
       </div>
-      {lastSyncCalls !== null && (
-        <div className="text-xs text-muted-foreground -mt-2">
-          Last sync used <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+      {(lastSyncCalls !== null || lastSyncStatus !== null) && (
+        <div className="text-xs -mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {lastSyncStatus && (
+            <span className={lastSyncStatus.failed > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : "text-emerald-600 dark:text-emerald-400 font-medium"}>
+              {lastSyncStatus.success}/{lastSyncStatus.total} updated
+              {lastSyncStatus.failed > 0 && ` · ${lastSyncStatus.failed} failed`}
+              {lastSyncStatus.failed === 0 && lastSyncStatus.autoRetried > 0 && ` · ${lastSyncStatus.autoRetried} auto-retried`}
+            </span>
+          )}
+          {lastSyncCalls !== null && (
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-foreground">{lastSyncCalls}</span> Meta API call{lastSyncCalls === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
       )}
 
