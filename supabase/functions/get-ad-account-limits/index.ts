@@ -115,9 +115,10 @@ Deno.serve(async (req: Request) => {
     const actId = (account as any).account_id as string;
 
     // --- Meta call (proxy via metaFetch) ---
-    // Never request adtrust_dsl together with supported fields: if Meta rejects
-    // that deprecated field, the whole response fails. Fetch supported account
-    // spending-limit fields first, then try adtrust_dsl separately as optional.
+    // adtrust_dsl (Daily Spending Limit) cannot be retrieved via Marketing API.
+    // Meta restricts it; only the Ads Manager UI exposes it (to admins only).
+    // We sync DSL via the Chrome extension into ad_account_insights.
+    // Here we just fetch the supported budget/balance fields.
     const safeFields = "min_daily_budget,currency,balance,spend_cap,amount_spent";
     const url = `https://graph.facebook.com/v23.0/${actId}?fields=${safeFields}&access_token=${encodeURIComponent(bmToken)}`;
     const res = await metaFetch(url, { method: "GET" });
@@ -127,36 +128,36 @@ Deno.serve(async (req: Request) => {
       ? (body?.error?.message || `Meta returned ${res.status}`)
       : null;
 
-    let rawAdtrustDsl: unknown = null;
-    for (const version of ["v19.0", "v18.0", "v17.0"]) {
-      const dslUrl = `https://graph.facebook.com/${version}/${actId}?fields=adtrust_dsl&access_token=${encodeURIComponent(bmToken)}`;
-      const dslRes = await metaFetch(dslUrl, { method: "GET" });
-      const dslBody = await dslRes.json().catch(() => ({}));
-      if (dslRes.ok && !dslBody?.error && dslBody?.adtrust_dsl !== undefined) {
-        rawAdtrustDsl = dslBody.adtrust_dsl;
-        break;
-      }
-    }
-
-    const adtrustDailyLimit = normalizeAmount(rawAdtrustDsl);
     const minDailyBudget = safeFieldsError ? 0 : normalizeAmount(body?.min_daily_budget);
     const currency = body?.currency || "USD";
     const balance = safeFieldsError ? 0 : normalizeAmount(body?.balance);
     const spendCap = safeFieldsError ? Number((account as any).spend_cap ?? 0) : (normalizeAmount(body?.spend_cap) || Number((account as any).spend_cap ?? 0));
     const amountSpent = safeFieldsError ? Number((account as any).amount_spent ?? 0) : (normalizeAmount(body?.amount_spent) || Number((account as any).amount_spent ?? 0));
-    const dailySpendLimit = adtrustDailyLimit > 0 ? adtrustDailyLimit : spendCap;
-    const dailySpendLimitSource = adtrustDailyLimit > 0 ? "adtrust_dsl" : spendCap > 0 ? "spend_cap" : null;
+
+    // Read the DSL value previously synced by the Chrome extension
+    const { data: insightsRow } = await supabase
+      .from("ad_account_insights")
+      .select("daily_spend_limit, daily_spend_limit_currency, daily_spend_limit_synced_at")
+      .eq("ad_account_id", ad_account_id)
+      .maybeSingle();
+
+    const syncedDsl = Number(insightsRow?.daily_spend_limit ?? 0);
+    const dailySpendLimit = syncedDsl > 0 ? syncedDsl : null;
+    const dailySpendLimitCurrency = (insightsRow as any)?.daily_spend_limit_currency || currency;
+    const dailySpendLimitSyncedAt = (insightsRow as any)?.daily_spend_limit_synced_at || null;
+    const dailySpendLimitSource = dailySpendLimit ? "extension_sync" : null;
 
     return json({
       ok: true,
       data: {
-        daily_spend_limit: dailySpendLimit > 0 ? dailySpendLimit : null,
-        daily_spend_limit_available: dailySpendLimit > 0,
+        daily_spend_limit: dailySpendLimit,
+        daily_spend_limit_available: !!dailySpendLimit,
+        daily_spend_limit_currency: dailySpendLimitCurrency,
+        daily_spend_limit_synced_at: dailySpendLimitSyncedAt,
         daily_spend_limit_source: dailySpendLimitSource,
-        unavailable_reason: dailySpendLimit > 0
+        unavailable_reason: dailySpendLimit
           ? null
-          : "Meta did not return any spending-limit value for this ad account.",
-        raw_adtrust_dsl: rawAdtrustDsl,
+          : "Daily Spending Limit hasn't been synced yet. Install the Chrome extension and click Sync.",
         min_daily_budget: minDailyBudget,
         currency,
         balance,
