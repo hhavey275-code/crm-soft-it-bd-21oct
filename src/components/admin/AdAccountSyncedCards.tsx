@@ -25,30 +25,44 @@ export function AdAccountSyncedCards({ adAccountId }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["ad-account-synced-cards", adAccountId],
     queryFn: async () => {
-      // 1) Pull every assignment event for this ad account, then derive
-      //    currently-attached cards by keeping the LATEST event per funding_source_id.
-      const { data: events, error } = await (supabase as any)
-        .from("ad_account_card_assignments")
-        .select(
-          "funding_source_id, display_string, is_primary, event_type, detected_at, ad_account_cards(admin_label, bank_name, holder_name, display_string)",
-        )
-        .eq("ad_account_id", adAccountId)
-        .order("detected_at", { ascending: false });
-      if (error) throw error;
+      // Strategy: union of (currently-attached cards derived from events)
+      // ∪ (last-known snapshot cards). This way, once a card is seen on
+      // an account it stays visible until an admin manually removes it
+      // from the vault — even if Meta later hides it (account disabled,
+      // hacked, access lost, etc.).
+      const [eventsRes, snapRes] = await Promise.all([
+        (supabase as any)
+          .from("ad_account_card_assignments")
+          .select(
+            "funding_source_id, display_string, is_primary, event_type, detected_at, ad_account_cards(admin_label, bank_name, holder_name, display_string)",
+          )
+          .eq("ad_account_id", adAccountId)
+          .order("detected_at", { ascending: false }),
+        (supabase as any)
+          .from("ad_account_last_known_state")
+          .select("cards, last_synced_at, last_sync_error")
+          .eq("ad_account_id", adAccountId)
+          .maybeSingle(),
+      ]);
+      if (eventsRes.error) throw eventsRes.error;
+      const events = eventsRes.data ?? [];
+      const snap = snapRes.data;
 
+      // Derive latest event per funding_source_id
       const latestByFs = new Map<string, any>();
-      for (const ev of events ?? []) {
+      for (const ev of events) {
         if (!latestByFs.has(ev.funding_source_id)) latestByFs.set(ev.funding_source_id, ev);
       }
 
-      const liveCards: SyncedCard[] = [];
+      const cardMap = new Map<string, SyncedCard>();
+
+      // Add currently-attached cards (latest event != detached)
       for (const ev of latestByFs.values()) {
-        // Card is currently attached only if the most recent event is NOT "detached".
         if (ev.event_type === "detached") continue;
         const meta = ev.ad_account_cards;
-        liveCards.push({
+        cardMap.set(ev.funding_source_id, {
           funding_source_id: ev.funding_source_id,
-          display_string: ev.display_string || meta?.display_string || "Unknown card",
+          display_string: ev.display_string || meta?.display_string || `Card ...${ev.funding_source_id.slice(-4)}`,
           is_primary: !!ev.is_primary,
           detected_at: ev.detected_at,
           source: "live",
@@ -58,57 +72,67 @@ export function AdAccountSyncedCards({ adAccountId }: Props) {
         });
       }
 
-      if (liveCards.length > 0) {
-        // Stable sort: primary first, then most recent
-        liveCards.sort((a, b) => {
-          if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
-          return new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime();
-        });
-        return { cards: liveCards, cached: false, lastSyncError: null as string | null };
-      }
-
-      // 2) Fallback: account may be disabled / hacked / sync failing — show
-      //    the last-known card snapshot so the admin can still see which
-      //    cards were on the account before access was lost.
-      const { data: snap } = await (supabase as any)
-        .from("ad_account_last_known_state")
-        .select("cards, last_synced_at, last_sync_error")
-        .eq("ad_account_id", adAccountId)
-        .maybeSingle();
-
+      // Add cached snapshot cards (only if not already in live set)
       const snapCards = Array.isArray(snap?.cards) ? snap.cards : [];
-      if (snapCards.length === 0) {
-        return { cards: [] as SyncedCard[], cached: false, lastSyncError: snap?.last_sync_error ?? null };
-      }
+      const fsIdsToEnrich = snapCards
+        .map((c: any) => String(c?.id ?? ""))
+        .filter((id: string) => id && !cardMap.has(id));
 
-      // Enrich snapshot cards with vault metadata (admin_label/bank/holder)
-      const fsIds = snapCards.map((c: any) => String(c?.id ?? "")).filter(Boolean);
       let metaByFs: Record<string, any> = {};
-      if (fsIds.length) {
+      if (fsIdsToEnrich.length) {
         const { data: vaultRows } = await (supabase as any)
           .from("ad_account_cards")
           .select("funding_source_id, admin_label, bank_name, holder_name, display_string")
-          .in("funding_source_id", fsIds);
+          .in("funding_source_id", fsIdsToEnrich);
         for (const r of vaultRows ?? []) metaByFs[r.funding_source_id] = r;
       }
 
-      const cached: SyncedCard[] = snapCards.map((c: any) => {
+      for (const c of snapCards) {
         const fsId = String(c?.id ?? "");
+        if (!fsId || cardMap.has(fsId)) continue;
         const meta = metaByFs[fsId];
-        return {
+        cardMap.set(fsId, {
           funding_source_id: fsId,
           display_string: c?.display_string || meta?.display_string || `Card ...${fsId.slice(-4)}`,
           is_primary: !!c?.is_primary,
           detected_at: snap?.last_synced_at || new Date().toISOString(),
-          source: "cached" as const,
+          source: "cached",
           admin_label: meta?.admin_label,
           bank_name: meta?.bank_name,
           holder_name: meta?.holder_name,
-        };
-      });
-      cached.sort((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1));
+        });
+      }
 
-      return { cards: cached, cached: true, lastSyncError: snap?.last_sync_error ?? null };
+      // Also include vault cards that came from any prior event (detached etc.)
+      // so an admin still sees them — only suppressed if NO record exists
+      // anywhere.
+      for (const ev of latestByFs.values()) {
+        if (cardMap.has(ev.funding_source_id)) continue;
+        const meta = ev.ad_account_cards;
+        cardMap.set(ev.funding_source_id, {
+          funding_source_id: ev.funding_source_id,
+          display_string: ev.display_string || meta?.display_string || `Card ...${ev.funding_source_id.slice(-4)}`,
+          is_primary: false,
+          detected_at: ev.detected_at,
+          source: "cached",
+          admin_label: meta?.admin_label,
+          bank_name: meta?.bank_name,
+          holder_name: meta?.holder_name,
+        });
+      }
+
+      const cards = Array.from(cardMap.values()).sort((a, b) => {
+        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+        if (a.source !== b.source) return a.source === "live" ? -1 : 1;
+        return new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime();
+      });
+
+      const anyLive = cards.some((c) => c.source === "live");
+      return {
+        cards,
+        cached: !anyLive && cards.length > 0,
+        lastSyncError: snap?.last_sync_error ?? null,
+      };
     },
     enabled: !!adAccountId,
   });
