@@ -287,7 +287,6 @@ export function AdminAdAccounts() {
       refetchInsights();
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       // Populate client_daily_stats for all users after Meta sync
       import("@/lib/populateDailyStats").then(m => m.populateClientDailyStats()).catch(console.error);
     },
@@ -319,7 +318,6 @@ export function AdminAdAccounts() {
       }
       if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
-      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh inventory"),
   });
@@ -352,9 +350,6 @@ export function AdminAdAccounts() {
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
-      // Refresh ad_accounts so fresh spend_cap/amount_spent (written by
-      // get-account-insights) flow into the Remaining column / progress bar.
-      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
   });
@@ -369,7 +364,6 @@ export function AdminAdAccounts() {
     onSuccess: () => {
       toast.success("Account updated from Meta");
       refetchInsights();
-      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
     onSettled: () => setSingleRefreshingId(null),

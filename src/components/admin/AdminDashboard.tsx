@@ -316,7 +316,6 @@ export function AdminDashboard() {
         saveSpendSnapshot(yesterdayStr, yesterdaySpend, ids.length),
       ]);
 
-      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
       queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph"] });
@@ -374,7 +373,6 @@ export function AdminDashboard() {
         saveSpendSnapshot(yesterdayStr, yesterday, ids.length),
       ]);
 
-      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph"] });
     } catch (err: any) {
       toast.error("Failed to fetch daily spend: " + (err.message || "Unknown error"));
