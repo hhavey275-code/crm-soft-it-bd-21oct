@@ -1059,7 +1059,17 @@ export function AdminAdAccounts() {
                 {paginatedAccounts.map((a: any) => {
                   const ins = insights[a.id];
                   return (
-                    <TableRow key={a.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ad-accounts/${a.id}`)} data-state={selectedIds.has(a.id) ? "selected" : undefined}>
+                    <TableRow
+                      key={a.id}
+                      data-account-row={a.id}
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/50 transition-colors",
+                        billingVisitMap.get(a.id)?.rank === 0 && "border-l-4 border-l-primary",
+                        flashAccountId === a.id && "ring-2 ring-primary ring-inset"
+                      )}
+                      onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                      data-state={selectedIds.has(a.id) ? "selected" : undefined}
+                    >
                       {showSelect && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} aria-label={`Select ${a.account_name}`} />
@@ -1071,15 +1081,35 @@ export function AdminAdAccounts() {
                             <AppWindow className="h-4 w-4 text-muted-foreground" />
                           </div>
           <div>
-                            <div className="text-sm text-primary">{a.account_name}</div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {(() => {
+                                const v = billingVisitMap.get(a.id);
+                                if (!v) return null;
+                                return (
+                                  <span
+                                    className={cn(
+                                      "h-2 w-2 rounded-full shrink-0",
+                                      v.rank === 0 ? "bg-primary" : "bg-primary/40"
+                                    )}
+                                    title={`Billing visited ${formatVisitAge(v.visit.visitedAt)}`}
+                                  />
+                                );
+                              })()}
+                              <div className="text-sm text-primary">{a.account_name}</div>
+                              {billingVisitMap.get(a.id)?.rank === 0 && (
+                                <span className="text-[10px] text-primary font-medium px-1.5 py-0.5 rounded-full bg-primary/10 shrink-0">
+                                  last visited · {formatVisitAge(billingVisitMap.get(a.id)!.visit.visitedAt)}
+                                </span>
+                              )}
+                            </div>
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
                             <div className="mt-0.5 flex items-center gap-1.5">
                               <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                              <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()} title="New Billing">
+                              <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
                                 <ExternalLink className="h-3 w-3" />
                               </a>
                               {a.platform !== "tiktok" && (
-                                <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => e.stopPropagation()} title="Old Billing Link">
+                                <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="Old Billing Link">
                                   Old
                                 </a>
                               )}
