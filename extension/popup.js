@@ -123,10 +123,16 @@ async function extractFbAccessToken(tabId) {
 
 // ---------- Graph API: list ad accounts with DSL ----------
 function normalizeDslAccount(acc) {
+  // Meta's `adtrust_dsl` for ad accounts is returned in the account currency's
+  // major units (e.g. USD dollars), NOT cents. Do NOT divide by 100.
+  // Empirically: an account whose Billing page shows "Daily spending limit $1,011.25"
+  // returns adtrust_dsl = 1011.25 (or 1011) from the Graph API.
+  const raw = acc.adtrust_dsl;
+  const num = raw === null || raw === undefined || raw === "" ? 0 : Number(raw);
   return {
     account_id: acc.account_id || acc.id?.replace(/^act_/, ""),
     name: acc.name,
-    daily_spend_limit: acc.adtrust_dsl ? Number(acc.adtrust_dsl) / 100 : 0,
+    daily_spend_limit: Number.isFinite(num) && num > 0 ? num : 0,
     currency: acc.currency || "USD",
   };
 }
