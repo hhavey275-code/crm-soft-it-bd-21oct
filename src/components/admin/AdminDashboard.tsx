@@ -370,42 +370,15 @@ export function AdminDashboard() {
       const ids = adAccounts.map((a: any) => a.id);
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-      const result = await chunkedMetaSync(ids, { date_from: fromStr, date_to: toStr });
-      if (result.rate_limited?.length) {
+      // Lightweight spend-only batch call (1 HTTP request per 50 accounts).
+      const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
+      const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
+      if (result.rate_limited.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
       }
-      const insights = result.insights ?? {};
-
-      // Aggregate daily breakdown across all accounts
-      const dailyMap: Record<string, number> = {};
-      let total = 0;
-      Object.values(insights).forEach((ins: any) => {
-        total += Number(ins?.date_spend) || Number(ins?.today_spend) || 0;
-        if (ins?.daily_breakdown && Array.isArray(ins.daily_breakdown)) {
-          for (const day of ins.daily_breakdown) {
-            if (day.date) {
-              dailyMap[day.date] = (dailyMap[day.date] || 0) + (Number(day.spend) || 0);
-            }
-          }
-        }
-      });
-
-      // Save daily snapshots from breakdown
-      const snapshotEntries = Object.entries(dailyMap);
-      if (snapshotEntries.length > 0) {
-        const batchSize = 30;
-        for (let i = 0; i < snapshotEntries.length; i += batchSize) {
-          const batch = snapshotEntries.slice(i, i + batchSize).map(([date, spend]) => ({
-            snapshot_date: date,
-            total_spend: Math.round(spend * 100) / 100,
-            account_count: ids.length,
-          }));
-          await (supabase as any).from("daily_spend_snapshots").upsert(batch, { onConflict: "snapshot_date" });
-        }
-        queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph"] });
-      }
-
+      const total = result.total;
+      // Daily breakdown isn't needed for the date-range card — the monthly
+      // chart has its own dedicated sync button (handleSyncMonthSpend).
       setDateSpend(total);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
@@ -430,21 +403,18 @@ export function AdminDashboard() {
       const monthEnd = min([endOfMonth(graphMonth), new Date()]);
       const fromStr = format(monthStart, "yyyy-MM-dd");
       const toStr = format(monthEnd, "yyyy-MM-dd");
-      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-      const result = await chunkedMetaSync(ids, { date_from: fromStr, date_to: toStr });
-      if (result.rate_limited?.length) {
+      // Lightweight batch call — only `spend` field, ~50 accounts per HTTP request.
+      const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
+      const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
+      if (result.rate_limited.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
       }
-      const insights = result.insights ?? {};
 
+      // Aggregate per-day spend across all accounts for the chart bars
       const dailyMap: Record<string, number> = {};
-      Object.values(insights).forEach((ins: any) => {
-        if (ins?.daily_breakdown && Array.isArray(ins.daily_breakdown)) {
-          for (const day of ins.daily_breakdown) {
-            if (day.date) {
-              dailyMap[day.date] = (dailyMap[day.date] || 0) + (Number(day.spend) || 0);
-            }
-          }
+      Object.values(result.daily).forEach((days) => {
+        for (const d of days) {
+          if (d?.date) dailyMap[d.date] = (dailyMap[d.date] || 0) + (Number(d.spend) || 0);
         }
       });
 
