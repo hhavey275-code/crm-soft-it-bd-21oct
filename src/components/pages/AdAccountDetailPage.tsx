@@ -57,6 +57,8 @@ export default function AdAccountDetailPage() {
   const [limitData, setLimitData] = useState<{
     daily_spend_limit: number | null;
     daily_spend_limit_available?: boolean;
+    daily_spend_limit_currency?: string;
+    daily_spend_limit_synced_at?: string | null;
     unavailable_reason?: string;
     min_daily_budget?: number;
     balance?: number;
@@ -97,6 +99,8 @@ export default function AdAccountDetailPage() {
       setLimitData({
         daily_spend_limit: data.data.daily_spend_limit ?? null,
         daily_spend_limit_available: data.data.daily_spend_limit_available ?? data.data.daily_spend_limit != null,
+        daily_spend_limit_currency: data.data.daily_spend_limit_currency,
+        daily_spend_limit_synced_at: data.data.daily_spend_limit_synced_at ?? null,
         unavailable_reason: data.data.unavailable_reason,
         min_daily_budget: data.data.min_daily_budget ?? 0,
         balance: data.data.balance ?? 0,
