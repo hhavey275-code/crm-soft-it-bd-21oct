@@ -412,6 +412,7 @@ export function AdminDashboard() {
       if (result.rate_limited.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
       }
+      setMonthSyncCalls(result.meta_calls ?? null);
 
       // Aggregate per-day spend across all accounts for the chart bars
       const dailyMap: Record<string, number> = {};
