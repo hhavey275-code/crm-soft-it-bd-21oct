@@ -1011,6 +1011,78 @@ export type Database = {
           },
         ]
       }
+      bm_invitations: {
+        Row: {
+          accepted_at: string | null
+          ad_account_permissions: Json
+          bm_role: string
+          business_manager_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          invite_response: Json | null
+          invited_by: string | null
+          invited_email: string
+          meta_business_scoped_user_id: string | null
+          meta_pending_user_id: string | null
+          permissions_applied_at: string | null
+          permissions_apply_log: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          ad_account_permissions?: Json
+          bm_role: string
+          business_manager_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invite_response?: Json | null
+          invited_by?: string | null
+          invited_email: string
+          meta_business_scoped_user_id?: string | null
+          meta_pending_user_id?: string | null
+          permissions_applied_at?: string | null
+          permissions_apply_log?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          ad_account_permissions?: Json
+          bm_role?: string
+          business_manager_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invite_response?: Json | null
+          invited_by?: string | null
+          invited_email?: string
+          meta_business_scoped_user_id?: string | null
+          meta_pending_user_id?: string | null
+          permissions_applied_at?: string | null
+          permissions_apply_log?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bm_invitations_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: false
+            referencedRelation: "business_managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bm_invitations_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: false
+            referencedRelation: "business_managers_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bm_user_snapshots: {
         Row: {
           business_manager_id: string

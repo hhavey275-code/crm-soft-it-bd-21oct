@@ -10,9 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck, Activity, KeyRound, Link2Off, ExternalLink, ShieldAlert, MoreHorizontal } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck, Activity, KeyRound, Link2Off, ExternalLink, ShieldAlert, MoreHorizontal, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
+import { InviteToBmDialog } from "@/components/admin/InviteToBmDialog";
 import { logSystemAction } from "@/lib/systemLog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -71,6 +72,7 @@ export function AdminBusinessManagers() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [revokeAllConfirm, setRevokeAllConfirm] = useState(false);
   const [recoveryDialogBmId, setRecoveryDialogBmId] = useState<string | null>(null);
+  const [inviteDialogBm, setInviteDialogBm] = useState<{ id: string; name: string } | null>(null);
   const [checkingPermBmId, setCheckingPermBmId] = useState<string | null>(null);
   const [revokeSingleId, setRevokeSingleId] = useState<string | null>(null);
 
@@ -900,6 +902,10 @@ export function AdminBusinessManagers() {
                           <ShieldCheck className={cn("mr-2 h-4 w-4", checkingPermBmId === bm.id && "animate-spin")} />
                           Check Permission
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setInviteDialogBm({ id: bm.id, name: bm.name })}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Invite User
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setRecoveryDialogBmId(bm.id)} className="text-destructive focus:text-destructive">
                           <ShieldAlert className="mr-2 h-4 w-4" />
                           Silent Recovery
@@ -1376,6 +1382,14 @@ export function AdminBusinessManagers() {
         open={!!recoveryDialogBmId}
         onOpenChange={(v) => !v && setRecoveryDialogBmId(null)}
         bmId={recoveryDialogBmId ?? undefined}
+      />
+
+      {/* Invite User to BM Dialog */}
+      <InviteToBmDialog
+        open={!!inviteDialogBm}
+        onOpenChange={(v) => !v && setInviteDialogBm(null)}
+        bmId={inviteDialogBm?.id ?? null}
+        bmName={inviteDialogBm?.name}
       />
     </div>
   );
