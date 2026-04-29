@@ -57,6 +57,12 @@ export function AdminDashboard() {
   const [graphMonth, setGraphMonth] = useState(new Date());
   const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
   const [dateSpendCalls, setDateSpendCalls] = useState<number | null>(null);
+  const [dateSpendProxyIp, setDateSpendProxyIp] = useState<string | null>(null);
+  const [dateSpendCached, setDateSpendCached] = useState<boolean>(() => {
+    try {
+      return !!sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
+    } catch { return false; }
+  });
   const [tenantTestMode, setTenantTestMode] = useState(() => {
     try { return localStorage.getItem("tenant_test_mode") === "true"; } catch { return false; }
   });
@@ -383,6 +389,8 @@ export function AdminDashboard() {
       // chart has its own dedicated sync button (handleSyncMonthSpend).
       setDateSpend(total);
       setDateSpendCalls(result.meta_calls ?? null);
+      setDateSpendProxyIp(result.proxy_ip ?? null);
+      setDateSpendCached(false);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
         dateFrom: dateRange.from.toISOString(),
