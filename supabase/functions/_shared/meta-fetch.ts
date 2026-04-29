@@ -66,15 +66,27 @@ export function metaCallSummary(prefix = " "): string {
 }
 
 /**
+ * Optional flags for metaFetch.
+ * - allowDirectFallback: if true, the call falls back to a direct Meta call
+ *   when the proxy is unhealthy/unreachable, EVEN when strict mode is on.
+ *   Use only for write operations whose business value (e.g. spend cap update)
+ *   outweighs the small IP-rotation risk of one direct call.
+ */
+export interface MetaFetchOptions extends RequestInit {
+  allowDirectFallback?: boolean;
+}
+
+/**
  * Proxy-first fetch for Meta Graph API. Falls back to a direct call only
  * when the proxy is unhealthy. Non-graph URLs are passed through to fetch().
  */
 export async function metaFetch(
   url: string,
-  options: RequestInit = {},
+  options: MetaFetchOptions = {},
 ): Promise<Response> {
+  const { allowDirectFallback = false, ...fetchOptions } = options;
   if (!url.startsWith("https://graph.facebook.com/")) {
-    return fetch(url, options);
+    return fetch(url, fetchOptions);
   }
 
   const proxySecret = Deno.env.get("META_PROXY_SECRET")?.trim();
@@ -82,20 +94,23 @@ export async function metaFetch(
   // Strict mode: when the proxy secret is set, FAIL the call rather than
   // silently falling back to the direct (Worker) IP. This protects accounts
   // from sudden IP rotation that Facebook may flag. Disable explicitly by
-  // setting META_PROXY_STRICT="false".
-  const strictMode = !!proxySecret && (Deno.env.get("META_PROXY_STRICT") ?? "true").toLowerCase() !== "false";
+  // setting META_PROXY_STRICT="false". Per-call `allowDirectFallback: true`
+  // also disables strict mode for that single call (use sparingly).
+  const strictMode = !!proxySecret
+    && (Deno.env.get("META_PROXY_STRICT") ?? "true").toLowerCase() !== "false"
+    && !allowDirectFallback;
 
   if (proxySecret && proxyUrl) {
     try {
-      const headers = new Headers(options.headers ?? {});
+      const headers = new Headers(fetchOptions.headers ?? {});
       const contentType =
         headers.get("Content-Type") ?? headers.get("content-type") ?? undefined;
-      const method = options.method ?? "GET";
+      const method = fetchOptions.method ?? "GET";
       const body =
-        options.body instanceof URLSearchParams
-          ? options.body.toString()
-          : typeof options.body === "string"
-            ? options.body
+        fetchOptions.body instanceof URLSearchParams
+          ? fetchOptions.body.toString()
+          : typeof fetchOptions.body === "string"
+            ? fetchOptions.body
             : undefined;
 
       const ctl = new AbortController();
@@ -194,5 +209,5 @@ export async function metaFetch(
 
   lastMetaVia = "direct";
   metaDirectCount += 1;
-  return fetch(url, options);
+  return fetch(url, fetchOptions);
 }
