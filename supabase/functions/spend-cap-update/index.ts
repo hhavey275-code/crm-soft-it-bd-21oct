@@ -587,7 +587,8 @@ Deno.serve(async (req)=>{
     let billingWarning = null;
     try {
       const healthRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=account_status,disable_reason,funding_source_details&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
+        method: "GET",
+        allowDirectFallback: true,
       });
       const healthData = await healthRes.json();
       const metaStatus = healthData?.account_status ?? null;
