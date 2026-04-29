@@ -71,12 +71,14 @@ Deno.serve(async (req: Request) => {
 
     if (incomingMap.size === 0) return json({ error: "No valid accounts" }, 400);
 
-    // Look up our internal ad_account UUIDs for the given Meta account_ids
-    const accountIds = Array.from(incomingMap.keys());
+    // Look up internal ad_account UUIDs. DB stores Meta accounts as
+    // "act_<id>" but the extension sends bare "<id>". Query both forms.
+    const bareIds = Array.from(incomingMap.keys());
+    const prefixedIds = bareIds.map((k) => `act_${k}`);
     const { data: existing, error: lookupErr } = await supabase
       .from("ad_accounts")
-      .select("id, account_id")
-      .in("account_id", accountIds);
+      .select("id, account_id, platform")
+      .in("account_id", [...bareIds, ...prefixedIds]);
     if (lookupErr) return json({ error: lookupErr.message }, 500);
 
     const now = new Date().toISOString();
