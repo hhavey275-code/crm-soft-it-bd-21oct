@@ -72,6 +72,7 @@ export function AdminBusinessManagers() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [revokeAllConfirm, setRevokeAllConfirm] = useState(false);
   const [recoveryDialogBmId, setRecoveryDialogBmId] = useState<string | null>(null);
+  const [inviteDialogBm, setInviteDialogBm] = useState<{ id: string; name: string } | null>(null);
   const [checkingPermBmId, setCheckingPermBmId] = useState<string | null>(null);
   const [revokeSingleId, setRevokeSingleId] = useState<string | null>(null);
 
