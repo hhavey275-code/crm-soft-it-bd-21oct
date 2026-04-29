@@ -37,7 +37,6 @@ export default function ClientSpendReportPage() {
   const [selectedPreset, setSelectedPreset] = useState("All Time");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
-  const [metaCalls, setMetaCalls] = useState<number | null>(null);
 
   const isAllTime = selectedPreset === "All Time" && !dateRange;
   const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
@@ -85,7 +84,7 @@ export default function ClientSpendReportPage() {
   const { data: metaRows, isLoading: metaLoading } = useQuery({
     queryKey: ["client-spend-report-meta", fromStr, toStr],
     queryFn: async () => {
-      if (!fromStr || !toStr || !userAccounts?.length) return [];
+      if (!fromStr || !toStr || !userAccounts?.length) return { rows: [], meta_calls: 0, proxy_ip: null as string | null };
 
       // Build user -> accountIds map
       const userAccountMap: Record<string, string[]> = {};
@@ -98,20 +97,23 @@ export default function ClientSpendReportPage() {
       const allAccountIds = [...new Set(userAccounts.map((ua: any) => ua.ad_account_id))];
 
       // Lightweight spend-only batch fetch (Meta Batch API: ~50 accounts per HTTP call)
-      const { spend: accountSpend, meta_calls } = await fetchSpendOnly(allAccountIds, {
+      const { spend: accountSpend, meta_calls, proxy_ip } = await fetchSpendOnly(allAccountIds, {
         date_from: fromStr,
         date_to: toStr,
       });
-      setMetaCalls(meta_calls ?? 0);
 
       // Aggregate per user
-      return Object.entries(userAccountMap).map(([userId, accIds]) => ({
+      const rows = Object.entries(userAccountMap).map(([userId, accIds]) => ({
         user_id: userId,
         total_spend: accIds.reduce((sum, id) => sum + (accountSpend[id] || 0), 0),
       }));
+      return { rows, meta_calls: meta_calls ?? 0, proxy_ip: proxy_ip ?? null };
     },
     enabled: !isAllTime && !!fromStr && !!toStr && !!userAccounts?.length,
     staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 
   const { data: profiles } = useQuery({
@@ -124,7 +126,9 @@ export default function ClientSpendReportPage() {
   });
 
   const isLoading = isAllTime ? allTimeLoading : metaLoading;
-  const rawRows = isAllTime ? allTimeRows : metaRows;
+  const rawRows = isAllTime ? allTimeRows : metaRows?.rows;
+  const metaCalls = !isAllTime ? metaRows?.meta_calls ?? null : null;
+  const proxyIp = !isAllTime ? metaRows?.proxy_ip ?? null : null;
 
   const aggregated = useMemo(() => {
     if (!rawRows?.length || !profiles?.length) return [];
@@ -248,6 +252,9 @@ export default function ClientSpendReportPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Meta API calls</p>
                     <p className="text-lg font-bold">{metaCalls}</p>
+                    {proxyIp && (
+                      <p className="text-[10px] text-muted-foreground">via {proxyIp}</p>
+                    )}
                   </div>
                 )}
               </div>
