@@ -55,7 +55,13 @@ export default function AdAccountDetailPage() {
 
   // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
   const [limitData, setLimitData] = useState<{
-    daily_spend_limit: number;
+    daily_spend_limit: number | null;
+    daily_spend_limit_available?: boolean;
+    unavailable_reason?: string;
+    min_daily_budget?: number;
+    balance?: number;
+    spend_cap?: number;
+    amount_spent?: number;
     currency: string;
     fetched_at: string;
     via?: string;
@@ -83,13 +89,19 @@ export default function AdAccountDetailPage() {
         throw new Error(data?.error || "Failed to fetch daily limit");
       }
       setLimitData({
-        daily_spend_limit: data.data.daily_spend_limit ?? 0,
+        daily_spend_limit: data.data.daily_spend_limit ?? null,
+        daily_spend_limit_available: data.data.daily_spend_limit_available ?? data.data.daily_spend_limit != null,
+        unavailable_reason: data.data.unavailable_reason,
+        min_daily_budget: data.data.min_daily_budget ?? 0,
+        balance: data.data.balance ?? 0,
+        spend_cap: data.data.spend_cap ?? 0,
+        amount_spent: data.data.amount_spent ?? 0,
         currency: data.data.currency || "USD",
         fetched_at: data.data.fetched_at,
         via: data.meta?.via,
         ip: data.meta?.ip ?? null,
       });
-      toast.success("Daily limit refreshed from Meta");
+      toast.success("Meta account limit data refreshed");
     } catch (err: any) {
       const msg = err?.message || String(err ?? "");
       toast.error(msg || "Failed to fetch daily limit");
