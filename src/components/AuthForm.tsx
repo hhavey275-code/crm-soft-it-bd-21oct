@@ -64,10 +64,10 @@ export function AuthForm() {
     setLoading(true);
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
         toast.success("Welcome back!");
-        navigate({ to: "/dashboard" });
       } else {
         const signUpPayload = {
           email, password,
