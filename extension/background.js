@@ -21,6 +21,11 @@ function getStored(keys) {
 function setStored(obj) {
   return new Promise((res) => chrome.storage.local.set(obj, res));
 }
+function chunk(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
 
 // ---------- Supabase token refresh ----------
 async function refreshSupabaseToken(apiUrl, anonKey, refreshToken) {
@@ -97,6 +102,42 @@ async function extractFbAccessToken(tabId) {
 }
 
 // ---------- Graph API ----------
+function normalizeCard(source, isPrimary = false) {
+  if (!source) return null;
+  const id = String(source.id || source.funding_source_id || "").trim();
+  if (!id) return null;
+  return {
+    id,
+    display_string: source.display_string || source.name || `Card ...${id.slice(-4)}`,
+    type: source.type || source.card_type || "unknown",
+    is_primary: !!isPrimary,
+    exp_month: source.exp_month || null,
+    exp_year: source.exp_year || null,
+  };
+}
+
+function mergeCards(existing = [], incoming = []) {
+  const byId = new Map();
+  for (const card of [...existing, ...incoming]) {
+    if (!card?.id) continue;
+    const prev = byId.get(card.id);
+    byId.set(card.id, { ...prev, ...card, is_primary: !!(prev?.is_primary || card.is_primary) });
+  }
+  return Array.from(byId.values()).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+}
+
+function extractAccountCards(acc) {
+  const cards = [];
+  const primary = normalizeCard(acc?.funding_source_details, true);
+  if (primary) cards.push(primary);
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const cycle of cycles) {
+    const card = normalizeCard(cycle?.funding_source_details, false);
+    if (card) cards.push(card);
+  }
+  return mergeCards([], cards);
+}
+
 function normalizeDslAccount(acc) {
   const raw = acc.adtrust_dsl;
   const num = raw === null || raw === undefined || raw === "" ? 0 : Number(raw);
@@ -105,6 +146,7 @@ function normalizeDslAccount(acc) {
     name: acc.name,
     daily_spend_limit: Number.isFinite(num) && num > 0 ? num : 0,
     currency: acc.currency || "USD",
+    cards: extractAccountCards(acc),
   };
 }
 
