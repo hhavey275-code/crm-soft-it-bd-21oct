@@ -692,6 +692,11 @@ export function AdminDashboard() {
               </Button>
             </span>
           </CardTitle>
+          {monthSyncCalls !== null && !monthSyncLoading && (
+            <p className="text-[10px] text-muted-foreground">
+              Last sync used <span className="font-semibold text-foreground">{monthSyncCalls}</span> Meta API call{monthSyncCalls === 1 ? "" : "s"}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {!monthlySpendData?.length ? (
