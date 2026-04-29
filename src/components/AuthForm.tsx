@@ -48,11 +48,16 @@ export function AuthForm() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          skipBrowserRedirect: true,
+        },
       });
       if (error) throw error;
+      if (!data.url) throw new Error("Google login link পাওয়া যায়নি");
+      window.location.assign(data.url);
     } catch (err: any) {
       toast.error(err?.message || "Google sign-in failed");
       setLoading(false);
