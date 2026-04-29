@@ -426,8 +426,6 @@ export function AdminDashboard() {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
       }
       const total = result.total;
-      // Daily breakdown isn't needed for the date-range card — the monthly
-      // chart has its own dedicated sync button (handleSyncMonthSpend).
       setDateSpend(total);
       setDateSpendCalls(result.meta_calls ?? null);
       setDateSpendProxyIp(result.proxy_ip ?? null);
@@ -437,6 +435,36 @@ export function AdminDashboard() {
         dateFrom: dateRange.from.toISOString(),
         dateTo: dateRange.to.toISOString(),
       }));
+
+      // Also persist per-day breakdown so the monthly graph reflects the same range.
+      try {
+        const dailyMap: Record<string, number> = {};
+        Object.values(result.daily ?? {}).forEach((days: any) => {
+          for (const d of days || []) {
+            if (d?.date) dailyMap[d.date] = (dailyMap[d.date] || 0) + (Number(d.spend) || 0);
+          }
+        });
+        const entries = Object.entries(dailyMap);
+        if (entries.length > 0) {
+          const batchSize = 30;
+          for (let i = 0; i < entries.length; i += batchSize) {
+            const batch = entries.slice(i, i + batchSize).map(([date, spend]) => ({
+              snapshot_date: date,
+              total_spend: Math.round(spend * 100) / 100,
+              account_count: ids.length,
+            }));
+            await (supabase as any).from("daily_spend_snapshots").upsert(batch, { onConflict: "snapshot_date" });
+          }
+          // Refresh the chart for any month touched by this date range.
+          const months = new Set(entries.map(([d]) => d.slice(0, 7)));
+          for (const m of months) {
+            await queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph", m] });
+          }
+        }
+      } catch (e) {
+        console.warn("Daily snapshot upsert failed:", e);
+      }
+
       setPickerOpen(false);
     } catch (err: any) {
       console.error("Date range spend error:", err);
