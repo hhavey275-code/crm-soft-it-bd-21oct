@@ -769,31 +769,53 @@ Deno.serve(async (req)=>{
         for (const a of accounts ?? [])accById.set(a.id, a);
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
         const until = bdYesterdayString();
-        // Run in chunks of 5 with small delay to stay under Meta rate limits.
-        const lbChunks = chunk(needsLookback, 5);
-        for (const lbChunk of lbChunks){
-          await Promise.all(lbChunk.map(async (adAccountId)=>{
+        // Group by BM access token, then send each token's lookbacks via Meta
+        // Batch API (one HTTP call per ~50 sub-requests) instead of one
+        // direct call per account. This collapses ~120 extra calls down to
+        // ~3-5 on a 320-account run.
+        const byToken = new Map<string, Array<{ id: string; actId: string }>>();
+        const decryptCache = new Map<string, string>();
+        for (const adAccountId of needsLookback) {
+          const acc = accById.get(adAccountId);
+          const rawTok = acc?.business_managers?.access_token;
+          if (!rawTok || !acc?.account_id) continue;
+          let plain = decryptCache.get(rawTok);
+          if (!plain) {
             try {
-              const acc = accById.get(adAccountId);
-              const rawTok = acc?.business_managers?.access_token;
-              if (!rawTok) return;
-              const accessToken = await decryptToken(rawTok, serviceKey);
-              const url = `https://graph.facebook.com/v23.0/${acc.account_id}/insights?fields=spend&time_range={"since":"${since}","until":"${until}"}&time_increment=1&limit=90&access_token=${accessToken}`;
-              const res = await metaFetch(url);
-              const json = await res.json();
-              if (json?.error) return;
-              let latest = null;
-              for (const row of json?.data ?? []){
-                const spend = parseFloat(row.spend ?? "0");
-                const date = row.date_start?.split("T")[0];
-                if (spend > 0 && date && (!latest || date > latest)) latest = date;
-              }
-              if (latest) lookbackResults.set(adAccountId, latest);
-            } catch (e) {
-              console.warn(`lookback failed for ${adAccountId}:`, e);
+              plain = await decryptToken(rawTok, serviceKey);
+              decryptCache.set(rawTok, plain);
+            } catch {
+              continue;
             }
-          }));
-          await delay(150);
+          }
+          if (!byToken.has(plain)) byToken.set(plain, []);
+          byToken.get(plain)!.push({ id: adAccountId, actId: acc.account_id });
+        }
+        const tr = `{"since":"${since}","until":"${until}"}`;
+        for (const [accessToken, list] of byToken.entries()) {
+          // Meta batch limit is 50 sub-requests per HTTP call.
+          const subBatches = chunk(list, 50);
+          for (const sub of subBatches) {
+            const relUrls = sub.map(({ actId }) =>
+              `${actId}/insights?fields=spend&time_range=${tr}&time_increment=1&limit=90`
+            );
+            try {
+              const results = await metaBatchGet(accessToken, relUrls);
+              results.forEach((json, i) => {
+                if (!json || json.__batch_error || json?.error) return;
+                let latest: string | null = null;
+                for (const row of json?.data ?? []) {
+                  const spend = parseFloat(row.spend ?? "0");
+                  const date = row.date_start?.split("T")[0];
+                  if (spend > 0 && date && (!latest || date > latest)) latest = date;
+                }
+                if (latest) lookbackResults.set(sub[i].id, latest);
+              });
+            } catch (e) {
+              console.warn(`lookback batch failed for token group:`, e);
+            }
+            await delay(100);
+          }
         }
       }
       const upsertRows = Object.entries(insights).map(([adAccountId, data])=>{
