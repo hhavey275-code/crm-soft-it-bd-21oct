@@ -860,7 +860,16 @@ export function AdminAdAccounts() {
             const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
 
             return (
-              <Card key={a.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/ad-accounts/${a.id}`)}>
+              <Card
+                key={a.id}
+                data-account-row={a.id}
+                className={cn(
+                  "border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-all",
+                  billingVisitMap.get(a.id)?.rank === 0 && "border-l-4 border-l-primary",
+                  flashAccountId === a.id && "ring-2 ring-primary"
+                )}
+                onClick={() => navigate(`/ad-accounts/${a.id}`)}
+              >
                 <CardContent className="p-4">
                   {/* Header: Name + Status */}
                   <div className="flex items-start justify-between mb-1">
@@ -870,14 +879,32 @@ export function AdminAdAccounts() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {(() => {
+                          const v = billingVisitMap.get(a.id);
+                          if (!v) return null;
+                          return (
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full shrink-0",
+                                v.rank === 0 ? "bg-primary" : "bg-primary/40"
+                              )}
+                              title={`Billing visited ${formatVisitAge(v.visit.visitedAt)}`}
+                            />
+                          );
+                        })()}
+                        <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                        {billingVisitMap.get(a.id)?.rank === 0 && (
+                          <span className="text-[10px] text-primary font-medium shrink-0">· last</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()} title="New Billing">
+                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
                           <ExternalLink className="h-3 w-3" />
                         </a>
                         {a.platform !== "tiktok" && (
-                          <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => e.stopPropagation()} title="Old Billing Link">
+                          <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="Old Billing Link">
                             Old
                           </a>
                         )}
