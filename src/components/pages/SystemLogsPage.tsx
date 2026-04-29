@@ -62,6 +62,17 @@ function extractIp(details: string | null): { ip: string | null; cleanDetails: s
     };
   }
 
+  // Format 1b: "... | proxy_ip=1.2.3.4" (Meta Spend Check style)
+  const proxyIpMatch = details.match(/\s*\|?\s*proxy_ip=([^\s|\]]+)/i);
+  if (proxyIpMatch) {
+    const raw = proxyIpMatch[1].trim();
+    const ip = raw && raw.toLowerCase() !== "n/a" ? raw : null;
+    return {
+      ip,
+      cleanDetails: details.replace(proxyIpMatch[0], "").trim(),
+    };
+  }
+
   // Format 2: [IP: ...] or [via=... IP: ...]
   const match = details.match(/\s*\[(?:via=[^\s\]]+\s+)?IP:\s*([^\]]+)\]/i);
   if (match) {
