@@ -282,19 +282,7 @@ function extractCurrencyFromPayload(payload, field) {
 }
 // Process a single account's Meta API calls
 async function processAccount(account, serviceKey, date, date_from, date_to) {
-  const emptyInsight = {
-    today_spend: 0,
-    yesterday_spend: 0,
-    today_orders: 0,
-    yesterday_orders: 0,
-    active_campaigns: 0,
-    today_messages: 0,
-    yesterday_messages: 0,
-    balance: 0,
-    daily_spend_limit: 0,
-    billing_threshold: 0,
-    cards: []
-  };
+  const emptyInsight = { ...EMPTY_INSIGHT };
   const rawToken = account.business_managers?.access_token;
   const actId = account.account_id;
   if (!rawToken) {
