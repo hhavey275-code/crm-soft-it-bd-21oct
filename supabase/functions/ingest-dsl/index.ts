@@ -55,6 +55,108 @@ function mergeCards(existing: CardRow[] = [], incoming: CardRow[] = []): CardRow
   return Array.from(byId.values()).sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary));
 }
 
+async function syncIncomingCards(supabase: any, accounts: any[], now: string) {
+  const rows = accounts.filter((acc) => Array.isArray(acc.incoming_cards) && acc.incoming_cards.length > 0);
+  if (!rows.length) return;
+
+  const adAccountIds = rows.map((acc) => acc.id);
+  const { data: snapshots } = await supabase
+    .from("ad_account_last_known_state")
+    .select("ad_account_id, cards")
+    .in("ad_account_id", adAccountIds);
+  const snapshotByAccount = new Map((snapshots ?? []).map((s: any) => [s.ad_account_id, Array.isArray(s.cards) ? s.cards : []]));
+
+  const recentEvents: any[] = [];
+  for (const idChunk of chunk(adAccountIds, 80)) {
+    const { data } = await supabase
+      .from("ad_account_card_assignments")
+      .select("ad_account_id, funding_source_id, event_type, is_primary, detected_at")
+      .in("ad_account_id", idChunk)
+      .order("detected_at", { ascending: false });
+    recentEvents.push(...(data ?? []));
+  }
+  const latestByKey = new Map<string, any>();
+  for (const ev of recentEvents) {
+    const key = `${ev.ad_account_id}:${ev.funding_source_id}`;
+    if (!latestByKey.has(key)) latestByKey.set(key, ev);
+  }
+
+  const assignmentRows: any[] = [];
+  const snapshotRows: any[] = [];
+  const insightCardRows: any[] = [];
+
+  for (const acc of rows) {
+    const cards = mergeCards(snapshotByAccount.get(acc.id) as CardRow[] | undefined, acc.incoming_cards);
+    if (!cards.length) continue;
+
+    for (const card of cards) {
+      await supabase.from("ad_account_cards").upsert({
+        funding_source_id: card.id,
+        bm_id: acc.business_manager_id ?? null,
+        display_string: card.display_string || `Card ...${card.id.slice(-4)}`,
+        card_type: card.type ?? null,
+        exp_month: card.exp_month ?? null,
+        exp_year: card.exp_year ?? null,
+        last_seen_at: now,
+        updated_at: now,
+      }, { onConflict: "bm_id,funding_source_id", ignoreDuplicates: false });
+    }
+
+    const fsIds = cards.map((card) => card.id);
+    const cardIdMap: Record<string, string> = {};
+    if (fsIds.length && acc.business_manager_id) {
+      const { data: vaultRows } = await supabase
+        .from("ad_account_cards")
+        .select("id, funding_source_id")
+        .eq("bm_id", acc.business_manager_id)
+        .in("funding_source_id", fsIds);
+      for (const row of vaultRows ?? []) cardIdMap[row.funding_source_id] = row.id;
+    }
+
+    for (const card of cards) {
+      const last = latestByKey.get(`${acc.id}:${card.id}`);
+      if (!last || last.event_type === "detached") {
+        assignmentRows.push({
+          ad_account_id: acc.id,
+          card_id: cardIdMap[card.id] ?? null,
+          funding_source_id: card.id,
+          display_string: card.display_string ?? null,
+          event_type: "attached",
+          is_primary: !!card.is_primary,
+          detected_by: "extension",
+          detected_at: now,
+          metadata: card,
+        });
+      } else if (card.is_primary && !last.is_primary) {
+        assignmentRows.push({
+          ad_account_id: acc.id,
+          card_id: cardIdMap[card.id] ?? null,
+          funding_source_id: card.id,
+          display_string: card.display_string ?? null,
+          event_type: "became_primary",
+          is_primary: true,
+          detected_by: "extension",
+          detected_at: now,
+          metadata: card,
+        });
+      }
+    }
+
+    snapshotRows.push({ ad_account_id: acc.id, cards, last_synced_at: now, last_sync_error: null, last_sync_error_at: null });
+    insightCardRows.push({ ad_account_id: acc.id, cards, updated_at: now });
+  }
+
+  for (const batch of chunk(assignmentRows, 50)) {
+    if (batch.length) await supabase.from("ad_account_card_assignments").insert(batch);
+  }
+  for (const batch of chunk(snapshotRows, 50)) {
+    if (batch.length) await supabase.from("ad_account_last_known_state").upsert(batch, { onConflict: "ad_account_id" });
+  }
+  for (const batch of chunk(insightCardRows, 50)) {
+    if (batch.length) await supabase.from("ad_account_insights").upsert(batch, { onConflict: "ad_account_id" });
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
