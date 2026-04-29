@@ -436,33 +436,21 @@ export function AdminDashboard() {
         dateTo: dateRange.to.toISOString(),
       }));
 
-      // Also persist per-day breakdown so the monthly graph reflects the same range.
+      // Daily snapshots are now persisted server-side inside get-spend-only
+      // (service role bypasses RLS, so writes always succeed). We just need
+      // to refresh the chart for any month touched by this date range.
       try {
-        const dailyMap: Record<string, number> = {};
+        const months = new Set<string>();
         Object.values(result.daily ?? {}).forEach((days: any) => {
           for (const d of days || []) {
-            if (d?.date) dailyMap[d.date] = (dailyMap[d.date] || 0) + (Number(d.spend) || 0);
+            if (d?.date) months.add(String(d.date).slice(0, 7));
           }
         });
-        const entries = Object.entries(dailyMap);
-        if (entries.length > 0) {
-          const batchSize = 30;
-          for (let i = 0; i < entries.length; i += batchSize) {
-            const batch = entries.slice(i, i + batchSize).map(([date, spend]) => ({
-              snapshot_date: date,
-              total_spend: Math.round(spend * 100) / 100,
-              account_count: ids.length,
-            }));
-            await (supabase as any).from("daily_spend_snapshots").upsert(batch, { onConflict: "snapshot_date" });
-          }
-          // Refresh the chart for any month touched by this date range.
-          const months = new Set(entries.map(([d]) => d.slice(0, 7)));
-          for (const m of months) {
-            await queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph", m] });
-          }
+        for (const m of months) {
+          await queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph", m] });
         }
       } catch (e) {
-        console.warn("Daily snapshot upsert failed:", e);
+        console.warn("Graph refresh failed:", e);
       }
 
       setPickerOpen(false);
