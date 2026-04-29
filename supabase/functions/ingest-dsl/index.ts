@@ -18,6 +18,16 @@ type DslRow = {
   account_id: string; // Meta account id, with or without "act_" prefix
   daily_spend_limit: number; // in account currency, full units (USD, not cents)
   currency?: string;
+  cards?: CardRow[];
+};
+
+type CardRow = {
+  id: string;
+  display_string?: string | null;
+  type?: string | null;
+  is_primary?: boolean;
+  exp_month?: number | null;
+  exp_year?: number | null;
 };
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -26,6 +36,23 @@ function chunk<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+function mergeCards(existing: CardRow[] = [], incoming: CardRow[] = []): CardRow[] {
+  const byId = new Map<string, CardRow>();
+  for (const card of [...existing, ...incoming]) {
+    const id = String(card?.id ?? "").trim();
+    if (!id) continue;
+    const prev = byId.get(id);
+    byId.set(id, {
+      ...prev,
+      ...card,
+      id,
+      display_string: card.display_string || prev?.display_string || `Card ...${id.slice(-4)}`,
+      is_primary: !!(prev?.is_primary || card.is_primary),
+    });
+  }
+  return Array.from(byId.values()).sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary));
 }
 
 Deno.serve(async (req: Request) => {
