@@ -497,8 +497,8 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
 // ====== MAIN ======
 // Process accounts in small batches (5 at a time) with 300ms delay between batches
 // to avoid Meta API rate limits. Each account makes 3-4 API calls, so batch of 5 = ~20 calls.
-const META_BATCH_SIZE = 20;
-const META_BATCH_DELAY_MS = 300;
+const META_BATCH_SIZE = 30;
+const META_BATCH_DELAY_MS = 150;
 
 async function logMetaCall(supabase: any, params: {
   userId: string | null;
