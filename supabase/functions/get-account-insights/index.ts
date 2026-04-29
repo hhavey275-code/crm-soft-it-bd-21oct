@@ -328,38 +328,35 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
       todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${yesterdayStr}","until":"${todayStr}"}&time_increment=1&access_token=${accessToken}`;
       combinedTodayYesterday = true;
     }
-    // Main account data fetch
-    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason&access_token=${accessToken}`;
-    // Backup/all linked cards via payment cycle endpoint (Meta only returns primary in funding_source_details)
-    const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details&access_token=${accessToken}`;
-    const fetchPromises = [
-      metaFetch(todayUrl),
-      metaFetch(accountFieldsUrl),
-      metaFetch(paymentCycleUrl),
-      fetchActiveCampaignCount(actId, accessToken).then((c)=>({
-          json: async ()=>c
-        }))
-    ];
-    if (yesterdayUrl) {
-      fetchPromises.splice(1, 0, metaFetch(yesterdayUrl));
-    }
-    const responses = await Promise.all(fetchPromises);
-    let todayData, yesterdayData, accountData, paymentCycleData, activeCampaigns;
-    if (yesterdayUrl) {
-      todayData = await responses[0].json();
-      yesterdayData = await responses[1].json();
-      accountData = await responses[2].json();
-      paymentCycleData = await responses[3].json();
-      activeCampaigns = await responses[4].json();
-    } else {
-      todayData = await responses[0].json();
-      yesterdayData = {
-        data: []
-      };
-      accountData = await responses[1].json();
-      paymentCycleData = await responses[2].json();
-      activeCampaigns = await responses[3].json();
-    }
+    // Build all sub-requests for a single batched Meta call (1 outbound HTTP hit instead of 4).
+    // relative_url MUST NOT include a leading slash and MUST NOT include access_token (the
+    // outer batch POST supplies the token). Strip the host + leading slash from the URL we'd
+    // otherwise pass to metaFetch.
+    const stripBase = (u: string) => u
+      .replace("https://graph.facebook.com/v23.0/", "")
+      .replace(/([?&])access_token=[^&]*/g, (m, sep) => (sep === "?" ? "?" : ""))
+      .replace(/[?&]$/, "");
+    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
+    const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details`;
+    const campaignFilter = encodeURIComponent(JSON.stringify([
+      { field: "effective_status", operator: "IN", value: ["ACTIVE"] }
+    ]));
+    const campaignsUrl = `https://graph.facebook.com/v23.0/${actId}/campaigns?filtering=${campaignFilter}&summary=true&limit=0`;
+
+    const subUrls = [stripBase(todayUrl)];
+    if (yesterdayUrl) subUrls.push(stripBase(yesterdayUrl));
+    subUrls.push(stripBase(accountFieldsUrl));
+    subUrls.push(stripBase(paymentCycleUrl));
+    subUrls.push(stripBase(campaignsUrl));
+
+    const batchResults = await metaBatchGet(accessToken, subUrls);
+    let idx = 0;
+    let todayData = batchResults[idx++];
+    let yesterdayData = yesterdayUrl ? batchResults[idx++] : { data: [] };
+    const accountData = batchResults[idx++];
+    const paymentCycleData = batchResults[idx++];
+    const campaignsData = batchResults[idx++];
+    const activeCampaigns = campaignsData?.summary?.total_count ?? 0;
     const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData) || checkRateLimit(paymentCycleData);
     if (rlCode) {
       return {
