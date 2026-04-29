@@ -145,6 +145,8 @@ export type Database = {
           billing_threshold: number | null
           cards: Json | null
           daily_spend_limit: number | null
+          daily_spend_limit_currency: string | null
+          daily_spend_limit_synced_at: string | null
           id: string
           last_spend_date: string | null
           today_messages: number | null
@@ -162,6 +164,8 @@ export type Database = {
           billing_threshold?: number | null
           cards?: Json | null
           daily_spend_limit?: number | null
+          daily_spend_limit_currency?: string | null
+          daily_spend_limit_synced_at?: string | null
           id?: string
           last_spend_date?: string | null
           today_messages?: number | null
@@ -179,6 +183,8 @@ export type Database = {
           billing_threshold?: number | null
           cards?: Json | null
           daily_spend_limit?: number | null
+          daily_spend_limit_currency?: string | null
+          daily_spend_limit_synced_at?: string | null
           id?: string
           last_spend_date?: string | null
           today_messages?: number | null
