@@ -367,7 +367,10 @@ Deno.serve(async (req)=>{
         body: new URLSearchParams({
           spend_cap: String(newSpendCapDollars),
           access_token: bmToken
-        })
+        }),
+        // Spend cap update is a critical write — if the proxy is down, allow a
+        // single direct call so the user's top-up doesn't get blocked entirely.
+        allowDirectFallback: true,
       });
       if (!metaRes.ok || metaData?.error) {
         const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
