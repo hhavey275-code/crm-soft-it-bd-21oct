@@ -94,6 +94,7 @@ export function AdminAdAccounts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
+  const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
