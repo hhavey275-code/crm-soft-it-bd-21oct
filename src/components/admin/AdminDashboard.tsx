@@ -322,7 +322,18 @@ export function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["admin-monthly-spend-graph"] });
       // Populate client_daily_stats for all users after Meta sync
       import("@/lib/populateDailyStats").then(m => m.populateClientDailyStats()).catch(console.error);
-      toast.success("Meta data updated successfully");
+      const failed = result.failed_account_ids?.length ?? 0;
+      const attempted = result.attempted ?? ids.length;
+      const succeeded = result.succeeded ?? (attempted - failed);
+      const autoRetried = result.auto_retried ?? 0;
+      setMetaSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
+      if (failed > 0) {
+        toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
+      } else if (autoRetried > 0) {
+        toast.success(`Meta data updated (${autoRetried} auto-retried successfully)`);
+      } else {
+        toast.success("Meta data updated successfully");
+      }
     } catch (err: any) {
       toast.error("Failed to update from Meta: " + (err.message || "Unknown error"));
     } finally {
