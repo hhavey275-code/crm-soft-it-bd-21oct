@@ -61,7 +61,8 @@ async function verifySpendCap(actId, bmToken) {
     if (attempt > 0) await delay(3000);
     try {
       const res = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
+        method: "GET",
+        allowDirectFallback: true,
       });
       let data = null;
       try { data = await res.json(); } catch { data = null; }
@@ -87,7 +88,7 @@ async function fetchLiveSpendCap(actId, bmToken) {
     try {
       const res = await metaFetch(
         `https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`,
-        { method: "GET" }
+        { method: "GET", allowDirectFallback: true }
       );
       let data = null;
       try { data = await res.json(); } catch { data = null; }
@@ -586,7 +587,8 @@ Deno.serve(async (req)=>{
     let billingWarning = null;
     try {
       const healthRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=account_status,disable_reason,funding_source_details&access_token=${encodeURIComponent(bmToken)}`, {
-        method: "GET"
+        method: "GET",
+        allowDirectFallback: true,
       });
       const healthData = await healthRes.json();
       const metaStatus = healthData?.account_status ?? null;
