@@ -25,6 +25,12 @@ async function setStored(obj) {
   return new Promise((res) => chrome.storage.local.set(obj, res));
 }
 
+function chunk(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 // ---------- Supabase auth ----------
 async function supabaseLogin(apiUrl, anonKey, email, password) {
   const url = `${apiUrl.replace(/\/$/, "")}/auth/v1/token?grant_type=password`;
