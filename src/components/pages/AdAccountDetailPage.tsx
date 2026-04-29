@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown, ArrowUpCircle, AlertTriangle, Settings, History, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown, ArrowUpCircle, AlertTriangle, Settings, History, ChevronDown, ChevronUp, Gauge, Globe } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess";
