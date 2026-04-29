@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,8 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, ArrowUpDown, BarChart3, Loader2 } from "lucide-react";
+import { CalendarIcon, ArrowUpDown, BarChart3, Loader2, RefreshCw } from "lucide-react";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
@@ -33,14 +34,60 @@ const DATE_PRESETS = [
 export default function ClientSpendReportPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState("All Time");
+  const queryClient = useQueryClient();
+
+  // Restore last-checked range from localStorage so the previously fetched
+  // data stays visible until the user manually picks a new range / refreshes.
+  const STORAGE_KEY = "client-spend-report:last-range";
+  const initialRange = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.from || !parsed?.to) return null;
+      return { from: new Date(parsed.from), to: new Date(parsed.to) } as DateRange;
+    } catch {
+      return null;
+    }
+  })();
+  const initialPreset = (() => {
+    if (typeof window === "undefined") return "Today";
+    try {
+      return localStorage.getItem(STORAGE_KEY + ":preset") || (initialRange ? "" : "Today");
+    } catch {
+      return initialRange ? "" : "Today";
+    }
+  })();
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined | null>(
+    initialRange ?? { from: new Date(), to: new Date() },
+  );
+  const [selectedPreset, setSelectedPreset] = useState(initialPreset);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
 
   const isAllTime = selectedPreset === "All Time" && !dateRange;
   const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
   const toStr = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
+
+  // Persist current range so next visit shows the same data without refetch.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (dateRange?.from && dateRange?.to) {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }),
+        );
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      localStorage.setItem(STORAGE_KEY + ":preset", selectedPreset || "");
+    } catch {
+      /* ignore */
+    }
+  }, [dateRange, selectedPreset]);
 
   // Fetch user_ad_accounts assignments (shared by both modes)
   const { data: userAccounts } = useQuery({
@@ -81,7 +128,7 @@ export default function ClientSpendReportPage() {
   });
 
   // Date range query: LIVE from Meta API via chunkedMetaSync
-  const { data: metaRows, isLoading: metaLoading } = useQuery({
+  const { data: metaRows, isLoading: metaLoading, isFetching: metaFetching, refetch: refetchMeta } = useQuery({
     queryKey: ["client-spend-report-meta", fromStr, toStr],
     queryFn: async () => {
       if (!fromStr || !toStr || !userAccounts?.length) return { rows: [], meta_calls: 0, proxy_ip: null as string | null };
@@ -110,10 +157,12 @@ export default function ClientSpendReportPage() {
       return { rows, meta_calls: meta_calls ?? 0, proxy_ip: proxy_ip ?? null };
     },
     enabled: !isAllTime && !!fromStr && !!toStr && !!userAccounts?.length,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
+    // Keep last fetched data visible until user manually refreshes / changes range.
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: profiles } = useQuery({
@@ -238,6 +287,19 @@ export default function ClientSpendReportPage() {
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {!isAllTime && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchMeta()}
+                  disabled={metaFetching}
+                  className="gap-1"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", metaFetching && "animate-spin")} />
+                  <span className="text-xs">Update</span>
+                </Button>
+              )}
 
               <div className="flex items-center gap-4">
                 <div>
