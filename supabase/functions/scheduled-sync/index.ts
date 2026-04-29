@@ -120,7 +120,7 @@ async function processAutoTopups(supabase, serviceKey) {
       let liveSpendCap: number | null = null;
       let liveAmountSpent: number | null = null;
       try {
-        const liveRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`, { method: "GET" });
+        const liveRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap,amount_spent&access_token=${encodeURIComponent(bmToken)}`, { method: "GET", allowDirectFallback: true });
         const liveData = await liveRes.json();
         if (liveData?.spend_cap !== undefined) liveSpendCap = centsToDollars(Number(liveData.spend_cap));
         if (liveData?.amount_spent !== undefined) liveAmountSpent = centsToDollars(Number(liveData.amount_spent));
@@ -166,7 +166,8 @@ async function processAutoTopups(supabase, serviceKey) {
         body: new URLSearchParams({
           spend_cap: String(newSpendCap),
           access_token: bmToken
-        })
+          }),
+          allowDirectFallback: true
       });
       const metaData = await metaRes.json();
       // Verify the spend cap was actually set (same pattern as spend-cap-update)
@@ -175,7 +176,8 @@ async function processAutoTopups(supabase, serviceKey) {
         // POST may have succeeded despite error response — do a GET to verify
         try {
           const checkRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-            method: "GET"
+            method: "GET",
+            allowDirectFallback: true
           });
           const checkData = await checkRes.json();
           if (checkData?.spend_cap !== undefined) {
@@ -193,7 +195,8 @@ async function processAutoTopups(supabase, serviceKey) {
         try {
           await delay(500);
           const verifyRes = await metaFetch(`https://graph.facebook.com/v23.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`, {
-            method: "GET"
+            method: "GET",
+            allowDirectFallback: true
           });
           const verifyData = await verifyRes.json();
           if (verifyData?.spend_cap !== undefined) {
