@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const CHUNK_SIZE = 30;
+const CHUNK_SIZE = 50;
 const CONCURRENCY = 3;
 const RETRY_CHUNK_SIZE = 10;
 const MAX_CHUNK_RETRIES = 2; // initial + 2 retries = 3 attempts per chunk
