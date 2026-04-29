@@ -259,6 +259,38 @@ Deno.serve(async (req) => {
       `get-spend-only: ${ids.length} accounts → ${tasks.length} batch call(s) in ${ms}ms${metaCallSummary(" ")}`,
     );
 
+    // Persist per-day totals into daily_spend_snapshots so the monthly graph
+    // stays in sync with whatever range the admin just queried. Service role
+    // bypasses RLS, so this always writes (the client-side upsert was being
+    // silently dropped by RLS in some sessions, leaving stale graph values).
+    try {
+      const dayTotals: Record<string, number> = {};
+      for (const days of Object.values(dailyMap)) {
+        for (const d of days || []) {
+          if (!d?.date) continue;
+          const s = Number(d.spend) || 0;
+          dayTotals[d.date] = (dayTotals[d.date] || 0) + s;
+        }
+      }
+      const rows = Object.entries(dayTotals).map(([date, spend]) => ({
+        snapshot_date: date,
+        total_spend: Math.round(spend * 100) / 100,
+        account_count: ids.length,
+      }));
+      if (rows.length) {
+        const { error: upsertErr } = await supabase
+          .from("daily_spend_snapshots")
+          .upsert(rows, { onConflict: "snapshot_date" });
+        if (upsertErr) {
+          console.warn("daily_spend_snapshots upsert failed:", upsertErr.message);
+        } else {
+          console.log(`daily_spend_snapshots: upserted ${rows.length} day(s)`);
+        }
+      }
+    } catch (snapErr) {
+      console.warn("daily_spend_snapshots persist error:", snapErr);
+    }
+
     // Write to system_logs so admins can see who checked spend, when, and via which proxy IP.
     try {
       let userName: string | null = "system";
