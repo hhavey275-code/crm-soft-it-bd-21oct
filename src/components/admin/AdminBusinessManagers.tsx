@@ -74,6 +74,11 @@ export function AdminBusinessManagers() {
   const [checkingPermBmId, setCheckingPermBmId] = useState<string | null>(null);
   const [revokeSingleId, setRevokeSingleId] = useState<string | null>(null);
 
+  // Manual single ad-account add
+  const [manualAddOpen, setManualAddOpen] = useState(false);
+  const [manualAdAccountId, setManualAdAccountId] = useState("");
+  const [manualBmId, setManualBmId] = useState<string>("");
+
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
@@ -235,6 +240,26 @@ export function AdminBusinessManagers() {
     }
     importMutation.mutate(toImport);
   };
+
+  const manualAddMutation = useMutation({
+    mutationFn: async () => {
+      if (!manualBmId || !manualAdAccountId.trim()) throw new Error("Select a BM and enter an Ad Account ID");
+      return invokeBmFunction<{ account?: any }>("add-ad-account-manual", {
+        business_manager_id: manualBmId,
+        ad_account_id: manualAdAccountId.trim(),
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(`Ad account added: ${res?.account?.account_name ?? manualAdAccountId}`);
+      setManualAddOpen(false);
+      setManualAdAccountId("");
+      setManualBmId("");
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const filteredSyncedAccounts = useMemo(() => {
     const q = importSearch.toLowerCase();
@@ -634,6 +659,16 @@ export function AdminBusinessManagers() {
               {!isMobile && (syncAllMutation.isPending ? "Syncing All..." : "Sync All")}
             </Button>
           )}
+          {bms && bms.length > 0 && (
+            <Button
+              variant="outline"
+              size={isMobile ? "sm" : "default"}
+              onClick={() => { setManualBmId(bms[0]?.id ?? ""); setManualAddOpen(true); }}
+            >
+              <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
+              {isMobile ? "Add Acc" : "Add Ad Account"}
+            </Button>
+          )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size={isMobile ? "sm" : "default"}>
@@ -663,6 +698,48 @@ export function AdminBusinessManagers() {
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={() => addBmMutation.mutate()} disabled={!bmId || !bmName || !accessToken || addBmMutation.isPending}>
                   {addBmMutation.isPending ? "Connecting..." : "Connect"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={manualAddOpen} onOpenChange={setManualAddOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Ad Account Manually</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Business Manager (token to use)</Label>
+                  <Select value={manualBmId} onValueChange={setManualBmId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a BM" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bms?.map((bm: any) => (
+                        <SelectItem key={bm.id} value={bm.id}>{bm.name} ({bm.bm_id})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ad Account ID</Label>
+                  <Input
+                    value={manualAdAccountId}
+                    onChange={(e) => setManualAdAccountId(e.target.value)}
+                    placeholder="1234567890 or act_1234567890"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The selected BM's token must have access to this account. Details will be fetched from Meta.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setManualAddOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => manualAddMutation.mutate()}
+                  disabled={!manualBmId || !manualAdAccountId.trim() || manualAddMutation.isPending}
+                >
+                  {manualAddMutation.isPending ? "Adding..." : "Add Account"}
                 </Button>
               </DialogFooter>
             </DialogContent>
