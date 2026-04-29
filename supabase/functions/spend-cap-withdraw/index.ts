@@ -172,6 +172,9 @@ Deno.serve(async (req) => {
         spend_cap: String(newSpendCap),
         access_token: bmToken,
       }),
+      // Critical write — allow direct fallback if proxy is down so the
+      // withdrawal isn't blocked. Reads stay strict.
+      allowDirectFallback: true,
     });
     const metaData = await metaRes.json().catch(() => null);
 
