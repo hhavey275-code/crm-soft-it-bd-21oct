@@ -543,29 +543,47 @@ export function AdminTopUp() {
       // On approval: insert seller_transactions ledger row FIRST (so the Telegram
       // running total includes this top-up), then forward the proof to Telegram.
       if (action === "approved") {
-        // Auto-sync to seller ledger if bank has a seller assigned
+        // Auto-sync to seller ledger if bank has a seller assigned.
+        // Idempotent: skip if a non-rejected ledger row already exists for this top-up
+        // (e.g. inserted by verify-topup auto-approval). Otherwise upgrade an existing
+        // pending row to approved instead of inserting a duplicate.
         const reqForSeller = requests?.find((r: any) => r.id === id);
         if (reqForSeller?.bank_account_id) {
           try {
             const { data: bankForSeller } = await (supabase as any).from("bank_accounts").select("seller_id").eq("id", reqForSeller.bank_account_id).single();
             if (bankForSeller?.seller_id) {
-              const clientProfileForName = reqForSeller.profile;
-              const clientDisplayName = clientProfileForName?.full_name || clientProfileForName?.email || "Client";
-              await (supabase as any).from("seller_transactions").insert({
-                seller_id: bankForSeller.seller_id,
-                type: "client_topup",
-                bdt_amount: Number(reqForSeller.bdt_amount || 0),
-                usdt_amount: 0,
-                rate: 0,
-                description: `Client top-up approved — $${amount}`,
-                bank_account_id: reqForSeller.bank_account_id,
-                top_up_request_id: id,
-                proof_url: reqForSeller.proof_url || null,
-                status: "approved",
-                reviewed_by: user?.id,
-                reviewed_at: new Date().toISOString(),
-                entry_by_name: clientDisplayName,
-              });
+              const { data: existingRows } = await (supabase as any)
+                .from("seller_transactions")
+                .select("id, status")
+                .eq("top_up_request_id", id)
+                .neq("status", "rejected");
+              const existing = (existingRows as any[])?.[0];
+              if (existing) {
+                if (existing.status !== "approved") {
+                  await (supabase as any)
+                    .from("seller_transactions")
+                    .update({ status: "approved", reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
+                    .eq("id", existing.id);
+                }
+              } else {
+                const clientProfileForName = reqForSeller.profile;
+                const clientDisplayName = clientProfileForName?.full_name || clientProfileForName?.email || "Client";
+                await (supabase as any).from("seller_transactions").insert({
+                  seller_id: bankForSeller.seller_id,
+                  type: "client_topup",
+                  bdt_amount: Number(reqForSeller.bdt_amount || 0),
+                  usdt_amount: 0,
+                  rate: 0,
+                  description: `Client top-up approved — $${amount}`,
+                  bank_account_id: reqForSeller.bank_account_id,
+                  top_up_request_id: id,
+                  proof_url: reqForSeller.proof_url || null,
+                  status: "approved",
+                  reviewed_by: user?.id,
+                  reviewed_at: new Date().toISOString(),
+                  entry_by_name: clientDisplayName,
+                });
+              }
             }
           } catch (e) {
             console.error("Seller ledger sync failed:", e);

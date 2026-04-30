@@ -30,8 +30,11 @@ export type MonthAggregate = {
 };
 
 export function getMonthBucket(date: Date | string): MonthBucket {
+  // Use UTC so a transaction's month bucket doesn't shift across the local
+  // timezone boundary (a row at 2026-04-30 23:30 UTC must stay in April even
+  // when the browser is in a +06:00 (BD) timezone).
   const d = typeof date === "string" ? new Date(date) : date;
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
 }
 
 export function isSameMonth(a: { year: number; month: number }, b: { year: number; month: number }) {
