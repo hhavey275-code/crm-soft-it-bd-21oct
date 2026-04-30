@@ -189,10 +189,14 @@ async function fetchCardsForAccount(accountId, accessToken) {
   const token = encodeURIComponent(accessToken);
   const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
   const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
-  const res = await fetch(url);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body?.error) return [];
-  return extractAccountCards(body);
+  try {
+    const res = await fetchWithTimeout(url, 12000);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) return [];
+    return extractAccountCards(body);
+  } catch {
+    return [];
+  }
 }
 
 async function fetchAllAdAccountsDsl(accessToken) {
