@@ -172,7 +172,7 @@ export function AdminAdAccounts() {
         supabase.functions.invoke("get-account-insights", {
           body: { ad_account_ids: ids, source: "cache" },
         }),
-        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit_currency, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
+        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit, hidden_daily_limit, daily_spend_limit_currency, daily_spend_limit_synced_at, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
       ]);
       const edge = (edgeRes.data?.insights as Record<string, InsightsData>) ?? {};
       // Merge DB row data so `cards` (and other fields) aren't lost when the edge cache lacks them
