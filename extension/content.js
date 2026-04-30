@@ -355,10 +355,15 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.source !== "dsl-crm") return;
-    if (event.data?.type === "run-billing-sweep") {
-      chrome.runtime.sendMessage({ type: "run-billing-sweep", reason: event.data.reason || "crm" }, (response) => {
-        window.postMessage({ source: "dsl-extension", type: "billing-sweep-result", response }, "*");
+    if (event.data?.type === "sync-single-account") {
+      const requestId = event.data.requestId;
+      const accountId = event.data.accountId;
+      chrome.runtime.sendMessage({ type: "sync-single-account", accountId }, (response) => {
+        window.postMessage({ source: "dsl-extension", type: "sync-single-account-result", requestId, response }, "*");
       });
+    }
+    if (event.data?.type === "ping") {
+      window.postMessage({ source: "dsl-extension", type: "pong" }, "*");
     }
   });
 
