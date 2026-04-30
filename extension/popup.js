@@ -474,17 +474,13 @@ async function refreshAutoSyncUi() {
 
 const autoSyncToggleEl = $("auto-sync-toggle");
 if (autoSyncToggleEl) {
-  autoSyncToggleEl.addEventListener("change", async (e) => {
-    const enabled = e.target.checked;
-    await setStored({ autoSyncEnabled: enabled });
-    await refreshAutoSyncUi();
-    if (enabled) {
-      try { chrome.runtime.sendMessage({ type: "ensure-alarm" }); } catch {}
-    }
-  });
+  // v1.4.2: background sweep removed. Toggle is informational only.
+  autoSyncToggleEl.checked = false;
+  autoSyncToggleEl.disabled = true;
+  const lbl = $("auto-sync-label");
+  if (lbl) lbl.textContent = "Per-account sync (use CRM Sync button)";
 }
 
-// Refresh status periodically while popup is open
 setInterval(() => { refreshAutoSyncUi().catch(() => {}); }, 5000);
 
 init();
