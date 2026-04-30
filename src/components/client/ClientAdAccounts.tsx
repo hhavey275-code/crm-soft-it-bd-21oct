@@ -780,6 +780,22 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: () => {
+      toast.success("Account synced from Meta");
+      refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to sync"),
+    onSettled: () => setSingleRefreshingId(null),
+  });
 
                       {/* Insights row */}
                       {ins && (
@@ -794,7 +810,19 @@ export function ClientAdAccounts() {
                           </div>
                           <div className="bg-muted/50 rounded-md p-1.5">
                             <p className="text-[10px] text-muted-foreground">Balance</p>
-                            <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                            <div className="flex items-center justify-center gap-1">
+                              <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5"
+                                disabled={singleRefreshingId === a.id}
+                                onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(a.id); }}
+                                title="Sync this account from Meta"
+                              >
+                                <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
