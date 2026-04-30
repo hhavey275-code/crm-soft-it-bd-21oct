@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Per-account live billing sync for Meta Ad Accounts. Click Sync in the CRM (or open a Meta billing page) and the extension parses hidden daily limit, threshold, balance, account type, timezone and payment cards, then syncs to your CRM.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [

@@ -1,6 +1,18 @@
 ## Goal
 
-Billing page e injected "Ads Check by CRM" panel ta aro boro/readable korbo, ar Total Spending row ta keno khali astese seta thik korbo. Ekta minor extension update (v1.4.3) — CRM UI te kono change nei.
+Billing page e injected "Ads Check by CRM" panel er card count duplicate/hidden card chara show korbo, ar remove flow false success/ulta palta action theke safe korbo. Extension update v1.4.4.
+
+## v1.4.4 card parsing/removal fix
+
+- `extension/content.js` card parser now ignores hidden elements and the extension panel itself.
+- Duplicate card candidates are merged by brand + last4 and the best visible short row wins.
+- Remove button only shows when the visible Meta card row has an actual visible remove/menu/options control; otherwise it shows `No remove`.
+- `extension/background.js` no longer clicks a random last button when remove/menu is absent.
+- If a menu opens but no remove option appears, it returns an error instead of fake success.
+- `extension/manifest.json`: `"version": "1.4.4"`
+- Repackage `extension/` → `public/dsl-sync-extension.zip`.
+
+## Previous v1.4.3 notes
 
 ## Problem analysis
 

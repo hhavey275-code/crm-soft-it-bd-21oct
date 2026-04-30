@@ -1,5 +1,5 @@
 // ============================================================
-//  DSL Sync — content script (v1.4.0)
+//  DSL Sync — content script (v1.4.4)
 //  SMIT-style live panel on Facebook Billing pages
 //  - Parses billing page DOM for: visible limit, hidden daily limit,
 //    threshold, balance, total spending, account type, timezone, cards.
@@ -38,6 +38,32 @@
 
   function pageText() {
     return document.body ? (document.body.innerText || "") : "";
+  }
+
+  function isVisible(el) {
+    if (!el || el.closest(`#${PANEL_ID}`)) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 8 && rect.height > 8;
+  }
+
+  function normalizeBrand(brand) {
+    const b = String(brand || "").replace(/\s+/g, "").toLowerCase();
+    if (b === "mastercard" || b === "master") return "mastercard";
+    if (b === "amex" || b === "americanexpress") return "americanexpress";
+    return b;
+  }
+
+  function hasCardAction(el) {
+    if (!el) return false;
+    const row = el.closest('li, [role="listitem"], [role="row"], div') || el;
+    const controls = Array.from(row.querySelectorAll('button, [role="button"], a[role="button"], a'));
+    return controls.some((b) => {
+      if (!isVisible(b)) return false;
+      const label = `${b.textContent || ""} ${b.getAttribute("aria-label") || ""} ${b.getAttribute("title") || ""}`;
+      return /remove|delete|detach|more|menu|options|⋯|…|ellipsis/i.test(label) || b.textContent?.trim() === "";
+    });
   }
 
   // Find the value that follows a label using a flexible regex.
@@ -93,7 +119,8 @@
     const curMatch = text.match(/\b(USD|BDT|EUR|GBP|INR|VND|IDR|THB|PHP|MYR|SGD|CAD|AUD)\b/);
     if (curMatch) currency = curMatch[1];
 
-    // Cards from "Payment methods" section
+    // Cards from the visible "Payment methods" section only. Avoid hidden Meta
+    // menus and this extension panel so duplicate/stale cards don't appear.
     const cards = parseCards();
 
     // Hidden limit fallback: from screenshot SMIT shows actual cap as
@@ -121,26 +148,25 @@
   }
 
   function parseCards() {
-    const cards = [];
-    const seen = new Set();
+    const best = new Map();
     // Heuristic: look for any element whose text matches "Visa ... 1234" / "MasterCard ... 1234"
-    const cardRe = /(VISA|Visa|MasterCard|Master Card|MASTERCARD|American Express|Discover|JCB|UnionPay)\s*[·•\-\u00b7\u2022]*\s*\.{0,4}\s*(\d{4})/;
+    const cardRe = /\b(VISA|Visa|MasterCard|Master Card|MASTERCARD|American Express|Amex|Discover|JCB|UnionPay)\b\s*[·•\-\u00b7\u2022]*\s*\.{0,4}\s*(\d{4})/;
     const expRe = /Expires?\s*(\d{1,2})\s*[\/\-]\s*(\d{2,4})/i;
-    const els = document.querySelectorAll('div, li, [role="listitem"]');
+    const els = Array.from(document.querySelectorAll('li, [role="listitem"], [role="row"], div')).filter(isVisible);
     for (const el of els) {
       const t = el.textContent || "";
-      if (t.length > 600) continue;
+      if (t.length > 260) continue;
+      if (!/Expires?|Default|Payment method|Visa|MasterCard|Master Card|American Express|Amex|Discover|JCB|UnionPay/i.test(t)) continue;
       const m = t.match(cardRe);
       if (!m) continue;
       const last4 = m[2];
-      const brand = m[1].replace(/\s+/g, "").toLowerCase();
+      const brand = normalizeBrand(m[1]);
       const key = `${brand}-${last4}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
 
       const expM = t.match(expRe);
       const isDefault = /\bDefault\b/i.test(t);
       const isBackup = /\bBackup\b/i.test(t);
+      const removable = hasCardAction(el);
 
       // Try to extract a numeric funding-source/payment-method id from inner HTML
       let fsId = null;
@@ -153,19 +179,25 @@
       // Synthetic id when Meta doesn't expose the numeric id in the DOM
       const id = fsId || `local:${brand}:${last4}`;
 
-      cards.push({
+      const candidate = {
         id,
         removal_hint: fsId ? null : { brand, last4 },
         display_string: `${m[1].toUpperCase()} *${last4}`,
         type: brand,
         is_primary: isDefault,
         is_backup: isBackup,
+        removable,
         exp_month: expM ? parseInt(expM[1], 10) : null,
         exp_year: expM ? parseInt(expM[2].length === 2 ? "20" + expM[2] : expM[2], 10) : null,
-      });
+        score: (expM ? 10 : 0) + (isDefault ? 6 : 0) + (isBackup ? 3 : 0) + (removable ? 2 : 0) - Math.floor(t.length / 80),
+      };
+      const prev = best.get(key);
+      if (!prev || candidate.score > prev.score) best.set(key, candidate);
     }
     // sort default → others
-    return cards.sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+    return Array.from(best.values())
+      .map(({ score, ...card }) => card)
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
   }
 
   // ---------- panel UI ----------
@@ -247,7 +279,7 @@
             <div style="font-weight:600;">${c.display_string}${c.is_primary ? ' <span style="background:#dcfce7;color:#15803d;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:4px;">Default</span>' : ''}${c.is_backup ? ' <span style="background:#fef3c7;color:#92400e;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:4px;">Backup</span>' : ''}</div>
             ${c.exp_month && c.exp_year ? `<div style="color:#94a3b8;font-size:10px;">Exp ${c.exp_month}/${c.exp_year}</div>` : ''}
           </div>
-          <button data-card-id="${c.id}" data-card-index="${idx}" class="dsl-crm-remove-card" style="background:#fff;border:1px solid #ef4444;color:#ef4444;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:10px;font-weight:600;">Remove</button>
+          ${c.removable ? `<button data-card-id="${c.id}" data-card-index="${idx}" class="dsl-crm-remove-card" style="background:#fff;border:1px solid #ef4444;color:#ef4444;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:10px;font-weight:600;">Remove</button>` : `<span style="color:#94a3b8;font-size:10px;white-space:nowrap;">No remove</span>`}
         </div>
       `).join("");
 
@@ -274,6 +306,10 @@
         const cardId = btn.getAttribute("data-card-id");
         const cardIndex = Number(btn.getAttribute("data-card-index"));
         const card = Number.isFinite(cardIndex) ? snap.cards[cardIndex] : null;
+        if (!card?.removable) {
+          alert("Meta ei card-er remove option show korche na, tai extension remove korbe na.");
+          return;
+        }
         if (!confirm(`Remove this card from act_${snap.account_id}?`)) return;
         btn.disabled = true;
         const orig = btn.textContent;

@@ -1,5 +1,5 @@
 // ============================================================
-//  DSL Sync — Background Service Worker (v1.4.2)
+//  DSL Sync — Background Service Worker (v1.4.4)
 //  - No mass sweeps / alarms (Meta detection-safe)
 //  - Per-account on-demand sync via "sync-single-account"
 //  - Opportunistic snapshots from content.js when user opens billing page
@@ -383,26 +383,47 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
     const [{ result } = {}] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: (hint) => {
+        const panel = document.getElementById("dsl-crm-panel");
+        const isVisible = (el) => {
+          if (!el || (panel && panel.contains(el))) return false;
+          const style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.width > 8 && rect.height > 8;
+        };
+        const normalizeBrand = (brand) => {
+          const b = String(brand || "").replace(/\s+/g, "").toLowerCase();
+          if (b === "mastercard" || b === "master") return "mastercard";
+          if (b === "amex" || b === "americanexpress") return "americanexpress";
+          return b;
+        };
         const brand = String(hint?.type || hint?.removal_hint?.brand || "").toLowerCase();
         const last4 = String(hint?.removal_hint?.last4 || hint?.display_string || "").match(/(\d{4})/)?.[1];
-        const nodes = Array.from(document.querySelectorAll('div, li, [role="listitem"]'));
+        const wantedBrand = normalizeBrand(brand);
+        const nodes = Array.from(document.querySelectorAll('li, [role="listitem"], [role="row"], div')).filter(isVisible);
         const holder = nodes.find((el) => {
           const t = (el.textContent || "").toLowerCase();
-          return t.length < 800 && (!brand || t.includes(brand.replace("mastercard", "master"))) && (!last4 || t.includes(last4));
+          const normalizedText = normalizeBrand(t);
+          return t.length < 260 && (!wantedBrand || normalizedText.includes(wantedBrand)) && (!last4 || t.includes(last4));
         });
         if (!holder) return { ok: false, error: "Card row not found on this billing page" };
         const clickByText = (root) => {
-          const buttons = Array.from(root.querySelectorAll('button, [role="button"], a'));
-          const btn = buttons.find((b) => /remove|delete|detach/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`));
+          const buttons = Array.from(root.querySelectorAll('button, [role="button"], a')).filter(isVisible);
+          const btn = buttons.find((b) => /remove|delete|detach/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""} ${b.getAttribute("title") || ""}`));
           if (btn) { btn.click(); return true; }
           return false;
         };
         if (clickByText(holder)) return { ok: true, pending_confirmation: true };
-        const menu = Array.from(holder.querySelectorAll('button, [role="button"]')).reverse().find((b) => /more|menu|options|⋯|…/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`)) || Array.from(holder.querySelectorAll('button, [role="button"]')).pop();
+        const holderButtons = Array.from(holder.querySelectorAll('button, [role="button"]')).filter(isVisible);
+        const menu = holderButtons.reverse().find((b) => /more|menu|options|⋯|…|ellipsis/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""} ${b.getAttribute("title") || ""}`));
         if (!menu) return { ok: false, error: "Remove/menu button not found for this card" };
         menu.click();
-        setTimeout(() => clickByText(document), 700);
-        return { ok: true, pending_confirmation: true };
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            const opened = clickByText(document);
+            resolve(opened ? { ok: true, pending_confirmation: true } : { ok: false, error: "Remove option not available for this card" });
+          }, 700);
+        });
       },
       args: [card || {}],
     });
