@@ -1,13 +1,14 @@
 // ============================================================
-//  DSL Sync — Background Service Worker (v1.4.0)
-//  - Auto-sync every 6 hours (only CRM-managed accounts)
-//  - Accepts billing-page snapshots from content.js (SMIT-style)
-//  - Performs card removal using the user's Facebook session
-//  - Survives popup close / tab switching (runs in service worker)
+//  DSL Sync — Background Service Worker (v1.4.2)
+//  - No mass sweeps / alarms (Meta detection-safe)
+//  - Per-account on-demand sync via "sync-single-account"
+//  - Opportunistic snapshots from content.js when user opens billing page
+//  - Card removal only while user is on a Meta billing page
 // ============================================================
 
-const ALARM_NAME = "auto-sync";
-const SYNC_INTERVAL_MINUTES = 360; // every 6 hours
+// Per-account cooldown so spam clicks don't open duplicate tabs
+const SYNC_COOLDOWN_MS = 8000;
+const recentSyncs = new Map();
 
 const getStored = (keys) => new Promise((res) => chrome.storage.local.get(keys, res));
 const setStored = (obj) => new Promise((res) => chrome.storage.local.set(obj, res));
@@ -306,36 +307,30 @@ async function runAutoSync(reason = "alarm") {
   }
 }
 
-async function runBillingSweep(reason = "crm") {
-  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
-  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) return { ok: false, error: "Not logged in to CRM extension" };
-  await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
+// ---------- Per-account on-demand sync ----------
+async function syncSingleAccount(accountId) {
+  const id = String(accountId || "").replace(/^act_/, "");
+  if (!id) return { ok: false, error: "Missing accountId" };
+
+  const last = recentSyncs.get(id) || 0;
+  if (Date.now() - last < SYNC_COOLDOWN_MS) {
+    return { ok: false, error: "Please wait a few seconds before syncing this account again." };
+  }
+  recentSyncs.set(id, Date.now());
+
+  let tab = null;
   try {
-    const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
-    const accountIds = managed.account_ids || [];
-    if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
-    let saved = 0;
-    const failed = [];
-    for (const accountId of accountIds) {
-      let tab = null;
-      try {
-        tab = await openBillingTab(accountId);
-        const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" });
-        if (res?.ok) saved += 1;
-        else failed.push({ accountId, error: res?.error || "snapshot failed" });
-      } catch (err) {
-        failed.push({ accountId, error: err?.message || String(err) });
-      } finally {
-        if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
-      }
-      await new Promise((r) => setTimeout(r, 1200));
-    }
-    await setStored({ lastSyncStatus: failed.length ? "partial" : "success", lastSyncAt: Date.now(), lastSyncSaved: saved, lastSyncError: failed[0]?.error || null });
-    return { ok: true, saved, attempted: accountIds.length, failed };
+    tab = await openBillingTab(id);
+    const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" }, 4);
+    if (!res?.ok) throw new Error(res?.error || "Could not parse billing page");
+    await setStored({ lastSyncStatus: "success", lastSyncAt: Date.now(), lastSyncSaved: 1, lastSyncError: null });
+    return { ok: true, accountId: id };
   } catch (err) {
     const message = err?.message || String(err);
     await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
     return { ok: false, error: message };
+  } finally {
+    if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
   }
 }
 
@@ -430,30 +425,15 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
   return { ok: true };
 }
 
-// ---------- Alarms / messaging ----------
-async function ensureAlarm() {
-  const existing = await chrome.alarms.get(ALARM_NAME);
-  if (!existing) {
-    chrome.alarms.create(ALARM_NAME, { delayInMinutes: 1, periodInMinutes: SYNC_INTERVAL_MINUTES });
-  }
-}
-chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); });
-chrome.runtime.onStartup.addListener(() => { ensureAlarm(); });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) runAutoSync("alarm");
-});
-
+// ---------- Messaging ----------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
+    // Backwards-compat: popup manual sync still uses Graph API path
     runAutoSync(msg.reason || "manual").then(sendResponse);
     return true;
   }
-  if (msg?.type === "run-billing-sweep") {
-    runBillingSweep(msg.reason || "manual").then(sendResponse);
-    return true;
-  }
-  if (msg?.type === "ensure-alarm") {
-    ensureAlarm().then(() => sendResponse({ ok: true }));
+  if (msg?.type === "sync-single-account") {
+    syncSingleAccount(msg.accountId).then(sendResponse);
     return true;
   }
   if (msg?.type === "remove-card") {

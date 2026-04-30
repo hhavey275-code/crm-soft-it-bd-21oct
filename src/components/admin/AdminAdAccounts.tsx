@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -86,21 +87,7 @@ function writeLastFullSync(ts: number) {
   }
 }
 
-function runExtensionBillingSweep(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Extension did not respond. Reinstall/login to the latest extension, then retry.")), 12000);
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== window || event.data?.source !== "dsl-extension" || event.data?.type !== "billing-sweep-result") return;
-      window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-      const response = event.data.response;
-      if (!response?.ok) reject(new Error(response?.error || "Extension live billing sync failed"));
-      else resolve(response);
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage({ source: "dsl-crm", type: "run-billing-sweep", reason: "update-all-from-meta" }, "*");
-  });
-}
+// v1.4.2: runExtensionBillingSweep removed. Use ExtensionSyncButton per row instead.
 
 export function AdminAdAccounts() {
   const queryClient = useQueryClient();
@@ -186,7 +173,7 @@ export function AdminAdAccounts() {
         supabase.functions.invoke("get-account-insights", {
           body: { ad_account_ids: ids, source: "cache" },
         }),
-        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit_currency, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
+        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit, hidden_daily_limit, daily_spend_limit_currency, daily_spend_limit_synced_at, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
       ]);
       const edge = (edgeRes.data?.insights as Record<string, InsightsData>) ?? {};
       // Merge DB row data so `cards` (and other fields) aren't lost when the edge cache lacks them
@@ -324,12 +311,8 @@ export function AdminAdAccounts() {
       writeLastFullSync(now);
       setLastFullSyncAt(now);
       refetchInsights();
-      runExtensionBillingSweep()
-        .then((res) => {
-          toast.success(`Extension live billing sync queued${res?.saved ? ` · ${res.saved} saved` : ""}`);
-          setTimeout(() => refetchInsights(), 2500);
-        })
-        .catch((err) => toast.warning(err.message || "Extension live billing sync not available"));
+      // v1.4.2: Mass extension billing sweep removed (Meta-detection risk).
+      // For per-account live billing data, use the Sync button on each row.
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
       // Populate client_daily_stats for all users after Meta sync
@@ -995,6 +978,9 @@ export function AdminAdAccounts() {
                         {ins.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
                           <p className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
                         )}
+                        {(ins as any).hidden_daily_limit != null && Number((ins as any).hidden_daily_limit) > 0 && (
+                          <p className="text-[10px] text-muted-foreground">DSL: {Number((ins as any).hidden_daily_limit).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1010,14 +996,18 @@ export function AdminAdAccounts() {
                       {ins?.updated_at && (
                         <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}</span>
                       )}
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-0.5">
+                        <ExtensionSyncButton
+                          accountId={a.account_id}
+                          onSynced={() => { refetchInsights(); }}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
                           disabled={singleRefreshingId === a.id}
                           onClick={() => refreshSingleMutation.mutate(a.id)}
-                          title="Refresh this account"
+                          title="Refresh from Meta API"
                         >
                           <RefreshCw className={cn("h-3 w-3", singleRefreshingId === a.id && "animate-spin")} />
                         </Button>
@@ -1157,10 +1147,21 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
-                        {ins?.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
-                          <div className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
-                        )}
+                        <div className="flex items-start gap-1.5">
+                          <div>
+                            <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
+                            {ins?.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
+                              <div className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
+                            )}
+                            {(ins as any)?.hidden_daily_limit != null && Number((ins as any).hidden_daily_limit) > 0 && (
+                              <div className="text-[10px] text-muted-foreground">DSL: {Number((ins as any).hidden_daily_limit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
+                            )}
+                          </div>
+                          <ExtensionSyncButton
+                            accountId={a.account_id}
+                            onSynced={() => { refetchInsights(); }}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>

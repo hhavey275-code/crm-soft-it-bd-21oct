@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "1.4.1",
-  "description": "SMIT-style live billing data + payment card sync for Meta Ad Accounts. Parses the Facebook Billing page for hidden limit, threshold, balance, account type, timezone and payment methods, syncs to your CRM, and lets admins remove cards inline.",
-  "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms", "notifications"],
+  "version": "1.4.2",
+  "description": "Per-account live billing sync for Meta Ad Accounts. Click Sync in the CRM (or open a Meta billing page) and the extension parses hidden daily limit, threshold, balance, account type, timezone and payment cards, then syncs to your CRM.",
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [
     "https://*.facebook.com/*",
     "https://graph.facebook.com/*",
     "https://*.supabase.co/*",
-    "https://*.lovable.app/*"
+    "https://*.lovable.app/*",
+    "https://*.lovable.dev/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -27,7 +28,8 @@
         "https://business.facebook.com/*",
         "https://www.facebook.com/adsmanager/*",
         "https://adsmanager.facebook.com/*",
-        "https://*.lovable.app/*"
+        "https://*.lovable.app/*",
+        "https://*.lovable.dev/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

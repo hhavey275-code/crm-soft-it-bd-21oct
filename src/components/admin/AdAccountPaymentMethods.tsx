@@ -187,19 +187,10 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            if (confirm("Remove this payment method from the ad account?")) {
-                              removeMutation.mutate(card.id || "");
-                            }
-                          }}
-                          disabled={removeMutation.isPending}
-                        >
-                          {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
+                        {/* Card removal moved to the extension's billing-page panel.
+                            Open the Meta billing page for this account and remove the
+                            card from there — it uses your active Facebook session and
+                            shows Meta's native confirmation dialog. */}
                       </div>
                     )}
                   </div>
