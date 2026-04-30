@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "1.2.1",
-  "description": "Sync Daily Spending Limit and payment cards from your Facebook Ads Manager admin account into your dashboard.",
+  "version": "1.3.0",
+  "description": "Sync Daily Spending Limit (incl. hidden limit) and payment cards from Facebook Ads Manager into your CRM. Supports inline card-removal on the billing page.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms", "notifications"],
   "host_permissions": [
     "https://*.facebook.com/*",

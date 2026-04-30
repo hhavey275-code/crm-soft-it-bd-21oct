@@ -43,6 +43,22 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
     enabled: !!adAccountId,
   });
 
+  // DB-cached cards from extension sync (primary source — fast & always current)
+  const { data: cachedCards } = useQuery({
+    queryKey: ["account-cached-cards", adAccountId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("ad_account_last_known_state")
+        .select("cards")
+        .eq("ad_account_id", adAccountId)
+        .maybeSingle();
+      const list = Array.isArray(data?.cards) ? data.cards : [];
+      return list as { id: string; display_string: string; type?: string; is_primary?: boolean; exp_month?: number; exp_year?: number }[];
+    },
+    enabled: !!adAccountId,
+  });
+
+  // Live cards via edge function — used only as fallback when no cached cards exist
   const { data: accountCards, isLoading: loadingCards } = useQuery({
     queryKey: ["account-all-cards", adAccountId],
     queryFn: async () => {
@@ -53,6 +69,7 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
       if (data?.error) throw new Error(data.error);
       return (data?.cards ?? []) as { id: string; display_string: string; type: string; exp_month?: number; exp_year?: number }[];
     },
+    enabled: !!adAccountId && (!cachedCards || cachedCards.length === 0),
   });
 
   const { data: bmMethods, isLoading: loadingBmMethods } = useQuery({
@@ -104,7 +121,9 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
   });
 
   const assigningMethodId = assignMutation.isPending ? assignMutation.variables : null;
-  const displayCards = accountCards && accountCards.length > 0 ? accountCards : currentCards;
+  const displayCards = (cachedCards && cachedCards.length > 0)
+    ? cachedCards
+    : (accountCards && accountCards.length > 0 ? accountCards : currentCards);
 
   return (
     <>

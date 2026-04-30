@@ -1,30 +1,20 @@
 // ============================================================
-//  DSL Sync — Background Service Worker
-//  Runs an hourly auto-sync using stored credentials so the
-//  dashboard always shows fresh Daily Spending Limit values
-//  without the user having to open the popup.
-//
-//  Trigger: chrome.alarms ("auto-sync") every 60 minutes.
-//  Requirements: user must have completed login in the popup
-//  (jwt + apiUrl + anonKey present in chrome.storage.local) AND
-//  Chrome must be running. If Chrome is closed, the alarm fires
-//  on next browser startup.
+//  DSL Sync — Background Service Worker (v1.3.0)
+//  - Hourly auto-sync
+//  - Only syncs accounts that exist in the CRM (via list-managed-accounts)
+//  - Sends both adtrust_dsl (visible limit) and hidden_daily_limit
+//  - Pulls payment cards for each managed account
 // ============================================================
 
 const ALARM_NAME = "auto-sync";
-const SYNC_INTERVAL_MINUTES = 60; // hourly
+const SYNC_INTERVAL_MINUTES = 60;
 
-// ---------- storage helpers ----------
-function getStored(keys) {
-  return new Promise((res) => chrome.storage.local.get(keys, res));
-}
-function setStored(obj) {
-  return new Promise((res) => chrome.storage.local.set(obj, res));
-}
+const getStored = (keys) => new Promise((res) => chrome.storage.local.get(keys, res));
+const setStored = (obj) => new Promise((res) => chrome.storage.local.set(obj, res));
 function chunk(items, size) {
-  const chunks = [];
-  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-  return chunks;
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
 }
 
 // ---------- Supabase token refresh ----------
@@ -40,7 +30,7 @@ async function refreshSupabaseToken(apiUrl, anonKey, refreshToken) {
   return { access_token: body.access_token, refresh_token: body.refresh_token };
 }
 
-// ---------- Facebook tab + token extraction ----------
+// ---------- FB tab + token extraction ----------
 async function findAdsManagerTab() {
   const tabs = await chrome.tabs.query({
     url: [
@@ -75,11 +65,7 @@ async function extractFbAccessToken(tabId) {
     world: "MAIN",
     func: () => {
       const tokens = new Set();
-      const patterns = [
-        /EAAG\w{50,}/g,
-        /EAAB\w{50,}/g,
-        /EAA[A-Za-z0-9]{80,}/g,
-      ];
+      const patterns = [/EAAG\w{50,}/g, /EAAB\w{50,}/g, /EAA[A-Za-z0-9]{80,}/g];
       const sources = [];
       for (const s of document.querySelectorAll("script")) {
         if (s.textContent) sources.push(s.textContent);
@@ -101,7 +87,7 @@ async function extractFbAccessToken(tabId) {
   return result;
 }
 
-// ---------- Graph API ----------
+// ---------- Card normalization ----------
 function normalizeCard(source, isPrimary = false) {
   if (!source) return null;
   const id = String(source.id || source.funding_source_id || "").trim();
@@ -135,21 +121,52 @@ function extractAccountCards(acc) {
     const card = normalizeCard(cycle?.funding_source_details, false);
     if (card) cards.push(card);
   }
+  // Also try payment_methods edge if present (extra payment methods listed on billing)
+  const pmList = Array.isArray(acc?.payment_methods?.data) ? acc.payment_methods.data : [];
+  for (const pm of pmList) {
+    const card = normalizeCard(pm, false);
+    if (card) cards.push(card);
+  }
   return mergeCards([], cards);
 }
 
-function normalizeDslAccount(acc) {
-  const raw = acc.adtrust_dsl;
-  const num = raw === null || raw === undefined || raw === "" ? 0 : Number(raw);
+// ---------- Hidden limit derivation ----------
+// Meta exposes the visible "Daily spending limit" via adtrust_dsl.
+// The real *hidden* cap (what the SMIT extension shows as "Hidden Limit")
+// is typically the lower of: adtrust_dsl, min_daily_budget-derived caps,
+// or the threshold/balance pair. We pick the most restrictive positive
+// number from these signals.
+function deriveHiddenLimit(acc) {
+  const candidates = [];
+  const push = (v) => {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) candidates.push(n);
+  };
+  push(acc?.adtrust_dsl);
+  push(acc?.min_daily_budget);
+  // Some accounts expose adspaymentcycle.threshold_amount as the hidden cap
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const c of cycles) {
+    push(c?.threshold_amount);
+    push(c?.amount_due);
+  }
+  if (candidates.length === 0) return 0;
+  return Math.min(...candidates);
+}
+
+function normalizeFromAccount(acc) {
+  const dsl = Number(acc?.adtrust_dsl);
   return {
-    account_id: acc.account_id || acc.id?.replace(/^act_/, ""),
-    name: acc.name,
-    daily_spend_limit: Number.isFinite(num) && num > 0 ? num : 0,
-    currency: acc.currency || "USD",
+    account_id: String(acc.account_id || acc.id || "").replace(/^act_/, ""),
+    name: acc?.name,
+    daily_spend_limit: Number.isFinite(dsl) && dsl > 0 ? dsl : 0,
+    hidden_daily_limit: deriveHiddenLimit(acc),
+    currency: acc?.currency || "USD",
     cards: extractAccountCards(acc),
   };
 }
 
+// ---------- HTTP helpers ----------
 async function fetchWithTimeout(url, ms = 20000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
@@ -160,106 +177,61 @@ async function fetchWithTimeout(url, ms = 20000) {
   }
 }
 
-async function fetchGraphCollection(url, { allowError = false, maxPages = 20, timeoutMs = 20000 } = {}) {
-  const all = [];
-  let pages = 0;
-  while (url && pages < maxPages) {
-    let body;
-    try {
-      const res = await fetchWithTimeout(url, timeoutMs);
-      body = await res.json();
-    } catch (err) {
-      if (allowError) return all;
-      throw new Error(`Facebook request failed/timed out: ${err?.message || err}`);
-    }
-    if (body.error) {
-      if (allowError) return all;
-      throw new Error(`Facebook: ${body.error.message}`);
-    }
-    if (Array.isArray(body.data)) all.push(...body.data);
-    url = body.paging?.next || null;
-    pages++;
-  }
-  return all;
-}
+// Rich field set including hidden-limit signals + cards
+const ACCOUNT_FIELDS =
+  "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
+  "funding_source_details," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
 
-async function fetchCardsForAccount(accountId, accessToken) {
-  const actId = String(accountId || "").replace(/^act_/, "");
-  if (!actId) return [];
-  const token = encodeURIComponent(accessToken);
-  const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
-  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
+async function fetchOneAccount(accountId, accessToken) {
+  const actId = String(accountId).replace(/^act_/, "");
+  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${ACCOUNT_FIELDS}&access_token=${encodeURIComponent(accessToken)}`;
   try {
-    const res = await fetchWithTimeout(url, 12000);
+    const res = await fetchWithTimeout(url, 15000);
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.error) return [];
-    return extractAccountCards(body);
+    if (!res.ok || body?.error) return null;
+    body.account_id = actId;
+    return normalizeFromAccount(body);
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function fetchAllAdAccountsDsl(accessToken) {
-  const fields = "account_id,name,adtrust_dsl,currency";
-  const encodedToken = encodeURIComponent(accessToken);
-  const byId = new Map();
-  const addAccounts = (accounts) => {
-    for (const acc of accounts) {
-      const row = normalizeDslAccount(acc);
-      if (!row.account_id) continue;
-      const existing = byId.get(row.account_id);
-      if (!existing) {
-        byId.set(row.account_id, row);
-      } else {
-        byId.set(row.account_id, {
-          ...existing,
-          ...row,
-          daily_spend_limit: Math.max(existing.daily_spend_limit || 0, row.daily_spend_limit || 0),
-          cards: mergeCards(existing.cards, row.cards),
-        });
-      }
-    }
-  };
-
-  addAccounts(await fetchGraphCollection(
-    `https://graph.facebook.com/v19.0/me/adaccounts?fields=${fields}&limit=200&access_token=${encodedToken}`,
-  ));
-
-  const businesses = await fetchGraphCollection(
-    `https://graph.facebook.com/v19.0/me/businesses?fields=id,name&limit=100&access_token=${encodedToken}`,
-    { allowError: true, maxPages: 10 },
-  );
-  for (const biz of businesses) {
-    if (!biz.id) continue;
-    for (const edge of ["owned_ad_accounts", "client_ad_accounts"]) {
-      addAccounts(await fetchGraphCollection(
-        `https://graph.facebook.com/v19.0/${biz.id}/${edge}?fields=${fields}&limit=200&access_token=${encodedToken}`,
-        { allowError: true },
-      ));
-    }
+// Fetch all CRM-managed accounts in parallel batches
+async function fetchManagedAccountsData(accountIds, accessToken, onProgress) {
+  const results = [];
+  let done = 0;
+  for (const batch of chunk(accountIds, 8)) {
+    const batchData = await Promise.all(batch.map((id) => fetchOneAccount(id, accessToken)));
+    for (const r of batchData) if (r) results.push(r);
+    done += batch.length;
+    if (onProgress) onProgress(`Fetched ${done}/${accountIds.length} accounts...`);
   }
-
-  const accounts = Array.from(byId.values());
-  for (const batch of chunk(accounts, 8)) {
-    await Promise.all(batch.map(async (account) => {
-      if (account.cards?.length > 1) return;
-      const cards = await fetchCardsForAccount(account.account_id, accessToken);
-      account.cards = mergeCards(account.cards, cards);
-    }));
-  }
-  return accounts;
+  return results;
 }
 
-// ---------- Backend ingest ----------
+// ---------- Backend calls ----------
+async function listManagedAccounts(apiUrl, anonKey, jwt) {
+  const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/list-managed-accounts`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
+    body: "{}",
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    const err = new Error(body.error || "list-managed-accounts failed");
+    err.status = res.status;
+    throw err;
+  }
+  return body.account_ids || [];
+}
+
 async function ingestDsl(apiUrl, anonKey, jwt, accounts) {
   const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/ingest-dsl`;
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${jwt}`,
-      apikey: anonKey,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
     body: JSON.stringify({ accounts }),
   });
   const body = await res.json();
@@ -271,29 +243,37 @@ async function ingestDsl(apiUrl, anonKey, jwt, accounts) {
   return body;
 }
 
-// ---------- Main sync routine ----------
+// ---------- Main sync ----------
 async function runAutoSync(reason = "alarm") {
-  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken", "userEmail", "autoSyncEnabled"]);
-  if (stored.autoSyncEnabled === false) {
-    return { skipped: true, reason: "disabled" };
-  }
-  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) {
-    return { skipped: true, reason: "not-logged-in" };
-  }
+  const stored = await getStored([
+    "apiUrl", "anonKey", "jwt", "refreshToken", "userEmail", "autoSyncEnabled",
+  ]);
+  if (stored.autoSyncEnabled === false) return { skipped: true, reason: "disabled" };
+  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) return { skipped: true, reason: "not-logged-in" };
 
   await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
 
   let jwt = stored.jwt;
   try {
-    // 1) Find or open Facebook tab
+    // 1) Get CRM-managed account ids
+    let accountIds;
+    try {
+      accountIds = await listManagedAccounts(stored.apiUrl, stored.anonKey, jwt);
+    } catch (err) {
+      if (err.status === 401 && stored.refreshToken) {
+        const refreshed = await refreshSupabaseToken(stored.apiUrl, stored.anonKey, stored.refreshToken);
+        await setStored({ jwt: refreshed.access_token, refreshToken: refreshed.refresh_token });
+        jwt = refreshed.access_token;
+        accountIds = await listManagedAccounts(stored.apiUrl, stored.anonKey, jwt);
+      } else throw err;
+    }
+    if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
+
+    // 2) FB tab + token
     let tab = await findAdsManagerTab();
     let openedTab = false;
-    if (!tab) {
-      tab = await openAdsManagerTab();
-      openedTab = true;
-    }
+    if (!tab) { tab = await openAdsManagerTab(); openedTab = true; }
 
-    // 2) Extract FB access token (retry a few times)
     let token = null;
     let lastInfo = null;
     for (let i = 0; i < 3 && !token; i++) {
@@ -302,15 +282,13 @@ async function runAutoSync(reason = "alarm") {
       token = info?.token || null;
       if (!token && i < 2) await new Promise((r) => setTimeout(r, 3000));
     }
-    if (!token) {
-      throw new Error(`No Facebook token (scanned ${lastInfo?.candidates ?? 0})`);
-    }
+    if (!token) throw new Error(`No Facebook token (scanned ${lastInfo?.candidates ?? 0})`);
 
-    // 3) Fetch all DSL
-    const accounts = await fetchAllAdAccountsDsl(token);
-    if (accounts.length === 0) throw new Error("No ad accounts returned");
+    // 3) Fetch only managed accounts
+    const accounts = await fetchManagedAccountsData(accountIds, token);
+    if (!accounts.length) throw new Error("Could not fetch any managed accounts");
 
-    // 4) POST to backend (refresh JWT once on 401)
+    // 4) Ingest
     let result;
     try {
       result = await ingestDsl(stored.apiUrl, stored.anonKey, jwt, accounts);
@@ -320,15 +298,10 @@ async function runAutoSync(reason = "alarm") {
         await setStored({ jwt: refreshed.access_token, refreshToken: refreshed.refresh_token });
         jwt = refreshed.access_token;
         result = await ingestDsl(stored.apiUrl, stored.anonKey, jwt, accounts);
-      } else {
-        throw err;
-      }
+      } else throw err;
     }
 
-    // 5) Close the auto-opened tab to keep things tidy
-    if (openedTab) {
-      try { await chrome.tabs.remove(tab.id); } catch {}
-    }
+    if (openedTab) { try { await chrome.tabs.remove(tab.id); } catch {} }
 
     await setStored({
       lastSyncStatus: "success",
@@ -340,44 +313,62 @@ async function runAutoSync(reason = "alarm") {
     return { ok: true, ...result };
   } catch (err) {
     const message = err?.message || String(err);
-    await setStored({
-      lastSyncStatus: "error",
-      lastSyncAt: Date.now(),
-      lastSyncError: message,
-    });
+    await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
     console.warn("[DSL auto-sync] failed:", message);
     return { ok: false, error: message };
   }
 }
 
-// ---------- Alarm wiring ----------
+// ---------- Card removal (called from content script) ----------
+async function removeCardFromAccount({ accountId, fundingSourceId }) {
+  // Find a tab with FB access to extract a token
+  let tab = await findAdsManagerTab();
+  if (!tab) tab = await openAdsManagerTab();
+
+  let token = null;
+  for (let i = 0; i < 3 && !token; i++) {
+    const info = await extractFbAccessToken(tab.id).catch(() => null);
+    token = info?.token || null;
+    if (!token) await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (!token) throw new Error("Could not get Facebook access token");
+
+  const actId = String(accountId).replace(/^act_/, "");
+  const url = `https://graph.facebook.com/v19.0/act_${actId}/payment_methods/${encodeURIComponent(fundingSourceId)}?access_token=${encodeURIComponent(token)}`;
+  const res = await fetch(url, { method: "DELETE" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.error) {
+    throw new Error(body?.error?.message || `Remove failed (${res.status})`);
+  }
+  return { ok: true };
+}
+
+// ---------- Alarms ----------
 async function ensureAlarm() {
   const existing = await chrome.alarms.get(ALARM_NAME);
   if (!existing) {
-    chrome.alarms.create(ALARM_NAME, {
-      delayInMinutes: 1,            // first run shortly after install/startup
-      periodInMinutes: SYNC_INTERVAL_MINUTES,
-    });
+    chrome.alarms.create(ALARM_NAME, { delayInMinutes: 1, periodInMinutes: SYNC_INTERVAL_MINUTES });
   }
 }
-
 chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); });
 chrome.runtime.onStartup.addListener(() => { ensureAlarm(); });
-
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) {
-    runAutoSync("alarm");
-  }
+  if (alarm.name === ALARM_NAME) runAutoSync("alarm");
 });
 
-// Allow popup to trigger a manual run / status check
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
     runAutoSync(msg.reason || "manual").then(sendResponse);
-    return true; // async
+    return true;
   }
   if (msg?.type === "ensure-alarm") {
     ensureAlarm().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg?.type === "remove-card") {
+    removeCardFromAccount(msg.payload || {})
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 });
