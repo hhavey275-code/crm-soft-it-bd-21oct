@@ -809,21 +809,19 @@ export function ClientAdAccounts() {
                             <p className="text-[10px] text-muted-foreground">Orders</p>
                             <p className="text-xs font-semibold">{Number(ins.today_orders ?? 0)}</p>
                           </div>
-                          <div className="bg-muted/50 rounded-md p-1.5">
+                          <div className="bg-muted/50 rounded-md p-1.5 relative">
                             <p className="text-[10px] text-muted-foreground">Balance</p>
-                            <div className="flex items-center justify-center gap-1">
-                              <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                disabled={singleRefreshingId === a.id}
-                                onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(a.id); }}
-                                title="Sync this account from Meta"
-                              >
-                                <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? 'animate-spin' : ''}`} />
-                              </Button>
-                            </div>
+                            <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full border-primary/40 bg-background text-primary shadow-sm hover:bg-primary hover:text-primary-foreground"
+                              disabled={singleRefreshingId === a.id}
+                              onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(a.id); }}
+                              title="Sync this account from Meta"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? 'animate-spin' : ''}`} />
+                            </Button>
                           </div>
                         </div>
                       )}
