@@ -421,7 +421,9 @@ $("sync-btn").addEventListener("click", async () => {
 
     $("progress-text").textContent = "Fetching all ad accounts from Facebook...";
     $("progress-bar").style.width = "60%";
-    const accounts = await fetchAllAdAccountsDsl(token);
+    const accounts = await fetchAllAdAccountsDsl(token, (msg) => {
+      $("progress-text").textContent = msg;
+    });
     if (accounts.length === 0) {
       throw new Error("No ad accounts found for this Facebook user.");
     }
