@@ -139,9 +139,11 @@ export type Database = {
       }
       ad_account_insights: {
         Row: {
+          account_type: string | null
           active_campaigns: number | null
           ad_account_id: string
           balance: number | null
+          billing_raw_snapshot: Json | null
           billing_threshold: number | null
           cards: Json | null
           daily_spend_limit: number | null
@@ -150,18 +152,23 @@ export type Database = {
           hidden_daily_limit: number | null
           id: string
           last_spend_date: string | null
+          outstanding_balance: number | null
+          timezone_name: string | null
           today_messages: number | null
           today_orders: number | null
           today_spend: number | null
+          total_spending: number | null
           updated_at: string | null
           yesterday_messages: number | null
           yesterday_orders: number | null
           yesterday_spend: number | null
         }
         Insert: {
+          account_type?: string | null
           active_campaigns?: number | null
           ad_account_id: string
           balance?: number | null
+          billing_raw_snapshot?: Json | null
           billing_threshold?: number | null
           cards?: Json | null
           daily_spend_limit?: number | null
@@ -170,18 +177,23 @@ export type Database = {
           hidden_daily_limit?: number | null
           id?: string
           last_spend_date?: string | null
+          outstanding_balance?: number | null
+          timezone_name?: string | null
           today_messages?: number | null
           today_orders?: number | null
           today_spend?: number | null
+          total_spending?: number | null
           updated_at?: string | null
           yesterday_messages?: number | null
           yesterday_orders?: number | null
           yesterday_spend?: number | null
         }
         Update: {
+          account_type?: string | null
           active_campaigns?: number | null
           ad_account_id?: string
           balance?: number | null
+          billing_raw_snapshot?: Json | null
           billing_threshold?: number | null
           cards?: Json | null
           daily_spend_limit?: number | null
@@ -190,9 +202,12 @@ export type Database = {
           hidden_daily_limit?: number | null
           id?: string
           last_spend_date?: string | null
+          outstanding_balance?: number | null
+          timezone_name?: string | null
           today_messages?: number | null
           today_orders?: number | null
           today_spend?: number | null
+          total_spending?: number | null
           updated_at?: string | null
           yesterday_messages?: number | null
           yesterday_orders?: number | null
@@ -211,41 +226,62 @@ export type Database = {
       ad_account_last_known_state: {
         Row: {
           account_status: number | null
+          account_type: string | null
           ad_account_id: string
           amount_spent: number | null
           balance: number | null
+          billing_raw_snapshot: Json | null
+          billing_threshold: number | null
           cards: Json | null
+          hidden_daily_limit: number | null
           last_spend_date: string | null
           last_sync_error: string | null
           last_sync_error_at: string | null
           last_synced_at: string | null
+          outstanding_balance: number | null
           spend_cap: number | null
+          timezone_name: string | null
+          total_spending: number | null
           updated_at: string
         }
         Insert: {
           account_status?: number | null
+          account_type?: string | null
           ad_account_id: string
           amount_spent?: number | null
           balance?: number | null
+          billing_raw_snapshot?: Json | null
+          billing_threshold?: number | null
           cards?: Json | null
+          hidden_daily_limit?: number | null
           last_spend_date?: string | null
           last_sync_error?: string | null
           last_sync_error_at?: string | null
           last_synced_at?: string | null
+          outstanding_balance?: number | null
           spend_cap?: number | null
+          timezone_name?: string | null
+          total_spending?: number | null
           updated_at?: string
         }
         Update: {
           account_status?: number | null
+          account_type?: string | null
           ad_account_id?: string
           amount_spent?: number | null
           balance?: number | null
+          billing_raw_snapshot?: Json | null
+          billing_threshold?: number | null
           cards?: Json | null
+          hidden_daily_limit?: number | null
           last_spend_date?: string | null
           last_sync_error?: string | null
           last_sync_error_at?: string | null
           last_synced_at?: string | null
+          outstanding_balance?: number | null
           spend_cap?: number | null
+          timezone_name?: string | null
+          total_spending?: number | null
           updated_at?: string
         }
         Relationships: [

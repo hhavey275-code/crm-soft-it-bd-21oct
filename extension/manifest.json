@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "1.3.0",
-  "description": "Sync Daily Spending Limit (incl. hidden limit) and payment cards from Facebook Ads Manager into your CRM. Supports inline card-removal on the billing page.",
+  "version": "1.4.0",
+  "description": "SMIT-style live billing data + payment card sync for Meta Ad Accounts. Parses the Facebook Billing page for hidden limit, threshold, balance, account type, timezone and payment methods, syncs to your CRM, and lets admins remove cards inline.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms", "notifications"],
   "host_permissions": [
     "https://*.facebook.com/*",
@@ -12,7 +12,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Sync DSL & Cards"
+    "default_title": "DSL & Cards Sync"
   },
   "background": {
     "service_worker": "background.js"
