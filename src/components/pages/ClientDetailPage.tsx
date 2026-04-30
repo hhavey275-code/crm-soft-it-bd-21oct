@@ -468,6 +468,21 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: async () => {
+      toast.success("Account synced from Meta");
+      await Promise.all([refetchInsights(), refetchAdAccounts()]);
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+    onSettled: () => setSingleRefreshingId(null),
+  });
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
@@ -1373,7 +1388,18 @@ export default function ClientDetailPage() {
                                 </TableCell>
                                 <TableCell><StatusBadge status={acc.status} /></TableCell>
                                 <TableCell className="whitespace-nowrap">
-                                  <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                                      disabled={singleRefreshingId === acc.id}
+                                      onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(acc.id); }}
+                                    >
+                                      <RefreshCw className={cn("h-3 w-3", singleRefreshingId === acc.id && "animate-spin")} />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap">
                                   <span className="text-sm">${ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
