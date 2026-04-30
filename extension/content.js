@@ -148,26 +148,25 @@
   }
 
   function parseCards() {
-    const cards = [];
-    const seen = new Set();
+    const best = new Map();
     // Heuristic: look for any element whose text matches "Visa ... 1234" / "MasterCard ... 1234"
-    const cardRe = /(VISA|Visa|MasterCard|Master Card|MASTERCARD|American Express|Discover|JCB|UnionPay)\s*[·•\-\u00b7\u2022]*\s*\.{0,4}\s*(\d{4})/;
+    const cardRe = /\b(VISA|Visa|MasterCard|Master Card|MASTERCARD|American Express|Amex|Discover|JCB|UnionPay)\b\s*[·•\-\u00b7\u2022]*\s*\.{0,4}\s*(\d{4})/;
     const expRe = /Expires?\s*(\d{1,2})\s*[\/\-]\s*(\d{2,4})/i;
-    const els = document.querySelectorAll('div, li, [role="listitem"]');
+    const els = Array.from(document.querySelectorAll('li, [role="listitem"], [role="row"], div')).filter(isVisible);
     for (const el of els) {
       const t = el.textContent || "";
-      if (t.length > 600) continue;
+      if (t.length > 260) continue;
+      if (!/Expires?|Default|Payment method|Visa|MasterCard|Master Card|American Express|Amex|Discover|JCB|UnionPay/i.test(t)) continue;
       const m = t.match(cardRe);
       if (!m) continue;
       const last4 = m[2];
-      const brand = m[1].replace(/\s+/g, "").toLowerCase();
+      const brand = normalizeBrand(m[1]);
       const key = `${brand}-${last4}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
 
       const expM = t.match(expRe);
       const isDefault = /\bDefault\b/i.test(t);
       const isBackup = /\bBackup\b/i.test(t);
+      const removable = hasCardAction(el);
 
       // Try to extract a numeric funding-source/payment-method id from inner HTML
       let fsId = null;
@@ -180,19 +179,25 @@
       // Synthetic id when Meta doesn't expose the numeric id in the DOM
       const id = fsId || `local:${brand}:${last4}`;
 
-      cards.push({
+      const candidate = {
         id,
         removal_hint: fsId ? null : { brand, last4 },
         display_string: `${m[1].toUpperCase()} *${last4}`,
         type: brand,
         is_primary: isDefault,
         is_backup: isBackup,
+        removable,
         exp_month: expM ? parseInt(expM[1], 10) : null,
         exp_year: expM ? parseInt(expM[2].length === 2 ? "20" + expM[2] : expM[2], 10) : null,
-      });
+        score: (expM ? 10 : 0) + (isDefault ? 6 : 0) + (isBackup ? 3 : 0) + (removable ? 2 : 0) - Math.floor(t.length / 80),
+      };
+      const prev = best.get(key);
+      if (!prev || candidate.score > prev.score) best.set(key, candidate);
     }
     // sort default → others
-    return cards.sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+    return Array.from(best.values())
+      .map(({ score, ...card }) => card)
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
   }
 
   // ---------- panel UI ----------
