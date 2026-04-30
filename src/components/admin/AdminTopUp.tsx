@@ -540,70 +540,32 @@ export function AdminTopUp() {
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
 
-      // On approval: insert seller_transactions ledger row FIRST (so the Telegram
-      // running total includes this top-up), then forward the proof to Telegram.
+      // Seller ledger sync + Telegram forward are now handled atomically by the
+      // database trigger `sync_seller_transaction_for_approved_topup_trigger` on
+      // `top_up_requests` (fires whenever status becomes 'approved'). This avoids
+      // race conditions between admin approve and verify-topup auto-approve, and
+      // guarantees both happen exactly once. We still mark forwarded=true here as
+      // a UI hint when the bank has a Telegram group; the trigger fires the
+      // forward-proof edge function asynchronously.
       if (action === "approved") {
-        // Auto-sync to seller ledger if bank has a seller assigned.
-        // Idempotent: skip if a non-rejected ledger row already exists for this top-up
-        // (e.g. inserted by verify-topup auto-approval). Otherwise upgrade an existing
-        // pending row to approved instead of inserting a duplicate.
-        const reqForSeller = requests?.find((r: any) => r.id === id);
-        if (reqForSeller?.bank_account_id) {
-          try {
-            const { data: bankForSeller } = await (supabase as any).from("bank_accounts").select("seller_id").eq("id", reqForSeller.bank_account_id).single();
-            if (bankForSeller?.seller_id) {
-              const { data: existingRows } = await (supabase as any)
-                .from("seller_transactions")
-                .select("id, status")
-                .eq("top_up_request_id", id)
-                .neq("status", "rejected");
-              const existing = (existingRows as any[])?.[0];
-              if (existing) {
-                if (existing.status !== "approved") {
-                  await (supabase as any)
-                    .from("seller_transactions")
-                    .update({ status: "approved", reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
-                    .eq("id", existing.id);
-                }
-              } else {
-                const clientProfileForName = reqForSeller.profile;
-                const clientDisplayName = clientProfileForName?.full_name || clientProfileForName?.email || "Client";
-                await (supabase as any).from("seller_transactions").insert({
-                  seller_id: bankForSeller.seller_id,
-                  type: "client_topup",
-                  bdt_amount: Number(reqForSeller.bdt_amount || 0),
-                  usdt_amount: 0,
-                  rate: 0,
-                  description: `Client top-up approved — $${amount}`,
-                  bank_account_id: reqForSeller.bank_account_id,
-                  top_up_request_id: id,
-                  proof_url: reqForSeller.proof_url || null,
-                  status: "approved",
-                  reviewed_by: user?.id,
-                  reviewed_at: new Date().toISOString(),
-                  entry_by_name: clientDisplayName,
-                });
-              }
-            }
-          } catch (e) {
-            console.error("Seller ledger sync failed:", e);
-          }
-        }
-
-        // Forward proof image to per-bank Telegram group (after ledger insert so
-        // forward-proof's Due/Advance running total reflects the new entry).
-        let forwarded = false;
         try {
-          const { data: fwdData, error: fwdErr } = await supabase.functions.invoke("forward-proof", { body: { request_id: id } });
-          if (fwdErr) {
-            console.error("Telegram forward error:", fwdErr);
-          } else if (fwdData?.ok && !fwdData?.skipped) {
-            forwarded = true;
+          const reqForSeller = requests?.find((r: any) => r.id === id);
+          if (reqForSeller?.bank_account_id) {
+            const { data: bankRow } = await (supabase as any)
+              .from("bank_accounts")
+              .select("telegram_group_id")
+              .eq("id", reqForSeller.bank_account_id)
+              .single();
+            if (bankRow?.telegram_group_id) {
+              await (supabase as any)
+                .from("top_up_requests")
+                .update({ telegram_forwarded: true })
+                .eq("id", id);
+            }
           }
         } catch (e) {
-          console.error("Telegram forward failed:", e);
+          console.error("Mark telegram_forwarded failed (non-blocking):", e);
         }
-        await (supabase as any).from("top_up_requests").update({ telegram_forwarded: forwarded }).eq("id", id);
       }
     },
     onSuccess: (_, { action }) => {
