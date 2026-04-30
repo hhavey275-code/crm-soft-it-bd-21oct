@@ -115,7 +115,9 @@ Deno.serve(async (req) => {
       .single();
     const clientName = profile?.full_name || profile?.email || reqData.user_id.slice(0, 8);
 
-    // Global Due/Advance running balance for this seller (matches forward-seller-proof)
+    // Global Due/Advance running balance for this seller (matches forward-seller-proof).
+    // Include THIS pending top-up as a credit so the forwarded message shows the
+    // total the seller will have once admin approves it.
     let runningTotalLine = '';
     if (sellerId) {
       try {
@@ -123,7 +125,9 @@ Deno.serve(async (req) => {
           .from('seller_transactions')
           .select('type, bdt_amount, usdt_amount, rate, status, created_at')
           .eq('seller_id', sellerId);
-        const balance = computeDueAdvance((txns as any[]) || []);
+        let balance = computeDueAdvance((txns as any[]) || []);
+        // Add this pending client top-up amount (it isn't in seller_transactions yet)
+        balance += Number(reqData.bdt_amount || 0);
         runningTotalLine = buildTotalLine(balance);
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
