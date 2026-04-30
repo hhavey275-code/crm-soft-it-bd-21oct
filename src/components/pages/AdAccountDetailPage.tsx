@@ -664,6 +664,9 @@ export default function AdAccountDetailPage() {
         {/* === Synced Payment Methods (from extension) === */}
         {!isTikTok && id && <AdAccountSyncedCards adAccountId={id} />}
 
+        {/* === Live Billing Data (from extension billing-page parser) === */}
+        {!isTikTok && id && <LiveBillingData adAccountId={id} />}
+
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-start gap-3">
