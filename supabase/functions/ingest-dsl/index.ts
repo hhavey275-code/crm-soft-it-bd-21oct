@@ -216,12 +216,11 @@ Deno.serve(async (req: Request) => {
       const key = norm(r.account_id);
       if (!key) continue;
       const limit = Number(r.daily_spend_limit);
-      if (!Number.isFinite(limit) || limit < 0) continue;
       const hidden = Number(r.hidden_daily_limit);
       incomingMap.set(key, {
         ...r,
         account_id: key,
-        daily_spend_limit: limit,
+        daily_spend_limit: Number.isFinite(limit) && limit >= 0 ? limit : 0,
         hidden_daily_limit: Number.isFinite(hidden) && hidden >= 0 ? hidden : 0,
       });
     }
@@ -244,6 +243,7 @@ Deno.serve(async (req: Request) => {
 
     const now = new Date().toISOString();
     const updates: any[] = [];
+    const lksUpdates: any[] = [];
     const matched: string[] = [];
     const unmatched: string[] = [];
 
@@ -252,14 +252,37 @@ Deno.serve(async (req: Request) => {
       if (!row) continue;
       matched.push(acc.account_id);
       const incomingCards = mergeCards([], Array.isArray(row.cards) ? row.cards : []);
-      updates.push({
+      const snap = row.billing_snapshot || {};
+
+      const insightUpdate: any = {
         ad_account_id: acc.id,
-        daily_spend_limit: row.daily_spend_limit,
-        hidden_daily_limit: row.hidden_daily_limit ?? null,
         daily_spend_limit_currency: row.currency || "USD",
         daily_spend_limit_synced_at: now,
         updated_at: now,
-      });
+      };
+      // Only overwrite the visible limit when the caller actually provided one (>0).
+      if ((row.daily_spend_limit ?? 0) > 0) insightUpdate.daily_spend_limit = row.daily_spend_limit;
+      if ((row.hidden_daily_limit ?? 0) > 0) insightUpdate.hidden_daily_limit = row.hidden_daily_limit;
+      if (snap.account_type !== undefined) insightUpdate.account_type = snap.account_type ?? null;
+      if (snap.timezone_name !== undefined) insightUpdate.timezone_name = snap.timezone_name ?? null;
+      if (snap.total_spending !== undefined && snap.total_spending !== null) insightUpdate.total_spending = snap.total_spending;
+      if (snap.outstanding_balance !== undefined && snap.outstanding_balance !== null) insightUpdate.outstanding_balance = snap.outstanding_balance;
+      if (snap.billing_threshold !== undefined && snap.billing_threshold !== null) insightUpdate.billing_threshold = snap.billing_threshold;
+      if (Object.keys(snap).length > 0) insightUpdate.billing_raw_snapshot = snap;
+      updates.push(insightUpdate);
+
+      // Mirror into ad_account_last_known_state for the hack-recovery / cache UI
+      const lks: any = { ad_account_id: acc.id, updated_at: now, last_synced_at: now, last_sync_error: null, last_sync_error_at: null };
+      if ((row.hidden_daily_limit ?? 0) > 0) lks.hidden_daily_limit = row.hidden_daily_limit;
+      if (snap.billing_threshold !== undefined && snap.billing_threshold !== null) lks.billing_threshold = snap.billing_threshold;
+      if (snap.total_spending !== undefined && snap.total_spending !== null) lks.total_spending = snap.total_spending;
+      if (snap.outstanding_balance !== undefined && snap.outstanding_balance !== null) lks.outstanding_balance = snap.outstanding_balance;
+      if (snap.balance !== undefined && snap.balance !== null) lks.balance = snap.balance;
+      if (snap.account_type !== undefined) lks.account_type = snap.account_type ?? null;
+      if (snap.timezone_name !== undefined) lks.timezone_name = snap.timezone_name ?? null;
+      if (Object.keys(snap).length > 0) lks.billing_raw_snapshot = snap;
+      lksUpdates.push(lks);
+
       (acc as any).incoming_cards = incomingCards;
     }
 
