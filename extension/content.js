@@ -19,7 +19,7 @@
   function getAccountId() {
     try {
       const u = new URL(location.href);
-      const a = u.searchParams.get("asset_id") || u.searchParams.get("account_id") || u.searchParams.get("act");
+      const a = u.searchParams.get("asset_id") || u.searchParams.get("payment_account_id") || u.searchParams.get("account_id") || u.searchParams.get("act");
       if (a) return String(a).replace(/^act_/, "");
     } catch {}
     const m = location.href.match(/act[_=](\d{6,})/);
@@ -44,7 +44,7 @@
   function findAfter(label, opts = {}) {
     const text = pageText();
     const flags = "i";
-    const lbl = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const lbl = opts.regex ? label : label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // Allow up to 80 chars (whitespace/newlines) between label and number, optional currency
     const re = new RegExp(lbl + "[^\\n]{0,80}?([A-Z]{0,3}\\s*\\$?\\s*[0-9][0-9,]*(?:\\.[0-9]+)?\\s*(?:USD|BDT|EUR|GBP)?)", flags);
     const m = text.match(re);
@@ -58,12 +58,12 @@
     const text = pageText();
     if (!text) return null;
 
-    const dsl = findAfter("Daily spending limit\\s*\\(set by Meta\\)") || findAfter("Daily spending limit");
+    const dsl = findAfter("Daily spending limit\\s*\\(set by Meta\\)", { regex: true }) || findAfter("Daily spending limit");
     const threshold = findAfter("Your balance reaches") || findAfter("Threshold");
     const outstanding = findAfter("Outstanding balance") || findAfter("Outstanding");
     const balance = findAfter("Balance");
     const totalSpending = findAfter("Total spending");
-    const limit = findAfter("\\bLimit\\b");
+    const limit = findAfter("\\bLimit\\b", { regex: true });
     const hiddenLimit = findAfter("Hidden Limit");
 
     // Account status — look for "Active", "Disabled", "USD | Active"
