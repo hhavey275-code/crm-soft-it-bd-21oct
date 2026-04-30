@@ -1135,8 +1135,20 @@ export function AdminAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
+                      <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            disabled={singleRefreshingId === a.id}
+                            onClick={() => refreshSingleMutation.mutate(a.id)}
+                            title="Sync this account from Meta"
+                          >
+                            <RefreshCw className={cn("h-3 w-3", singleRefreshingId === a.id && "animate-spin")} />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
