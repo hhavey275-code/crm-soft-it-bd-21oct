@@ -279,7 +279,7 @@
             <div style="font-weight:600;">${c.display_string}${c.is_primary ? ' <span style="background:#dcfce7;color:#15803d;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:4px;">Default</span>' : ''}${c.is_backup ? ' <span style="background:#fef3c7;color:#92400e;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:4px;">Backup</span>' : ''}</div>
             ${c.exp_month && c.exp_year ? `<div style="color:#94a3b8;font-size:10px;">Exp ${c.exp_month}/${c.exp_year}</div>` : ''}
           </div>
-          <button data-card-id="${c.id}" data-card-index="${idx}" class="dsl-crm-remove-card" style="background:#fff;border:1px solid #ef4444;color:#ef4444;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:10px;font-weight:600;">Remove</button>
+          ${c.removable ? `<button data-card-id="${c.id}" data-card-index="${idx}" class="dsl-crm-remove-card" style="background:#fff;border:1px solid #ef4444;color:#ef4444;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:10px;font-weight:600;">Remove</button>` : `<span style="color:#94a3b8;font-size:10px;white-space:nowrap;">No remove</span>`}
         </div>
       `).join("");
 
@@ -306,6 +306,10 @@
         const cardId = btn.getAttribute("data-card-id");
         const cardIndex = Number(btn.getAttribute("data-card-index"));
         const card = Number.isFinite(cardIndex) ? snap.cards[cardIndex] : null;
+        if (!card?.removable) {
+          alert("Meta ei card-er remove option show korche na, tai extension remove korbe na.");
+          return;
+        }
         if (!confirm(`Remove this card from act_${snap.account_id}?`)) return;
         btn.disabled = true;
         const orig = btn.textContent;
