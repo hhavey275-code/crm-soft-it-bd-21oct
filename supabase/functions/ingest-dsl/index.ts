@@ -300,6 +300,15 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (lksUpdates.length > 0) {
+      for (const lksChunk of chunk(lksUpdates, 100)) {
+        const { error: lksErr } = await supabase
+          .from("ad_account_last_known_state")
+          .upsert(lksChunk, { onConflict: "ad_account_id" });
+        if (lksErr) console.warn("[ingest-dsl] lks upsert failed:", lksErr.message);
+      }
+    }
+
     await syncIncomingCards(supabase, existing, now);
 
     return json({
