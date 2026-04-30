@@ -1,5 +1,5 @@
 // ============================================================
-//  DSL Sync — content script (v1.4.0)
+//  DSL Sync — content script (v1.4.4)
 //  SMIT-style live panel on Facebook Billing pages
 //  - Parses billing page DOM for: visible limit, hidden daily limit,
 //    threshold, balance, total spending, account type, timezone, cards.
@@ -38,6 +38,32 @@
 
   function pageText() {
     return document.body ? (document.body.innerText || "") : "";
+  }
+
+  function isVisible(el) {
+    if (!el || el.closest(`#${PANEL_ID}`)) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 8 && rect.height > 8;
+  }
+
+  function normalizeBrand(brand) {
+    const b = String(brand || "").replace(/\s+/g, "").toLowerCase();
+    if (b === "mastercard" || b === "master") return "mastercard";
+    if (b === "amex" || b === "americanexpress") return "americanexpress";
+    return b;
+  }
+
+  function hasCardAction(el) {
+    if (!el) return false;
+    const row = el.closest('li, [role="listitem"], [role="row"], div') || el;
+    const controls = Array.from(row.querySelectorAll('button, [role="button"], a[role="button"], a'));
+    return controls.some((b) => {
+      if (!isVisible(b)) return false;
+      const label = `${b.textContent || ""} ${b.getAttribute("aria-label") || ""} ${b.getAttribute("title") || ""}`;
+      return /remove|delete|detach|more|menu|options|⋯|…|ellipsis/i.test(label) || b.textContent?.trim() === "";
+    });
   }
 
   // Find the value that follows a label using a flexible regex.
@@ -93,7 +119,8 @@
     const curMatch = text.match(/\b(USD|BDT|EUR|GBP|INR|VND|IDR|THB|PHP|MYR|SGD|CAD|AUD)\b/);
     if (curMatch) currency = curMatch[1];
 
-    // Cards from "Payment methods" section
+    // Cards from the visible "Payment methods" section only. Avoid hidden Meta
+    // menus and this extension panel so duplicate/stale cards don't appear.
     const cards = parseCards();
 
     // Hidden limit fallback: from screenshot SMIT shows actual cap as
