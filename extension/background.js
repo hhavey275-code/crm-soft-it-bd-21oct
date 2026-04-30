@@ -1,13 +1,14 @@
 // ============================================================
-//  DSL Sync — Background Service Worker (v1.4.0)
-//  - Auto-sync every 6 hours (only CRM-managed accounts)
-//  - Accepts billing-page snapshots from content.js (SMIT-style)
-//  - Performs card removal using the user's Facebook session
-//  - Survives popup close / tab switching (runs in service worker)
+//  DSL Sync — Background Service Worker (v1.4.2)
+//  - No mass sweeps / alarms (Meta detection-safe)
+//  - Per-account on-demand sync via "sync-single-account"
+//  - Opportunistic snapshots from content.js when user opens billing page
+//  - Card removal only while user is on a Meta billing page
 // ============================================================
 
-const ALARM_NAME = "auto-sync";
-const SYNC_INTERVAL_MINUTES = 360; // every 6 hours
+// Per-account cooldown so spam clicks don't open duplicate tabs
+const SYNC_COOLDOWN_MS = 8000;
+const recentSyncs = new Map();
 
 const getStored = (keys) => new Promise((res) => chrome.storage.local.get(keys, res));
 const setStored = (obj) => new Promise((res) => chrome.storage.local.set(obj, res));
