@@ -810,7 +810,19 @@ export function ClientAdAccounts() {
                           </div>
                           <div className="bg-muted/50 rounded-md p-1.5">
                             <p className="text-[10px] text-muted-foreground">Balance</p>
-                            <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                            <div className="flex items-center justify-center gap-1">
+                              <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5"
+                                disabled={singleRefreshingId === a.id}
+                                onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(a.id); }}
+                                title="Sync this account from Meta"
+                              >
+                                <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
