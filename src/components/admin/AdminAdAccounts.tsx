@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
