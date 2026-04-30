@@ -540,55 +540,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Auto-sync to seller ledger BEFORE Telegram forward so the running total includes it
-    let sellerId: string | null = null;
-    if (bank_account_id) {
-      const { data: bankForSeller } = await supabase.from('bank_accounts').select('seller_id').eq('id', bank_account_id).single();
-      if (bankForSeller?.seller_id) {
-        sellerId = bankForSeller.seller_id;
-        let clientDisplayName = '';
-        try {
-          const { data: cp } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
-          clientDisplayName = cp?.full_name || cp?.email || '';
-        } catch {}
-        await supabase.from('seller_transactions').insert({
-          seller_id: sellerId,
-          type: 'client_topup',
-          bdt_amount: bdtNum,
-          usdt_amount: 0,
-          rate: 0,
-          description: `Client top-up auto-approved — $${amount}`,
-          bank_account_id,
-          top_up_request_id: request_id,
-          proof_url: proof_url || null,
-          entry_by_name: clientDisplayName || null,
-          status: 'approved',
-          reviewed_at: new Date().toISOString(),
-        });
-      }
-    }
-
-    // Compute global Due/Advance running balance for the seller (matches forward-seller-proof)
-    let runningTotalLine = '';
-    if (sellerId) {
-      try {
-        const { data: txns } = await supabase
-          .from('seller_transactions')
-          .select('type, bdt_amount, usdt_amount, rate, status, created_at')
-          .eq('seller_id', sellerId);
-        const balance = computeDueAdvance((txns as any[]) || []);
-        runningTotalLine = buildTotalLine(balance);
-      } catch (e) {
-        console.error('Due/Advance compute failed:', e);
-      }
-    }
-
+    // Seller ledger sync + Telegram forward are handled atomically by the
+    // database trigger `sync_seller_transaction_for_approved_topup_trigger`
+    // on `top_up_requests`. We only need to mark telegram_forwarded as a UI
+    // hint when the receiving bank has a Telegram group configured.
     let telegramForwarded = false;
-    if (proof_url) {
-      const { data: clientProfile } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
-      const clientName = clientProfile?.full_name || clientProfile?.email || 'Unknown';
-      const caption = `✅ <b>Auto-Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${bdtNum.toLocaleString()})\n🔖 Ref: ${payment_reference || 'N/A'}${runningTotalLine}`;
-      telegramForwarded = await forwardProofToTelegram(supabase, proof_url, caption, bank_account_id);
+    if (bank_account_id && proof_url) {
+      const { data: bankRow } = await supabase
+        .from('bank_accounts')
+        .select('telegram_group_id')
+        .eq('id', bank_account_id)
+        .single();
+      if (bankRow?.telegram_group_id) telegramForwarded = true;
     }
 
     await supabase.from('top_up_requests').update({ telegram_forwarded: telegramForwarded }).eq('id', request_id);
