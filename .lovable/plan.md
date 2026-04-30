@@ -1,85 +1,122 @@
-I understand — the last update is still showing the old visible limit (250), sync is fragile when switching tabs, and cards are not reliably reaching the CRM. I will change the approach from “Graph API only” to a SMIT-style billing-page reader, because the screenshot proves the real values are available in the rendered Facebook Billing UI.
+## Goal
 
-Plan:
+Confirm previous decisions (hybrid sync, no mass sweep, card remove only on Meta page) AND add a **client-side per-account "Sync" button** next to each account's Daily/Budget limit on the Client Ad Accounts page. Same button works for admin too. Click → extension opens that one account's billing page in a background tab → parses hidden Daily Spending Limit (DSL) + threshold + balance → pushes to CRM → tab closes → UI refreshes.
 
-1. Upgrade extension to v1.4.0 with a billing-page live panel
-   - Inject a right-side CRM panel on Facebook Billing pages, similar to the SMIT panel.
-   - Show live parsed values beside the ad account:
-     - Account status
-     - Visible limit
-     - Hidden daily limit
-     - Billing threshold
-     - Balance / outstanding balance
-     - Total spending
-     - Account type
-     - Timezone
-     - Payment methods, including default and backup cards
-     - Card expiry when visible
-     - Payment method remove button
-   - Add clear sync status inside the panel: parsed, syncing, synced, failed.
+## Why this is safe
 
-2. Fix hidden limit accuracy by parsing Facebook Billing DOM text
-   - Stop relying only on `adtrust_dsl`, because in your screenshot that gives 250 while the actual billing-page daily limit is 134.52.
-   - Parse the Billing page text directly for:
-     - `Daily spending limit (set by Meta): $134.52`
-     - SMIT-style labels if present: `Hidden Limit`, `Threshold`, `Balance`, `Total spending`, etc.
-   - Store parsed hidden limit separately in CRM, and display hidden limit before the older visible limit where appropriate.
+- **User-initiated, one click = one account, one tab.** No automated loops.
+- Same flow as opening a Meta page yourself — Meta sees one normal page load per click. No bot-like rapid-fire pattern.
+- No `chrome.alarms` periodic scans. No `runBillingSweep` mass loop.
 
-3. Fix cards not syncing by reading the visible Payment methods section
-   - Parse all visible card rows from Billing page:
-     - Visa/MasterCard/etc.
-     - last 4 digits
-     - default badge
-     - backup cards
-     - expiry date where shown
-   - Sync these cards into:
-     - `ad_account_last_known_state.cards`
-     - `ad_account_insights.cards`
-     - card assignment history, so CRM card panels show them immediately.
+## Changes
 
-4. Make sync survive tab changes
-   - Move the manual sync flow to the background service worker instead of depending on the popup staying open.
-   - Popup button will only start the background job and show status from `chrome.storage.local`.
-   - If you click another tab or the popup closes, sync continues.
-   - Auto-sync will run every 6 hours as requested, not every hour.
+### 1. Extension v1.4.2
 
-5. Only sync CRM accounts
-   - Keep the existing CRM account filter from `list-managed-accounts`.
-   - Extension will only sync accounts whose Meta account IDs exist in the CRM.
-   - No random BM accounts will be pushed to the CRM.
+**`extension/background.js`**
+- Remove `runBillingSweep()` and the `chrome.alarms` periodic auto-sync.
+- Keep `sync-single-account` message handler (already designed in last plan):
+  - Opens `https://adsmanager.facebook.com/ads/manager/account_settings/account_billing/?act={accountId}` as inactive tab
+  - Waits for content script ready (poll up to 8s)
+  - Sends `collect-billing-snapshot`, receives parsed payload
+  - POSTs to `ingest-dsl` edge function
+  - Closes tab, returns `{ ok: true, snapshot }` to caller
+- Keep opportunistic listener for `push-billing-snapshot` (when user is naturally on a billing page).
+- Keep card removal flow (only when active billing tab present).
 
-6. Add richer CRM storage for live billing fields
-   - Add columns to store billing-page data accurately, for example:
-     - `account_type`
-     - `timezone_name`
-     - `billing_threshold`
-     - `total_spending`
-     - `outstanding_balance`
-     - `billing_raw_snapshot` JSON for debugging/parsing fallback
-   - Add equivalent fields to the last-known-state table where needed.
+**`extension/content.js`**
+- No change to floating panel or DOM parsing.
+- Make sure `collect-billing-snapshot` listener returns the latest snapshot (already wired in v1.4.1).
 
-7. Update CRM ad account detail page
-   - Add a “Live Billing Data from Extension” card on the ad account details page.
-   - Show hidden daily limit prominently, e.g. “Hidden Limit: $134.52”.
-   - Show visible limit separately, e.g. “Visible Limit: $250.00”.
-   - Show threshold, balance, total spend, account type, timezone, last synced time, and cards.
-   - Make synced cards appear in the existing Payment Methods section too.
+**`extension/manifest.json`**
+- Bump version to `1.4.2`.
+- Remove `alarms` permission.
+- Add `externally_connectable.matches` for both preview and published CRM domains so client/admin pages can call the extension:
+  - `https://*.lovable.app/*`
+  - `https://*.lovable.dev/*`
+  - Any custom CRM domain already listed.
 
-8. Improve payment method removal
-   - Keep removal inside Facebook Billing page using the logged-in Facebook session.
-   - Add the remove action beside parsed cards in the injected CRM panel.
-   - After removal, re-parse the page and sync the updated card list back to CRM.
-   - If Facebook changes DOM/API and the card ID cannot be detected, show a clear message instead of silent failure.
+**`extension/popup.js`**
+- Remove "Sync All Accounts" button.
+- Show: login status + a one-line note ("Open any ad account billing page or click Sync from CRM").
 
-9. Package and update download
-   - Repackage `public/dsl-sync-extension.zip` from the updated extension.
-   - Update CRM download label and filename to `dsl-sync-extension-v1.4.0.zip` / “Download extension v1.4.0”.
+### 2. CRM UI — Client side (NEW)
 
-Technical notes:
+**`src/components/client/ClientAdAccounts.tsx`**
+- Next to each account row's Budget/limit display (desktop table cell + mobile tile), add a small icon button: `RefreshCw` icon, tooltip "Sync hidden daily limit from Meta".
+- Click handler:
+  ```ts
+  chrome.runtime.sendMessage(EXT_ID, { type: "sync-single-account", accountId: a.account_id }, (res) => { ... })
+  ```
+- Show inline spinner while in flight; toast success/fail; on success invalidate the `ad_accounts` + `insights` queries so updated DSL appears.
+- If `chrome.runtime` undefined → toast: "Install the CRM Sync extension to use this feature" with link to extension download (already on `AdAccountDetailPage`).
+- Optional small badge under the limit value showing "Live · {timeAgo}" if `daily_spend_limit_synced_at` exists.
 
-- This will use a hybrid data source:
-  - Facebook Billing page DOM parser for hidden limit, visible cards, threshold, account type, timezone, and billing-page-only data.
-  - Graph API only as fallback for fields it can reliably return.
-- I will not embed the screenshot as an app asset; I will use it only as reference for the parser/UI.
-- The database migration will be needed for the new billing fields.
-- After implementation, you will need to install the new v1.4.0 extension and open the Facebook billing page while logged in for the live parser to read the same data SMIT reads.
+**Read & display DSL in client list (NEW)**
+- Extend the client `ad_accounts` query to also fetch `ad_account_last_known_state` (hidden_daily_limit, daily_spend_limit, billing_threshold, daily_spend_limit_synced_at) keyed by account_id.
+- In the row, show alongside Budget: "Daily Limit: $X" if hidden_daily_limit available; else "—". This makes the data visible to clients (currently only admins see it via `LiveBillingData`).
+
+### 3. CRM UI — Admin side (from previous plan, kept)
+
+**`src/components/admin/AdminAdAccounts.tsx`**
+- Same per-row Sync button (calls same `sync-single-account`).
+- "Update All from Meta" button → only refetch from CRM DB (no extension sweep). Tooltip explains: "Use the row Sync button for live Meta data per account."
+- Threshold display next to balance (already added in v1.4.1) stays.
+
+**`src/components/admin/LiveBillingData.tsx`**
+- Add "Sync from Meta now" button using same `sync-single-account` message.
+
+**`src/components/admin/AdAccountPaymentMethods.tsx`**
+- Remove centralized "Remove" button. Replace with note: "Card removal works from the extension panel when you're on the Meta billing page."
+
+### 4. Repackage
+
+`public/dsl-sync-extension.zip` rebuilt with v1.4.2.
+
+## Technical notes
+
+**Sync flow (per click):**
+```text
+Client/Admin clicks Sync on account row
+  → window.chrome.runtime.sendMessage(EXT_ID, { type: "sync-single-account", accountId })
+  → background.js: chrome.tabs.create({ url: billingUrl, active: false })
+  → poll content.js readiness (max 8s)
+  → chrome.tabs.sendMessage(tabId, { type: "collect-billing-snapshot" })
+  → content.js parses DOM → returns BillingSnapshot
+  → background.js → fetch supabase ingest-dsl with user's auth token
+  → chrome.tabs.remove(tabId)
+  → callback({ ok: true })
+  → CRM toast + queryClient.invalidateQueries(["ad_accounts"]) + ["last_known_state"]
+```
+
+**Why no Meta ban concern here:**
+- 1 click = 1 tab = 1 page load. Identical to user manually opening that page.
+- No background timers. No looping over many accounts. Burden of pacing is on the human clicking.
+- If user spam-clicks 20 sync buttons in 5 seconds, we add a small per-account 10s cooldown in `background.js` (in-memory map) to be defensive.
+
+**Files to edit:**
+- `extension/background.js`
+- `extension/content.js`
+- `extension/manifest.json`
+- `extension/popup.js`
+- `src/components/client/ClientAdAccounts.tsx`
+- `src/components/admin/AdminAdAccounts.tsx`
+- `src/components/admin/LiveBillingData.tsx`
+- `src/components/admin/AdAccountPaymentMethods.tsx`
+- `public/dsl-sync-extension.zip` (rebuild)
+
+**No DB changes.** Schema from v1.4.0 already has all needed columns.
+
+## What stays the same
+
+- `ingest-dsl` and `list-managed-accounts` edge functions — no change.
+- Opportunistic sync (when you naturally browse a billing page) — works as is.
+- Live data auto-refresh in admin detail page — works as is.
+- All existing CRM data, queries, RLS — untouched.
+
+## After deploy
+
+User actions:
+1. Download v1.4.2 zip from the Ad Account detail page, reinstall (Load unpacked, replace existing).
+2. Make sure logged in to Facebook in the same Chrome profile.
+3. On Client Ad Accounts page → click the small Sync icon next to any account's Daily Limit → wait ~5-7s → updated DSL appears.
+4. Same button available on Admin list and Admin detail page.
