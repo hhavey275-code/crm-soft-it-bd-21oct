@@ -150,12 +150,28 @@ function normalizeDslAccount(acc) {
   };
 }
 
-async function fetchGraphCollection(url, { allowError = false, maxPages = 20 } = {}) {
+async function fetchWithTimeout(url, ms = 20000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchGraphCollection(url, { allowError = false, maxPages = 20, timeoutMs = 20000 } = {}) {
   const all = [];
   let pages = 0;
   while (url && pages < maxPages) {
-    const res = await fetch(url);
-    const body = await res.json();
+    let body;
+    try {
+      const res = await fetchWithTimeout(url, timeoutMs);
+      body = await res.json();
+    } catch (err) {
+      if (allowError) return all;
+      throw new Error(`Facebook request failed/timed out: ${err?.message || err}`);
+    }
     if (body.error) {
       if (allowError) return all;
       throw new Error(`Facebook: ${body.error.message}`);
