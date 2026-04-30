@@ -180,12 +180,31 @@ function normalizeDslAccount(acc) {
   };
 }
 
-async function fetchGraphCollection(url, { allowError = false, maxPages = 20 } = {}) {
+// Fetch with hard timeout so the popup never hangs forever on a slow Graph
+// call. Returns the parsed JSON or throws.
+async function fetchWithTimeout(url, ms = 20000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchGraphCollection(url, { allowError = false, maxPages = 20, timeoutMs = 20000 } = {}) {
   const all = [];
   let pages = 0;
   while (url && pages < maxPages) {
-    const res = await fetch(url);
-    const body = await res.json();
+    let body;
+    try {
+      const res = await fetchWithTimeout(url, timeoutMs);
+      body = await res.json();
+    } catch (err) {
+      if (allowError) return all;
+      throw new Error(`Facebook request failed/timed out: ${err?.message || err}`);
+    }
     if (body.error) {
       if (allowError) return all;
       throw new Error(`Facebook: ${body.error.message}`);
@@ -203,13 +222,17 @@ async function fetchCardsForAccount(accountId, accessToken) {
   const token = encodeURIComponent(accessToken);
   const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
   const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
-  const res = await fetch(url);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body?.error) return [];
-  return extractAccountCards(body);
+  try {
+    const res = await fetchWithTimeout(url, 12000);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) return [];
+    return extractAccountCards(body);
+  } catch {
+    return [];
+  }
 }
 
-async function fetchAllAdAccountsDsl(accessToken) {
+async function fetchAllAdAccountsDsl(accessToken, onProgress) {
   const fields = "account_id,name,adtrust_dsl,currency";
   const encodedToken = encodeURIComponent(accessToken);
   const byId = new Map();
@@ -231,34 +254,42 @@ async function fetchAllAdAccountsDsl(accessToken) {
     }
   };
 
-  // 1) User-level ad accounts. Fast, but Facebook can omit some BM accounts here.
+  // 1) User-level ad accounts.
+  if (onProgress) onProgress("Loading your ad accounts...");
   addAccounts(await fetchGraphCollection(
     `https://graph.facebook.com/v19.0/me/adaccounts?fields=${fields}&limit=200&access_token=${encodedToken}`,
+    { allowError: true },
   ));
 
-  // 2) Business Manager owned/client ad accounts. This catches accounts that
-  // are visible in Ads Manager/Billing but missing from /me/adaccounts.
+  // 2) Business Manager owned/client ad accounts.
+  if (onProgress) onProgress("Loading Business Manager accounts...");
   const businesses = await fetchGraphCollection(
     `https://graph.facebook.com/v19.0/me/businesses?fields=id,name&limit=100&access_token=${encodedToken}`,
-    { allowError: true, maxPages: 10 },
+    { allowError: true, maxPages: 5 },
   );
+  let bIdx = 0;
   for (const biz of businesses) {
+    bIdx++;
     if (!biz.id) continue;
+    if (onProgress) onProgress(`Scanning BM ${bIdx}/${businesses.length}: ${biz.name || biz.id}...`);
     for (const edge of ["owned_ad_accounts", "client_ad_accounts"]) {
       addAccounts(await fetchGraphCollection(
         `https://graph.facebook.com/v19.0/${biz.id}/${edge}?fields=${fields}&limit=200&access_token=${encodedToken}`,
-        { allowError: true },
+        { allowError: true, maxPages: 10 },
       ));
     }
   }
 
   const accounts = Array.from(byId.values());
+  let done = 0;
   for (const batch of chunk(accounts, 8)) {
     await Promise.all(batch.map(async (account) => {
-      if (account.cards?.length > 1) return;
+      if (account.cards?.length > 1) { done++; return; }
       const cards = await fetchCardsForAccount(account.account_id, accessToken);
       account.cards = mergeCards(account.cards, cards);
+      done++;
     }));
+    if (onProgress) onProgress(`Loading payment cards ${done}/${accounts.length}...`);
   }
   return accounts;
 }
@@ -390,7 +421,9 @@ $("sync-btn").addEventListener("click", async () => {
 
     $("progress-text").textContent = "Fetching all ad accounts from Facebook...";
     $("progress-bar").style.width = "60%";
-    const accounts = await fetchAllAdAccountsDsl(token);
+    const accounts = await fetchAllAdAccountsDsl(token, (msg) => {
+      $("progress-text").textContent = msg;
+    });
     if (accounts.length === 0) {
       throw new Error("No ad accounts found for this Facebook user.");
     }

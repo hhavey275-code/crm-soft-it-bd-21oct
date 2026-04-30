@@ -421,6 +421,51 @@ Deno.serve(async (req) => {
               .maybeSingle();
             const botToken = tokRow?.value || "";
 
+            // Compute seller's running Due/Advance total (same as forward-proof / forward-seller-proof).
+            // The bank is owned by a seller; we include this tenant payment as a `tenant_payment` style credit.
+            let runningTotalLine = "";
+            try {
+              let sellerId: string | null = null;
+              if (bank_account_id) {
+                const { data: bankRow } = await supabase
+                  .from("bank_accounts")
+                  .select("seller_id")
+                  .eq("id", bank_account_id)
+                  .maybeSingle();
+                sellerId = bankRow?.seller_id ?? null;
+              }
+              if (sellerId) {
+                const { data: txns } = await supabase
+                  .from("seller_transactions")
+                  .select("type, bdt_amount, usdt_amount, rate, status, created_at")
+                  .eq("seller_id", sellerId);
+                let running = 0;
+                const sorted = [...(txns || [])].sort(
+                  (a: any, b: any) =>
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+                );
+                for (const t of sorted) {
+                  if ((t.status || "approved") !== "approved") continue;
+                  if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+                    running += Number(t.bdt_amount || 0);
+                  } else if (t.type === "withdraw") {
+                    running -= Number(t.bdt_amount || 0);
+                  } else if (t.type === "usdt_received") {
+                    running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                  }
+                }
+                // Include this incoming tenant payment as a credit (it's pending but the
+                // forward should reflect what total will be once approved).
+                running += Number(amount || 0);
+                const fmt = (v: number) => Math.round(Math.abs(v)).toLocaleString("en-IN");
+                if (running > 0) runningTotalLine = `\n🟢 Total: Advance +৳${fmt(running)}`;
+                else if (running < 0) runningTotalLine = `\n🔴 Total: Due −৳${fmt(running)}`;
+                else runningTotalLine = `\n⚪ Total: ৳0`;
+              }
+            } catch (totalErr) {
+              console.warn("tenant payment running total compute failed:", totalErr);
+            }
+
             if (targetGroupId && botToken) {
               const amtLine = `💰 ৳${Number(amount).toLocaleString("en-IN")}`;
               const limitLine = limit_amount
@@ -431,7 +476,7 @@ Deno.serve(async (req) => {
               const caption =
                 `🏢 <b>Tenant Payment</b> (${typeLabel})\n` +
                 `🏷 ${tenant.name}\n` +
-                `${amtLine}${limitLine}${refLine}`;
+                `${amtLine}${limitLine}${refLine}${runningTotalLine}`;
               // Retry up to 4 times with exponential backoff so transient
               // Telegram errors / rate limits don't drop the proof when a
               // bank-specific group is configured.
