@@ -304,7 +304,7 @@ async function runBillingSweep(reason = "crm") {
   await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
   try {
     const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
-    const accountIds = (managed.account_ids || []).slice(0, 60);
+    const accountIds = managed.account_ids || [];
     if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
     let saved = 0;
     const failed = [];
