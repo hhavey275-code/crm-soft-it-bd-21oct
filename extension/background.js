@@ -446,10 +446,129 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
   return { ok: true };
 }
 
+// ---------- SMIT-style: GraphQL remove via captured creds ----------
+// Tries multiple known Meta mutation names; the first one accepted wins.
+async function removeCardViaGraphql({ accountId, cardId, card, creds, pageUrl }) {
+  if (!creds?.fb_dtsg) {
+    return { ok: false, error: "fb_dtsg not captured yet — refresh the billing page once." };
+  }
+  if (!cardId || String(cardId).startsWith("local:")) {
+    return { ok: false, error: "Card has no real Meta id (local hint only)." };
+  }
+  const actId = String(accountId).replace(/^act_/, "");
+  const referer = pageUrl || `https://business.facebook.com/billing_hub/accounts/details?asset_id=${actId}`;
+
+  // Build base form params (Meta accepts URL-encoded mutation calls)
+  function form(extra) {
+    const sp = new URLSearchParams();
+    sp.set("av", creds.__user || creds.av || "0");
+    sp.set("__user", creds.__user || "0");
+    sp.set("__a", "1");
+    sp.set("__req", "a");
+    sp.set("dpr", "2");
+    if (creds.__rev) sp.set("__rev", creds.__rev);
+    if (creds.__hs) sp.set("__hs", creds.__hs);
+    if (creds.__spin_r) sp.set("__spin_r", creds.__spin_r);
+    if (creds.__spin_t) sp.set("__spin_t", creds.__spin_t);
+    if (creds.__spin_b) sp.set("__spin_b", creds.__spin_b);
+    sp.set("fb_dtsg", creds.fb_dtsg);
+    sp.set("jazoest", creds.jazoest || "0");
+    if (creds.lsd) sp.set("lsd", creds.lsd);
+    sp.set("server_timestamps", "true");
+    for (const [k, v] of Object.entries(extra || {})) sp.set(k, String(v));
+    return sp;
+  }
+
+  // Variants: known mutation names Meta has used
+  const attempts = [
+    {
+      name: "BillingPaymentMethodDeleteMutation",
+      doc_id: null,
+      vars: { input: { client_mutation_id: "1", payment_account_id: actId, payment_method_id: cardId, actor_id: creds.__user || "0" } },
+    },
+    {
+      name: "useBillingRemovePaymentMethodMutation",
+      doc_id: null,
+      vars: { input: { client_mutation_id: "1", actor_id: creds.__user || "0", payment_account_id: actId, payment_method_id: cardId } },
+    },
+    {
+      name: "BillingHubRemovePaymentMethodMutation",
+      doc_id: null,
+      vars: { input: { client_mutation_id: "1", payment_method_id: cardId, ad_account_id: actId, actor_id: creds.__user || "0" } },
+    },
+  ];
+
+  let lastError = null;
+  for (const a of attempts) {
+    const body = form({
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: a.name,
+      variables: JSON.stringify(a.vars),
+      doc_id: a.doc_id || "",
+    });
+    try {
+      const res = await fetch("https://www.facebook.com/api/graphql/", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-FB-Friendly-Name": a.name,
+          "X-FB-LSD": creds.lsd || "",
+          "Sec-Fetch-Site": "same-origin",
+        },
+        body: body.toString(),
+        referrer: referer,
+      });
+      const text = await res.text();
+      // Meta sometimes prefixes with "for (;;);"
+      const cleaned = text.replace(/^for \(;;\);/, "").trim();
+      let json = null;
+      try { json = JSON.parse(cleaned); } catch {}
+      if (res.ok && json && !json.errors && !json.error) {
+        return { ok: true, mutation: a.name, response: json };
+      }
+      lastError = json?.errors?.[0]?.message || json?.error?.message || `${a.name} -> ${res.status}`;
+    } catch (e) {
+      lastError = `${a.name}: ${e?.message || e}`;
+    }
+  }
+  return { ok: false, error: lastError || "All remove mutations failed" };
+}
+
+// Fallback: use Graph API DELETE with EAA token if we managed to capture one
+async function removeCardViaGraphApi({ accountId, cardId, creds }) {
+  if (!creds?.access_token) return { ok: false, error: "no_access_token" };
+  const actId = String(accountId).replace(/^act_/, "");
+  const url = `https://graph.facebook.com/v19.0/act_${actId}/payment_methods/${encodeURIComponent(cardId)}?access_token=${encodeURIComponent(creds.access_token)}`;
+  try {
+    const res = await fetch(url, { method: "DELETE" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) return { ok: false, error: body?.error?.message || `HTTP ${res.status}` };
+    return { ok: true, via: "graph_api" };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+async function removeCardSmart(payload) {
+  // 1) Try GraphQL replay with captured creds
+  const g = await removeCardViaGraphql(payload);
+  if (g.ok) return g;
+  // 2) Fall back to Graph API DELETE
+  const fb = await removeCardViaGraphApi(payload);
+  if (fb.ok) return fb;
+  // 3) Final fallback: open Meta UI and click Remove (legacy path)
+  return await removeCardFromAccount({
+    accountId: payload.accountId,
+    fundingSourceId: payload.cardId,
+    card: payload.card,
+    tabId: payload.tabId,
+  });
+}
+
 // ---------- Messaging ----------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
-    // Backwards-compat: popup manual sync still uses Graph API path
     runAutoSync(msg.reason || "manual").then(sendResponse);
     return true;
   }
@@ -458,7 +577,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "remove-card") {
+    // Legacy path
     removeCardFromAccount({ ...(msg.payload || {}), tabId: sender?.tab?.id })
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg?.type === "remove-card-graphql") {
+    // SMIT-style path: use creds captured by the page hook
+    removeCardSmart({ ...(msg.payload || {}), tabId: sender?.tab?.id })
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
