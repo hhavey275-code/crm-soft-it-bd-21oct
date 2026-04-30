@@ -33,6 +33,8 @@ import { friendlyEdgeError } from "@/lib/utils";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { AdminNotes } from "@/components/admin/AdminNotes";
 
+const EXTENSION_VERSION = "1.2.1";
+
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
