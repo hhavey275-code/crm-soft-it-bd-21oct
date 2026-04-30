@@ -988,23 +988,45 @@ export function AdminSellers() {
 
       {/* Sellers List */}
       <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3")}>
-        {sellers?.map((s: any) => (
+        {sellers?.map((s: any) => {
+          const pendingCount = pendingUsdtBySeller?.[s.user_id] || 0;
+          return (
           <Card
             key={s.user_id}
             className={cn(
-              "cursor-pointer border transition-all duration-200 hover:shadow-lg hover:shadow-primary/5",
-              selectedSeller?.user_id === s.user_id ? "ring-2 ring-primary shadow-lg shadow-primary/10 border-primary/30" : "hover:border-primary/30"
+              "cursor-pointer border transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 relative",
+              selectedSeller?.user_id === s.user_id ? "ring-2 ring-primary shadow-lg shadow-primary/10 border-primary/30" : "hover:border-primary/30",
+              pendingCount > 0 && "ring-2 ring-red-500/60 border-red-500/40"
             )}
             onClick={() => { setSelectedSeller(s); clearAllFilters(); }}
           >
+            {pendingCount > 0 && (
+              <span className="absolute -top-2 -right-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white shadow-lg ring-2 ring-background animate-pulse">
+                {pendingCount > 9 ? "9+" : pendingCount}
+              </span>
+            )}
             <CardContent className="p-4 flex items-center justify-between">
               <div className="min-w-0 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-bold text-sm shrink-0">
+                <div className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg font-bold text-sm shrink-0",
+                  pendingCount > 0
+                    ? "bg-gradient-to-br from-red-500/30 to-red-500/10 text-red-600 dark:text-red-400"
+                    : "bg-gradient-to-br from-primary/20 to-primary/5 text-primary"
+                )}>
                   {(s.full_name || s.email || "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold truncate text-foreground">{s.full_name || s.email}</p>
-                  <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+                  <p className={cn(
+                    "font-semibold truncate",
+                    pendingCount > 0 ? "text-red-600 dark:text-red-400" : "text-foreground"
+                  )}>
+                    {s.full_name || s.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {pendingCount > 0
+                      ? `🔔 ${pendingCount} pending USDT submission${pendingCount > 1 ? "s" : ""}`
+                      : s.email}
+                  </p>
                 </div>
               </div>
               <Button
@@ -1026,7 +1048,8 @@ export function AdminSellers() {
               </Button>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
         {(!sellers || sellers.length === 0) && (
           <p className="text-muted-foreground text-sm col-span-full text-center py-8">No sellers yet. Convert a client to seller to get started.</p>
         )}
