@@ -2731,7 +2731,10 @@ export type Database = {
           proof_url: string | null
           reviewed_by: string | null
           status: string
+          telegram_forward_error: string | null
           telegram_forwarded: boolean | null
+          telegram_forwarded_at: string | null
+          telegram_forwarding_started_at: string | null
           updated_at: string
           usd_rate: number | null
           user_id: string
@@ -2751,7 +2754,10 @@ export type Database = {
           proof_url?: string | null
           reviewed_by?: string | null
           status?: string
+          telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
+          telegram_forwarded_at?: string | null
+          telegram_forwarding_started_at?: string | null
           updated_at?: string
           usd_rate?: number | null
           user_id: string
@@ -2771,7 +2777,10 @@ export type Database = {
           proof_url?: string | null
           reviewed_by?: string | null
           status?: string
+          telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
+          telegram_forwarded_at?: string | null
+          telegram_forwarding_started_at?: string | null
           updated_at?: string
           usd_rate?: number | null
           user_id?: string
