@@ -49,7 +49,9 @@
     const re = new RegExp(lbl + "[^\\n]{0,80}?([A-Z]{0,3}\\s*\\$?\\s*[0-9][0-9,]*(?:\\.[0-9]+)?\\s*(?:USD|BDT|EUR|GBP)?)", flags);
     const m = text.match(re);
     if (!m) return null;
-    const raw = m[1];
+    const raw = m[1].trim();
+    // Reject pure 4-digit year-only matches (e.g. "2024") with no currency/decimal
+    if (/^\d{4}$/.test(raw)) return null;
     return { raw, value: parseMoney(raw), currency: parseCurrency(raw) };
   }
 
@@ -62,7 +64,12 @@
     const threshold = findAfter("Your balance reaches") || findAfter("Threshold");
     const outstanding = findAfter("Outstanding balance") || findAfter("Outstanding");
     const balance = findAfter("Balance");
-    const totalSpending = findAfter("Total spending");
+    const totalSpending =
+      findAfter("Total amount spent") ||
+      findAfter("Amount spent") ||
+      findAfter("Total spending") ||
+      findAfter("Spent this month") ||
+      findAfter("\\bSpent\\b", { regex: true });
     const limit = findAfter("\\bLimit\\b", { regex: true });
     const hiddenLimit = findAfter("Hidden Limit");
 
@@ -171,29 +178,29 @@
       position: "fixed",
       top: "80px",
       right: "16px",
-      width: "320px",
-      maxHeight: "80vh",
+      width: "420px",
+      maxHeight: "85vh",
       overflowY: "auto",
       background: "#ffffff",
       color: "#0f172a",
       border: "1px solid #e2e8f0",
-      borderRadius: "10px",
-      boxShadow: "0 10px 30px rgba(15,23,42,0.18)",
+      borderRadius: "12px",
+      boxShadow: "0 12px 36px rgba(15,23,42,0.22)",
       zIndex: "2147483646",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      fontSize: "12px",
-      lineHeight: "1.4",
+      fontSize: "13px",
+      lineHeight: "1.5",
     });
     panel.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:10px 10px 0 0;">
-        <div style="font-weight:700;font-size:13px;">📊 Ads Check by CRM</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:12px 12px 0 0;">
+        <div style="font-weight:700;font-size:15px;">📊 Ads Check by CRM</div>
         <div style="display:flex;gap:6px;">
-          <button id="dsl-crm-sync" title="Sync to CRM" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;">Sync</button>
-          <button id="dsl-crm-collapse" title="Hide" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;">_</button>
+          <button id="dsl-crm-sync" title="Sync to CRM" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:600;">Sync</button>
+          <button id="dsl-crm-collapse" title="Hide" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:600;">_</button>
         </div>
       </div>
-      <div id="dsl-crm-body" style="padding:10px 12px;"></div>
-      <div id="dsl-crm-status" style="padding:6px 12px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">Parsing…</div>
+      <div id="dsl-crm-body" style="padding:12px 14px;"></div>
+      <div id="dsl-crm-status" style="padding:8px 14px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9;">Parsing…</div>
     `;
     document.documentElement.appendChild(panel);
     panel.querySelector("#dsl-crm-collapse").addEventListener("click", () => {
@@ -212,9 +219,9 @@
   function row(label, value, opts = {}) {
     if (value === null || value === undefined || value === "") return "";
     const accent = opts.accent ? "color:#059669;font-weight:700;" : "";
-    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-      <span style="color:#64748b;">${label}</span>
-      <span style="${accent}text-align:right;">${value}</span>
+    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">
+      <span style="color:#64748b;font-size:12px;">${label}</span>
+      <span style="${accent}text-align:right;font-size:13px;">${value}</span>
     </div>`;
   }
 
