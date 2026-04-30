@@ -38,6 +38,8 @@ interface InsightsData {
   today_spend: number;
   yesterday_spend: number;
   balance: number;
+  billing_threshold?: number | null;
+  daily_spend_limit_currency?: string | null;
   cards: { id: string; display_string: string; type: number }[];
   updated_at?: string;
   last_spend_date?: string | null;
@@ -82,6 +84,22 @@ function writeLastFullSync(ts: number) {
   } catch {
     // ignore
   }
+}
+
+function runExtensionBillingSweep(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Extension did not respond. Reinstall/login to the latest extension, then retry.")), 12000);
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window || event.data?.source !== "dsl-extension" || event.data?.type !== "billing-sweep-result") return;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      const response = event.data.response;
+      if (!response?.ok) reject(new Error(response?.error || "Extension live billing sync failed"));
+      else resolve(response);
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "dsl-crm", type: "run-billing-sweep", reason: "update-all-from-meta" }, "*");
+  });
 }
 
 export function AdminAdAccounts() {
