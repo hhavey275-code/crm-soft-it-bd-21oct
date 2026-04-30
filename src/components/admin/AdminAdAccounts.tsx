@@ -991,10 +991,6 @@ export function AdminAdAccounts() {
                         <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}</span>
                       )}
                       <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-0.5">
-                        <ExtensionSyncButton
-                          accountId={a.account_id}
-                          onSynced={() => { refetchInsights(); }}
-                        />
                         <Button
                           variant="ghost"
                           size="icon"
