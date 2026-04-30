@@ -307,36 +307,30 @@ async function runAutoSync(reason = "alarm") {
   }
 }
 
-async function runBillingSweep(reason = "crm") {
-  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
-  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) return { ok: false, error: "Not logged in to CRM extension" };
-  await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
+// ---------- Per-account on-demand sync ----------
+async function syncSingleAccount(accountId) {
+  const id = String(accountId || "").replace(/^act_/, "");
+  if (!id) return { ok: false, error: "Missing accountId" };
+
+  const last = recentSyncs.get(id) || 0;
+  if (Date.now() - last < SYNC_COOLDOWN_MS) {
+    return { ok: false, error: "Please wait a few seconds before syncing this account again." };
+  }
+  recentSyncs.set(id, Date.now());
+
+  let tab = null;
   try {
-    const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
-    const accountIds = managed.account_ids || [];
-    if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
-    let saved = 0;
-    const failed = [];
-    for (const accountId of accountIds) {
-      let tab = null;
-      try {
-        tab = await openBillingTab(accountId);
-        const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" });
-        if (res?.ok) saved += 1;
-        else failed.push({ accountId, error: res?.error || "snapshot failed" });
-      } catch (err) {
-        failed.push({ accountId, error: err?.message || String(err) });
-      } finally {
-        if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
-      }
-      await new Promise((r) => setTimeout(r, 1200));
-    }
-    await setStored({ lastSyncStatus: failed.length ? "partial" : "success", lastSyncAt: Date.now(), lastSyncSaved: saved, lastSyncError: failed[0]?.error || null });
-    return { ok: true, saved, attempted: accountIds.length, failed };
+    tab = await openBillingTab(id);
+    const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" }, 4);
+    if (!res?.ok) throw new Error(res?.error || "Could not parse billing page");
+    await setStored({ lastSyncStatus: "success", lastSyncAt: Date.now(), lastSyncSaved: 1, lastSyncError: null });
+    return { ok: true, accountId: id };
   } catch (err) {
     const message = err?.message || String(err);
     await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
     return { ok: false, error: message };
+  } finally {
+    if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
   }
 }
 
