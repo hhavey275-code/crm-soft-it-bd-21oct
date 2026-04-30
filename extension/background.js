@@ -206,13 +206,21 @@ const ACCOUNT_FIELDS =
   "funding_source_details," +
   "adspaymentcycle{funding_source_details,threshold_amount,amount_due}," +
   "payment_methods";
+const ACCOUNT_FIELDS_SAFE =
+  "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
+  "funding_source_details," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
 
 async function fetchOneAccount(accountId, accessToken) {
   const actId = String(accountId).replace(/^act_/, "");
-  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${ACCOUNT_FIELDS}&access_token=${encodeURIComponent(accessToken)}`;
+  const makeUrl = (fields) => `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`;
   try {
-    const res = await fetchWithTimeout(url, 15000);
-    const body = await res.json().catch(() => ({}));
+    let res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS), 15000);
+    let body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) {
+      res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS_SAFE), 15000);
+      body = await res.json().catch(() => ({}));
+    }
     if (!res.ok || body?.error) return null;
     body.account_id = actId;
     return normalizeFromAccount(body);
