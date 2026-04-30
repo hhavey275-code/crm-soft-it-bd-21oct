@@ -780,22 +780,6 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
-  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
-  const refreshSingleMutation = useMutation({
-    mutationFn: async (accountId: string) => {
-      setSingleRefreshingId(accountId);
-      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-      return await chunkedMetaSync([accountId]);
-    },
-    onSuccess: () => {
-      toast.success("Account synced from Meta");
-      refetchInsights();
-      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
-    },
-    onError: (err: any) => toast.error(err?.message || "Failed to sync"),
-    onSettled: () => setSingleRefreshingId(null),
-  });
 
                       {/* Insights row */}
                       {ins && (
