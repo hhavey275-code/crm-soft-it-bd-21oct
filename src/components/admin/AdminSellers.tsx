@@ -343,6 +343,34 @@ export function AdminSellers() {
     },
   });
 
+  // Pending USDT submissions per seller (for red notification badge on each seller card)
+  const { data: pendingUsdtBySeller } = useQuery({
+    queryKey: ["admin-sellers-pending-usdt"],
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("seller_transactions")
+        .select("seller_id")
+        .eq("type", "usdt_received")
+        .eq("status", "pending");
+      const map: Record<string, number> = {};
+      for (const r of (data as any[]) ?? []) {
+        map[r.seller_id] = (map[r.seller_id] || 0) + 1;
+      }
+      return map;
+    },
+  });
+
+  useEffect(() => {
+    const ch = supabase
+      .channel("admin-sellers-pending-usdt-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "seller_transactions" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-sellers-pending-usdt"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [queryClient]);
+
   // Fetch all clients (for convert dialog)
   const { data: clients } = useQuery({
     queryKey: ["admin-clients-for-convert"],
