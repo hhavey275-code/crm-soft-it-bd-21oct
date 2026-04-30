@@ -24,6 +24,7 @@ import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 import { AdAccountSyncedCards } from "@/components/admin/AdAccountSyncedCards";
+import { LiveBillingData } from "@/components/admin/LiveBillingData";
 import { CardHistoryTimeline } from "@/components/admin/CardHistoryTimeline";
 import { HackRecoveryPanel } from "@/components/admin/HackRecoveryPanel";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
