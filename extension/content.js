@@ -338,6 +338,24 @@
     pushTimer = setTimeout(() => pushSnapshot(false), 2500);
   }
 
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.type === "collect-billing-snapshot") {
+      pushSnapshot(true)
+        .then(() => sendResponse({ ok: true }))
+        .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
+      return true;
+    }
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.data?.source !== "dsl-crm") return;
+    if (event.data?.type === "run-billing-sweep") {
+      chrome.runtime.sendMessage({ type: "run-billing-sweep", reason: event.data.reason || "crm" }, (response) => {
+        window.postMessage({ source: "dsl-extension", type: "billing-sweep-result", response }, "*");
+      });
+    }
+  });
+
   // ---------- bootstrap ----------
   function start() {
     if (!BILLING_RE.test(location.pathname)) return;
