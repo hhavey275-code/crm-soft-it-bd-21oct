@@ -1,73 +1,85 @@
+I understand — the last update is still showing the old visible limit (250), sync is fragile when switching tabs, and cards are not reliably reaching the CRM. I will change the approach from “Graph API only” to a SMIT-style billing-page reader, because the screenshot proves the real values are available in the rendered Facebook Billing UI.
 
-# Extension v1.3.0 — Hidden Limit, Cards Sync, Account Filtering, Card Removal
+Plan:
 
-আপনার ৩টা মূল সমস্যা ঠিক করব। সব পরিবর্তন **শুধু extension + ingest function এ** — CRM UI প্রায় একই থাকবে, শুধু Payment Methods card-list টা auto-update হবে sync এর সাথে।
+1. Upgrade extension to v1.4.0 with a billing-page live panel
+   - Inject a right-side CRM panel on Facebook Billing pages, similar to the SMIT panel.
+   - Show live parsed values beside the ad account:
+     - Account status
+     - Visible limit
+     - Hidden daily limit
+     - Billing threshold
+     - Balance / outstanding balance
+     - Total spending
+     - Account type
+     - Timezone
+     - Payment methods, including default and backup cards
+     - Card expiry when visible
+     - Payment method remove button
+   - Add clear sync status inside the panel: parsed, syncing, synced, failed.
 
----
+2. Fix hidden limit accuracy by parsing Facebook Billing DOM text
+   - Stop relying only on `adtrust_dsl`, because in your screenshot that gives 250 while the actual billing-page daily limit is 134.52.
+   - Parse the Billing page text directly for:
+     - `Daily spending limit (set by Meta): $134.52`
+     - SMIT-style labels if present: `Hidden Limit`, `Threshold`, `Balance`, `Total spending`, etc.
+   - Store parsed hidden limit separately in CRM, and display hidden limit before the older visible limit where appropriate.
 
-## ১. Hidden Limit (আসল spending limit) সঠিকভাবে আনা
+3. Fix cards not syncing by reading the visible Payment methods section
+   - Parse all visible card rows from Billing page:
+     - Visa/MasterCard/etc.
+     - last 4 digits
+     - default badge
+     - backup cards
+     - expiry date where shown
+   - Sync these cards into:
+     - `ad_account_last_known_state.cards`
+     - `ad_account_insights.cards`
+     - card assignment history, so CRM card panels show them immediately.
 
-**সমস্যা:** এখন extension `adtrust_dsl` field পাঠাচ্ছে, যেটা অনেক সময় Meta's *advertised* limit (250) দেখায়, কিন্তু আসল hidden cap (134.52) আলাদা।
+4. Make sync survive tab changes
+   - Move the manual sync flow to the background service worker instead of depending on the popup staying open.
+   - Popup button will only start the background job and show status from `chrome.storage.local`.
+   - If you click another tab or the popup closes, sync continues.
+   - Auto-sync will run every 6 hours as requested, not every hour.
 
-**সমাধান:** SMIT.vn যেভাবে দুটোই দেখায়, সেভাবে দুটো field ই request করব Graph API থেকে:
-- `adtrust_dsl` → "Limit" (250)
-- `min_daily_budget` / `spend_cap` সহ আরো signal চেক করে **আসল hidden limit** নেব। প্রধানত billing endpoint `/act_<id>?fields=adtrust_dsl,balance,amount_spent,spend_cap,min_daily_budget,custom_audience_info,end_advertiser` থেকে যেটা সবচেয়ে নিচু/restrictive number সেটাই hidden limit হিসেবে রাখব (SMIT এই same approach ব্যবহার করে)।
-- Backend এ `ad_account_insights` এ নতুন column `hidden_daily_limit` যোগ করব এবং CRM detail page এ "Hidden Limit" row দেখাবো।
+5. Only sync CRM accounts
+   - Keep the existing CRM account filter from `list-managed-accounts`.
+   - Extension will only sync accounts whose Meta account IDs exist in the CRM.
+   - No random BM accounts will be pushed to the CRM.
 
-**API call নিয়ে আপনার প্রশ্ন:** API call বাড়ানো না — same `/act_<id>` endpoint, শুধু একটু বেশি fields। এটা SMIT এর মতই — user session token দিয়ে call হয়, আপনার Graph rate limit এ effect পড়বে না।
+6. Add richer CRM storage for live billing fields
+   - Add columns to store billing-page data accurately, for example:
+     - `account_type`
+     - `timezone_name`
+     - `billing_threshold`
+     - `total_spending`
+     - `outstanding_balance`
+     - `billing_raw_snapshot` JSON for debugging/parsing fallback
+   - Add equivalent fields to the last-known-state table where needed.
 
----
+7. Update CRM ad account detail page
+   - Add a “Live Billing Data from Extension” card on the ad account details page.
+   - Show hidden daily limit prominently, e.g. “Hidden Limit: $134.52”.
+   - Show visible limit separately, e.g. “Visible Limit: $250.00”.
+   - Show threshold, balance, total spend, account type, timezone, last synced time, and cards.
+   - Make synced cards appear in the existing Payment Methods section too.
 
-## ২. Cards CRM এ auto-আসা না — ঠিক করব
+8. Improve payment method removal
+   - Keep removal inside Facebook Billing page using the logged-in Facebook session.
+   - Add the remove action beside parsed cards in the injected CRM panel.
+   - After removal, re-parse the page and sync the updated card list back to CRM.
+   - If Facebook changes DOM/API and the card ID cannot be detected, show a clear message instead of silent failure.
 
-**সমস্যা:** Payment Methods section এ cards তখনই দেখায় যখন CRM থেকে "Sync Now" চাপা হয়। Extension থেকে আসা cards সরাসরি ওখানে দেখায় না।
+9. Package and update download
+   - Repackage `public/dsl-sync-extension.zip` from the updated extension.
+   - Update CRM download label and filename to `dsl-sync-extension-v1.4.0.zip` / “Download extension v1.4.0”.
 
-**সমাধান:** ingest-dsl function এ আগে থেকেই `syncIncomingCards` আছে যেটা `ad_account_cards`, `ad_account_card_assignments`, `ad_account_last_known_state` table এ লিখে। কিন্তু `AdAccountPaymentMethods.tsx` সেগুলো না দেখে edge function `list_account_cards` থেকে live Graph call করছে।
+Technical notes:
 
-ঠিক করব:
-- `AdAccountPaymentMethods.tsx`: প্রথমে `ad_account_last_known_state.cards` (extension যেটা দিয়েছে) থেকে cards দেখাবো। Live `list_account_cards` call হবে fallback / refresh হিসেবে, default এ DB-cached cards দেখাবে।
-- ফলে extension যখনই sync করবে (auto প্রতি ১ ঘন্টা / ৬ ঘন্টা) — CRM এ cards সাথে সাথে চলে আসবে, কোনো manual action লাগবে না।
-
----
-
-## ৩. Sync শুধু CRM এর accounts এর জন্য (sync speed + accuracy)
-
-**সমস্যা:** এখন extension Facebook এ সব ad account scan করে — যেগুলো CRM এ নেই সেগুলোও। ফলে slow + অযথা data।
-
-**সমাধান:**
-- Extension first call করবে নতুন backend endpoint `list-managed-accounts` → CRM এ existing সব `account_id` এর list ফেরত দেবে (small payload)।
-- তারপর শুধু সেই account গুলোর জন্যই Graph API hit করবে (`/act_<id>?fields=...` — direct, BM scan লাগবে না)।
-- Result: অনেক কম API call, অনেক fast sync, accurate data।
-
-**Extension এ কোন API key লাগবে না** — আগে যেমন user JWT দিয়ে call হচ্ছিল, এখনও তাই। শুধু এখন CRM-known account গুলোর জন্যই।
-
----
-
-## ৪. Extension থেকে Card Remove করার option
-
-**সমস্যা:** SMIT এর extension billing page এ open হয়ে inline card-remove button দেখায়, login session এর data দিয়ে।
-
-**সমাধান:**
-- `content.js` কে enhance করব: যখন user `business.facebook.com/billing_hub/accounts/details?asset_id=...` page এ থাকে, content script ওই page এর payment methods list এর পাশে আমাদের একটা ছোট "Remove (CRM)" button inject করবে।
-- Click করলে Graph API DELETE call হবে user session token দিয়ে: `DELETE /act_<id>/payment_methods/<funding_source_id>`।
-- Success হলে CRM এও notify পাঠাবে যাতে `ad_account_cards` snapshot update হয় সাথে সাথে।
-- Existing CRM "Remove" button (`AdAccountPaymentMethods.tsx` এর `removeMutation`) ও same Graph DELETE call এর উপর depend করে — সেটা already আছে edge function `manage-ad-account-partners` এ। শুধু extension থেকেও same kaaj করা যাবে।
-
----
-
-## Technical Files
-
-**Extension:**
-- `extension/manifest.json` — version → `1.3.0`, content script এ billing_hub URL pattern যোগ
-- `extension/background.js` + `extension/popup.js` — managed-accounts endpoint call করে শুধু সেগুলোর জন্যই Graph fetch, hidden limit fields যোগ
-- `extension/content.js` — billing_hub page এ "Remove" button inject + Graph DELETE handler
-- `public/dsl-sync-extension.zip` — re-zip
-
-**Frontend:**
-- `src/components/pages/AdAccountDetailPage.tsx` — button label `v1.3.0`, hidden limit row দেখানো
-- `src/components/admin/AdAccountPaymentMethods.tsx` — DB-cached cards (`ad_account_last_known_state`) primary source হবে
-
-**Backend:**
-- New edge function `list-managed-accounts` — admin role check করে DB থেকে সব ad_accounts এর `account_id` array return করে
-- `supabase/functions/ingest-dsl/index.ts` — `hidden_daily_limit` field accept করে `ad_account_insights` এ save
-- Migration: `ad_account_insights` এ `hidden_daily_limit numeric` column যোগ
+- This will use a hybrid data source:
+  - Facebook Billing page DOM parser for hidden limit, visible cards, threshold, account type, timezone, and billing-page-only data.
+  - Graph API only as fallback for fields it can reliably return.
+- I will not embed the screenshot as an app asset; I will use it only as reference for the parser/UI.
+- The database migration will be needed for the new billing fields.
+- After implementation, you will need to install the new v1.4.0 extension and open the Facebook billing page while logged in for the live parser to read the same data SMIT reads.
