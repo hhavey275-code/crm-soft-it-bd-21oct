@@ -298,6 +298,39 @@ async function runAutoSync(reason = "alarm") {
   }
 }
 
+async function runBillingSweep(reason = "crm") {
+  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
+  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) return { ok: false, error: "Not logged in to CRM extension" };
+  await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
+  try {
+    const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
+    const accountIds = (managed.account_ids || []).slice(0, 60);
+    if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
+    let saved = 0;
+    const failed = [];
+    for (const accountId of accountIds) {
+      let tab = null;
+      try {
+        tab = await openBillingTab(accountId);
+        const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" });
+        if (res?.ok) saved += 1;
+        else failed.push({ accountId, error: res?.error || "snapshot failed" });
+      } catch (err) {
+        failed.push({ accountId, error: err?.message || String(err) });
+      } finally {
+        if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
+      }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+    await setStored({ lastSyncStatus: failed.length ? "partial" : "success", lastSyncAt: Date.now(), lastSyncSaved: saved, lastSyncError: failed[0]?.error || null });
+    return { ok: true, saved, attempted: accountIds.length, failed };
+  } catch (err) {
+    const message = err?.message || String(err);
+    await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
+    return { ok: false, error: message };
+  }
+}
+
 // ---------- Billing-page snapshot from content.js ----------
 async function pushBillingSnapshot(snap) {
   const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
