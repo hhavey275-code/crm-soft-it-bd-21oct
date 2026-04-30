@@ -201,7 +201,7 @@ async function fetchWithTimeout(url, ms = 20000) {
 const ACCOUNT_FIELDS =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
   "funding_source_details," +
-  "adspaymentcycle{funding_source_details,threshold_amount_due}," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}," +
   "payment_methods";
 const ACCOUNT_FIELDS_SAFE =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
