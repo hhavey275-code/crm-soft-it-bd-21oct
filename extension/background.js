@@ -69,7 +69,8 @@ async function openBillingTab(accountId) {
         const listener = (tabId, info) => {
           if (tabId === tab.id && info.status === "complete") {
             chrome.tabs.onUpdated.removeListener(listener);
-            setTimeout(() => resolve(tab), 4500);
+            // Give the SPA / GraphQL traffic time to populate.
+            setTimeout(() => resolve(tab), 2500);
           }
         };
         chrome.tabs.onUpdated.addListener(listener);
