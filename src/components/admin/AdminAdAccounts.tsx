@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -975,12 +974,6 @@ export function AdminAdAccounts() {
                       <div className="bg-muted/50 rounded-md p-1.5">
                         <p className="text-[10px] text-muted-foreground">Balance</p>
                         <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
-                        {ins.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
-                        )}
-                        {(ins as any).hidden_daily_limit != null && Number((ins as any).hidden_daily_limit) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">DSL: {Number((ins as any).hidden_daily_limit).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
-                        )}
                       </div>
                     </div>
                   )}
@@ -997,10 +990,6 @@ export function AdminAdAccounts() {
                         <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}</span>
                       )}
                       <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-0.5">
-                        <ExtensionSyncButton
-                          accountId={a.account_id}
-                          onSynced={() => { refetchInsights(); }}
-                        />
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1147,21 +1136,7 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <div className="flex items-start gap-1.5">
-                          <div>
-                            <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
-                            {ins?.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
-                              <div className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
-                            )}
-                            {(ins as any)?.hidden_daily_limit != null && Number((ins as any).hidden_daily_limit) > 0 && (
-                              <div className="text-[10px] text-muted-foreground">DSL: {Number((ins as any).hidden_daily_limit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
-                            )}
-                          </div>
-                          <ExtensionSyncButton
-                            accountId={a.account_id}
-                            onSynced={() => { refetchInsights(); }}
-                          />
-                        </div>
+                        <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>

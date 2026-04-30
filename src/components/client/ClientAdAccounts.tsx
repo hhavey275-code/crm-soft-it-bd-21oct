@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
 import { formatDistanceToNow } from "date-fns";
 import { friendlyEdgeError } from "@/lib/utils";
 import { FailedTopUps } from "@/components/FailedTopUps";
@@ -238,25 +237,6 @@ export function ClientAdAccounts() {
     enabled: !!user && !!accounts && accounts.length > 0,
     staleTime: 60_000,
     refetchOnMount: "always",
-  });
-
-  // v1.4.2: Pull hidden DSL / threshold straight from ad_account_insights
-  // (the edge cache trims these fields, so we read the table directly).
-  const { data: billingExtras = {}, refetch: refetchBillingExtras } = useQuery({
-    queryKey: ["client-billing-extras", user?.id, accounts?.map((a: any) => a.id).join(",") || ""],
-    queryFn: async () => {
-      if (!accounts || accounts.length === 0) return {} as Record<string, any>;
-      const ids = accounts.map((a: any) => a.id);
-      const { data } = await supabase
-        .from("ad_account_insights")
-        .select("ad_account_id, daily_spend_limit, hidden_daily_limit, billing_threshold, daily_spend_limit_currency, daily_spend_limit_synced_at")
-        .in("ad_account_id", ids);
-      const map: Record<string, any> = {};
-      (data ?? []).forEach((row: any) => { map[row.ad_account_id] = row; });
-      return map;
-    },
-    enabled: !!user && !!accounts && accounts.length > 0,
-    staleTime: 60_000,
   });
 
   const hasAutoRefreshed = useRef(false);
@@ -800,30 +780,6 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
-                      {/* Daily Limit (live from Meta) */}
-                      <div className="mt-2 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                        <div className="text-xs text-muted-foreground">
-                          <span>Daily Limit: </span>
-                          {(() => {
-                            const be = (billingExtras as any)[a.id];
-                            const dsl = Number(be?.hidden_daily_limit ?? be?.daily_spend_limit ?? 0);
-                            const cur = be?.daily_spend_limit_currency || "USD";
-                            return dsl > 0 ? (
-                              <span className="font-medium text-foreground">${dsl.toLocaleString()} {cur}</span>
-                            ) : <span>—</span>;
-                          })()}
-                          {(() => {
-                            const be = (billingExtras as any)[a.id];
-                            return be?.daily_spend_limit_synced_at ? (
-                              <span className="ml-1 text-[10px]">· {formatDistanceToNow(new Date(be.daily_spend_limit_synced_at), { addSuffix: true })}</span>
-                            ) : null;
-                          })()}
-                        </div>
-                        <ExtensionSyncButton
-                          accountId={a.account_id}
-                          onSynced={() => { refetchInsights(); refetchBillingExtras(); }}
-                        />
-                      </div>
 
                       {/* Insights row */}
                       {ins && (
@@ -988,25 +944,7 @@ export function ClientAdAccounts() {
                         </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-start gap-1.5">
-                          <div className="min-w-0 flex-1">
-                            <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
-                            {(() => {
-                              const be = (billingExtras as any)[a.id];
-                              const dsl = Number(be?.hidden_daily_limit ?? be?.daily_spend_limit ?? 0);
-                              const cur = be?.daily_spend_limit_currency || "USD";
-                              return dsl > 0 ? (
-                                <div className="text-[10px] text-muted-foreground mt-1">Daily Limit: <span className="font-medium text-foreground">${dsl.toLocaleString()} {cur}</span></div>
-                              ) : (
-                                <div className="text-[10px] text-muted-foreground mt-1">Daily Limit: —</div>
-                              );
-                            })()}
-                          </div>
-                          <ExtensionSyncButton
-                            accountId={a.account_id}
-                            onSynced={() => { refetchInsights(); refetchBillingExtras(); }}
-                          />
-                        </div>
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell>
