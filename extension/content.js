@@ -137,9 +137,10 @@
 
       // Try to extract a numeric funding-source/payment-method id from inner HTML
       let fsId = null;
-      const html = (el.outerHTML || "").slice(0, 6000);
+      const html = (el.outerHTML || "").slice(0, 12000);
       const idM = html.match(/payment_method[s]?\/(\d{6,})/) ||
-                  html.match(/funding_source_id["':\s]+(\d{6,})/) ||
+                  html.match(/funding_source_id["'\s:=]+(\d{6,})/) ||
+                  html.match(/(?:paymentMethodID|payment_method_id|paymentMethodId|fundingSourceID|funding_source_id)["'\s:=]+["']?(\d{6,})/) ||
                   html.match(/data-(?:payment-method-id|funding-source-id)="(\d{6,})"/);
       if (idM) fsId = idM[1];
       // Synthetic id when Meta doesn't expose the numeric id in the DOM
@@ -147,6 +148,7 @@
 
       cards.push({
         id,
+        removal_hint: fsId ? null : { brand, last4 },
         display_string: `${m[1].toUpperCase()} *${last4}`,
         type: brand,
         is_primary: isDefault,
