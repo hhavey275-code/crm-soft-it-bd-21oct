@@ -800,6 +800,31 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
+                      {/* Daily Limit (live from Meta) */}
+                      <div className="mt-2 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-xs text-muted-foreground">
+                          <span>Daily Limit: </span>
+                          {(() => {
+                            const be = (billingExtras as any)[a.id];
+                            const dsl = Number(be?.hidden_daily_limit ?? be?.daily_spend_limit ?? 0);
+                            const cur = be?.daily_spend_limit_currency || "USD";
+                            return dsl > 0 ? (
+                              <span className="font-medium text-foreground">${dsl.toLocaleString()} {cur}</span>
+                            ) : <span>—</span>;
+                          })()}
+                          {(() => {
+                            const be = (billingExtras as any)[a.id];
+                            return be?.daily_spend_limit_synced_at ? (
+                              <span className="ml-1 text-[10px]">· {formatDistanceToNow(new Date(be.daily_spend_limit_synced_at), { addSuffix: true })}</span>
+                            ) : null;
+                          })()}
+                        </div>
+                        <ExtensionSyncButton
+                          accountId={a.account_id}
+                          onSynced={() => { refetchInsights(); refetchBillingExtras(); }}
+                        />
+                      </div>
+
                       {/* Insights row */}
                       {ins && (
                         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
