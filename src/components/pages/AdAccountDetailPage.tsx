@@ -24,6 +24,7 @@ import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 import { AdAccountSyncedCards } from "@/components/admin/AdAccountSyncedCards";
+import { LiveBillingData } from "@/components/admin/LiveBillingData";
 import { CardHistoryTimeline } from "@/components/admin/CardHistoryTimeline";
 import { HackRecoveryPanel } from "@/components/admin/HackRecoveryPanel";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
@@ -33,7 +34,7 @@ import { friendlyEdgeError } from "@/lib/utils";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { AdminNotes } from "@/components/admin/AdminNotes";
 
-const EXTENSION_VERSION = "1.3.0";
+const EXTENSION_VERSION = "1.4.0";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -663,6 +664,9 @@ export default function AdAccountDetailPage() {
 
         {/* === Synced Payment Methods (from extension) === */}
         {!isTikTok && id && <AdAccountSyncedCards adAccountId={id} />}
+
+        {/* === Live Billing Data (from extension billing-page parser) === */}
+        {!isTikTok && id && <LiveBillingData adAccountId={id} />}
 
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (

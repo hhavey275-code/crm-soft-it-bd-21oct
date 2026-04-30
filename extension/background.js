@@ -1,13 +1,13 @@
 // ============================================================
-//  DSL Sync — Background Service Worker (v1.3.0)
-//  - Hourly auto-sync
-//  - Only syncs accounts that exist in the CRM (via list-managed-accounts)
-//  - Sends both adtrust_dsl (visible limit) and hidden_daily_limit
-//  - Pulls payment cards for each managed account
+//  DSL Sync — Background Service Worker (v1.4.0)
+//  - Auto-sync every 6 hours (only CRM-managed accounts)
+//  - Accepts billing-page snapshots from content.js (SMIT-style)
+//  - Performs card removal using the user's Facebook session
+//  - Survives popup close / tab switching (runs in service worker)
 // ============================================================
 
 const ALARM_NAME = "auto-sync";
-const SYNC_INTERVAL_MINUTES = 60;
+const SYNC_INTERVAL_MINUTES = 360; // every 6 hours
 
 const getStored = (keys) => new Promise((res) => chrome.storage.local.get(keys, res));
 const setStored = (obj) => new Promise((res) => chrome.storage.local.set(obj, res));
@@ -31,7 +31,7 @@ async function refreshSupabaseToken(apiUrl, anonKey, refreshToken) {
 }
 
 // ---------- FB tab + token extraction ----------
-async function findAdsManagerTab() {
+async function findFbTab() {
   const tabs = await chrome.tabs.query({
     url: [
       "https://business.facebook.com/*",
@@ -42,7 +42,7 @@ async function findAdsManagerTab() {
   return tabs[0] || null;
 }
 
-async function openAdsManagerTab() {
+async function openFbTab() {
   return new Promise((resolve) => {
     chrome.tabs.create(
       { url: "https://business.facebook.com/adsmanager/manage/accounts", active: false },
@@ -81,13 +81,13 @@ async function extractFbAccessToken(tabId) {
         }
       }
       const sorted = Array.from(tokens).sort((a, b) => b.length - a.length);
-      return { token: sorted[0] || null, candidates: sorted.length, url: location.href };
+      return { token: sorted[0] || null, candidates: sorted.length };
     },
   });
   return result;
 }
 
-// ---------- Card normalization ----------
+// ---------- Card / account normalization ----------
 function normalizeCard(source, isPrimary = false) {
   if (!source) return null;
   const id = String(source.id || source.funding_source_id || "").trim();
@@ -101,17 +101,15 @@ function normalizeCard(source, isPrimary = false) {
     exp_year: source.exp_year || null,
   };
 }
-
 function mergeCards(existing = [], incoming = []) {
   const byId = new Map();
-  for (const card of [...existing, ...incoming]) {
-    if (!card?.id) continue;
-    const prev = byId.get(card.id);
-    byId.set(card.id, { ...prev, ...card, is_primary: !!(prev?.is_primary || card.is_primary) });
+  for (const c of [...existing, ...incoming]) {
+    if (!c?.id) continue;
+    const prev = byId.get(c.id);
+    byId.set(c.id, { ...prev, ...c, is_primary: !!(prev?.is_primary || c.is_primary) });
   }
   return Array.from(byId.values()).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
 }
-
 function extractAccountCards(acc) {
   const cards = [];
   const primary = normalizeCard(acc?.funding_source_details, true);
@@ -121,7 +119,6 @@ function extractAccountCards(acc) {
     const card = normalizeCard(cycle?.funding_source_details, false);
     if (card) cards.push(card);
   }
-  // Also try payment_methods edge if present (extra payment methods listed on billing)
   const pmList = Array.isArray(acc?.payment_methods?.data) ? acc.payment_methods.data : [];
   for (const pm of pmList) {
     const card = normalizeCard(pm, false);
@@ -129,13 +126,6 @@ function extractAccountCards(acc) {
   }
   return mergeCards([], cards);
 }
-
-// ---------- Hidden limit derivation ----------
-// Meta exposes the visible "Daily spending limit" via adtrust_dsl.
-// The real *hidden* cap (what the SMIT extension shows as "Hidden Limit")
-// is typically the lower of: adtrust_dsl, min_daily_budget-derived caps,
-// or the threshold/balance pair. We pick the most restrictive positive
-// number from these signals.
 function deriveHiddenLimit(acc) {
   const candidates = [];
   const push = (v) => {
@@ -144,16 +134,10 @@ function deriveHiddenLimit(acc) {
   };
   push(acc?.adtrust_dsl);
   push(acc?.min_daily_budget);
-  // Some accounts expose adspaymentcycle.threshold_amount as the hidden cap
   const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
-  for (const c of cycles) {
-    push(c?.threshold_amount);
-    push(c?.amount_due);
-  }
-  if (candidates.length === 0) return 0;
-  return Math.min(...candidates);
+  for (const c of cycles) { push(c?.threshold_amount); push(c?.amount_due); }
+  return candidates.length ? Math.min(...candidates) : 0;
 }
-
 function normalizeFromAccount(acc) {
   const dsl = Number(acc?.adtrust_dsl);
   return {
@@ -166,18 +150,13 @@ function normalizeFromAccount(acc) {
   };
 }
 
-// ---------- HTTP helpers ----------
 async function fetchWithTimeout(url, ms = 20000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(timer); }
 }
 
-// Rich field set including hidden-limit signals + cards
 const ACCOUNT_FIELDS =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
   "funding_source_details," +
@@ -192,58 +171,40 @@ async function fetchOneAccount(accountId, accessToken) {
     if (!res.ok || body?.error) return null;
     body.account_id = actId;
     return normalizeFromAccount(body);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-
-// Fetch all CRM-managed accounts in parallel batches
-async function fetchManagedAccountsData(accountIds, accessToken, onProgress) {
+async function fetchManagedAccountsData(accountIds, accessToken) {
   const results = [];
-  let done = 0;
   for (const batch of chunk(accountIds, 8)) {
-    const batchData = await Promise.all(batch.map((id) => fetchOneAccount(id, accessToken)));
-    for (const r of batchData) if (r) results.push(r);
-    done += batch.length;
-    if (onProgress) onProgress(`Fetched ${done}/${accountIds.length} accounts...`);
+    const data = await Promise.all(batch.map((id) => fetchOneAccount(id, accessToken)));
+    for (const r of data) if (r) results.push(r);
   }
   return results;
 }
 
 // ---------- Backend calls ----------
-async function listManagedAccounts(apiUrl, anonKey, jwt) {
-  const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/list-managed-accounts`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
-    body: "{}",
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    const err = new Error(body.error || "list-managed-accounts failed");
-    err.status = res.status;
-    throw err;
+async function callBackend(apiUrl, anonKey, jwt, refreshToken, path, payload) {
+  const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/${path}`;
+  const doFetch = async (token) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, apikey: anonKey },
+      body: JSON.stringify(payload || {}),
+    });
+    const body = await res.json().catch(() => ({}));
+    return { res, body };
+  };
+  let { res, body } = await doFetch(jwt);
+  if (res.status === 401 && refreshToken) {
+    const refreshed = await refreshSupabaseToken(apiUrl, anonKey, refreshToken);
+    await setStored({ jwt: refreshed.access_token, refreshToken: refreshed.refresh_token });
+    ({ res, body } = await doFetch(refreshed.access_token));
   }
-  return body.account_ids || [];
-}
-
-async function ingestDsl(apiUrl, anonKey, jwt, accounts) {
-  const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/ingest-dsl`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
-    body: JSON.stringify({ accounts }),
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    const err = new Error(body.error || "Ingest failed");
-    err.status = res.status;
-    throw err;
-  }
+  if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
   return body;
 }
 
-// ---------- Main sync ----------
+// ---------- Main auto-sync (Graph API, scheduled) ----------
 async function runAutoSync(reason = "alarm") {
   const stored = await getStored([
     "apiUrl", "anonKey", "jwt", "refreshToken", "userEmail", "autoSyncEnabled",
@@ -253,55 +214,28 @@ async function runAutoSync(reason = "alarm") {
 
   await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
 
-  let jwt = stored.jwt;
   try {
-    // 1) Get CRM-managed account ids
-    let accountIds;
-    try {
-      accountIds = await listManagedAccounts(stored.apiUrl, stored.anonKey, jwt);
-    } catch (err) {
-      if (err.status === 401 && stored.refreshToken) {
-        const refreshed = await refreshSupabaseToken(stored.apiUrl, stored.anonKey, stored.refreshToken);
-        await setStored({ jwt: refreshed.access_token, refreshToken: refreshed.refresh_token });
-        jwt = refreshed.access_token;
-        accountIds = await listManagedAccounts(stored.apiUrl, stored.anonKey, jwt);
-      } else throw err;
-    }
+    const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
+    const accountIds = managed.account_ids || [];
     if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
 
-    // 2) FB tab + token
-    let tab = await findAdsManagerTab();
-    let openedTab = false;
-    if (!tab) { tab = await openAdsManagerTab(); openedTab = true; }
+    let tab = await findFbTab();
+    let opened = false;
+    if (!tab) { tab = await openFbTab(); opened = true; }
 
-    let token = null;
-    let lastInfo = null;
+    let token = null, info = null;
     for (let i = 0; i < 3 && !token; i++) {
-      const info = await extractFbAccessToken(tab.id).catch(() => null);
-      lastInfo = info;
+      info = await extractFbAccessToken(tab.id).catch(() => null);
       token = info?.token || null;
-      if (!token && i < 2) await new Promise((r) => setTimeout(r, 3000));
+      if (!token) await new Promise((r) => setTimeout(r, 3000));
     }
-    if (!token) throw new Error(`No Facebook token (scanned ${lastInfo?.candidates ?? 0})`);
+    if (!token) throw new Error(`No Facebook token (scanned ${info?.candidates ?? 0})`);
 
-    // 3) Fetch only managed accounts
     const accounts = await fetchManagedAccountsData(accountIds, token);
     if (!accounts.length) throw new Error("Could not fetch any managed accounts");
 
-    // 4) Ingest
-    let result;
-    try {
-      result = await ingestDsl(stored.apiUrl, stored.anonKey, jwt, accounts);
-    } catch (err) {
-      if (err.status === 401 && stored.refreshToken) {
-        const refreshed = await refreshSupabaseToken(stored.apiUrl, stored.anonKey, stored.refreshToken);
-        await setStored({ jwt: refreshed.access_token, refreshToken: refreshed.refresh_token });
-        jwt = refreshed.access_token;
-        result = await ingestDsl(stored.apiUrl, stored.anonKey, jwt, accounts);
-      } else throw err;
-    }
-
-    if (openedTab) { try { await chrome.tabs.remove(tab.id); } catch {} }
+    const result = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "ingest-dsl", { accounts });
+    if (opened) { try { await chrome.tabs.remove(tab.id); } catch {} }
 
     await setStored({
       lastSyncStatus: "success",
@@ -319,12 +253,50 @@ async function runAutoSync(reason = "alarm") {
   }
 }
 
-// ---------- Card removal (called from content script) ----------
-async function removeCardFromAccount({ accountId, fundingSourceId }) {
-  // Find a tab with FB access to extract a token
-  let tab = await findAdsManagerTab();
-  if (!tab) tab = await openAdsManagerTab();
+// ---------- Billing-page snapshot from content.js ----------
+async function pushBillingSnapshot(snap) {
+  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
+  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) {
+    throw new Error("Not logged in to CRM. Open the extension popup and log in.");
+  }
+  if (!snap || !snap.account_id) throw new Error("No account id in snapshot");
 
+  // Convert content-script snapshot into the shape ingest-dsl expects.
+  const cards = (snap.cards || []).filter((c) => c && c.id && !String(c.id).startsWith("local:")).map((c) => ({
+    id: String(c.id),
+    display_string: c.display_string,
+    type: c.type,
+    is_primary: !!c.is_primary,
+    exp_month: c.exp_month ?? null,
+    exp_year: c.exp_year ?? null,
+  }));
+
+  const account = {
+    account_id: snap.account_id,
+    name: undefined,
+    currency: snap.currency || "USD",
+    daily_spend_limit: snap.visible_limit ?? 0,
+    hidden_daily_limit: snap.hidden_daily_limit ?? 0,
+    cards,
+    billing_snapshot: {
+      account_status: snap.account_status ?? null,
+      account_type: snap.account_type ?? null,
+      timezone_name: snap.timezone_name ?? null,
+      billing_threshold: snap.billing_threshold ?? null,
+      outstanding_balance: snap.outstanding_balance ?? null,
+      balance: snap.balance ?? null,
+      total_spending: snap.total_spending ?? null,
+      raw_url: snap.source_url ?? null,
+      parsed_at: snap.parsed_at,
+    },
+  };
+  return await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "ingest-dsl", { accounts: [account], source: "billing_page" });
+}
+
+// ---------- Card removal ----------
+async function removeCardFromAccount({ accountId, fundingSourceId }) {
+  let tab = await findFbTab();
+  if (!tab) tab = await openFbTab();
   let token = null;
   for (let i = 0; i < 3 && !token; i++) {
     const info = await extractFbAccessToken(tab.id).catch(() => null);
@@ -332,7 +304,6 @@ async function removeCardFromAccount({ accountId, fundingSourceId }) {
     if (!token) await new Promise((r) => setTimeout(r, 2000));
   }
   if (!token) throw new Error("Could not get Facebook access token");
-
   const actId = String(accountId).replace(/^act_/, "");
   const url = `https://graph.facebook.com/v19.0/act_${actId}/payment_methods/${encodeURIComponent(fundingSourceId)}?access_token=${encodeURIComponent(token)}`;
   const res = await fetch(url, { method: "DELETE" });
@@ -343,7 +314,7 @@ async function removeCardFromAccount({ accountId, fundingSourceId }) {
   return { ok: true };
 }
 
-// ---------- Alarms ----------
+// ---------- Alarms / messaging ----------
 async function ensureAlarm() {
   const existing = await chrome.alarms.get(ALARM_NAME);
   if (!existing) {
@@ -368,6 +339,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "remove-card") {
     removeCardFromAccount(msg.payload || {})
       .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg?.type === "push-billing-snapshot") {
+    pushBillingSnapshot(msg.payload)
+      .then((r) => sendResponse({ ok: true, ...r }))
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
