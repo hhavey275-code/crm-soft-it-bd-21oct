@@ -324,12 +324,8 @@ export function AdminAdAccounts() {
       writeLastFullSync(now);
       setLastFullSyncAt(now);
       refetchInsights();
-      runExtensionBillingSweep()
-        .then((res) => {
-          toast.success(`Extension live billing sync queued${res?.saved ? ` · ${res.saved} saved` : ""}`);
-          setTimeout(() => refetchInsights(), 2500);
-        })
-        .catch((err) => toast.warning(err.message || "Extension live billing sync not available"));
+      // v1.4.2: Mass extension billing sweep removed (Meta-detection risk).
+      // For per-account live billing data, use the Sync button on each row.
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
       // Populate client_daily_stats for all users after Meta sync
