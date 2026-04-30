@@ -1184,7 +1184,7 @@ export function AdminSellers() {
             {/* Due/Advance — Hero Card */}
             <div className={cn(
               "col-span-2 md:col-span-1 relative overflow-hidden rounded-xl p-[1px]",
-              dueAdvance >= 0
+              displayDueAdvance >= 0
                 ? "bg-gradient-to-br from-emerald-500 to-teal-600"
                 : "bg-gradient-to-br from-rose-500 to-red-600"
             )}>
@@ -1192,18 +1192,22 @@ export function AdminSellers() {
                 <div className="flex items-center gap-2 mb-2">
                   <div className={cn(
                     "flex h-7 w-7 items-center justify-center rounded-lg",
-                    dueAdvance >= 0 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                    displayDueAdvance >= 0 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
                   )}>
                     <Wallet className="h-3.5 w-3.5" />
                   </div>
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {dueAdvance >= 0 ? "Advance" : "Due"}
+                    {displayDueAdvance >= 0 ? "Advance" : "Due"}
                   </span>
                 </div>
-                <p className={cn("text-2xl md:text-3xl font-extrabold tracking-tight", dueAdvance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                  {dueAdvance >= 0 ? "+" : "−"}৳{Math.abs(dueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                <p className={cn("text-2xl md:text-3xl font-extrabold tracking-tight", displayDueAdvance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                  {displayDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(displayDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-1">After all transactions</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {monthView
+                    ? activeClosingRecord ? `Closed ${monthLabel(activeBucket)}` : `Current ${monthLabel(activeBucket)}`
+                    : "After all transactions"}
+                </p>
               </div>
             </div>
 
