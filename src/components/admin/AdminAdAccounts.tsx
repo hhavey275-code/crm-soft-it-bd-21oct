@@ -196,6 +196,8 @@ export function AdminAdAccounts() {
           ...row,
           ...existing,
           cards: (existing.cards && existing.cards.length ? existing.cards : row.cards) ?? [],
+          billing_threshold: existing.billing_threshold && Number(existing.billing_threshold) > 0 ? existing.billing_threshold : row.billing_threshold,
+          daily_spend_limit_currency: existing.daily_spend_limit_currency || row.daily_spend_limit_currency,
         };
       });
       // Persist to localStorage so the next page reload can show data instantly
