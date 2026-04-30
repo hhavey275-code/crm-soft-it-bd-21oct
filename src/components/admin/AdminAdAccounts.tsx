@@ -975,12 +975,6 @@ export function AdminAdAccounts() {
                       <div className="bg-muted/50 rounded-md p-1.5">
                         <p className="text-[10px] text-muted-foreground">Balance</p>
                         <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
-                        {ins.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
-                        )}
-                        {(ins as any).hidden_daily_limit != null && Number((ins as any).hidden_daily_limit) > 0 && (
-                          <p className="text-[10px] text-muted-foreground">DSL: {Number((ins as any).hidden_daily_limit).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
-                        )}
                       </div>
                     </div>
                   )}
