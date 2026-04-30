@@ -327,10 +327,15 @@ $("sync-btn").addEventListener("click", async () => {
   clearStatus();
 
   try {
+    $("progress-text").textContent = "Loading CRM-managed accounts...";
+    $("progress-bar").style.width = "10%";
+    const managedIds = await listManagedAccounts(stored.apiUrl, stored.anonKey, stored.jwt);
+    if (!managedIds.length) throw new Error("No Meta ad accounts found in your CRM.");
+
     let tab = await findAdsManagerTab();
     if (!tab) {
       $("progress-text").textContent = "Opening Ads Manager (background)...";
-      $("progress-bar").style.width = "15%";
+      $("progress-bar").style.width = "20%";
       tab = await openAdsManagerTab();
     }
     $("progress-text").textContent = "Extracting Facebook access token...";
@@ -343,8 +348,6 @@ $("sync-btn").addEventListener("click", async () => {
       lastInfo = info;
       token = info?.token || null;
       if (!token) {
-        // Force-focus + reload the tab once on attempt 2 to make Facebook
-        // re-emit its inline scripts with a fresh token.
         if (i === 1) {
           try { await chrome.tabs.reload(tab.id); } catch {}
           await new Promise((r) => setTimeout(r, 5000));
@@ -355,18 +358,18 @@ $("sync-btn").addEventListener("click", async () => {
     }
     if (!token) {
       throw new Error(
-        `Could not find Facebook access token (scanned ${lastInfo?.candidates ?? 0} candidates on ${lastInfo?.url || "the tab"}). ` +
-        `Try this: open https://business.facebook.com/adsmanager/manage/accounts in a NEW tab, wait until it fully loads (the accounts table is visible), then click Sync again.`,
+        `Could not find Facebook access token (scanned ${lastInfo?.candidates ?? 0} candidates). ` +
+        `Open https://business.facebook.com/adsmanager/manage/accounts in a NEW tab, wait until it loads, then click Sync again.`,
       );
     }
 
-    $("progress-text").textContent = "Fetching all ad accounts from Facebook...";
-    $("progress-bar").style.width = "60%";
-    const accounts = await fetchAllAdAccountsDsl(token, (msg) => {
+    $("progress-text").textContent = `Fetching ${managedIds.length} CRM accounts from Facebook...`;
+    $("progress-bar").style.width = "55%";
+    const accounts = await fetchManagedAccountsData(managedIds, token, (msg) => {
       $("progress-text").textContent = msg;
     });
     if (accounts.length === 0) {
-      throw new Error("No ad accounts found for this Facebook user.");
+      throw new Error("Could not fetch any managed accounts (check Facebook permissions).");
     }
 
     $("progress-text").textContent = `Sending ${accounts.length} accounts to your dashboard...`;
