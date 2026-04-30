@@ -239,25 +239,6 @@ export function ClientAdAccounts() {
     refetchOnMount: "always",
   });
 
-  // v1.4.2: Pull hidden DSL / threshold straight from ad_account_insights
-  // (the edge cache trims these fields, so we read the table directly).
-  const { data: billingExtras = {}, refetch: refetchBillingExtras } = useQuery({
-    queryKey: ["client-billing-extras", user?.id, accounts?.map((a: any) => a.id).join(",") || ""],
-    queryFn: async () => {
-      if (!accounts || accounts.length === 0) return {} as Record<string, any>;
-      const ids = accounts.map((a: any) => a.id);
-      const { data } = await supabase
-        .from("ad_account_insights")
-        .select("ad_account_id, daily_spend_limit, hidden_daily_limit, billing_threshold, daily_spend_limit_currency, daily_spend_limit_synced_at")
-        .in("ad_account_id", ids);
-      const map: Record<string, any> = {};
-      (data ?? []).forEach((row: any) => { map[row.ad_account_id] = row; });
-      return map;
-    },
-    enabled: !!user && !!accounts && accounts.length > 0,
-    staleTime: 60_000,
-  });
-
   const hasAutoRefreshed = useRef(false);
   useEffect(() => {
     if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
