@@ -425,30 +425,15 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
   return { ok: true };
 }
 
-// ---------- Alarms / messaging ----------
-async function ensureAlarm() {
-  const existing = await chrome.alarms.get(ALARM_NAME);
-  if (!existing) {
-    chrome.alarms.create(ALARM_NAME, { delayInMinutes: 1, periodInMinutes: SYNC_INTERVAL_MINUTES });
-  }
-}
-chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); });
-chrome.runtime.onStartup.addListener(() => { ensureAlarm(); });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) runAutoSync("alarm");
-});
-
+// ---------- Messaging ----------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
+    // Backwards-compat: popup manual sync still uses Graph API path
     runAutoSync(msg.reason || "manual").then(sendResponse);
     return true;
   }
-  if (msg?.type === "run-billing-sweep") {
-    runBillingSweep(msg.reason || "manual").then(sendResponse);
-    return true;
-  }
-  if (msg?.type === "ensure-alarm") {
-    ensureAlarm().then(() => sendResponse({ ok: true }));
+  if (msg?.type === "sync-single-account") {
+    syncSingleAccount(msg.accountId).then(sendResponse);
     return true;
   }
   if (msg?.type === "remove-card") {
