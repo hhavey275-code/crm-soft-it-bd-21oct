@@ -435,7 +435,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) runAutoSync("alarm");
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
     runAutoSync(msg.reason || "manual").then(sendResponse);
     return true;
@@ -449,7 +449,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "remove-card") {
-    removeCardFromAccount(msg.payload || {})
+    removeCardFromAccount({ ...(msg.payload || {}), tabId: sender?.tab?.id })
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
