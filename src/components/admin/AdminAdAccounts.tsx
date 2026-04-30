@@ -86,21 +86,7 @@ function writeLastFullSync(ts: number) {
   }
 }
 
-function runExtensionBillingSweep(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Extension did not respond. Reinstall/login to the latest extension, then retry.")), 12000);
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== window || event.data?.source !== "dsl-extension" || event.data?.type !== "billing-sweep-result") return;
-      window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-      const response = event.data.response;
-      if (!response?.ok) reject(new Error(response?.error || "Extension live billing sync failed"));
-      else resolve(response);
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage({ source: "dsl-crm", type: "run-billing-sweep", reason: "update-all-from-meta" }, "*");
-  });
-}
+// v1.4.2: runExtensionBillingSweep removed. Use ExtensionSyncButton per row instead.
 
 export function AdminAdAccounts() {
   const queryClient = useQueryClient();
