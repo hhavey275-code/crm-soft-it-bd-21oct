@@ -468,6 +468,21 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: async () => {
+      toast.success("Account synced from Meta");
+      await Promise.all([refetchInsights(), refetchAdAccounts()]);
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+    onSettled: () => setSingleRefreshingId(null),
+  });
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
