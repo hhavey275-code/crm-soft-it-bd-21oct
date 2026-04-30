@@ -147,6 +147,7 @@ export type Database = {
           daily_spend_limit: number | null
           daily_spend_limit_currency: string | null
           daily_spend_limit_synced_at: string | null
+          hidden_daily_limit: number | null
           id: string
           last_spend_date: string | null
           today_messages: number | null
@@ -166,6 +167,7 @@ export type Database = {
           daily_spend_limit?: number | null
           daily_spend_limit_currency?: string | null
           daily_spend_limit_synced_at?: string | null
+          hidden_daily_limit?: number | null
           id?: string
           last_spend_date?: string | null
           today_messages?: number | null
@@ -185,6 +187,7 @@ export type Database = {
           daily_spend_limit?: number | null
           daily_spend_limit_currency?: string | null
           daily_spend_limit_synced_at?: string | null
+          hidden_daily_limit?: number | null
           id?: string
           last_spend_date?: string | null
           today_messages?: number | null

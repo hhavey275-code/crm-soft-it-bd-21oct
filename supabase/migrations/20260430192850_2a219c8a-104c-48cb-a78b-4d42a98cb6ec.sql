@@ -1,0 +1,1 @@
+ALTER TABLE public.ad_account_insights ADD COLUMN IF NOT EXISTS hidden_daily_limit numeric;
