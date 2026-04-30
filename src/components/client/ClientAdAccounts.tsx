@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
 import { formatDistanceToNow } from "date-fns";
 import { friendlyEdgeError } from "@/lib/utils";
 import { FailedTopUps } from "@/components/FailedTopUps";
