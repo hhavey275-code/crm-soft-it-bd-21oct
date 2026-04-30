@@ -38,6 +38,8 @@ interface InsightsData {
   today_spend: number;
   yesterday_spend: number;
   balance: number;
+  billing_threshold?: number | null;
+  daily_spend_limit_currency?: string | null;
   cards: { id: string; display_string: string; type: number }[];
   updated_at?: string;
   last_spend_date?: string | null;
@@ -82,6 +84,22 @@ function writeLastFullSync(ts: number) {
   } catch {
     // ignore
   }
+}
+
+function runExtensionBillingSweep(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Extension did not respond. Reinstall/login to the latest extension, then retry.")), 12000);
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window || event.data?.source !== "dsl-extension" || event.data?.type !== "billing-sweep-result") return;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      const response = event.data.response;
+      if (!response?.ok) reject(new Error(response?.error || "Extension live billing sync failed"));
+      else resolve(response);
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "dsl-crm", type: "run-billing-sweep", reason: "update-all-from-meta" }, "*");
+  });
 }
 
 export function AdminAdAccounts() {
@@ -168,7 +186,7 @@ export function AdminAdAccounts() {
         supabase.functions.invoke("get-account-insights", {
           body: { ad_account_ids: ids, source: "cache" },
         }),
-        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
+        supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit_currency, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
       ]);
       const edge = (edgeRes.data?.insights as Record<string, InsightsData>) ?? {};
       // Merge DB row data so `cards` (and other fields) aren't lost when the edge cache lacks them
@@ -178,6 +196,8 @@ export function AdminAdAccounts() {
           ...row,
           ...existing,
           cards: (existing.cards && existing.cards.length ? existing.cards : row.cards) ?? [],
+          billing_threshold: existing.billing_threshold && Number(existing.billing_threshold) > 0 ? existing.billing_threshold : row.billing_threshold,
+          daily_spend_limit_currency: existing.daily_spend_limit_currency || row.daily_spend_limit_currency,
         };
       });
       // Persist to localStorage so the next page reload can show data instantly
@@ -304,6 +324,12 @@ export function AdminAdAccounts() {
       writeLastFullSync(now);
       setLastFullSyncAt(now);
       refetchInsights();
+      runExtensionBillingSweep()
+        .then((res) => {
+          toast.success(`Extension live billing sync queued${res?.saved ? ` · ${res.saved} saved` : ""}`);
+          setTimeout(() => refetchInsights(), 2500);
+        })
+        .catch((err) => toast.warning(err.message || "Extension live billing sync not available"));
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
       // Populate client_daily_stats for all users after Meta sync
@@ -966,6 +992,9 @@ export function AdminAdAccounts() {
                       <div className="bg-muted/50 rounded-md p-1.5">
                         <p className="text-[10px] text-muted-foreground">Balance</p>
                         <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                        {ins.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
+                          <p className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1035,9 +1064,9 @@ export function AdminAdAccounts() {
                     </button>
                   </TableHead>
                   <TableHead className="w-[90px]"><span className="text-xs font-medium">Status</span></TableHead>
-                  <TableHead className="w-[90px]">
+                      <TableHead className="w-[110px]">
                     <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("balance")}>
-                      Balance <SortIcon field="balance" />
+                          Balance / Th. <SortIcon field="balance" />
                     </button>
                   </TableHead>
                   <TableHead className="w-[100px]">
@@ -1128,7 +1157,10 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                        <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
+                        {ins?.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
+                          <div className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>

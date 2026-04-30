@@ -179,8 +179,19 @@ function deriveHiddenLimit(acc) {
   return candidates.length ? Math.min(...candidates) : 0;
 }
 
+function deriveBillingThreshold(acc) {
+  const candidates = [];
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const c of cycles) {
+    const n = Number(c?.threshold_amount);
+    if (Number.isFinite(n) && n > 0) candidates.push(n);
+  }
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+
 function normalizeFromAccount(acc) {
   const dsl = Number(acc?.adtrust_dsl);
+  const threshold = deriveBillingThreshold(acc);
   return {
     account_id: String(acc.account_id || acc.id || "").replace(/^act_/, ""),
     name: acc?.name,
@@ -188,6 +199,11 @@ function normalizeFromAccount(acc) {
     hidden_daily_limit: deriveHiddenLimit(acc),
     currency: acc?.currency || "USD",
     cards: extractAccountCards(acc),
+    billing_snapshot: {
+      billing_threshold: threshold || null,
+      balance: Number(acc?.balance) || null,
+      total_spending: Number(acc?.amount_spent) || null,
+    },
   };
 }
 
@@ -201,14 +217,23 @@ async function fetchWithTimeout(url, ms = 20000) {
 const ACCOUNT_FIELDS =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
   "funding_source_details," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}," +
+  "payment_methods";
+const ACCOUNT_FIELDS_SAFE =
+  "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
+  "funding_source_details," +
   "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
 
 async function fetchOneAccount(accountId, accessToken) {
   const actId = String(accountId).replace(/^act_/, "");
-  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${ACCOUNT_FIELDS}&access_token=${encodeURIComponent(accessToken)}`;
+  const makeUrl = (fields) => `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`;
   try {
-    const res = await fetchWithTimeout(url, 15000);
-    const body = await res.json().catch(() => ({}));
+    let res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS), 15000);
+    let body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) {
+      res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS_SAFE), 15000);
+      body = await res.json().catch(() => ({}));
+    }
     if (!res.ok || body?.error) return null;
     body.account_id = actId;
     return normalizeFromAccount(body);

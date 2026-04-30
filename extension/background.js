@@ -59,6 +59,35 @@ async function openFbTab() {
   });
 }
 
+async function openBillingTab(accountId) {
+  const actId = String(accountId).replace(/^act_/, "");
+  return new Promise((resolve) => {
+    chrome.tabs.create(
+      { url: `https://business.facebook.com/billing_hub/accounts/details?asset_id=${actId}`, active: false },
+      (tab) => {
+        const listener = (tabId, info) => {
+          if (tabId === tab.id && info.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(listener);
+            setTimeout(() => resolve(tab), 4500);
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+      },
+    );
+  });
+}
+
+async function sendTabMessage(tabId, message, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, message);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, 1800));
+    }
+  }
+}
+
 async function extractFbAccessToken(tabId) {
   const [{ result } = {}] = await chrome.scripting.executeScript({
     target: { tabId },
@@ -138,8 +167,18 @@ function deriveHiddenLimit(acc) {
   for (const c of cycles) { push(c?.threshold_amount); push(c?.amount_due); }
   return candidates.length ? Math.min(...candidates) : 0;
 }
+function deriveBillingThreshold(acc) {
+  const candidates = [];
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const c of cycles) {
+    const n = Number(c?.threshold_amount);
+    if (Number.isFinite(n) && n > 0) candidates.push(n);
+  }
+  return candidates.length ? Math.max(...candidates) : 0;
+}
 function normalizeFromAccount(acc) {
   const dsl = Number(acc?.adtrust_dsl);
+  const threshold = deriveBillingThreshold(acc);
   return {
     account_id: String(acc.account_id || acc.id || "").replace(/^act_/, ""),
     name: acc?.name,
@@ -147,6 +186,11 @@ function normalizeFromAccount(acc) {
     hidden_daily_limit: deriveHiddenLimit(acc),
     currency: acc?.currency || "USD",
     cards: extractAccountCards(acc),
+    billing_snapshot: {
+      billing_threshold: threshold || null,
+      balance: Number(acc?.balance) || null,
+      total_spending: Number(acc?.amount_spent) || null,
+    },
   };
 }
 
@@ -160,14 +204,23 @@ async function fetchWithTimeout(url, ms = 20000) {
 const ACCOUNT_FIELDS =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
   "funding_source_details," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}," +
+  "payment_methods";
+const ACCOUNT_FIELDS_SAFE =
+  "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
+  "funding_source_details," +
   "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
 
 async function fetchOneAccount(accountId, accessToken) {
   const actId = String(accountId).replace(/^act_/, "");
-  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${ACCOUNT_FIELDS}&access_token=${encodeURIComponent(accessToken)}`;
+  const makeUrl = (fields) => `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`;
   try {
-    const res = await fetchWithTimeout(url, 15000);
-    const body = await res.json().catch(() => ({}));
+    let res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS), 15000);
+    let body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.error) {
+      res = await fetchWithTimeout(makeUrl(ACCOUNT_FIELDS_SAFE), 15000);
+      body = await res.json().catch(() => ({}));
+    }
     if (!res.ok || body?.error) return null;
     body.account_id = actId;
     return normalizeFromAccount(body);
@@ -253,6 +306,39 @@ async function runAutoSync(reason = "alarm") {
   }
 }
 
+async function runBillingSweep(reason = "crm") {
+  const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
+  if (!stored.apiUrl || !stored.anonKey || !stored.jwt) return { ok: false, error: "Not logged in to CRM extension" };
+  await setStored({ lastSyncStatus: "running", lastSyncAt: Date.now(), lastSyncReason: reason });
+  try {
+    const managed = await callBackend(stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken, "list-managed-accounts", {});
+    const accountIds = managed.account_ids || [];
+    if (!accountIds.length) throw new Error("No CRM-managed Meta accounts");
+    let saved = 0;
+    const failed = [];
+    for (const accountId of accountIds) {
+      let tab = null;
+      try {
+        tab = await openBillingTab(accountId);
+        const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" });
+        if (res?.ok) saved += 1;
+        else failed.push({ accountId, error: res?.error || "snapshot failed" });
+      } catch (err) {
+        failed.push({ accountId, error: err?.message || String(err) });
+      } finally {
+        if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
+      }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+    await setStored({ lastSyncStatus: failed.length ? "partial" : "success", lastSyncAt: Date.now(), lastSyncSaved: saved, lastSyncError: failed[0]?.error || null });
+    return { ok: true, saved, attempted: accountIds.length, failed };
+  } catch (err) {
+    const message = err?.message || String(err);
+    await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
+    return { ok: false, error: message };
+  }
+}
+
 // ---------- Billing-page snapshot from content.js ----------
 async function pushBillingSnapshot(snap) {
   const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
@@ -294,9 +380,39 @@ async function pushBillingSnapshot(snap) {
 }
 
 // ---------- Card removal ----------
-async function removeCardFromAccount({ accountId, fundingSourceId }) {
-  let tab = await findFbTab();
+async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }) {
+  let tab = tabId ? await chrome.tabs.get(tabId).catch(() => null) : null;
+  if (!tab) tab = await findFbTab();
   if (!tab) tab = await openFbTab();
+  if (!fundingSourceId || String(fundingSourceId).startsWith("local:")) {
+    const [{ result } = {}] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (hint) => {
+        const brand = String(hint?.type || hint?.removal_hint?.brand || "").toLowerCase();
+        const last4 = String(hint?.removal_hint?.last4 || hint?.display_string || "").match(/(\d{4})/)?.[1];
+        const nodes = Array.from(document.querySelectorAll('div, li, [role="listitem"]'));
+        const holder = nodes.find((el) => {
+          const t = (el.textContent || "").toLowerCase();
+          return t.length < 800 && (!brand || t.includes(brand.replace("mastercard", "master"))) && (!last4 || t.includes(last4));
+        });
+        if (!holder) return { ok: false, error: "Card row not found on this billing page" };
+        const clickByText = (root) => {
+          const buttons = Array.from(root.querySelectorAll('button, [role="button"], a'));
+          const btn = buttons.find((b) => /remove|delete|detach/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`));
+          if (btn) { btn.click(); return true; }
+          return false;
+        };
+        if (clickByText(holder)) return { ok: true, pending_confirmation: true };
+        const menu = Array.from(holder.querySelectorAll('button, [role="button"]')).reverse().find((b) => /more|menu|options|⋯|…/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`)) || Array.from(holder.querySelectorAll('button, [role="button"]')).pop();
+        if (!menu) return { ok: false, error: "Remove/menu button not found for this card" };
+        menu.click();
+        setTimeout(() => clickByText(document), 700);
+        return { ok: true, pending_confirmation: true };
+      },
+      args: [card || {}],
+    });
+    return result || { ok: false, error: "Could not open Meta remove action" };
+  }
   let token = null;
   for (let i = 0; i < 3 && !token; i++) {
     const info = await extractFbAccessToken(tab.id).catch(() => null);
@@ -327,9 +443,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) runAutoSync("alarm");
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "run-auto-sync") {
     runAutoSync(msg.reason || "manual").then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "run-billing-sweep") {
+    runBillingSweep(msg.reason || "manual").then(sendResponse);
     return true;
   }
   if (msg?.type === "ensure-alarm") {
@@ -337,7 +457,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "remove-card") {
-    removeCardFromAccount(msg.payload || {})
+    removeCardFromAccount({ ...(msg.payload || {}), tabId: sender?.tab?.id })
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
