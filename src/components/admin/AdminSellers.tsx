@@ -597,6 +597,10 @@ export function AdminSellers() {
   );
   const activeClosingLive = activeOpening + activeMonthAgg.delta;
   const activeClosingRecord = closingFor(activeBucket);
+  const monthDueAdvance = activeClosingRecord
+    ? Number(activeClosingRecord.closing_due_advance_bdt || 0)
+    : activeClosingLive;
+  const displayDueAdvance = monthView ? monthDueAdvance : dueAdvance;
 
   const closeMonthMutation = useMutation({
     mutationFn: async () => {
@@ -1127,18 +1131,11 @@ export function AdminSellers() {
                   Opening: {activeOpening >= 0 ? "+" : "−"}৳{Math.abs(activeOpening).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </span>
                 <span className={cn(
-                  "text-xs px-2.5 py-1 rounded-full border font-medium",
-                  activeMonthAgg.delta >= 0 ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900"
-                                            : "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900"
-                )}>
-                  This Month Net: {activeMonthAgg.delta >= 0 ? "+" : "−"}৳{Math.abs(activeMonthAgg.delta).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </span>
-                <span className={cn(
                   "text-xs px-2.5 py-1 rounded-full border font-semibold",
-                  activeClosingLive >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+                  monthDueAdvance >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
                                         : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
                 )}>
-                  Closing: {activeClosingLive >= 0 ? "+" : "−"}৳{Math.abs(activeClosingLive).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {activeClosingRecord ? "Closed Due/Adv" : "Current Due/Adv"}: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </span>
 
                 {activeClosingRecord ? (
