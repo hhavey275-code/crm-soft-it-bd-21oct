@@ -990,6 +990,9 @@ export function AdminAdAccounts() {
                       <div className="bg-muted/50 rounded-md p-1.5">
                         <p className="text-[10px] text-muted-foreground">Balance</p>
                         <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                        {ins.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
+                          <p className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString()} {ins.daily_spend_limit_currency || "USD"}</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1059,9 +1062,9 @@ export function AdminAdAccounts() {
                     </button>
                   </TableHead>
                   <TableHead className="w-[90px]"><span className="text-xs font-medium">Status</span></TableHead>
-                  <TableHead className="w-[90px]">
+                      <TableHead className="w-[110px]">
                     <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("balance")}>
-                      Balance <SortIcon field="balance" />
+                          Balance / Th. <SortIcon field="balance" />
                     </button>
                   </TableHead>
                   <TableHead className="w-[100px]">
@@ -1152,7 +1155,10 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                        <div className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</div>
+                        {ins?.billing_threshold != null && Number(ins.billing_threshold) > 0 && (
+                          <div className="text-[10px] text-muted-foreground">Th: {Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {ins.daily_spend_limit_currency || "USD"}</div>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
