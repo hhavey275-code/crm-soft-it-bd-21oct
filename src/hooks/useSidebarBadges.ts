@@ -12,7 +12,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     if (isAdminUser) {
-      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes] = await Promise.all([
+      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes, sellerUsdtRes] = await Promise.all([
         (supabase as any)
           .from("top_up_requests")
           .select("*", { count: "exact", head: true })
@@ -38,6 +38,11 @@ export function useSidebarBadges(): Record<string, number> {
           .from("bm_access_requests")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
+        (supabase as any)
+          .from("seller_transactions")
+          .select("*", { count: "exact", head: true })
+          .eq("type", "usdt_received")
+          .eq("status", "pending"),
       ]);
 
       setBadges({
@@ -46,6 +51,7 @@ export function useSidebarBadges(): Record<string, number> {
         clients: clientsRes.count || 0,
         "failed-topups": failedRes.count || 0,
         requests: (adReqRes.count || 0) + (bmReqRes.count || 0),
+        sellers: sellerUsdtRes.count || 0,
       });
     } else {
       // Client: show own failed topups count
