@@ -22,7 +22,7 @@ export function syncSingleAccountViaExtension(accountId: string, timeoutMs = 350
       resolve({
         ok: false,
         error:
-          "Extension did not respond. Make sure the v1.4.2 'DSL & Cards Sync' extension is installed and you are logged in.",
+          "Extension did not respond. Make sure the v1.4.3 'DSL & Cards Sync' extension is installed and you are logged in.",
       });
     }, timeoutMs);
 
