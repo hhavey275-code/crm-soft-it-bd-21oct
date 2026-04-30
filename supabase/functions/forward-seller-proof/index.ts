@@ -105,6 +105,8 @@ Deno.serve(async (req) => {
     }
 
     // Build Due/Advance running total line for THIS seller (single global balance).
+    // Include THIS pending bdt_payment as a credit so the forwarded total shows
+    // what the seller's balance will be once admin approves the entry.
     let runningTotalLine = '';
     if (resolvedSellerId) {
       try {
@@ -112,7 +114,9 @@ Deno.serve(async (req) => {
           .from('seller_transactions')
           .select('type, bdt_amount, usdt_amount, rate, status, created_at')
           .eq('seller_id', resolvedSellerId);
-        const balance = computeDueAdvance((txns as any[]) || []);
+        let balance = computeDueAdvance((txns as any[]) || []);
+        // Add the current incoming bdt_payment that isn't in the ledger yet
+        balance += Number(bdt_amount || 0);
         if (balance > 0) {
           runningTotalLine = `\n🟢 Total: Advance +৳${formatBdtIN(balance)}`;
         } else if (balance < 0) {
