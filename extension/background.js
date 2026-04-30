@@ -410,6 +410,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     runAutoSync(msg.reason || "manual").then(sendResponse);
     return true;
   }
+  if (msg?.type === "run-billing-sweep") {
+    runBillingSweep(msg.reason || "manual").then(sendResponse);
+    return true;
+  }
   if (msg?.type === "ensure-alarm") {
     ensureAlarm().then(() => sendResponse({ ok: true }));
     return true;
