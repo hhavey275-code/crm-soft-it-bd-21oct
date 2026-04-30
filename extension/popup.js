@@ -179,8 +179,19 @@ function deriveHiddenLimit(acc) {
   return candidates.length ? Math.min(...candidates) : 0;
 }
 
+function deriveBillingThreshold(acc) {
+  const candidates = [];
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const c of cycles) {
+    const n = Number(c?.threshold_amount);
+    if (Number.isFinite(n) && n > 0) candidates.push(n);
+  }
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+
 function normalizeFromAccount(acc) {
   const dsl = Number(acc?.adtrust_dsl);
+  const threshold = deriveBillingThreshold(acc);
   return {
     account_id: String(acc.account_id || acc.id || "").replace(/^act_/, ""),
     name: acc?.name,
@@ -188,6 +199,11 @@ function normalizeFromAccount(acc) {
     hidden_daily_limit: deriveHiddenLimit(acc),
     currency: acc?.currency || "USD",
     cards: extractAccountCards(acc),
+    billing_snapshot: {
+      billing_threshold: threshold || null,
+      balance: Number(acc?.balance) || null,
+      total_spending: Number(acc?.amount_spent) || null,
+    },
   };
 }
 
