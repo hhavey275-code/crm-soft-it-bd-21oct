@@ -14,12 +14,25 @@ function json(body: unknown, status = 200) {
   });
 }
 
+type BillingSnapshot = {
+  account_status?: string | null;
+  account_type?: string | null;
+  timezone_name?: string | null;
+  billing_threshold?: number | null;
+  outstanding_balance?: number | null;
+  balance?: number | null;
+  total_spending?: number | null;
+  raw_url?: string | null;
+  parsed_at?: string;
+};
+
 type DslRow = {
   account_id: string; // Meta account id, with or without "act_" prefix
-  daily_spend_limit: number; // visible "Limit" in account currency
+  daily_spend_limit?: number; // visible "Limit" in account currency
   hidden_daily_limit?: number; // real Meta-enforced cap (often lower)
   currency?: string;
   cards?: CardRow[];
+  billing_snapshot?: BillingSnapshot;
 };
 
 type CardRow = {
