@@ -1151,9 +1151,9 @@ export function AdminAdAccounts() {
                         <div className="flex items-center gap-1">
                           <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
                             disabled={singleRefreshingId === a.id}
                             onClick={() => refreshSingleMutation.mutate(a.id)}
                             title="Sync this account from Meta"
