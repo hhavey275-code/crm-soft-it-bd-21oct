@@ -372,9 +372,39 @@ async function pushBillingSnapshot(snap) {
 }
 
 // ---------- Card removal ----------
-async function removeCardFromAccount({ accountId, fundingSourceId }) {
-  let tab = await findFbTab();
+async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }) {
+  let tab = tabId ? await chrome.tabs.get(tabId).catch(() => null) : null;
+  if (!tab) tab = await findFbTab();
   if (!tab) tab = await openFbTab();
+  if (!fundingSourceId || String(fundingSourceId).startsWith("local:")) {
+    const [{ result } = {}] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (hint) => {
+        const brand = String(hint?.type || hint?.removal_hint?.brand || "").toLowerCase();
+        const last4 = String(hint?.removal_hint?.last4 || hint?.display_string || "").match(/(\d{4})/)?.[1];
+        const nodes = Array.from(document.querySelectorAll('div, li, [role="listitem"]'));
+        const holder = nodes.find((el) => {
+          const t = (el.textContent || "").toLowerCase();
+          return t.length < 800 && (!brand || t.includes(brand.replace("mastercard", "master"))) && (!last4 || t.includes(last4));
+        });
+        if (!holder) return { ok: false, error: "Card row not found on this billing page" };
+        const clickByText = (root) => {
+          const buttons = Array.from(root.querySelectorAll('button, [role="button"], a'));
+          const btn = buttons.find((b) => /remove|delete|detach/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`));
+          if (btn) { btn.click(); return true; }
+          return false;
+        };
+        if (clickByText(holder)) return { ok: true, pending_confirmation: true };
+        const menu = Array.from(holder.querySelectorAll('button, [role="button"]')).reverse().find((b) => /more|menu|options|⋯|…/i.test(`${b.textContent || ""} ${b.getAttribute("aria-label") || ""}`)) || Array.from(holder.querySelectorAll('button, [role="button"]')).pop();
+        if (!menu) return { ok: false, error: "Remove/menu button not found for this card" };
+        menu.click();
+        setTimeout(() => clickByText(document), 700);
+        return { ok: true, pending_confirmation: true };
+      },
+      args: [card || {}],
+    });
+    return result || { ok: false, error: "Could not open Meta remove action" };
+  }
   let token = null;
   for (let i = 0; i < 3 && !token; i++) {
     const info = await extractFbAccessToken(tab.id).catch(() => null);
