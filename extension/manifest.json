@@ -26,7 +26,8 @@
       "matches": [
         "https://business.facebook.com/*",
         "https://www.facebook.com/adsmanager/*",
-        "https://adsmanager.facebook.com/*"
+        "https://adsmanager.facebook.com/*",
+        "https://*.lovable.app/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
