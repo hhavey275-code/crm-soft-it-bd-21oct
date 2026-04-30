@@ -69,7 +69,8 @@ async function openBillingTab(accountId) {
         const listener = (tabId, info) => {
           if (tabId === tab.id && info.status === "complete") {
             chrome.tabs.onUpdated.removeListener(listener);
-            setTimeout(() => resolve(tab), 4500);
+            // Give the SPA / GraphQL traffic time to populate.
+            setTimeout(() => resolve(tab), 2500);
           }
         };
         chrome.tabs.onUpdated.addListener(listener);
@@ -321,7 +322,7 @@ async function syncSingleAccount(accountId) {
   let tab = null;
   try {
     tab = await openBillingTab(id);
-    const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot" }, 4);
+    const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot", timeoutMs: 25000 }, 6);
     if (!res?.ok) throw new Error(res?.error || "Could not parse billing page");
     await setStored({ lastSyncStatus: "success", lastSyncAt: Date.now(), lastSyncSaved: 1, lastSyncError: null });
     return { ok: true, accountId: id };

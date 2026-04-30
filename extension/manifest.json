@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "2.0.0",
-  "description": "SMIT-style live billing sync: page-world hook captures Meta GraphQL responses for cards, limits, threshold, balance and total spending; remove cards via direct GraphQL mutation; one-click sync to your CRM.",
+  "version": "2.1.0",
+  "description": "Live Meta billing sync: page-world hook + DOM parser captures cards, hidden DSL, threshold and balance; remove cards via captured Meta mutation replay or visible UI flow; one-click sync to CRM.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [
     "https://*.facebook.com/*",
