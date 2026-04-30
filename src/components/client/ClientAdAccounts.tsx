@@ -433,6 +433,23 @@ export function ClientAdAccounts() {
     },
   });
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: () => {
+      toast.success("Account synced from Meta");
+      refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to sync"),
+    onSettled: () => setSingleRefreshingId(null),
+  });
+
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortField(field); setSortDir("asc"); }
