@@ -33,6 +33,8 @@ import { friendlyEdgeError } from "@/lib/utils";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { AdminNotes } from "@/components/admin/AdminNotes";
 
+const EXTENSION_VERSION = "1.2.1";
+
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -612,9 +614,30 @@ export default function AdAccountDetailPage() {
                     {isAdmin && (
                       <div className="text-[11px] text-muted-foreground mt-2">
                         Daily Spending Limit comes from the Chrome extension.{" "}
-                        <a href="/dsl-sync-extension.zip" download className="underline text-primary">
-                          Download extension
-                        </a>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch("/dsl-sync-extension.zip");
+                              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `dsl-sync-extension-v${EXTENSION_VERSION}.zip`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              URL.revokeObjectURL(url);
+                              toast.success(`Extension v${EXTENSION_VERSION} downloaded`);
+                            } catch (e: any) {
+                              toast.error(e?.message || "Download failed");
+                            }
+                          }}
+                          className="underline text-primary"
+                        >
+                          Download extension v{EXTENSION_VERSION}
+                        </button>
                       </div>
                     )}
                   </div>
