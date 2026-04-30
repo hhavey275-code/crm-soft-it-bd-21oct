@@ -127,7 +127,7 @@ async function extractFbAccessToken(tabId) {
   return result;
 }
 
-// ---------- Graph API: list ad accounts with DSL + payment cards ----------
+// ---------- Graph API: per-account fetch (managed-only) ----------
 function normalizeCard(source, isPrimary = false) {
   if (!source) return null;
   const id = String(source.id || source.funding_source_id || "").trim();
@@ -161,149 +161,90 @@ function extractAccountCards(acc) {
     const card = normalizeCard(cycle?.funding_source_details, false);
     if (card) cards.push(card);
   }
+  const pm = Array.isArray(acc?.payment_methods?.data) ? acc.payment_methods.data : [];
+  for (const p of pm) {
+    const card = normalizeCard(p, false);
+    if (card) cards.push(card);
+  }
   return mergeCards([], cards);
 }
 
-function normalizeDslAccount(acc) {
-  // Meta's `adtrust_dsl` for ad accounts is returned in the account currency's
-  // major units (e.g. USD dollars), NOT cents. Do NOT divide by 100.
-  // Empirically: an account whose Billing page shows "Daily spending limit $1,011.25"
-  // returns adtrust_dsl = 1011.25 (or 1011) from the Graph API.
-  const raw = acc.adtrust_dsl;
-  const num = raw === null || raw === undefined || raw === "" ? 0 : Number(raw);
+function deriveHiddenLimit(acc) {
+  const candidates = [];
+  const push = (v) => { const n = Number(v); if (Number.isFinite(n) && n > 0) candidates.push(n); };
+  push(acc?.adtrust_dsl);
+  push(acc?.min_daily_budget);
+  const cycles = Array.isArray(acc?.adspaymentcycle?.data) ? acc.adspaymentcycle.data : [];
+  for (const c of cycles) { push(c?.threshold_amount); push(c?.amount_due); }
+  return candidates.length ? Math.min(...candidates) : 0;
+}
+
+function normalizeFromAccount(acc) {
+  const dsl = Number(acc?.adtrust_dsl);
   return {
-    account_id: acc.account_id || acc.id?.replace(/^act_/, ""),
-    name: acc.name,
-    daily_spend_limit: Number.isFinite(num) && num > 0 ? num : 0,
-    currency: acc.currency || "USD",
+    account_id: String(acc.account_id || acc.id || "").replace(/^act_/, ""),
+    name: acc?.name,
+    daily_spend_limit: Number.isFinite(dsl) && dsl > 0 ? dsl : 0,
+    hidden_daily_limit: deriveHiddenLimit(acc),
+    currency: acc?.currency || "USD",
     cards: extractAccountCards(acc),
   };
 }
 
-// Fetch with hard timeout so the popup never hangs forever on a slow Graph
-// call. Returns the parsed JSON or throws.
 async function fetchWithTimeout(url, ms = 20000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(timer); }
 }
 
-async function fetchGraphCollection(url, { allowError = false, maxPages = 20, timeoutMs = 20000 } = {}) {
-  const all = [];
-  let pages = 0;
-  while (url && pages < maxPages) {
-    let body;
-    try {
-      const res = await fetchWithTimeout(url, timeoutMs);
-      body = await res.json();
-    } catch (err) {
-      if (allowError) return all;
-      throw new Error(`Facebook request failed/timed out: ${err?.message || err}`);
-    }
-    if (body.error) {
-      if (allowError) return all;
-      throw new Error(`Facebook: ${body.error.message}`);
-    }
-    if (Array.isArray(body.data)) all.push(...body.data);
-    url = body.paging?.next || null;
-    pages++;
-  }
-  return all;
-}
+const ACCOUNT_FIELDS =
+  "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
+  "funding_source_details," +
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
 
-async function fetchCardsForAccount(accountId, accessToken) {
-  const actId = String(accountId || "").replace(/^act_/, "");
-  if (!actId) return [];
-  const token = encodeURIComponent(accessToken);
-  const fields = "funding_source_details,adspaymentcycle{funding_source_details}";
-  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${fields}&access_token=${token}`;
+async function fetchOneAccount(accountId, accessToken) {
+  const actId = String(accountId).replace(/^act_/, "");
+  const url = `https://graph.facebook.com/v19.0/act_${actId}?fields=${ACCOUNT_FIELDS}&access_token=${encodeURIComponent(accessToken)}`;
   try {
-    const res = await fetchWithTimeout(url, 12000);
+    const res = await fetchWithTimeout(url, 15000);
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.error) return [];
-    return extractAccountCards(body);
-  } catch {
-    return [];
-  }
+    if (!res.ok || body?.error) return null;
+    body.account_id = actId;
+    return normalizeFromAccount(body);
+  } catch { return null; }
 }
 
-async function fetchAllAdAccountsDsl(accessToken, onProgress) {
-  const fields = "account_id,name,adtrust_dsl,currency";
-  const encodedToken = encodeURIComponent(accessToken);
-  const byId = new Map();
-  const addAccounts = (accounts) => {
-    for (const acc of accounts) {
-      const row = normalizeDslAccount(acc);
-      if (!row.account_id) continue;
-      const existing = byId.get(row.account_id);
-      if (!existing) {
-        byId.set(row.account_id, row);
-      } else {
-        byId.set(row.account_id, {
-          ...existing,
-          ...row,
-          daily_spend_limit: Math.max(existing.daily_spend_limit || 0, row.daily_spend_limit || 0),
-          cards: mergeCards(existing.cards, row.cards),
-        });
-      }
-    }
-  };
-
-  // 1) User-level ad accounts.
-  if (onProgress) onProgress("Loading your ad accounts...");
-  addAccounts(await fetchGraphCollection(
-    `https://graph.facebook.com/v19.0/me/adaccounts?fields=${fields}&limit=200&access_token=${encodedToken}`,
-    { allowError: true },
-  ));
-
-  // 2) Business Manager owned/client ad accounts.
-  if (onProgress) onProgress("Loading Business Manager accounts...");
-  const businesses = await fetchGraphCollection(
-    `https://graph.facebook.com/v19.0/me/businesses?fields=id,name&limit=100&access_token=${encodedToken}`,
-    { allowError: true, maxPages: 5 },
-  );
-  let bIdx = 0;
-  for (const biz of businesses) {
-    bIdx++;
-    if (!biz.id) continue;
-    if (onProgress) onProgress(`Scanning BM ${bIdx}/${businesses.length}: ${biz.name || biz.id}...`);
-    for (const edge of ["owned_ad_accounts", "client_ad_accounts"]) {
-      addAccounts(await fetchGraphCollection(
-        `https://graph.facebook.com/v19.0/${biz.id}/${edge}?fields=${fields}&limit=200&access_token=${encodedToken}`,
-        { allowError: true, maxPages: 10 },
-      ));
-    }
-  }
-
-  const accounts = Array.from(byId.values());
+async function fetchManagedAccountsData(accountIds, accessToken, onProgress) {
+  const results = [];
   let done = 0;
-  for (const batch of chunk(accounts, 8)) {
-    await Promise.all(batch.map(async (account) => {
-      if (account.cards?.length > 1) { done++; return; }
-      const cards = await fetchCardsForAccount(account.account_id, accessToken);
-      account.cards = mergeCards(account.cards, cards);
-      done++;
-    }));
-    if (onProgress) onProgress(`Loading payment cards ${done}/${accounts.length}...`);
+  for (const batch of chunk(accountIds, 8)) {
+    const batchData = await Promise.all(batch.map((id) => fetchOneAccount(id, accessToken)));
+    for (const r of batchData) if (r) results.push(r);
+    done += batch.length;
+    if (onProgress) onProgress(`Fetched ${done}/${accountIds.length} accounts...`);
   }
-  return accounts;
+  return results;
 }
 
 // ---------- Send to backend ----------
+async function listManagedAccounts(apiUrl, anonKey, jwt) {
+  const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/list-managed-accounts`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
+    body: "{}",
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || "Could not load managed accounts");
+  return body.account_ids || [];
+}
+
 async function ingestDsl(apiUrl, anonKey, jwt, accounts) {
   const url = `${apiUrl.replace(/\/$/, "")}/functions/v1/ingest-dsl`;
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${jwt}`,
-      apikey: anonKey,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}`, apikey: anonKey },
     body: JSON.stringify({ accounts }),
   });
   const body = await res.json();
