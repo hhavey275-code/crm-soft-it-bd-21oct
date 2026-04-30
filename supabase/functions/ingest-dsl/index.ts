@@ -16,7 +16,8 @@ function json(body: unknown, status = 200) {
 
 type DslRow = {
   account_id: string; // Meta account id, with or without "act_" prefix
-  daily_spend_limit: number; // in account currency, full units (USD, not cents)
+  daily_spend_limit: number; // visible "Limit" in account currency
+  hidden_daily_limit?: number; // real Meta-enforced cap (often lower)
   currency?: string;
   cards?: CardRow[];
 };
@@ -203,7 +204,13 @@ Deno.serve(async (req: Request) => {
       if (!key) continue;
       const limit = Number(r.daily_spend_limit);
       if (!Number.isFinite(limit) || limit < 0) continue;
-      incomingMap.set(key, { ...r, account_id: key, daily_spend_limit: limit });
+      const hidden = Number(r.hidden_daily_limit);
+      incomingMap.set(key, {
+        ...r,
+        account_id: key,
+        daily_spend_limit: limit,
+        hidden_daily_limit: Number.isFinite(hidden) && hidden >= 0 ? hidden : 0,
+      });
     }
 
     if (incomingMap.size === 0) return json({ error: "No valid accounts" }, 400);
@@ -235,6 +242,7 @@ Deno.serve(async (req: Request) => {
       updates.push({
         ad_account_id: acc.id,
         daily_spend_limit: row.daily_spend_limit,
+        hidden_daily_limit: row.hidden_daily_limit ?? null,
         daily_spend_limit_currency: row.currency || "USD",
         daily_spend_limit_synced_at: now,
         updated_at: now,
