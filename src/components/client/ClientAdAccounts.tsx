@@ -964,25 +964,7 @@ export function ClientAdAccounts() {
                         </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-start gap-1.5">
-                          <div className="min-w-0 flex-1">
-                            <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
-                            {(() => {
-                              const be = (billingExtras as any)[a.id];
-                              const dsl = Number(be?.hidden_daily_limit ?? be?.daily_spend_limit ?? 0);
-                              const cur = be?.daily_spend_limit_currency || "USD";
-                              return dsl > 0 ? (
-                                <div className="text-[10px] text-muted-foreground mt-1">Daily Limit: <span className="font-medium text-foreground">${dsl.toLocaleString()} {cur}</span></div>
-                              ) : (
-                                <div className="text-[10px] text-muted-foreground mt-1">Daily Limit: —</div>
-                              );
-                            })()}
-                          </div>
-                          <ExtensionSyncButton
-                            accountId={a.account_id}
-                            onSynced={() => { refetchInsights(); refetchBillingExtras(); }}
-                          />
-                        </div>
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell>
