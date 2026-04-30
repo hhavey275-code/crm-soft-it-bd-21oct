@@ -996,14 +996,18 @@ export function AdminAdAccounts() {
                       {ins?.updated_at && (
                         <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}</span>
                       )}
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-0.5">
+                        <ExtensionSyncButton
+                          accountId={a.account_id}
+                          onSynced={() => { refetchInsights(); }}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
                           disabled={singleRefreshingId === a.id}
                           onClick={() => refreshSingleMutation.mutate(a.id)}
-                          title="Refresh this account"
+                          title="Refresh from Meta API"
                         >
                           <RefreshCw className={cn("h-3 w-3", singleRefreshingId === a.id && "animate-spin")} />
                         </Button>
