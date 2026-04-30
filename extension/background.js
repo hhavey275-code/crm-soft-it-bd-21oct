@@ -59,6 +59,35 @@ async function openFbTab() {
   });
 }
 
+async function openBillingTab(accountId) {
+  const actId = String(accountId).replace(/^act_/, "");
+  return new Promise((resolve) => {
+    chrome.tabs.create(
+      { url: `https://business.facebook.com/billing_hub/accounts/details?asset_id=${actId}`, active: false },
+      (tab) => {
+        const listener = (tabId, info) => {
+          if (tabId === tab.id && info.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(listener);
+            setTimeout(() => resolve(tab), 4500);
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+      },
+    );
+  });
+}
+
+async function sendTabMessage(tabId, message, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, message);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, 1800));
+    }
+  }
+}
+
 async function extractFbAccessToken(tabId) {
   const [{ result } = {}] = await chrome.scripting.executeScript({
     target: { tabId },
@@ -160,7 +189,8 @@ async function fetchWithTimeout(url, ms = 20000) {
 const ACCOUNT_FIELDS =
   "account_id,name,currency,adtrust_dsl,min_daily_budget,balance,amount_spent,spend_cap," +
   "funding_source_details," +
-  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}";
+  "adspaymentcycle{funding_source_details,threshold_amount,amount_due}," +
+  "payment_methods";
 
 async function fetchOneAccount(accountId, accessToken) {
   const actId = String(accountId).replace(/^act_/, "");
