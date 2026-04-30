@@ -277,6 +277,14 @@
             payload: { accountId: snap.account_id, fundingSourceId: cardId, card },
           });
           if (!res?.ok) throw new Error(res?.error || "Failed");
+          if (res.pending_confirmation) {
+            btn.disabled = false;
+            btn.textContent = "Confirm in Meta";
+            btn.style.color = "#92400e";
+            btn.style.borderColor = "#f59e0b";
+            setStatus("Meta remove dialog/menu opened. Confirm removal on the page.", "info");
+            return;
+          }
           btn.style.color = "#15803d";
           btn.style.borderColor = "#15803d";
           btn.textContent = "Removed ✓";
