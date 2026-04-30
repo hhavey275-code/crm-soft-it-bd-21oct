@@ -565,22 +565,30 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Insights row */}
-              {ins && (
-                <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-muted/50 rounded-md p-1.5">
-                    <p className="text-[10px] text-muted-foreground">Today Spend</p>
-                    <p className="text-xs font-semibold">${Number(ins.today_spend ?? 0).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-muted/50 rounded-md p-1.5">
-                    <p className="text-[10px] text-muted-foreground">Yesterday</p>
-                    <p className="text-xs font-semibold">${Number(ins.yesterday_spend ?? 0).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-muted/50 rounded-md p-1.5">
-                    <p className="text-[10px] text-muted-foreground">Balance</p>
-                    <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
-                  </div>
+              <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                <div className="bg-muted/50 rounded-md p-1.5">
+                  <p className="text-[10px] text-muted-foreground">Today Spend</p>
+                  <p className="text-xs font-semibold">${Number(ins?.today_spend ?? 0).toLocaleString()}</p>
                 </div>
-              )}
+                <div className="bg-muted/50 rounded-md p-1.5">
+                  <p className="text-[10px] text-muted-foreground">Yesterday</p>
+                  <p className="text-xs font-semibold">${Number(ins?.yesterday_spend ?? 0).toLocaleString()}</p>
+                </div>
+                <div className="relative bg-muted/50 rounded-md p-1.5 pr-7">
+                  <p className="text-[10px] text-muted-foreground">Balance</p>
+                  <p className="text-xs font-semibold">${Number(ins?.balance ?? 0).toLocaleString()}</p>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute -top-1.5 -right-1.5 h-7 w-7 rounded-full border-primary/40 bg-background text-primary shadow-sm hover:bg-primary hover:text-primary-foreground"
+                    disabled={singleRefreshingId === acc.id}
+                    onClick={(e) => { e.stopPropagation(); refreshSingleMutation.mutate(acc.id); }}
+                    aria-label="Sync ad account"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", singleRefreshingId === acc.id && "animate-spin")} />
+                  </Button>
+                </div>
+              </div>
 
               {/* Card info */}
               {ins?.cards?.[0] && (
