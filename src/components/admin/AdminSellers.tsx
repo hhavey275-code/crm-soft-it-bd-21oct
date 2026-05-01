@@ -784,6 +784,7 @@ export function AdminSellers() {
         "Month": monthLabel(bucket),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
+        "Transaction ID": extractTrxId(t.description),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
