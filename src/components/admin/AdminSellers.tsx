@@ -142,7 +142,7 @@ async function fetchAllSellerTransactions(sellerId: string) {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await (supabase as any)
       .from("seller_transactions")
-      .select("*, bank_accounts(bank_name, account_number, account_name)")
+      .select("*, bank_accounts(bank_name, account_number, account_name), top_up_requests(payment_reference)")
       .eq("seller_id", sellerId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
