@@ -111,6 +111,37 @@ function getPresetRange(preset: DatePreset): { from: Date; to: Date } | null {
   }
 }
 
+function sortSellerTxnsAsc(txns: any[]) {
+  return [...(txns || [])].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function nextMonthBucket({ year, month }: MonthBucket): MonthBucket {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
+async function fetchAllSellerTransactions(sellerId: string) {
+  const pageSize = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await (supabase as any)
+      .from("seller_transactions")
+      .select("*, bank_accounts(bank_name, account_number, account_name)")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data as any[]) ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
 export function AdminSellers() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
