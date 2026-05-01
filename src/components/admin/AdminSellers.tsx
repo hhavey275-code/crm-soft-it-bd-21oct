@@ -1837,7 +1837,7 @@ export function AdminSellers() {
                             {renderEditableCell(t, "usdt_amount", `$${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "rate", Number(t.rate || 0).toFixed(1), "font-semibold")}
                             <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            {renderEditableCell(t, "description", t.description || "—", "max-w-[140px] truncate font-medium")}
+                            {renderEditableCell(t, "description", t.description || "—", "font-medium whitespace-nowrap text-xs")}
                             <td className="border border-border px-3 py-1.5 text-center font-medium">
                               {t.proof_url ? (
                                 <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">
