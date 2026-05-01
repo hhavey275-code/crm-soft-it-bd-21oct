@@ -161,7 +161,7 @@ export function AppSidebar() {
   ];
 
   // Keys to hide in tenant mode
-  const tenantHiddenKeys = ["agencies", "sellers", "spend-report"];
+  const tenantHiddenKeys = ["agencies", "sellers", "spend-report", "audit"];
 
   let navItems: typeof adminNavItems;
   if (isSuperAdmin) {
