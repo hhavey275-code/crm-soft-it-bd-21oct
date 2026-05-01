@@ -1495,6 +1495,29 @@ export function AdminSellers() {
             />
           </div>
 
+          {uncalculatedTxns.length > 0 && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  Not Calculated Payments ({uncalculatedTxns.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-2 space-y-2">
+                {uncalculatedTxns.slice(0, 10).map(({ txn, reason }: any) => (
+                  <div key={txn.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs">
+                    <span className="font-medium">{format(new Date(txn.created_at), "MMM d, yyyy HH:mm")} · {getTypeLabel(txn.type)}</span>
+                    <span className="text-muted-foreground">৳{Number(txn.bdt_amount || 0).toLocaleString()} · ${Number(txn.usdt_amount || 0).toLocaleString()} @ {Number(txn.rate || 0)}</span>
+                    <span className="font-semibold text-amber-700 dark:text-amber-300">{reason}</span>
+                  </div>
+                ))}
+                {uncalculatedTxns.length > 10 && (
+                  <p className="text-[11px] text-muted-foreground">Full list is included in Monthly Excel export.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Pending USDT Approvals — only seller-submitted USDT, not client/admin top-ups */}
           {sellerTxns?.some((t: any) => t.status === "pending" && t.type === "usdt_received") && (
             <Card className="border-amber-500/30 bg-amber-500/5">
