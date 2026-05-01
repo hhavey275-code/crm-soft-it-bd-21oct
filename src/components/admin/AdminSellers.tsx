@@ -1190,6 +1190,9 @@ export function AdminSellers() {
                <Button size="sm" variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
                  <Download className="h-4 w-4 mr-1" /> Monthly Excel
                </Button>
+                <Button size="sm" variant="outline" onClick={() => recalcClosedMonthsMutation.mutate()} disabled={recalcClosedMonthsMutation.isPending || !(closings || []).length}>
+                  <RefreshCw className="h-4 w-4 mr-1" /> Recalc Closed
+                </Button>
             </div>
           </div>
 
