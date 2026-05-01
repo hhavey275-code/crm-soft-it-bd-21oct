@@ -497,7 +497,7 @@ export function SellerDashboard() {
           ) : isMobile ? (
             <div className="divide-y divide-border/50">
               {filtered.map((t: any) => {
-                const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                const convertedBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
                 const typeColors: Record<string, string> = {
                   bdt_payment: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
                   usdt_received: "text-sky-600 dark:text-sky-400 bg-sky-500/10",
@@ -657,7 +657,7 @@ export function SellerDashboard() {
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {filtered.map((t: any) => {
-                    const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                    const convertedBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
                     const typeColors: Record<string, string> = {
                       bdt_payment: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
                       usdt_received: "text-sky-600 dark:text-sky-400 bg-sky-500/10",
