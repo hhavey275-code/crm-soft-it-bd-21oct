@@ -599,9 +599,6 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // Filter-bound totals (for the "filtered" cards / table footer)
-  const dueAdvanceFiltered = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
-
   // Lifetime Due/Advance — ALWAYS computed from the full ledger, independent
   // of typeFilter / bankFilter / datePreset. This is what the All-Time hero
   // card must show so changing a filter never changes the headline balance.
