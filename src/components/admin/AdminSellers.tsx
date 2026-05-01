@@ -1701,7 +1701,7 @@ export function AdminSellers() {
                         );
                       })()}
                       <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
-                        <span className="text-muted-foreground truncate max-w-[60%]">{t.description || "—"}</span>
+                        <span className="text-muted-foreground break-all max-w-[70%]">{t.description || "—"}</span>
                         {t.proof_url ? (
                           <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
                             <ImageIcon className="h-3 w-3" /> View
