@@ -2203,10 +2203,15 @@ export function AdminSellers() {
             <DialogTitle>Monthly Excel Export</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm cursor-pointer">
+              <Checkbox checked={exportAllMonths} onCheckedChange={(v) => setExportAllMonths(Boolean(v))} />
+              <span className="font-medium">Export all months, month-to-month sheets</span>
+            </label>
             <div>
               <Label className="text-xs">Month</Label>
               <Select
                 value={`${exportBucket.year}-${exportBucket.month}`}
+                disabled={exportAllMonths}
                 onValueChange={(v) => {
                   const [y, m] = v.split("-").map(Number);
                   setExportBucket({ year: y, month: m });
