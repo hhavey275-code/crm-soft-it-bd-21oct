@@ -63,13 +63,13 @@ export function getSellerTransactionSkipReason(t: any): string | null {
   const status = (t.status || "approved").toLowerCase();
   if (status !== "approved") return `Status is ${status}`;
   if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-    return Number(t.bdt_amount || 0) > 0 ? null : "BDT amount is missing or zero";
+    return Number(t.bdt_amount || 0) !== 0 ? null : "BDT amount is missing or zero";
   }
   if (t.type === "withdraw") {
-    return Number(t.bdt_amount || 0) > 0 ? null : "Withdraw amount is missing or zero";
+    return Number(t.bdt_amount || 0) !== 0 ? null : "Withdraw amount is missing or zero";
   }
   if (t.type === "usdt_received") {
-    if (Number(t.usdt_amount || 0) <= 0) return "USDT amount is missing or zero";
+    if (Number(t.usdt_amount || 0) === 0) return "USDT amount is missing or zero";
     if (Number(t.rate || 0) <= 0) return "USDT rate is missing or zero";
     return null;
   }
@@ -104,9 +104,9 @@ export function computeDueAdvanceRunning(transactions: any[]): Map<string, numbe
       running += Number(t.bdt_amount || 0);
     } else if (t.type === "usdt_received") {
       // USDT given to client — convert to BDT cost and subtract
-      running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      running -= Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
     } else if (t.type === "withdraw") {
-      running -= Number(t.bdt_amount || 0);
+      running -= Math.abs(Number(t.bdt_amount || 0));
     }
 
     result.set(t.id, running);
@@ -136,10 +136,10 @@ export function computeTransactionDelta(t: any): number {
     return Number(t.bdt_amount || 0);
   }
   if (t.type === "withdraw") {
-    return -Number(t.bdt_amount || 0);
+    return -Math.abs(Number(t.bdt_amount || 0));
   }
   if (t.type === "usdt_received") {
-    return -(Number(t.usdt_amount || 0) * Number(t.rate || 0));
+    return -(Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0));
   }
   return 0;
 }

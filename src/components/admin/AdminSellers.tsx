@@ -572,11 +572,11 @@ export function AdminSellers() {
         if (!isCountedSellerTransaction(t)) return acc;
         if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
-          acc.totalUsdt += Number(t.usdt_amount || 0);
-          acc.totalConvertedBdt += Number(t.usdt_amount || 0) * Number(t.rate || 0);
+          acc.totalUsdt += Math.abs(Number(t.usdt_amount || 0));
+          acc.totalConvertedBdt += Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
         }
         if (t.type === "client_topup") acc.totalClientBdt += Number(t.bdt_amount || 0);
-        if (t.type === "withdraw") acc.totalWithdrawn += Number(t.bdt_amount || 0);
+        if (t.type === "withdraw") acc.totalWithdrawn += Math.abs(Number(t.bdt_amount || 0));
         return acc;
       },
       { totalBdtPaid: 0, totalUsdt: 0, totalConvertedBdt: 0, totalClientBdt: 0, totalWithdrawn: 0 }
@@ -755,7 +755,7 @@ export function AdminSellers() {
     let skippedRows = 0;
 
     const buildRow = (t: any, running: Map<string, number>, bucket: MonthBucket): Record<string, any> => {
-      const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
       const skipReason = getSellerTransactionSkipReason(t) || "";
       if (skipReason) skippedRows += 1;
       const full: Record<ExportCol, any> = {
@@ -838,7 +838,7 @@ export function AdminSellers() {
       return;
     }
     const rows: any[] = filteredTxns.map((t: any) => {
-      const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
       return {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
@@ -1558,7 +1558,7 @@ export function AdminSellers() {
               </CardHeader>
               <CardContent className="p-4 pt-2 space-y-2">
                 {sellerTxns.filter((t: any) => t.status === "pending" && t.type === "usdt_received").map((t: any) => {
-                  const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                  const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
                   return (
                     <div key={t.id} className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-card">
                       <div className="flex-1 min-w-[200px]">
@@ -1611,7 +1611,7 @@ export function AdminSellers() {
             /* Mobile: Card-based layout */
             <div className="space-y-2 pb-20">
               {filteredTxns?.map((t: any) => {
-                const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                const convertedBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
                 const typeLabel = t.type === "usdt_received" ? "USDT Given" : t.type === "bdt_payment" ? "BDT Payment" : t.type === "withdraw" ? "Withdraw" : "Client Top-Up";
                 const typeColor = t.type === "usdt_received" ? "text-sky-600 dark:text-sky-400" : t.type === "bdt_payment" ? "text-emerald-600 dark:text-emerald-400" : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
                 const typeIcon = t.type === "usdt_received" ? <ArrowUpRight className="h-3.5 w-3.5" /> : t.type === "bdt_payment" ? <ArrowDownLeft className="h-3.5 w-3.5" /> : t.type === "withdraw" ? <RefreshCw className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />;
@@ -1772,7 +1772,7 @@ export function AdminSellers() {
                     </thead>
                     <tbody>
                       {filteredTxns?.map((t: any) => {
-                        const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                        const convertedBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
                         const typeLabel = t.type === "usdt_received" ? "USDT Given" : t.type === "bdt_payment" ? "BDT Payment" : t.type === "withdraw" ? "Withdraw" : "Client Top-Up";
                         const typeColor = t.type === "usdt_received" ? "text-sky-600 dark:text-sky-400" : t.type === "bdt_payment" ? "text-emerald-600 dark:text-emerald-400" : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
                         return (

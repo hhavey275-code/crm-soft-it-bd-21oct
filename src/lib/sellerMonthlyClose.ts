@@ -78,9 +78,9 @@ export function aggregateMonth(txns: any[], bucket: MonthBucket): MonthAggregate
     if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.bdtIn += Number(t.bdt_amount || 0);
     else if (t.type === "client_topup") acc.clientBdt += Number(t.bdt_amount || 0);
     else if (t.type === "usdt_received") {
-      acc.usdtGiven += Number(t.usdt_amount || 0);
-      acc.convertedBdt += Number(t.usdt_amount || 0) * Number(t.rate || 0);
-    } else if (t.type === "withdraw") acc.withdrawBdt += Number(t.bdt_amount || 0);
+      acc.usdtGiven += Math.abs(Number(t.usdt_amount || 0));
+      acc.convertedBdt += Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
+    } else if (t.type === "withdraw") acc.withdrawBdt += Math.abs(Number(t.bdt_amount || 0));
   }
   acc.delta = acc.bdtIn + acc.clientBdt - acc.convertedBdt - acc.withdrawBdt;
   return acc;
