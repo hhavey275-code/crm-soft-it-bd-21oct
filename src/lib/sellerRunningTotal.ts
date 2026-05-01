@@ -58,6 +58,28 @@ export function computeRunningTotalsByBank(transactions: any[]): Map<string, num
  * Single global running Due/Advance balance per seller.
  * Positive = Advance, Negative = Due.
  */
+export function getSellerTransactionSkipReason(t: any): string | null {
+  if (!t) return "Missing transaction";
+  const status = (t.status || "approved").toLowerCase();
+  if (status !== "approved") return `Status is ${status}`;
+  if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+    return Number(t.bdt_amount || 0) > 0 ? null : "BDT amount is missing or zero";
+  }
+  if (t.type === "withdraw") {
+    return Number(t.bdt_amount || 0) > 0 ? null : "Withdraw amount is missing or zero";
+  }
+  if (t.type === "usdt_received") {
+    if (Number(t.usdt_amount || 0) <= 0) return "USDT amount is missing or zero";
+    if (Number(t.rate || 0) <= 0) return "USDT rate is missing or zero";
+    return null;
+  }
+  return `Unknown type: ${t.type || "blank"}`;
+}
+
+export function isCountedSellerTransaction(t: any): boolean {
+  return getSellerTransactionSkipReason(t) === null;
+}
+
 export function computeDueAdvanceRunning(transactions: any[]): Map<string, number> {
   const result = new Map<string, number>();
   if (!transactions || transactions.length === 0) return result;
@@ -73,9 +95,7 @@ export function computeDueAdvanceRunning(transactions: any[]): Map<string, numbe
   let running = 0;
 
   for (const t of sorted) {
-    const status = (t.status || "approved").toLowerCase();
-
-    if (status !== "approved") {
+    if (!isCountedSellerTransaction(t)) {
       result.set(t.id, running);
       continue;
     }
