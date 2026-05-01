@@ -860,43 +860,194 @@ export function AdminSellers() {
       toast.error("No transactions to export");
       return;
     }
-    const rows: any[] = filteredTxns.map((t: any) => {
-      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-      return {
-        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
-        "Type": getTypeLabel(t.type),
-        "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
-        "BDT Amount": Number(t.bdt_amount || 0),
-        "USDT Amount": Number(t.usdt_amount || 0),
-        "Rate": Number(t.rate || 0),
-        "Converted (BDT)": Number(convBdt.toFixed(2)),
-        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
-        "Account Name": t.bank_accounts?.account_name || "",
-        "Due/Advance (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
-        "Description": t.description || "",
-        "Proof URL": t.proof_url || "",
-      };
+    // ── Build styled ledger sheet matching the user's design ──
+    // Columns: Date & time | Payment | USDT | Rate | Converted BDT | Total Due/Adv
+    // Sort transactions ascending by date so the ledger reads top-to-bottom
+    const sorted = [...filteredTxns].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      if (ta !== tb) return ta - tb;
+      return String(a.id).localeCompare(String(b.id));
     });
-    rows.push({
-      "Date": "", "Type": "TOTALS", "Status": "",
-      "Transaction ID": "",
-      "BDT Amount": sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt,
-      "USDT Amount": sellerTotals.totalUsdt,
-      "Rate": 0,
-      "Converted (BDT)": Number(sellerTotals.totalConvertedBdt.toFixed(2)),
-      "Bank": `Withdrawn: BDT ${sellerTotals.totalWithdrawn.toLocaleString()}`,
-      "Account Name": "",
-      "Due/Advance (BDT)": "",
-      "Description": dueAdvance >= 0 ? `Advance: BDT ${dueAdvance.toFixed(2)}` : `Due: BDT ${Math.abs(dueAdvance).toFixed(2)}`,
-      "Proof URL": "",
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+
+    // Identify the carry-forward / opening row (the first txn whose description mentions carry forward)
+    const openingTxn = sorted.find((t: any) =>
+      typeof t.description === "string" && /carry forward|opening balance/i.test(t.description)
+    );
+    const dataRows = openingTxn ? sorted.filter((t: any) => t.id !== openingTxn.id) : sorted;
+    const openingBalance = openingTxn ? computeTransactionDelta(openingTxn) : 0;
+
+    // Aggregate totals from non-opening rows only
+    let totalPayment = 0;
+    let totalUsdt = 0;
+    let totalConvertedBdt = 0;
+    for (const t of dataRows) {
+      if ((t.status || "approved").toLowerCase() !== "approved") continue;
+      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+        totalPayment += Number(t.bdt_amount || 0);
+      } else if (t.type === "usdt_received") {
+        totalUsdt += Math.abs(Number(t.usdt_amount || 0));
+        totalConvertedBdt += Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
+      }
+    }
+    const finalBalance = openingBalance + totalPayment - totalConvertedBdt;
+
+    // Style helpers
+    const border = {
+      top: { style: "thin", color: { rgb: "999999" } },
+      bottom: { style: "thin", color: { rgb: "999999" } },
+      left: { style: "thin", color: { rgb: "999999" } },
+      right: { style: "thin", color: { rgb: "999999" } },
+    };
+    const headerStyle = {
+      font: { bold: true, sz: 12, color: { rgb: "000000" } },
+      fill: { fgColor: { rgb: "D9E1F2" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border,
+    };
+    const headerYellow = {
+      ...headerStyle,
+      font: { bold: true, sz: 12, color: { rgb: "1F4E78" } },
+      fill: { fgColor: { rgb: "FFFF00" } },
+    };
+    const subLabelStyle = {
+      font: { italic: true, sz: 10, color: { rgb: "555555" } },
+      alignment: { horizontal: "center" },
+    };
+    const totalRedStyle = {
+      font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "C00000" } },
+      alignment: { horizontal: "right", vertical: "center" },
+      numFmt: '#,##0.00',
+      border,
+    };
+    const finalBalanceStyle = {
+      font: { bold: true, sz: 14, color: { rgb: "000000" } },
+      alignment: { horizontal: "right", vertical: "center" },
+      numFmt: '#,##0.00',
+    };
+    const openingYellowStyle = {
+      font: { bold: true, sz: 11, color: { rgb: "000000" } },
+      fill: { fgColor: { rgb: "FFFF00" } },
+      alignment: { horizontal: "right", vertical: "center" },
+      numFmt: '#,##0.00',
+      border,
+    };
+    const openingLabelStyle = {
+      font: { bold: true, sz: 11, color: { rgb: "000000" } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border,
+    };
+    const dataNumStyle = {
+      alignment: { horizontal: "right", vertical: "center" },
+      numFmt: '#,##0.00',
+      border,
+    };
+    const dataTextStyle = {
+      alignment: { horizontal: "left", vertical: "center" },
+      border,
+    };
+
+    // Build sheet rows (AOA)
+    // Row 1: Headers
+    // Row 2: blank | blank | blank | blank | blank | finalBalance value
+    // Row 3: blank | blank | "Total usdt" | blank | "total Taka" | blank
+    // Row 4: blank | totalPayment | totalUsdt | blank | totalConvertedBdt | blank   (red)
+    // Row 5: "previous month closing balance" | openingBalance | blank | blank | blank | blank   (yellow)
+    // Row 6+: transactions
+    const aoa: any[][] = [];
+
+    aoa.push([
+      "date and time", "payment", "usdt", "Rate", "Conveted BDT", "total due/adv",
+    ]);
+    aoa.push(["", "", "", "", "", finalBalance]);
+    aoa.push(["", "", "Total usdt", "", "total Taka", ""]);
+    aoa.push(["", totalPayment, totalUsdt, "", totalConvertedBdt, ""]);
+    aoa.push(["previous month closing balance", openingBalance, "", "", "", ""]);
+
+    // Transaction rows + running balance
+    let running = openingBalance;
+    for (const t of dataRows) {
+      const isApproved = (t.status || "approved").toLowerCase() === "approved";
+      const dt = format(new Date(t.created_at), "dd MMM hh:mm a").toLowerCase();
+      let payment: any = "";
+      let usdt: any = "";
+      let rate: any = "";
+      let convBdt: any = "";
+      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+        payment = Number(t.bdt_amount || 0);
+        if (isApproved) running += Number(t.bdt_amount || 0);
+      } else if (t.type === "usdt_received") {
+        usdt = Number(t.usdt_amount || 0);
+        rate = Number(t.rate || 0);
+        convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
+        if (isApproved) running -= convBdt;
+      } else if (t.type === "withdraw") {
+        payment = -Math.abs(Number(t.bdt_amount || 0));
+        if (isApproved) running -= Math.abs(Number(t.bdt_amount || 0));
+      }
+      aoa.push([dt, payment, usdt, rate, convBdt, running]);
+    }
+
+    const ws: any = XLSXStyle.utils.aoa_to_sheet(aoa);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 28 }, // date and time / opening label
+      { wch: 18 }, // payment
+      { wch: 14 }, // usdt
+      { wch: 8 },  // rate
+      { wch: 16 }, // converted bdt
+      { wch: 18 }, // total due/adv
+    ];
+    ws["!rows"] = [
+      { hpt: 28 }, // headers
+      { hpt: 24 }, // final balance
+      { hpt: 18 }, // sub-labels
+      { hpt: 24 }, // red totals
+      { hpt: 22 }, // opening row
+    ];
+
+    // Apply styles
+    const setStyle = (addr: string, style: any) => {
+      if (!ws[addr]) ws[addr] = { t: "s", v: "" };
+      ws[addr].s = style;
+    };
+
+    // Row 1: headers (col F yellow)
+    ["A1", "B1", "C1", "D1", "E1"].forEach((a) => setStyle(a, headerStyle));
+    setStyle("F1", headerYellow);
+
+    // Row 2: final balance in F2
+    setStyle("F2", finalBalanceStyle);
+
+    // Row 3: sub-labels
+    setStyle("C3", subLabelStyle);
+    setStyle("E3", subLabelStyle);
+
+    // Row 4: red totals
+    ["B4", "C4", "E4"].forEach((a) => setStyle(a, totalRedStyle));
+
+    // Row 5: opening (yellow background)
+    setStyle("A5", openingLabelStyle);
+    setStyle("B5", openingYellowStyle);
+    ["C5", "D5", "E5", "F5"].forEach((a) => setStyle(a, { fill: { fgColor: { rgb: "FFFF00" } }, border }));
+
+    // Data rows: rows 6 .. 6 + dataRows.length - 1
+    for (let i = 0; i < dataRows.length; i++) {
+      const r = 6 + i;
+      setStyle(`A${r}`, dataTextStyle);
+      ["B", "C", "D", "E", "F"].forEach((col) => setStyle(`${col}${r}`, dataNumStyle));
+    }
+
+    // Update sheet range to cover all styled cells
+    const lastRow = 5 + dataRows.length;
+    ws["!ref"] = `A1:F${Math.max(lastRow, 5)}`;
+
+    const wb = XLSXStyle.utils.book_new();
+    XLSXStyle.utils.book_append_sheet(wb, ws, "Ledger");
     const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    XLSX.writeFile(wb, `${sellerSlug}-ledger-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`);
+    XLSXStyle.writeFile(wb, `${sellerSlug}-ledger-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`);
     toast.success("Exported to Excel");
   };
 
