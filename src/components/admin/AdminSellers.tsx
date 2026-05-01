@@ -1783,20 +1783,20 @@ export function AdminSellers() {
             <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[13px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
+                  <table className="w-full text-[12px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
                     <thead>
                       <tr className="bg-muted/60">
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Date</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Type</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Account</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Payment (BDT)</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">TrxID / Note</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-primary whitespace-nowrap">Due/Advance (৳)</th>
-                        <th className="border border-border px-2 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap w-10"></th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Date</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Type</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Account</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">BDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Conv. BDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground">TrxID / Note</th>
+                        <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-primary whitespace-nowrap">Due/Adv (৳)</th>
+                        <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap w-8"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1806,9 +1806,9 @@ export function AdminSellers() {
                         const typeColor = t.type === "usdt_received" ? "text-sky-600 dark:text-sky-400" : t.type === "bdt_payment" ? "text-emerald-600 dark:text-emerald-400" : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
                         return (
                           <tr key={t.id} className="hover:bg-muted/30 group">
-                            <td className="border border-border px-3 py-1.5 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
-                            <td className={cn("border border-border px-3 py-1.5 text-center font-bold", typeColor)}>{typeLabel}</td>
-                            <td className="border border-border px-3 py-1.5 text-center text-xs whitespace-nowrap">
+                            <td className="border border-border px-1.5 py-1 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d")}</td>
+                            <td className={cn("border border-border px-1.5 py-1 text-center font-bold whitespace-nowrap", typeColor)}>{typeLabel}</td>
+                            <td className="border border-border px-1.5 py-1 text-center text-[11px] whitespace-nowrap">
                               {t.bank_accounts ? (
                                 <div className="leading-tight">
                                   <div className="font-medium">{t.bank_accounts.bank_name} — {t.bank_accounts.account_number}</div>
