@@ -60,6 +60,7 @@ const adminNavItems = [
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
   { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
+  { title: "Accounts Audit", url: "/audit", icon: Shield, key: "audit" },
   { title: "Agencies", url: "/agencies", icon: Building2, key: "agencies" },
   { title: "Spend Report", url: "/client-spend-report", icon: Receipt, key: "spend-report" },
   { title: "Tenants", url: "/tenants", icon: Building2, key: "tenants" },
@@ -160,7 +161,7 @@ export function AppSidebar() {
   ];
 
   // Keys to hide in tenant mode
-  const tenantHiddenKeys = ["agencies", "sellers", "spend-report"];
+  const tenantHiddenKeys = ["agencies", "sellers", "spend-report", "audit"];
 
   let navItems: typeof adminNavItems;
   if (isSuperAdmin) {
