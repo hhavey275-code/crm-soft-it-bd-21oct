@@ -1089,7 +1089,7 @@ export function AdminSellers() {
     }
     return (
       <td
-        className={cn("border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors", className)}
+        className={cn("border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors", className)}
         onClick={() => startEdit(txn.id, field, field === "description" ? (txn[field] || "") : (txn[field] || 0))}
         title="Click to edit"
       >
@@ -1783,20 +1783,20 @@ export function AdminSellers() {
             <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[13px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
+                  <table className="w-full text-[12px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
                     <thead>
                       <tr className="bg-muted/60">
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Date</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Type</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Account</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Payment (BDT)</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">TrxID / Note</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
-                        <th className="border border-border px-3 py-2 text-center font-semibold text-primary whitespace-nowrap">Due/Advance (৳)</th>
-                        <th className="border border-border px-2 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap w-10"></th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Date</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Type</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Account</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">BDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Conv. BDT</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground">TrxID / Note</th>
+                        <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
+                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-primary whitespace-nowrap">Due/Adv (৳)</th>
+                        <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap w-8"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1806,9 +1806,9 @@ export function AdminSellers() {
                         const typeColor = t.type === "usdt_received" ? "text-sky-600 dark:text-sky-400" : t.type === "bdt_payment" ? "text-emerald-600 dark:text-emerald-400" : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
                         return (
                           <tr key={t.id} className="hover:bg-muted/30 group">
-                            <td className="border border-border px-3 py-1.5 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
-                            <td className={cn("border border-border px-3 py-1.5 text-center font-bold", typeColor)}>{typeLabel}</td>
-                            <td className="border border-border px-3 py-1.5 text-center text-xs whitespace-nowrap">
+                            <td className="border border-border px-1.5 py-1 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d")}</td>
+                            <td className={cn("border border-border px-1.5 py-1 text-center font-bold whitespace-nowrap", typeColor)}>{typeLabel}</td>
+                            <td className="border border-border px-1.5 py-1 text-center text-[11px] whitespace-nowrap">
                               {t.bank_accounts ? (
                                 <div className="leading-tight">
                                   <div className="font-medium">{t.bank_accounts.bank_name} — {t.bank_accounts.account_number}</div>
@@ -1841,27 +1841,27 @@ export function AdminSellers() {
                             {renderEditableCell(t, "bdt_amount", `৳${Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "usdt_amount", `$${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "rate", Number(t.rate || 0).toFixed(1), "font-semibold")}
-                            <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="border border-border px-1.5 py-1 text-center font-semibold whitespace-nowrap">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 0 })}</td>
                             {(() => {
                               const trxRef = t.top_up_requests?.payment_reference;
                               if (!trxRef || editingCell?.id === t.id && editingCell?.field === "description") {
-                                return renderEditableCell(t, "description", t.description || "—", "font-medium whitespace-nowrap text-xs");
+                                return renderEditableCell(t, "description", t.description || "—", "font-medium text-[11px]");
                               }
                               return (
                                 <td
-                                  className="border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-xs"
+                                  className="border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-[11px]"
                                   onClick={() => startEdit(t.id, "description", t.description || "")}
                                   title="Click to edit"
                                 >
-                                  <div className="whitespace-nowrap">{t.description || "—"}</div>
-                                  <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {trxRef}</div>
+                                  <div className="leading-tight">{t.description || "—"}</div>
+                                  <div className="text-[10px] font-mono text-primary mt-0.5 break-all">TrxID: {trxRef}</div>
                                 </td>
                               );
                             })()}
-                            <td className="border border-border px-3 py-1.5 text-center font-medium">
+                            <td className="border border-border px-1 py-1 text-center font-medium">
                               {t.proof_url ? (
                                 <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">
-                                  <ImageIcon className="h-3.5 w-3.5" /> View
+                                  <ImageIcon className="h-3.5 w-3.5" />
                                 </button>
                               ) : "—"}
                             </td>
@@ -1870,7 +1870,7 @@ export function AdminSellers() {
                               const isPending = (t.status || "approved").toLowerCase() !== "approved";
                               return (
                                 <td className={cn(
-                                  "border border-border px-3 py-1.5 text-right font-extrabold tabular-nums whitespace-nowrap",
+                                  "border border-border px-1.5 py-1 text-right font-extrabold tabular-nums whitespace-nowrap",
                                   isPending ? "text-muted-foreground/60 italic" :
                                     da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                                 )}>
