@@ -184,10 +184,10 @@ export function AdminSellers() {
   const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const [exportAllMonths, setExportAllMonths] = useState(true);
   const ALL_EXPORT_COLS = [
-    "Date","Month","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Change (BDT)","Due/Advance (BDT)","Description","Proof URL","Not Calculated Reason",
+    "Date","Month","Type","Status","Transaction ID","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Change (BDT)","Due/Advance (BDT)","Description","Proof URL","Not Calculated Reason",
   ] as const;
   type ExportCol = typeof ALL_EXPORT_COLS[number];
-  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","Month","Type","BDT Amount","USDT Amount","Rate","Change (BDT)","Due/Advance (BDT)","Not Calculated Reason"]);
+  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","Month","Type","Transaction ID","BDT Amount","USDT Amount","Rate","Change (BDT)","Due/Advance (BDT)","Not Calculated Reason"]);
 
   // Inline edit states
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
