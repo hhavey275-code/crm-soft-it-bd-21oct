@@ -1793,7 +1793,7 @@ export function AdminSellers() {
                         <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
                         <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
                         <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Conv. BDT</th>
-                        <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-muted-foreground">TrxID / Note</th>
+                        <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground w-[150px] max-w-[150px]">TrxID / Note</th>
                         <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
                         <th className="border border-border px-1.5 py-1.5 text-center font-semibold text-primary whitespace-nowrap">Due/Adv (৳)</th>
                         <th className="border border-border px-1 py-1.5 text-center font-semibold text-muted-foreground whitespace-nowrap w-8"></th>
