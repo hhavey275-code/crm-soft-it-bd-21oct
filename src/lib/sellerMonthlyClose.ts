@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { computeTransactionDelta, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 
 export type MonthBucket = { year: number; month: number };
 
@@ -51,14 +52,27 @@ export function monthLabel({ year, month }: MonthBucket): string {
   return d.toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
+function compareMonth(a: MonthBucket, b: MonthBucket): number {
+  return (a.year - b.year) || (a.month - b.month);
+}
+
+export function computeLedgerBalanceBefore(txns: any[], bucket: MonthBucket): number {
+  let running = 0;
+  for (const t of txns || []) {
+    if (compareMonth(getMonthBucket(t.created_at), bucket) < 0 && isCountedSellerTransaction(t)) {
+      running += computeTransactionDelta(t);
+    }
+  }
+  return running;
+}
+
 /** Aggregate seller transactions for a single month (approved only). */
 export function aggregateMonth(txns: any[], bucket: MonthBucket): MonthAggregate {
   const acc: MonthAggregate = {
     bdtIn: 0, clientBdt: 0, usdtGiven: 0, convertedBdt: 0, withdrawBdt: 0, delta: 0,
   };
   for (const t of txns) {
-    const status = (t.status || "approved").toLowerCase();
-    if (status !== "approved") continue;
+    if (!isCountedSellerTransaction(t)) continue;
     const b = getMonthBucket(t.created_at);
     if (!isSameMonth(b, bucket)) continue;
     if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.bdtIn += Number(t.bdt_amount || 0);
