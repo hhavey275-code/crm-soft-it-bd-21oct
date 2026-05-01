@@ -331,7 +331,7 @@ export function AdminTopUp() {
                 .single();
               if (bankRow?.seller_id) {
                 // Insert ledger entry (idempotent: unique index on tenant_payment_id)
-                const { error: ledgerErr } = await (supabase as any)
+                const { data: insertedRow, error: ledgerErr } = await (supabase as any)
                   .from("seller_transactions")
                   .insert({
                     seller_id: bankRow.seller_id,
@@ -347,9 +347,21 @@ export function AdminTopUp() {
                     reviewed_by: user?.id,
                     reviewed_at: new Date().toISOString(),
                     entry_by_name: `Tenant: ${tenant?.name || "Unknown"}`,
-                  });
+                  })
+                  .select("id")
+                  .maybeSingle();
                 if (ledgerErr && !String(ledgerErr.message || "").toLowerCase().includes("duplicate")) {
                   console.error("Tenant → seller ledger insert failed:", ledgerErr);
+                }
+                // If duplicate, look up the existing row so we can still pass its id
+                let sellerTxnId = insertedRow?.id || null;
+                if (!sellerTxnId) {
+                  const { data: existingRow } = await (supabase as any)
+                    .from("seller_transactions")
+                    .select("id")
+                    .eq("tenant_payment_id", id)
+                    .maybeSingle();
+                  sellerTxnId = existingRow?.id || null;
                 }
 
                 // Forward to Telegram with running Total line (uses computeDueAdvance
@@ -358,6 +370,8 @@ export function AdminTopUp() {
                   try {
                     await supabase.functions.invoke("forward-seller-proof", {
                       body: {
+                        seller_transaction_id: sellerTxnId,
+                        payment_kind: "bdt_payment",
                         proof_url: tenantProofUrl,
                         seller_name: `Tenant: ${tenant?.name || "Unknown"}`,
                         seller_id: bankRow.seller_id,
