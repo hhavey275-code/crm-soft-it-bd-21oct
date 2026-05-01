@@ -103,18 +103,11 @@ export function computeRunningWithOpening(monthTxns: any[], opening: number): Ma
   });
   let running = opening;
   for (const t of sorted) {
-    const status = (t.status || "approved").toLowerCase();
-    if (status !== "approved") {
+    if (!isCountedSellerTransaction(t)) {
       result.set(t.id, running);
       continue;
     }
-    if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-      running += Number(t.bdt_amount || 0);
-    } else if (t.type === "usdt_received") {
-      running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-    } else if (t.type === "withdraw") {
-      running -= Number(t.bdt_amount || 0);
-    }
+    running += computeTransactionDelta(t);
     result.set(t.id, running);
   }
   return result;
