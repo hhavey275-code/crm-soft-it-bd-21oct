@@ -24,6 +24,7 @@ import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdt
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, getSellerTransactionSkipReason, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
+import XLSXStyle from "xlsx-js-style";
 import {
   getMonthBucket,
   isSameMonth,
