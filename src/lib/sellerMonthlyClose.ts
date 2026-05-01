@@ -136,13 +136,6 @@ export async function listClosings(sellerId: string): Promise<MonthlyClosing[]> 
   return (data as MonthlyClosing[]) ?? [];
 }
 
-/** Resolve opening balance for the given month: previous month's closing, or 0. */
-export async function getOpeningFor(sellerId: string, bucket: MonthBucket): Promise<number> {
-  const prev = prevMonth(bucket);
-  const rec = await getMonthlyClosing(sellerId, prev);
-  return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
-}
-
 /** Close (or re-close) a month: aggregate, compute closing, upsert row. */
 export async function closeMonth(params: {
   sellerId: string;
@@ -152,7 +145,7 @@ export async function closeMonth(params: {
   note?: string;
 }): Promise<MonthlyClosing> {
   const { sellerId, bucket, txns, closedBy, note } = params;
-  const opening = await getOpeningFor(sellerId, bucket);
+  const opening = computeLedgerBalanceBefore(txns, bucket);
   const agg = aggregateMonth(txns, bucket);
   const closing = opening + agg.delta;
 
