@@ -158,7 +158,7 @@ export async function runSellerAudit(): Promise<AuditReport> {
       user_name: profile?.full_name || profile?.email || null,
       bdt_amount: Number(tr.bdt_amount || 0),
       amount_usd: Number(tr.amount || 0),
-      bank_account_id: tr.bank_account_id,
+      bank_account_id: tr.bank_account_id || "",
       bank_name: bank?.bank_name || null,
       seller_id: bank.seller_id,
       seller_name: sellerNameById.get(bank.seller_id) || null,
