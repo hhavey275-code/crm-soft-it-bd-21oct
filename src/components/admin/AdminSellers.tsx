@@ -142,7 +142,7 @@ async function fetchAllSellerTransactions(sellerId: string) {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await (supabase as any)
       .from("seller_transactions")
-      .select("*, bank_accounts(bank_name, account_number, account_name)")
+      .select("*, bank_accounts(bank_name, account_number, account_name), top_up_requests(payment_reference)")
       .eq("seller_id", sellerId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -784,7 +784,7 @@ export function AdminSellers() {
         "Month": monthLabel(bucket),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": extractTrxId(t.description),
+        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -865,7 +865,7 @@ export function AdminSellers() {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": extractTrxId(t.description),
+        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -1701,7 +1701,12 @@ export function AdminSellers() {
                         );
                       })()}
                       <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
-                        <span className="text-muted-foreground break-all max-w-[70%]">{t.description || "—"}</span>
+                        <div className="text-muted-foreground break-all max-w-[70%] space-y-0.5">
+                          <div>{t.description || "—"}</div>
+                          {t.top_up_requests?.payment_reference && (
+                            <div className="text-[10px] font-mono text-primary">TrxID: {t.top_up_requests.payment_reference}</div>
+                          )}
+                        </div>
                         {t.proof_url ? (
                           <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
                             <ImageIcon className="h-3 w-3" /> View
@@ -1837,7 +1842,22 @@ export function AdminSellers() {
                             {renderEditableCell(t, "usdt_amount", `$${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "rate", Number(t.rate || 0).toFixed(1), "font-semibold")}
                             <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            {renderEditableCell(t, "description", t.description || "—", "font-medium whitespace-nowrap text-xs")}
+                            {(() => {
+                              const trxRef = t.top_up_requests?.payment_reference;
+                              if (!trxRef || editingCell?.id === t.id && editingCell?.field === "description") {
+                                return renderEditableCell(t, "description", t.description || "—", "font-medium whitespace-nowrap text-xs");
+                              }
+                              return (
+                                <td
+                                  className="border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-xs"
+                                  onClick={() => startEdit(t.id, "description", t.description || "")}
+                                  title="Click to edit"
+                                >
+                                  <div className="whitespace-nowrap">{t.description || "—"}</div>
+                                  <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {trxRef}</div>
+                                </td>
+                              );
+                            })()}
                             <td className="border border-border px-3 py-1.5 text-center font-medium">
                               {t.proof_url ? (
                                 <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">

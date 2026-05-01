@@ -58,7 +58,7 @@ export function SellerDashboard() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("seller_transactions")
-        .select("*, bank_accounts(bank_name, account_number)")
+        .select("*, bank_accounts(bank_name, account_number), top_up_requests(payment_reference)")
         .eq("seller_id", user!.id)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
@@ -185,7 +185,7 @@ export function SellerDashboard() {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": extractTrxId(t.description),
+        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -560,6 +560,9 @@ export function SellerDashboard() {
                     {t.description && (
                       <p className="text-[10px] text-muted-foreground mt-1 truncate">📝 {t.description}</p>
                     )}
+                    {t.top_up_requests?.payment_reference && (
+                      <p className="text-[10px] font-mono text-primary mt-0.5 break-all">TrxID: {t.top_up_requests.payment_reference}</p>
+                    )}
                     {t.proof_url && (
                       <button
                         onClick={() => setProofUrl(t.proof_url)}
@@ -716,8 +719,11 @@ export function SellerDashboard() {
                         <td className="px-4 py-3 text-right text-xs font-bold text-foreground tabular-nums">
                           {fmt(convertedBdt, "৳")}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px] truncate">
-                          {t.description || "—"}
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <div className="whitespace-nowrap">{t.description || "—"}</div>
+                          {t.top_up_requests?.payment_reference && (
+                            <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {t.top_up_requests.payment_reference}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {t.proof_url ? (
