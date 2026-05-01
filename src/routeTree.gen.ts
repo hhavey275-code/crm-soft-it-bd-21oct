@@ -37,6 +37,7 @@ import { Route as BusinessManagersRouteImport } from './routes/business-managers
 import { Route as BillingsRouteImport } from './routes/billings'
 import { Route as BanksRouteImport } from './routes/banks'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AgentRouteImport } from './routes/agent'
 import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
@@ -197,6 +198,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuditRoute = AuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AnnouncementsRoute = AnnouncementsRouteImport.update({
   id: '/announcements',
   path: '/announcements',
@@ -302,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
+  '/audit': typeof AuditRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
@@ -351,6 +358,7 @@ export interface FileRoutesByTo {
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
+  '/audit': typeof AuditRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
@@ -400,6 +408,7 @@ export interface FileRoutesById {
   '/agency-wallet': typeof AgencyWalletRoute
   '/agent': typeof AgentRoute
   '/announcements': typeof AnnouncementsRoute
+  '/audit': typeof AuditRoute
   '/auth': typeof AuthRoute
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
+    | '/audit'
     | '/auth'
     | '/banks'
     | '/billings'
@@ -500,6 +510,7 @@ export interface FileRouteTypes {
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
+    | '/audit'
     | '/auth'
     | '/banks'
     | '/billings'
@@ -548,6 +559,7 @@ export interface FileRouteTypes {
     | '/agency-wallet'
     | '/agent'
     | '/announcements'
+    | '/audit'
     | '/auth'
     | '/banks'
     | '/billings'
@@ -598,6 +610,7 @@ export interface RootRouteChildren {
   AgencyWalletRoute: typeof AgencyWalletRoute
   AgentRoute: typeof AgentRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
+  AuditRoute: typeof AuditRoute
   AuthRoute: typeof AuthRoute
   BanksRoute: typeof BanksRoute
   BillingsRoute: typeof BillingsRoute
@@ -833,6 +846,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/audit': {
+      id: '/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/announcements': {
       id: '/announcements'
       path: '/announcements'
@@ -1015,6 +1035,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgencyWalletRoute: AgencyWalletRoute,
   AgentRoute: AgentRoute,
   AnnouncementsRoute: AnnouncementsRoute,
+  AuditRoute: AuditRoute,
   AuthRoute: AuthRoute,
   BanksRoute: BanksRoute,
   BillingsRoute: BillingsRoute,
