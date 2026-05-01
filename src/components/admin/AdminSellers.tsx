@@ -119,6 +119,19 @@ function sortSellerTxnsAsc(txns: any[]) {
   });
 }
 
+/** Extract a transaction reference id from the description text.
+ *  e.g. "TrxID: 1188006260920088" → "1188006260920088".
+ *  Falls back to a long digit sequence (>=8 digits) anywhere in the text,
+ *  otherwise returns the raw description (or "" if none). */
+function extractTrxId(desc: string | null | undefined): string {
+  if (!desc) return "";
+  const m1 = desc.match(/Tr[xn]\s*ID\s*[:\-]?\s*([A-Za-z0-9]+)/i);
+  if (m1) return m1[1];
+  const m2 = desc.match(/\b(\d{8,})\b/);
+  if (m2) return m2[1];
+  return desc.trim();
+}
+
 function nextMonthBucket({ year, month }: MonthBucket): MonthBucket {
   return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
 }
@@ -184,10 +197,10 @@ export function AdminSellers() {
   const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const [exportAllMonths, setExportAllMonths] = useState(true);
   const ALL_EXPORT_COLS = [
-    "Date","Month","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Change (BDT)","Due/Advance (BDT)","Description","Proof URL","Not Calculated Reason",
+    "Date","Month","Type","Status","Transaction ID","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Change (BDT)","Due/Advance (BDT)","Description","Proof URL","Not Calculated Reason",
   ] as const;
   type ExportCol = typeof ALL_EXPORT_COLS[number];
-  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","Month","Type","BDT Amount","USDT Amount","Rate","Change (BDT)","Due/Advance (BDT)","Not Calculated Reason"]);
+  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","Month","Type","Transaction ID","BDT Amount","USDT Amount","Rate","Change (BDT)","Due/Advance (BDT)","Not Calculated Reason"]);
 
   // Inline edit states
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -771,6 +784,7 @@ export function AdminSellers() {
         "Month": monthLabel(bucket),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
+        "Transaction ID": extractTrxId(t.description),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -851,6 +865,7 @@ export function AdminSellers() {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
+        "Transaction ID": extractTrxId(t.description),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -864,6 +879,7 @@ export function AdminSellers() {
     });
     rows.push({
       "Date": "", "Type": "TOTALS", "Status": "",
+      "Transaction ID": "",
       "BDT Amount": sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt,
       "USDT Amount": sellerTotals.totalUsdt,
       "Rate": 0,
@@ -875,7 +891,7 @@ export function AdminSellers() {
       "Proof URL": "",
     });
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
+    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Transactions");
     const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
