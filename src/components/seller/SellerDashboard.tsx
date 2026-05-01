@@ -58,7 +58,7 @@ export function SellerDashboard() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("seller_transactions")
-        .select("*, bank_accounts(bank_name, account_number)")
+        .select("*, bank_accounts(bank_name, account_number), top_up_requests(payment_reference)")
         .eq("seller_id", user!.id)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
