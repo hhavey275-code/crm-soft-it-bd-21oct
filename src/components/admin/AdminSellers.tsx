@@ -1841,27 +1841,27 @@ export function AdminSellers() {
                             {renderEditableCell(t, "bdt_amount", `৳${Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "usdt_amount", `$${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
                             {renderEditableCell(t, "rate", Number(t.rate || 0).toFixed(1), "font-semibold")}
-                            <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="border border-border px-1.5 py-1 text-center font-semibold whitespace-nowrap">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 0 })}</td>
                             {(() => {
                               const trxRef = t.top_up_requests?.payment_reference;
                               if (!trxRef || editingCell?.id === t.id && editingCell?.field === "description") {
-                                return renderEditableCell(t, "description", t.description || "—", "font-medium whitespace-nowrap text-xs");
+                                return renderEditableCell(t, "description", t.description || "—", "font-medium text-[11px]");
                               }
                               return (
                                 <td
-                                  className="border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-xs"
+                                  className="border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-[11px]"
                                   onClick={() => startEdit(t.id, "description", t.description || "")}
                                   title="Click to edit"
                                 >
-                                  <div className="whitespace-nowrap">{t.description || "—"}</div>
-                                  <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {trxRef}</div>
+                                  <div className="leading-tight">{t.description || "—"}</div>
+                                  <div className="text-[10px] font-mono text-primary mt-0.5 break-all">TrxID: {trxRef}</div>
                                 </td>
                               );
                             })()}
-                            <td className="border border-border px-3 py-1.5 text-center font-medium">
+                            <td className="border border-border px-1 py-1 text-center font-medium">
                               {t.proof_url ? (
                                 <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">
-                                  <ImageIcon className="h-3.5 w-3.5" /> View
+                                  <ImageIcon className="h-3.5 w-3.5" />
                                 </button>
                               ) : "—"}
                             </td>
@@ -1870,7 +1870,7 @@ export function AdminSellers() {
                               const isPending = (t.status || "approved").toLowerCase() !== "approved";
                               return (
                                 <td className={cn(
-                                  "border border-border px-3 py-1.5 text-right font-extrabold tabular-nums whitespace-nowrap",
+                                  "border border-border px-1.5 py-1 text-right font-extrabold tabular-nums whitespace-nowrap",
                                   isPending ? "text-muted-foreground/60 italic" :
                                     da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                                 )}>
