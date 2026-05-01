@@ -22,7 +22,7 @@ import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDial
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
-import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, getSellerTransactionSkipReason, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
 import {
   getMonthBucket,
@@ -31,6 +31,7 @@ import {
   prevMonth,
   filterMonth,
   aggregateMonth,
+  computeLedgerBalanceBefore,
   computeRunningWithOpening,
   closeMonth as closeMonthApi,
   reopenMonth as reopenMonthApi,
