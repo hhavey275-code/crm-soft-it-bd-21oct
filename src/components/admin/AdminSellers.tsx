@@ -638,11 +638,9 @@ export function AdminSellers() {
   const runningTotals = useMemo(() => {
     if (!sellerTxns) return new Map<string, number>();
     if (!monthView) return computeDueAdvanceRunning(sellerTxns);
-    const prev = prevMonth(activeBucket);
-    const rec = (closings || []).find((c: MonthlyClosing) => c.year === prev.year && c.month === prev.month);
-    const opening = rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    const opening = computeLedgerBalanceBefore(sellerTxns, activeBucket);
     return computeRunningWithOpening(filterMonth(sellerTxns, activeBucket), opening);
-  }, [sellerTxns, monthView, activeBucket, closings]);
+  }, [sellerTxns, monthView, activeBucket]);
 
   // Opening balance for a bucket: live ledger balance before that month.
   const openingFor = (b: MonthBucket): number => {
@@ -666,6 +664,12 @@ export function AdminSellers() {
   // secondary "Recorded" pill plus a Recalc button when they disagree.
   const monthDueAdvance = activeClosingLive;
   const displayDueAdvance = monthView ? monthDueAdvance : dueAdvance;
+  const uncalculatedTxns = useMemo(
+    () => (sellerTxns || [])
+      .map((t: any) => ({ txn: t, reason: getSellerTransactionSkipReason(t) }))
+      .filter((item) => item.reason),
+    [sellerTxns]
+  );
 
   const closeMonthMutation = useMutation({
     mutationFn: async () => {
