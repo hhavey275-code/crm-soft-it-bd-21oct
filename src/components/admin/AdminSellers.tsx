@@ -324,7 +324,15 @@ export function AdminSellers() {
         bank_account_id: ocrIsOthersBank ? undefined : (ocrSelectedBankId || undefined),
         ...getApprovedAdminEntryMeta(),
       };
-      if (ocrResult.date) entry.created_at = new Date(ocrResult.date).toISOString();
+      if (ocrResult.date) {
+        // Use the date from OCR/payment proof, but attach the current time-of-day
+        // so multiple BDT payments on the same date keep a stable insertion order
+        // and interleave correctly with client_topup rows (which have real times).
+        const ocrDate = new Date(ocrResult.date);
+        const now = new Date();
+        ocrDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        entry.created_at = ocrDate.toISOString();
+      }
       const { error } = await (supabase as any).from("seller_transactions").insert(entry);
       if (error) throw error;
 
