@@ -1851,10 +1851,10 @@ export function AdminSellers() {
                                 <td
                                   className="border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-[11px]"
                                   onClick={() => startEdit(t.id, "description", t.description || "")}
-                                  title="Click to edit"
+                                  title={t.description || ""}
                                 >
-                                  <div className="leading-tight">{t.description || "—"}</div>
-                                  <div className="text-[10px] font-mono text-primary mt-0.5 break-all">TrxID: {trxRef}</div>
+                                  <div className="leading-tight truncate max-w-[120px] text-[10px] text-muted-foreground mx-auto">{t.description || "—"}</div>
+                                  <div className="text-[11px] font-mono text-primary mt-0.5 break-all font-semibold">{trxRef}</div>
                                 </td>
                               );
                             })()}
