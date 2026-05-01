@@ -719,8 +719,11 @@ export function SellerDashboard() {
                         <td className="px-4 py-3 text-right text-xs font-bold text-foreground tabular-nums">
                           {fmt(convertedBdt, "৳")}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px] truncate">
-                          {t.description || "—"}
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <div className="whitespace-nowrap">{t.description || "—"}</div>
+                          {t.top_up_requests?.payment_reference && (
+                            <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {t.top_up_requests.payment_reference}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {t.proof_url ? (
