@@ -101,7 +101,7 @@ export async function runSellerAudit(): Promise<AuditReport> {
   ] = await Promise.all([
     supabase
       .from("top_up_requests")
-      .select("id, user_id, amount, bdt_amount, bank_account_id, status, created_at, reviewed_at")
+      .select("id, user_id, amount, bdt_amount, bank_account_id, status, created_at, updated_at")
       .eq("status", "approved")
       .not("bank_account_id", "is", null)
       .order("created_at", { ascending: false })
@@ -162,7 +162,7 @@ export async function runSellerAudit(): Promise<AuditReport> {
       bank_name: bank?.bank_name || null,
       seller_id: bank.seller_id,
       seller_name: sellerNameById.get(bank.seller_id) || null,
-      approved_at: tr.reviewed_at || null,
+      approved_at: (tr as any).updated_at || null,
       created_at: tr.created_at,
     });
   }
