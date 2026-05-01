@@ -698,6 +698,29 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message || "Failed to reopen"),
   });
 
+  const recalcClosedMonthsMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSeller) throw new Error("No seller");
+      const closed = [...(closings || [])].sort((a, b) => (a.year - b.year) || (a.month - b.month));
+      if (!closed.length) throw new Error("No closed months found");
+      for (const c of closed) {
+        await closeMonthApi({
+          sellerId: selectedSeller.user_id,
+          bucket: { year: c.year, month: c.month },
+          txns: sellerTxns || [],
+          closedBy: user?.id ?? null,
+          note: "Recalculated from live seller ledger",
+        });
+      }
+      return closed.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`Recalculated ${count} closed month${count === 1 ? "" : "s"}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to recalculate months"),
+  });
+
   // Build available months: continuous range from earliest activity → current month.
   // No gaps — so every month can be closed in order, keeping the Due/Advance
   // carry-forward chain intact even for months with zero transactions.
