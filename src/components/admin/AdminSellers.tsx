@@ -865,6 +865,7 @@ export function AdminSellers() {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
+        "Transaction ID": extractTrxId(t.description),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -878,6 +879,7 @@ export function AdminSellers() {
     });
     rows.push({
       "Date": "", "Type": "TOTALS", "Status": "",
+      "Transaction ID": "",
       "BDT Amount": sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt,
       "USDT Amount": sellerTotals.totalUsdt,
       "Rate": 0,
@@ -889,7 +891,7 @@ export function AdminSellers() {
       "Proof URL": "",
     });
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
+    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Transactions");
     const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
