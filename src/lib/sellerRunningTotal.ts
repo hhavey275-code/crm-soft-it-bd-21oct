@@ -131,8 +131,7 @@ export function formatBdt(value: number): string {
  */
 export function computeTransactionDelta(t: any): number {
   if (!t) return 0;
-  const status = (t.status || "approved").toLowerCase();
-  if (status !== "approved") return 0;
+  if (!isCountedSellerTransaction(t)) return 0;
   if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
     return Number(t.bdt_amount || 0);
   }
