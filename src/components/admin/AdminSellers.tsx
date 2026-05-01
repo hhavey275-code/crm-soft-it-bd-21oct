@@ -1264,7 +1264,7 @@ export function AdminSellers() {
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {monthView
-                    ? activeClosingRecord ? `Closed ${monthLabel(activeBucket)}` : `Current ${monthLabel(activeBucket)}`
+                    ? `Current ${monthLabel(activeBucket)}`
                     : "After all transactions"}
                 </p>
               </div>
