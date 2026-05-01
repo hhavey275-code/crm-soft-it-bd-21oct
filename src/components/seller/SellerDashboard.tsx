@@ -132,11 +132,11 @@ export function SellerDashboard() {
         if (status !== "approved") return acc;
         if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
-          acc.totalUsdt += Number(t.usdt_amount || 0);
-          acc.totalConvertedBdt += Number(t.usdt_amount || 0) * Number(t.rate || 0);
+          acc.totalUsdt += Math.abs(Number(t.usdt_amount || 0));
+          acc.totalConvertedBdt += Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
         }
         if (t.type === "client_topup") acc.totalClientBdt += Number(t.bdt_amount || 0);
-        if (t.type === "withdraw") acc.totalWithdrawn += Number(t.bdt_amount || 0);
+        if (t.type === "withdraw") acc.totalWithdrawn += Math.abs(Number(t.bdt_amount || 0));
         return acc;
       },
       { totalBdtPaid: 0, totalUsdt: 0, totalConvertedBdt: 0, totalClientBdt: 0, totalWithdrawn: 0 }
@@ -172,7 +172,7 @@ export function SellerDashboard() {
       return;
     }
     const rows = filtered.map((t: any) => {
-      const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
       return {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
