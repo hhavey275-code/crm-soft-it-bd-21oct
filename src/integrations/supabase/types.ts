@@ -2965,6 +2965,17 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_monthly_balance_view: {
+        Row: {
+          closing_balance: number | null
+          month_delta: number | null
+          month_label: string | null
+          month_start: string | null
+          opening_balance: number | null
+          seller_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_invoice_number: { Args: never; Returns: string }
