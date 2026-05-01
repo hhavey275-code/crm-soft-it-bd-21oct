@@ -420,15 +420,7 @@ export function AdminSellers() {
   const { data: sellerTxns } = useQuery({
     queryKey: ["admin-seller-txns", selectedSeller?.user_id],
     enabled: !!selectedSeller,
-    queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("seller_transactions")
-        .select("*, bank_accounts(bank_name, account_number, account_name)")
-        .eq("seller_id", selectedSeller.user_id)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
-      return (data as any[]) ?? [];
-    },
+    queryFn: async () => fetchAllSellerTransactions(selectedSeller.user_id),
   });
 
   // Realtime: keep the seller ledger in sync. Without this, an approval coming
