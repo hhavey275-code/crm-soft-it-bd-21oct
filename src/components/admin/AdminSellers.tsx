@@ -608,11 +608,52 @@ export function AdminSellers() {
   // Approve / reject pending mutation
   const reviewTxnMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      // Fetch the row first so we know what to forward AFTER approval.
+      const { data: before } = await (supabase as any)
+        .from("seller_transactions")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
       const { error } = await (supabase as any)
         .from("seller_transactions")
         .update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
+
+      // On approval of a USDT-received entry with proof, forward to Telegram.
+      // The forward function itself enforces the telegram_forwarded idempotency
+      // lock so retries / double-clicks never produce duplicate messages.
+      if (
+        status === "approved" &&
+        before &&
+        before.type === "usdt_received" &&
+        before.proof_url &&
+        before.telegram_forwarded !== true
+      ) {
+        try {
+          const sellerProfile = selectedSeller as any;
+          const isOthers = !before.bank_account_id;
+          await supabase.functions.invoke("forward-seller-proof", {
+            body: {
+              seller_transaction_id: before.id,
+              payment_kind: "usdt_received",
+              proof_url: before.proof_url,
+              seller_id: before.seller_id,
+              seller_name: sellerProfile?.full_name || sellerProfile?.email,
+              usdt_amount: Number(before.usdt_amount || 0),
+              rate: Number(before.rate || 0),
+              bdt_amount: Number(before.usdt_amount || 0) * Number(before.rate || 0),
+              bank_account_id: isOthers ? undefined : before.bank_account_id,
+              reference: extractTrxId(before.description) || null,
+              others_telegram_group_id: isOthers ? sellerProfile?.others_telegram_group_id : undefined,
+            },
+          });
+        } catch (fwdErr) {
+          console.error("USDT approval Telegram forward failed:", fwdErr);
+          // Don't block approval on forward failure — admin can retry.
+        }
+      }
     },
     onSuccess: (_d, vars) => {
       toast.success(vars.status === "approved" ? "Approved!" : "Rejected");
