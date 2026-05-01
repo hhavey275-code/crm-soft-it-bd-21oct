@@ -1853,7 +1853,7 @@ export function AdminSellers() {
                                   onClick={() => startEdit(t.id, "description", t.description || "")}
                                   title={t.description || ""}
                                 >
-                                  <div className="leading-tight truncate max-w-[120px] text-[10px] text-muted-foreground mx-auto">{t.description || "—"}</div>
+                                  <div className="leading-tight line-clamp-2 break-words max-w-[180px] text-[10px] text-muted-foreground mx-auto">{t.description || "—"}</div>
                                   <div className="text-[11px] font-mono text-primary mt-0.5 break-all font-semibold">{trxRef}</div>
                                 </td>
                               );
