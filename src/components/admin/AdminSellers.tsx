@@ -641,9 +641,15 @@ export function AdminSellers() {
   );
   const activeClosingLive = activeOpening + activeMonthAgg.delta;
   const activeClosingRecord = closingFor(activeBucket);
-  const monthDueAdvance = activeClosingRecord
-    ? Number(activeClosingRecord.closing_due_advance_bdt || 0)
-    : activeClosingLive;
+  // Drift: closing was saved earlier, but the underlying ledger has changed
+  // since (rows added/removed/edited). Compare to the live recompute.
+  const closingDrift = activeClosingRecord
+    ? Math.round((Number(activeClosingRecord.closing_due_advance_bdt || 0) - activeClosingLive) * 100) / 100
+    : 0;
+  // Always trust live computation for the headline so the visible balance
+  // matches the ledger. The stored closing value (if any) is shown as a
+  // secondary "Recorded" pill plus a Recalc button when they disagree.
+  const monthDueAdvance = activeClosingLive;
   const displayDueAdvance = monthView ? monthDueAdvance : dueAdvance;
 
   const closeMonthMutation = useMutation({
