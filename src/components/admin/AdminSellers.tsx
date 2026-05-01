@@ -350,6 +350,17 @@ export function AdminSellers() {
       const { error } = await (supabase as any).from("seller_transactions").insert(entry);
       if (error) throw error;
 
+      // Find the row we just inserted so we can pass its ID into the forward
+      // function for idempotency-locked Telegram delivery.
+      const { data: insertedRow } = await (supabase as any)
+        .from("seller_transactions")
+        .select("id")
+        .eq("seller_id", entry.seller_id)
+        .eq("type", "bdt_payment")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       // Forward to Telegram
       const shouldForward = ocrIsOthersBank
         ? !!(selectedSeller as any).others_telegram_group_id
@@ -358,6 +369,8 @@ export function AdminSellers() {
         try {
           await supabase.functions.invoke("forward-seller-proof", {
             body: {
+              seller_transaction_id: insertedRow?.id,
+              payment_kind: "bdt_payment",
               proof_url: ocrImageUrl,
               seller_id: selectedSeller.user_id,
               seller_name: selectedSeller.full_name || selectedSeller.email,
