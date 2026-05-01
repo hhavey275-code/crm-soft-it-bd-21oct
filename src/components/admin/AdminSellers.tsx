@@ -1089,7 +1089,7 @@ export function AdminSellers() {
     }
     return (
       <td
-        className={cn("border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors", className)}
+        className={cn("border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors", className)}
         onClick={() => startEdit(txn.id, field, field === "description" ? (txn[field] || "") : (txn[field] || 0))}
         title="Click to edit"
       >
