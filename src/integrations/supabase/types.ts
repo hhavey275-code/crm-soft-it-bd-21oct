@@ -1866,6 +1866,51 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_balance_audit_log: {
+        Row: {
+          anomalies: Json
+          approved_topup_count: number
+          audit_date: string
+          calculated_balance_bdt: number
+          created_at: string
+          delta_bdt: number
+          has_issues: boolean
+          id: string
+          orphan_topup_ids: string[] | null
+          previous_balance_bdt: number
+          seller_id: string
+          seller_txn_count: number
+        }
+        Insert: {
+          anomalies?: Json
+          approved_topup_count?: number
+          audit_date: string
+          calculated_balance_bdt?: number
+          created_at?: string
+          delta_bdt?: number
+          has_issues?: boolean
+          id?: string
+          orphan_topup_ids?: string[] | null
+          previous_balance_bdt?: number
+          seller_id: string
+          seller_txn_count?: number
+        }
+        Update: {
+          anomalies?: Json
+          approved_topup_count?: number
+          audit_date?: string
+          calculated_balance_bdt?: number
+          created_at?: string
+          delta_bdt?: number
+          has_issues?: boolean
+          id?: string
+          orphan_topup_ids?: string[] | null
+          previous_balance_bdt?: number
+          seller_id?: string
+          seller_txn_count?: number
+        }
+        Relationships: []
+      }
       seller_monthly_closings: {
         Row: {
           closed_at: string
