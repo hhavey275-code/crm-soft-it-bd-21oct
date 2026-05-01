@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { runSellerAudit, backfillOrphan, type AuditReport, type OrphanTopup } from "@/lib/sellerAudit";
+import { exportAllSellersMonthly, getAvailableMonths, monthLabel, type Bucket } from "@/lib/sellerMonthlyExportAll";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,12 +18,40 @@ export function AdminAudit() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refetching, setRefetching] = useState(false);
+  const [exportBucket, setExportBucket] = useState<Bucket | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data: report, isLoading, refetch } = useQuery<AuditReport>({
     queryKey: ["seller-audit-report"],
     queryFn: runSellerAudit,
     staleTime: 30_000,
   });
+
+  const { data: months } = useQuery<Bucket[]>({
+    queryKey: ["audit-available-months"],
+    queryFn: getAvailableMonths,
+    staleTime: 60_000,
+  });
+
+  // Default to latest month once loaded
+  useEffect(() => {
+    if (months && months.length && !exportBucket) {
+      setExportBucket(months[0]);
+    }
+  }, [months, exportBucket]);
+
+  const handleExport = async () => {
+    if (!exportBucket) return;
+    setExporting(true);
+    try {
+      const res = await exportAllSellersMonthly(exportBucket);
+      toast.success(`Exported ${res.sheets} seller sheet(s) for ${monthLabel(exportBucket)}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fixOrphan = useMutation({
     mutationFn: async (orphan: OrphanTopup) => {
@@ -59,10 +89,34 @@ export function AdminAudit() {
             Last run: {format(new Date(report.generated_at), "PPp")}
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={refetching} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refetching ? "animate-spin" : ""}`} />
-          Re-run audit
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={exportBucket ? `${exportBucket.year}-${exportBucket.month}` : ""}
+            onValueChange={(v) => {
+              const [y, m] = v.split("-").map(Number);
+              setExportBucket({ year: y, month: m });
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Pick month" />
+            </SelectTrigger>
+            <SelectContent>
+              {(months || []).map((b) => (
+                <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                  {monthLabel(b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={handleExport} disabled={exporting || !exportBucket}>
+            <Download className={`h-4 w-4 mr-2 ${exporting ? "animate-pulse" : ""}`} />
+            {exporting ? "Exporting…" : "Download Monthly Excel"}
+          </Button>
+          <Button onClick={handleRefresh} disabled={refetching} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refetching ? "animate-spin" : ""}`} />
+            Re-run audit
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
