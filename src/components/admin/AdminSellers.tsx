@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
@@ -22,15 +22,15 @@ import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDial
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
-import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, getSellerTransactionSkipReason, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
 import {
   getMonthBucket,
   isSameMonth,
   monthLabel,
-  prevMonth,
   filterMonth,
   aggregateMonth,
+  computeLedgerBalanceBefore,
   computeRunningWithOpening,
   closeMonth as closeMonthApi,
   reopenMonth as reopenMonthApi,
@@ -110,6 +110,37 @@ function getPresetRange(preset: DatePreset): { from: Date; to: Date } | null {
   }
 }
 
+function sortSellerTxnsAsc(txns: any[]) {
+  return [...(txns || [])].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function nextMonthBucket({ year, month }: MonthBucket): MonthBucket {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
+async function fetchAllSellerTransactions(sellerId: string) {
+  const pageSize = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await (supabase as any)
+      .from("seller_transactions")
+      .select("*, bank_accounts(bank_name, account_number, account_name)")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data as any[]) ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
 export function AdminSellers() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -151,11 +182,12 @@ export function AdminSellers() {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showMonthlyExport, setShowMonthlyExport] = useState(false);
   const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [exportAllMonths, setExportAllMonths] = useState(true);
   const ALL_EXPORT_COLS = [
-    "Date","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Due/Advance (BDT)","Description","Proof URL",
+    "Date","Month","Type","Status","BDT Amount","USDT Amount","Rate","Converted (BDT)","Bank","Account Name","Change (BDT)","Due/Advance (BDT)","Description","Proof URL","Not Calculated Reason",
   ] as const;
   type ExportCol = typeof ALL_EXPORT_COLS[number];
-  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","BDT Amount","USDT Amount","Rate","Due/Advance (BDT)"]);
+  const [exportCols, setExportCols] = useState<ExportCol[]>(["Date","Month","Type","BDT Amount","USDT Amount","Rate","Change (BDT)","Due/Advance (BDT)","Not Calculated Reason"]);
 
   // Inline edit states
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -387,15 +419,7 @@ export function AdminSellers() {
   const { data: sellerTxns } = useQuery({
     queryKey: ["admin-seller-txns", selectedSeller?.user_id],
     enabled: !!selectedSeller,
-    queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("seller_transactions")
-        .select("*, bank_accounts(bank_name, account_number, account_name)")
-        .eq("seller_id", selectedSeller.user_id)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
-      return (data as any[]) ?? [];
-    },
+    queryFn: async () => fetchAllSellerTransactions(selectedSeller.user_id),
   });
 
   // Realtime: keep the seller ledger in sync. Without this, an approval coming
@@ -545,8 +569,7 @@ export function AdminSellers() {
   const sellerTotals = useMemo(() => {
     return filteredTxns.reduce(
       (acc: any, t: any) => {
-        const status = t.status || "approved";
-        if (status !== "approved") return acc;
+        if (!isCountedSellerTransaction(t)) return acc;
         if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
           acc.totalUsdt += Number(t.usdt_amount || 0);
@@ -576,23 +599,13 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // Filter-bound totals (for the "filtered" cards / table footer)
-  const dueAdvanceFiltered = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
-
   // Lifetime Due/Advance — ALWAYS computed from the full ledger, independent
   // of typeFilter / bankFilter / datePreset. This is what the All-Time hero
   // card must show so changing a filter never changes the headline balance.
   const dueAdvance = useMemo(() => {
     let running = 0;
     for (const t of (sellerTxns || [])) {
-      if ((t.status || "approved") !== "approved") continue;
-      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-        running += Number(t.bdt_amount || 0);
-      } else if (t.type === "withdraw") {
-        running -= Number(t.bdt_amount || 0);
-      } else if (t.type === "usdt_received") {
-        running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-      }
+      running += computeTransactionDelta(t);
     }
     return running;
   }, [sellerTxns]);
@@ -621,17 +634,13 @@ export function AdminSellers() {
   const runningTotals = useMemo(() => {
     if (!sellerTxns) return new Map<string, number>();
     if (!monthView) return computeDueAdvanceRunning(sellerTxns);
-    const prev = prevMonth(activeBucket);
-    const rec = (closings || []).find((c: MonthlyClosing) => c.year === prev.year && c.month === prev.month);
-    const opening = rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    const opening = computeLedgerBalanceBefore(sellerTxns, activeBucket);
     return computeRunningWithOpening(filterMonth(sellerTxns, activeBucket), opening);
-  }, [sellerTxns, monthView, activeBucket, closings]);
+  }, [sellerTxns, monthView, activeBucket]);
 
-  // Opening balance for a bucket: previous month's closing or 0
+  // Opening balance for a bucket: live ledger balance before that month.
   const openingFor = (b: MonthBucket): number => {
-    const prev = prevMonth(b);
-    const rec = closingFor(prev);
-    return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    return computeLedgerBalanceBefore(sellerTxns || [], b);
   };
 
   const activeOpening = openingFor(activeBucket);
@@ -651,6 +660,12 @@ export function AdminSellers() {
   // secondary "Recorded" pill plus a Recalc button when they disagree.
   const monthDueAdvance = activeClosingLive;
   const displayDueAdvance = monthView ? monthDueAdvance : dueAdvance;
+  const uncalculatedTxns = useMemo(
+    () => (sellerTxns || [])
+      .map((t: any) => ({ txn: t, reason: getSellerTransactionSkipReason(t) }))
+      .filter((item) => item.reason),
+    [sellerTxns]
+  );
 
   const closeMonthMutation = useMutation({
     mutationFn: async () => {
@@ -683,6 +698,29 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message || "Failed to reopen"),
   });
 
+  const recalcClosedMonthsMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSeller) throw new Error("No seller");
+      const closed = [...(closings || [])].sort((a, b) => (a.year - b.year) || (a.month - b.month));
+      if (!closed.length) throw new Error("No closed months found");
+      for (const c of closed) {
+        await closeMonthApi({
+          sellerId: selectedSeller.user_id,
+          bucket: { year: c.year, month: c.month },
+          txns: sellerTxns || [],
+          closedBy: user?.id ?? null,
+          note: "Recalculated from live seller ledger",
+        });
+      }
+      return closed.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`Recalculated ${count} closed month${count === 1 ? "" : "s"}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to recalculate months"),
+  });
+
   // Build available months: continuous range from earliest activity → current month.
   // No gaps — so every month can be closed in order, keeping the Due/Advance
   // carry-forward chain intact even for months with zero transactions.
@@ -711,21 +749,18 @@ export function AdminSellers() {
 
   const exportMonthlyToExcel = () => {
     if (!selectedSeller) return;
-    const monthTxns = filterMonth(sellerTxns || [], exportBucket);
-    if (!monthTxns.length) {
-      toast.error("No transactions in selected month");
-      return;
-    }
-    const opening = openingFor(exportBucket);
-    const running = computeRunningWithOpening(monthTxns, opening);
-    // Sort ascending for export readability
-    const sorted = [...monthTxns].sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-    const buildRow = (t: any): Record<string, any> => {
+    const months = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
+    const wb = XLSX.utils.book_new();
+    let totalRows = 0;
+    let skippedRows = 0;
+
+    const buildRow = (t: any, running: Map<string, number>, bucket: MonthBucket): Record<string, any> => {
       const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const skipReason = getSellerTransactionSkipReason(t) || "";
+      if (skipReason) skippedRows += 1;
       const full: Record<ExportCol, any> = {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
+        "Month": monthLabel(bucket),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
         "BDT Amount": Number(t.bdt_amount || 0),
@@ -734,43 +769,59 @@ export function AdminSellers() {
         "Converted (BDT)": Number(convBdt.toFixed(2)),
         "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
         "Account Name": t.bank_accounts?.account_name || "",
+        "Change (BDT)": Number(computeTransactionDelta(t).toFixed(2)),
         "Due/Advance (BDT)": Number((running.get(t.id) || 0).toFixed(2)),
         "Description": t.description || "",
         "Proof URL": t.proof_url || "",
+        "Not Calculated Reason": skipReason,
       };
       const picked: Record<string, any> = {};
       for (const c of exportCols) picked[c] = full[c];
       return picked;
     };
-    const rows: any[] = [];
-    // Opening row
-    const openingRow: Record<string, any> = {};
-    exportCols.forEach(c => { openingRow[c] = ""; });
-    if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
-    if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (carry-forward)`;
-    if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
-    rows.push(openingRow);
-    sorted.forEach(t => rows.push(buildRow(t)));
-    // Closing row
-    const agg = aggregateMonth(sellerTxns || [], exportBucket);
-    const closing = opening + agg.delta;
-    const closingRow: Record<string, any> = {};
-    exportCols.forEach(c => { closingRow[c] = ""; });
-    if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
-    if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
-    if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
-    if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
-    if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
-    if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
-    rows.push(closingRow);
 
-    const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
-    const wb = XLSX.utils.book_new();
-    const sheetName = `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    for (const bucket of months) {
+      const monthTxns = filterMonth(sellerTxns || [], bucket);
+      const opening = openingFor(bucket);
+      const running = computeRunningWithOpening(monthTxns, opening);
+      const sorted = sortSellerTxnsAsc(monthTxns);
+      const rows: any[] = [];
+      const openingRow: Record<string, any> = {};
+      exportCols.forEach(c => { openingRow[c] = ""; });
+      if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
+      if (exportCols.includes("Month")) openingRow["Month"] = monthLabel(bucket);
+      if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (ledger before month)`;
+      if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
+      rows.push(openingRow);
+      sorted.forEach(t => rows.push(buildRow(t, running, bucket)));
+      const agg = aggregateMonth(sellerTxns || [], bucket);
+      const closing = opening + agg.delta;
+      const closingRow: Record<string, any> = {};
+      exportCols.forEach(c => { closingRow[c] = ""; });
+      if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
+      if (exportCols.includes("Month")) closingRow["Month"] = monthLabel(bucket);
+      if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
+      if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
+      if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
+      if (exportCols.includes("Change (BDT)")) closingRow["Change (BDT)"] = Number(agg.delta.toFixed(2));
+      if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
+      if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
+      rows.push(closingRow);
+      totalRows += rows.length;
+
+      const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
+      ws["!cols"] = exportCols.map((c) => ({ wch: c.includes("Description") || c.includes("Reason") || c.includes("Proof") ? 34 : 16 }));
+      XLSX.utils.book_append_sheet(wb, ws, `${bucket.year}-${String(bucket.month).padStart(2, "0")}`);
+    }
+
+    if (!totalRows) {
+      toast.error("No data to export");
+      return;
+    }
     const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    XLSX.writeFile(wb, `${sellerSlug}-${sheetName}-ledger.xlsx`);
-    toast.success(`Exported ${monthLabel(exportBucket)}`);
+    const suffix = exportAllMonths ? "month-by-month" : `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `${sellerSlug}-${suffix}-ledger.xlsx`);
+    toast.success(`Exported ${exportAllMonths ? "all months" : monthLabel(exportBucket)}${skippedRows ? ` — ${skippedRows} not calculated listed` : ""}`);
     setShowMonthlyExport(false);
   };
 
@@ -1139,6 +1190,9 @@ export function AdminSellers() {
                <Button size="sm" variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
                  <Download className="h-4 w-4 mr-1" /> Monthly Excel
                </Button>
+                <Button size="sm" variant="outline" onClick={() => recalcClosedMonthsMutation.mutate()} disabled={recalcClosedMonthsMutation.isPending || !(closings || []).length}>
+                  <RefreshCw className="h-4 w-4 mr-1" /> Recalc Closed
+                </Button>
             </div>
           </div>
 
@@ -1466,6 +1520,29 @@ export function AdminSellers() {
               }}
             />
           </div>
+
+          {uncalculatedTxns.length > 0 && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  Not Calculated Payments ({uncalculatedTxns.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-2 space-y-2">
+                {uncalculatedTxns.slice(0, 10).map(({ txn, reason }: any) => (
+                  <div key={txn.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs">
+                    <span className="font-medium">{format(new Date(txn.created_at), "MMM d, yyyy HH:mm")} · {getTypeLabel(txn.type)}</span>
+                    <span className="text-muted-foreground">৳{Number(txn.bdt_amount || 0).toLocaleString()} · ${Number(txn.usdt_amount || 0).toLocaleString()} @ {Number(txn.rate || 0)}</span>
+                    <span className="font-semibold text-amber-700 dark:text-amber-300">{reason}</span>
+                  </div>
+                ))}
+                {uncalculatedTxns.length > 10 && (
+                  <p className="text-[11px] text-muted-foreground">Full list is included in Monthly Excel export.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Pending USDT Approvals — only seller-submitted USDT, not client/admin top-ups */}
           {sellerTxns?.some((t: any) => t.status === "pending" && t.type === "usdt_received") && (
@@ -2152,10 +2229,15 @@ export function AdminSellers() {
             <DialogTitle>Monthly Excel Export</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm cursor-pointer">
+              <Checkbox checked={exportAllMonths} onCheckedChange={(v) => setExportAllMonths(Boolean(v))} />
+              <span className="font-medium">Export all months, month-to-month sheets</span>
+            </label>
             <div>
               <Label className="text-xs">Month</Label>
               <Select
                 value={`${exportBucket.year}-${exportBucket.month}`}
+                disabled={exportAllMonths}
                 onValueChange={(v) => {
                   const [y, m] = v.split("-").map(Number);
                   setExportBucket({ year: y, month: m });

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { computeTransactionDelta, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 
 export type MonthBucket = { year: number; month: number };
 
@@ -51,14 +52,27 @@ export function monthLabel({ year, month }: MonthBucket): string {
   return d.toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
+function compareMonth(a: MonthBucket, b: MonthBucket): number {
+  return (a.year - b.year) || (a.month - b.month);
+}
+
+export function computeLedgerBalanceBefore(txns: any[], bucket: MonthBucket): number {
+  let running = 0;
+  for (const t of txns || []) {
+    if (compareMonth(getMonthBucket(t.created_at), bucket) < 0 && isCountedSellerTransaction(t)) {
+      running += computeTransactionDelta(t);
+    }
+  }
+  return running;
+}
+
 /** Aggregate seller transactions for a single month (approved only). */
 export function aggregateMonth(txns: any[], bucket: MonthBucket): MonthAggregate {
   const acc: MonthAggregate = {
     bdtIn: 0, clientBdt: 0, usdtGiven: 0, convertedBdt: 0, withdrawBdt: 0, delta: 0,
   };
   for (const t of txns) {
-    const status = (t.status || "approved").toLowerCase();
-    if (status !== "approved") continue;
+    if (!isCountedSellerTransaction(t)) continue;
     const b = getMonthBucket(t.created_at);
     if (!isSameMonth(b, bucket)) continue;
     if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.bdtIn += Number(t.bdt_amount || 0);
@@ -89,18 +103,11 @@ export function computeRunningWithOpening(monthTxns: any[], opening: number): Ma
   });
   let running = opening;
   for (const t of sorted) {
-    const status = (t.status || "approved").toLowerCase();
-    if (status !== "approved") {
+    if (!isCountedSellerTransaction(t)) {
       result.set(t.id, running);
       continue;
     }
-    if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-      running += Number(t.bdt_amount || 0);
-    } else if (t.type === "usdt_received") {
-      running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-    } else if (t.type === "withdraw") {
-      running -= Number(t.bdt_amount || 0);
-    }
+    running += computeTransactionDelta(t);
     result.set(t.id, running);
   }
   return result;
@@ -129,13 +136,6 @@ export async function listClosings(sellerId: string): Promise<MonthlyClosing[]> 
   return (data as MonthlyClosing[]) ?? [];
 }
 
-/** Resolve opening balance for the given month: previous month's closing, or 0. */
-export async function getOpeningFor(sellerId: string, bucket: MonthBucket): Promise<number> {
-  const prev = prevMonth(bucket);
-  const rec = await getMonthlyClosing(sellerId, prev);
-  return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
-}
-
 /** Close (or re-close) a month: aggregate, compute closing, upsert row. */
 export async function closeMonth(params: {
   sellerId: string;
@@ -145,7 +145,7 @@ export async function closeMonth(params: {
   note?: string;
 }): Promise<MonthlyClosing> {
   const { sellerId, bucket, txns, closedBy, note } = params;
-  const opening = await getOpeningFor(sellerId, bucket);
+  const opening = computeLedgerBalanceBefore(txns, bucket);
   const agg = aggregateMonth(txns, bucket);
   const closing = opening + agg.delta;
 
