@@ -28,7 +28,6 @@ import {
   getMonthBucket,
   isSameMonth,
   monthLabel,
-  prevMonth,
   filterMonth,
   aggregateMonth,
   computeLedgerBalanceBefore,
