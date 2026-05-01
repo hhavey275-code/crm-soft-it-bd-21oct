@@ -656,16 +656,16 @@ export function SellerDashboard() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border/60 bg-muted/40">
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Account</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">BDT</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">USDT</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rate</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Conv BDT</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">TrxID / Note</th>
-                    <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Proof</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-primary">Due/Advance (৳)</th>
+                    <th className="px-1.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date</th>
+                    <th className="px-1.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                    <th className="px-1.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Account</th>
+                    <th className="px-1.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">BDT</th>
+                    <th className="px-1.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">USDT</th>
+                    <th className="px-1.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rate</th>
+                    <th className="px-1.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Conv BDT</th>
+                    <th className="px-1.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">TrxID / Note</th>
+                    <th className="px-1.5 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Proof</th>
+                    <th className="px-1.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-primary">Due/Advance (৳)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -680,10 +680,10 @@ export function SellerDashboard() {
                     const colorClass = typeColors[t.type] || "text-muted-foreground bg-muted";
                     return (
                       <tr key={t.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        <td className="px-1.5 py-2 text-xs text-muted-foreground whitespace-nowrap">
                           {format(new Date(t.created_at), "MMM d, yyyy")}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-2">
                           <div className="flex items-center gap-1.5">
                             <span className={cn("inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md", colorClass)}>
                               {getTypeIcon(t.type)}
@@ -692,7 +692,7 @@ export function SellerDashboard() {
                             <StatusBadge status={t.status} />
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        <td className="px-1.5 py-2 text-xs text-muted-foreground whitespace-nowrap">
                           {t.bank_accounts ? (
                             <div className="leading-tight">
                               <span className="inline-flex items-center gap-1">
@@ -707,25 +707,25 @@ export function SellerDashboard() {
                             <span className="text-primary font-medium">👤 {t.entry_by_name}</span>
                           ) : "—"}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-bold text-foreground tabular-nums">
+                        <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
                           {fmt(Number(t.bdt_amount), "৳")}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-bold text-foreground tabular-nums">
+                        <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
                           {fmt(Number(t.usdt_amount), "$")}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground tabular-nums">
+                        <td className="px-1.5 py-2 text-right text-xs font-semibold text-muted-foreground tabular-nums">
                           {Number(t.rate) > 0 ? t.rate : "—"}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-bold text-foreground tabular-nums">
+                        <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
                           {fmt(convertedBdt, "৳")}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <td className="px-1.5 py-2 text-xs text-muted-foreground">
                           <div className="whitespace-nowrap">{t.description || "—"}</div>
                           {t.top_up_requests?.payment_reference && (
                             <div className="text-[10px] font-mono text-primary mt-0.5">TrxID: {t.top_up_requests.payment_reference}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-1.5 py-2 text-center">
                           {t.proof_url ? (
                             <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:text-primary/80 transition-colors">
                               <ImageIcon className="h-4 w-4" />
@@ -737,7 +737,7 @@ export function SellerDashboard() {
                           const isPending = (t.status || "approved").toLowerCase() !== "approved";
                           return (
                             <td className={cn(
-                              "px-4 py-3 text-right text-xs font-extrabold tabular-nums whitespace-nowrap",
+                              "px-1.5 py-2 text-right text-xs font-extrabold tabular-nums whitespace-nowrap",
                               isPending ? "text-muted-foreground/60 italic" :
                                 da.isZero ? "text-muted-foreground" : da.isAdvance ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                             )}>
@@ -751,20 +751,20 @@ export function SellerDashboard() {
                   })}
                   {/* Totals Row */}
                   <tr className="bg-muted/30 border-t-2 border-border/60">
-                    <td className="px-4 py-3 text-xs font-bold text-foreground" colSpan={3}>
+                    <td className="px-1.5 py-2 text-xs font-bold text-foreground" colSpan={3}>
                       <span className="uppercase tracking-wider text-[11px]">Total</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs font-extrabold text-foreground tabular-nums">
+                    <td className="px-1.5 py-2 text-right text-xs font-extrabold text-foreground tabular-nums">
                       ৳{(totals.totalBdtPaid + totals.totalClientBdt).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs font-extrabold text-foreground tabular-nums">
+                    <td className="px-1.5 py-2 text-right text-xs font-extrabold text-foreground tabular-nums">
                       ${totals.totalUsdt.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs text-muted-foreground">—</td>
-                    <td className="px-4 py-3 text-right text-xs font-extrabold text-foreground tabular-nums">
+                    <td className="px-1.5 py-2 text-right text-xs text-muted-foreground">—</td>
+                    <td className="px-1.5 py-2 text-right text-xs font-extrabold text-foreground tabular-nums">
                       ৳{totals.totalConvertedBdt.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3" colSpan={3}></td>
+                    <td className="px-1.5 py-2" colSpan={3}></td>
                   </tr>
                 </tbody>
               </table>
