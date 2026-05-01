@@ -570,8 +570,7 @@ export function AdminSellers() {
   const sellerTotals = useMemo(() => {
     return filteredTxns.reduce(
       (acc: any, t: any) => {
-        const status = t.status || "approved";
-        if (status !== "approved") return acc;
+        if (!isCountedSellerTransaction(t)) return acc;
         if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
           acc.totalUsdt += Number(t.usdt_amount || 0);
@@ -610,14 +609,7 @@ export function AdminSellers() {
   const dueAdvance = useMemo(() => {
     let running = 0;
     for (const t of (sellerTxns || [])) {
-      if ((t.status || "approved") !== "approved") continue;
-      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-        running += Number(t.bdt_amount || 0);
-      } else if (t.type === "withdraw") {
-        running -= Number(t.bdt_amount || 0);
-      } else if (t.type === "usdt_received") {
-        running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-      }
+      running += computeTransactionDelta(t);
     }
     return running;
   }, [sellerTxns]);
