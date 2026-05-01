@@ -56,6 +56,11 @@ Deno.serve(async (req) => {
       bank_name: otherBankName,
       account_number: otherAccountNumber,
       account_holder_name: otherAccountHolderName,
+      // New (idempotency + USDT support)
+      seller_transaction_id,
+      payment_kind, // 'bdt_payment' | 'usdt_received'
+      usdt_amount,
+      rate,
     } = await req.json();
 
     if (!proof_url) {
@@ -63,6 +68,23 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Idempotency lock: if a seller_transaction_id is provided and it's already
+    // been forwarded, skip silently. Prevents duplicate Telegram messages on
+    // retries, double clicks, or replays.
+    if (seller_transaction_id) {
+      const { data: existing } = await supabase
+        .from('seller_transactions')
+        .select('telegram_forwarded, telegram_message_id')
+        .eq('id', seller_transaction_id)
+        .maybeSingle();
+      if (existing?.telegram_forwarded) {
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: existing.telegram_message_id }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
     // Get bot token
@@ -115,8 +137,17 @@ Deno.serve(async (req) => {
           .select('type, bdt_amount, usdt_amount, rate, status, created_at')
           .eq('seller_id', resolvedSellerId);
         let balance = computeDueAdvance((txns as any[]) || []);
-        // Add the current incoming bdt_payment that isn't in the ledger yet
-        balance += Number(bdt_amount || 0);
+        // If the current transaction is already in the ledger (we received an id),
+        // the running total already accounts for it — do NOT add again.
+        // Otherwise, factor in the pending entry so the forwarded total reflects
+        // what the balance WILL be once admin approves.
+        if (!seller_transaction_id) {
+          if (payment_kind === 'usdt_received') {
+            balance -= Number(usdt_amount || 0) * Number(rate || 0);
+          } else {
+            balance += Number(bdt_amount || 0);
+          }
+        }
         if (balance > 0) {
           runningTotalLine = `\n🟢 Total: Advance +৳${formatBdtIN(balance)}`;
         } else if (balance < 0) {
@@ -129,9 +160,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    let caption = `💰 <b>Seller Payment</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
-    if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
-    caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
+    let caption: string;
+    if (payment_kind === 'usdt_received') {
+      const usdt = Number(usdt_amount || 0);
+      const r = Number(rate || 0);
+      const converted = usdt * r;
+      caption = `💵 <b>USDT Given (Approved)</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
+      if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
+      caption += `\n💲 USDT: ${usdt.toLocaleString()}`;
+      caption += `\n📈 Rate: ৳${r.toLocaleString()}`;
+      caption += `\n💰 BDT: ৳${formatBdtIN(converted)}`;
+      caption += `\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
+    } else {
+      caption = `💰 <b>Seller Payment</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
+      if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
+      caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
+    }
 
     const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
       method: 'POST',
@@ -148,6 +192,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Mark as forwarded (idempotency lock) — best-effort.
+    if (seller_transaction_id) {
+      try {
+        await supabase
+          .from('seller_transactions')
+          .update({
+            telegram_forwarded: true,
+            telegram_message_id: tgResult.result?.message_id || null,
+            telegram_forwarded_at: new Date().toISOString(),
+          })
+          .eq('id', seller_transaction_id)
+          .eq('telegram_forwarded', false); // double-safety against race
+      } catch (e) {
+        console.error('Failed to mark seller_transaction as forwarded:', e);
+      }
+    }
     console.log(`✅ Forwarded seller proof to group ${groupId}`);
     return new Response(JSON.stringify({ ok: true, message_id: tgResult.result?.message_id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

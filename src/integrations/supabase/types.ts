@@ -1986,6 +1986,9 @@ export type Database = {
           reviewed_by: string | null
           seller_id: string
           status: string
+          telegram_forwarded: boolean
+          telegram_forwarded_at: string | null
+          telegram_message_id: number | null
           tenant_payment_id: string | null
           top_up_request_id: string | null
           type: string
@@ -2005,6 +2008,9 @@ export type Database = {
           reviewed_by?: string | null
           seller_id: string
           status?: string
+          telegram_forwarded?: boolean
+          telegram_forwarded_at?: string | null
+          telegram_message_id?: number | null
           tenant_payment_id?: string | null
           top_up_request_id?: string | null
           type: string
@@ -2024,6 +2030,9 @@ export type Database = {
           reviewed_by?: string | null
           seller_id?: string
           status?: string
+          telegram_forwarded?: boolean
+          telegram_forwarded_at?: string | null
+          telegram_message_id?: number | null
           tenant_payment_id?: string | null
           top_up_request_id?: string | null
           type?: string
