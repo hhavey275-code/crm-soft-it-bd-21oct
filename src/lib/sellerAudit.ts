@@ -154,7 +154,7 @@ export async function runSellerAudit(): Promise<AuditReport> {
     const profile = profileById.get(tr.user_id) as any;
     orphans.push({
       topup_id: tr.id,
-      user_id: tr.user_id,
+      user_id: tr.user_id || "",
       user_name: profile?.full_name || profile?.email || null,
       bdt_amount: Number(tr.bdt_amount || 0),
       amount_usd: Number(tr.amount || 0),
