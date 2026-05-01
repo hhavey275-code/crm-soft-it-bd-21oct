@@ -560,6 +560,9 @@ export function SellerDashboard() {
                     {t.description && (
                       <p className="text-[10px] text-muted-foreground mt-1 truncate">📝 {t.description}</p>
                     )}
+                    {t.top_up_requests?.payment_reference && (
+                      <p className="text-[10px] font-mono text-primary mt-0.5 break-all">TrxID: {t.top_up_requests.payment_reference}</p>
+                    )}
                     {t.proof_url && (
                       <button
                         onClick={() => setProofUrl(t.proof_url)}
