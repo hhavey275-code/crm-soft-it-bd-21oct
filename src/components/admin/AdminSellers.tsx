@@ -398,7 +398,32 @@ export function AdminSellers() {
     },
   });
 
-  // Fetch assigned banks for selected seller
+  // Realtime: keep the seller ledger in sync. Without this, an approval coming
+  // in via DB trigger (e.g. top-up approved → seller_transactions row inserted)
+  // never reaches the open admin view, so the headline balance and Month View
+  // both go stale until a manual refresh.
+  useEffect(() => {
+    if (!selectedSeller?.user_id) return;
+    const channel = supabase
+      .channel(`admin-seller-txns-${selectedSeller.user_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "seller_transactions", filter: `seller_id=eq.${selectedSeller.user_id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+          queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller.user_id] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "seller_monthly_closings", filter: `seller_id=eq.${selectedSeller.user_id}` },
+        () => queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller.user_id] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedSeller?.user_id, queryClient]);
+
+
   const { data: sellerBanks } = useQuery({
     queryKey: ["admin-seller-banks", selectedSeller?.user_id],
     enabled: !!selectedSeller,
@@ -551,7 +576,26 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const dueAdvance = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
+  // Filter-bound totals (for the "filtered" cards / table footer)
+  const dueAdvanceFiltered = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt - sellerTotals.totalWithdrawn;
+
+  // Lifetime Due/Advance — ALWAYS computed from the full ledger, independent
+  // of typeFilter / bankFilter / datePreset. This is what the All-Time hero
+  // card must show so changing a filter never changes the headline balance.
+  const dueAdvance = useMemo(() => {
+    let running = 0;
+    for (const t of (sellerTxns || [])) {
+      if ((t.status || "approved") !== "approved") continue;
+      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+        running += Number(t.bdt_amount || 0);
+      } else if (t.type === "withdraw") {
+        running -= Number(t.bdt_amount || 0);
+      } else if (t.type === "usdt_received") {
+        running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      }
+    }
+    return running;
+  }, [sellerTxns]);
 
   // ===== Month-to-month closing =====
   const { data: closings } = useQuery({
@@ -597,9 +641,15 @@ export function AdminSellers() {
   );
   const activeClosingLive = activeOpening + activeMonthAgg.delta;
   const activeClosingRecord = closingFor(activeBucket);
-  const monthDueAdvance = activeClosingRecord
-    ? Number(activeClosingRecord.closing_due_advance_bdt || 0)
-    : activeClosingLive;
+  // Drift: closing was saved earlier, but the underlying ledger has changed
+  // since (rows added/removed/edited). Compare to the live recompute.
+  const closingDrift = activeClosingRecord
+    ? Math.round((Number(activeClosingRecord.closing_due_advance_bdt || 0) - activeClosingLive) * 100) / 100
+    : 0;
+  // Always trust live computation for the headline so the visible balance
+  // matches the ledger. The stored closing value (if any) is shown as a
+  // secondary "Recorded" pill plus a Recalc button when they disagree.
+  const monthDueAdvance = activeClosingLive;
   const displayDueAdvance = monthView ? monthDueAdvance : dueAdvance;
 
   const closeMonthMutation = useMutation({
@@ -1135,11 +1185,19 @@ export function AdminSellers() {
                     monthDueAdvance >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
                                           : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
                   )}>
-                    {activeClosingRecord ? "Closed Due/Adv" : "Current Due/Adv"}: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    Current Due/Adv: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </span>
 
                   {activeClosingRecord ? (
                     <>
+                      {Math.abs(closingDrift) >= 0.5 && (
+                        <span
+                          className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800 font-medium"
+                          title="Recorded closing differs from live ledger — click Recalc to fix"
+                        >
+                          Recorded: ৳{Math.round(Number(activeClosingRecord.closing_due_advance_bdt || 0)).toLocaleString()} (drift {closingDrift >= 0 ? "+" : "−"}৳{Math.abs(Math.round(closingDrift)).toLocaleString()})
+                        </span>
+                      )}
                       <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800 font-medium inline-flex items-center gap-1">
                         <Lock className="h-3 w-3" /> Closed {format(new Date(activeClosingRecord.closed_at), "MMM d, HH:mm")}
                       </span>
@@ -1206,7 +1264,7 @@ export function AdminSellers() {
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {monthView
-                    ? activeClosingRecord ? `Closed ${monthLabel(activeBucket)}` : `Current ${monthLabel(activeBucket)}`
+                    ? `Current ${monthLabel(activeBucket)}`
                     : "After all transactions"}
                 </p>
               </div>
