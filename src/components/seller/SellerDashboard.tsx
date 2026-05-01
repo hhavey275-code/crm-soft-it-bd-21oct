@@ -171,12 +171,21 @@ export function SellerDashboard() {
       toast.error("No transactions to export");
       return;
     }
+    const extractTrxId = (desc: string | null | undefined): string => {
+      if (!desc) return "";
+      const m1 = desc.match(/Tr[xn]\s*ID\s*[:\-]?\s*([A-Za-z0-9]+)/i);
+      if (m1) return m1[1];
+      const m2 = desc.match(/\b(\d{8,})\b/);
+      if (m2) return m2[1];
+      return desc.trim();
+    };
     const rows = filtered.map((t: any) => {
       const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
       return {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
+        "Transaction ID": extractTrxId(t.description),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
@@ -189,6 +198,7 @@ export function SellerDashboard() {
     });
     rows.push({
       "Date": "", "Type": "TOTALS", "Status": "",
+      "Transaction ID": "",
       "BDT Amount": totals.totalBdtPaid + totals.totalClientBdt,
       "USDT Amount": totals.totalUsdt,
       "Rate": 0,
