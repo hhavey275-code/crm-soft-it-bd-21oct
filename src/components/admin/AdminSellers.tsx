@@ -1185,11 +1185,19 @@ export function AdminSellers() {
                     monthDueAdvance >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
                                           : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
                   )}>
-                    {activeClosingRecord ? "Closed Due/Adv" : "Current Due/Adv"}: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    Current Due/Adv: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </span>
 
                   {activeClosingRecord ? (
                     <>
+                      {Math.abs(closingDrift) >= 0.5 && (
+                        <span
+                          className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800 font-medium"
+                          title="Recorded closing differs from live ledger — click Recalc to fix"
+                        >
+                          Recorded: ৳{Math.round(Number(activeClosingRecord.closing_due_advance_bdt || 0)).toLocaleString()} (drift {closingDrift >= 0 ? "+" : "−"}৳{Math.abs(Math.round(closingDrift)).toLocaleString()})
+                        </span>
+                      )}
                       <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800 font-medium inline-flex items-center gap-1">
                         <Lock className="h-3 w-3" /> Closed {format(new Date(activeClosingRecord.closed_at), "MMM d, HH:mm")}
                       </span>
