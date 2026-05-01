@@ -398,7 +398,32 @@ export function AdminSellers() {
     },
   });
 
-  // Fetch assigned banks for selected seller
+  // Realtime: keep the seller ledger in sync. Without this, an approval coming
+  // in via DB trigger (e.g. top-up approved → seller_transactions row inserted)
+  // never reaches the open admin view, so the headline balance and Month View
+  // both go stale until a manual refresh.
+  useEffect(() => {
+    if (!selectedSeller?.user_id) return;
+    const channel = supabase
+      .channel(`admin-seller-txns-${selectedSeller.user_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "seller_transactions", filter: `seller_id=eq.${selectedSeller.user_id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+          queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller.user_id] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "seller_monthly_closings", filter: `seller_id=eq.${selectedSeller.user_id}` },
+        () => queryClient.invalidateQueries({ queryKey: ["admin-seller-closings", selectedSeller.user_id] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedSeller?.user_id, queryClient]);
+
+
   const { data: sellerBanks } = useQuery({
     queryKey: ["admin-seller-banks", selectedSeller?.user_id],
     enabled: !!selectedSeller,
