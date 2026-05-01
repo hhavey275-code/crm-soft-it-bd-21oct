@@ -1849,11 +1849,11 @@ export function AdminSellers() {
                               }
                               return (
                                 <td
-                                  className="border border-border px-1.5 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-[11px]"
+                                  className="border border-border px-1 py-1 text-center cursor-pointer hover:bg-primary/10 transition-colors font-medium text-[11px] w-[150px] max-w-[150px]"
                                   onClick={() => startEdit(t.id, "description", t.description || "")}
                                   title={t.description || ""}
                                 >
-                                  <div className="leading-tight line-clamp-2 break-words max-w-[180px] text-[10px] text-muted-foreground mx-auto">{t.description || "—"}</div>
+                                  <div className="leading-tight truncate text-[10px] text-muted-foreground">{t.description || "—"}</div>
                                   <div className="text-[11px] font-mono text-primary mt-0.5 break-all font-semibold">{trxRef}</div>
                                 </td>
                               );
