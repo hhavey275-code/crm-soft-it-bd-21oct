@@ -185,7 +185,7 @@ export function SellerDashboard() {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": extractTrxId(t.description),
+        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
         "BDT Amount": Number(t.bdt_amount || 0),
         "USDT Amount": Number(t.usdt_amount || 0),
         "Rate": Number(t.rate || 0),
