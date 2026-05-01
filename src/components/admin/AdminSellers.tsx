@@ -726,21 +726,18 @@ export function AdminSellers() {
 
   const exportMonthlyToExcel = () => {
     if (!selectedSeller) return;
-    const monthTxns = filterMonth(sellerTxns || [], exportBucket);
-    if (!monthTxns.length) {
-      toast.error("No transactions in selected month");
-      return;
-    }
-    const opening = openingFor(exportBucket);
-    const running = computeRunningWithOpening(monthTxns, opening);
-    // Sort ascending for export readability
-    const sorted = [...monthTxns].sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-    const buildRow = (t: any): Record<string, any> => {
+    const months = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
+    const wb = XLSX.utils.book_new();
+    let totalRows = 0;
+    let skippedRows = 0;
+
+    const buildRow = (t: any, running: Map<string, number>, bucket: MonthBucket): Record<string, any> => {
       const convBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      const skipReason = getSellerTransactionSkipReason(t) || "";
+      if (skipReason) skippedRows += 1;
       const full: Record<ExportCol, any> = {
         "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
+        "Month": monthLabel(bucket),
         "Type": getTypeLabel(t.type),
         "Status": (t.status || "approved").toUpperCase(),
         "BDT Amount": Number(t.bdt_amount || 0),
@@ -749,43 +746,59 @@ export function AdminSellers() {
         "Converted (BDT)": Number(convBdt.toFixed(2)),
         "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
         "Account Name": t.bank_accounts?.account_name || "",
+        "Change (BDT)": Number(computeTransactionDelta(t).toFixed(2)),
         "Due/Advance (BDT)": Number((running.get(t.id) || 0).toFixed(2)),
         "Description": t.description || "",
         "Proof URL": t.proof_url || "",
+        "Not Calculated Reason": skipReason,
       };
       const picked: Record<string, any> = {};
       for (const c of exportCols) picked[c] = full[c];
       return picked;
     };
-    const rows: any[] = [];
-    // Opening row
-    const openingRow: Record<string, any> = {};
-    exportCols.forEach(c => { openingRow[c] = ""; });
-    if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
-    if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (carry-forward)`;
-    if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
-    rows.push(openingRow);
-    sorted.forEach(t => rows.push(buildRow(t)));
-    // Closing row
-    const agg = aggregateMonth(sellerTxns || [], exportBucket);
-    const closing = opening + agg.delta;
-    const closingRow: Record<string, any> = {};
-    exportCols.forEach(c => { closingRow[c] = ""; });
-    if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
-    if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
-    if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
-    if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
-    if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
-    if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
-    rows.push(closingRow);
 
-    const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
-    const wb = XLSX.utils.book_new();
-    const sheetName = `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    for (const bucket of months) {
+      const monthTxns = filterMonth(sellerTxns || [], bucket);
+      const opening = openingFor(bucket);
+      const running = computeRunningWithOpening(monthTxns, opening);
+      const sorted = sortSellerTxnsAsc(monthTxns);
+      const rows: any[] = [];
+      const openingRow: Record<string, any> = {};
+      exportCols.forEach(c => { openingRow[c] = ""; });
+      if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
+      if (exportCols.includes("Month")) openingRow["Month"] = monthLabel(bucket);
+      if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (ledger before month)`;
+      if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
+      rows.push(openingRow);
+      sorted.forEach(t => rows.push(buildRow(t, running, bucket)));
+      const agg = aggregateMonth(sellerTxns || [], bucket);
+      const closing = opening + agg.delta;
+      const closingRow: Record<string, any> = {};
+      exportCols.forEach(c => { closingRow[c] = ""; });
+      if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
+      if (exportCols.includes("Month")) closingRow["Month"] = monthLabel(bucket);
+      if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
+      if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
+      if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
+      if (exportCols.includes("Change (BDT)")) closingRow["Change (BDT)"] = Number(agg.delta.toFixed(2));
+      if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
+      if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
+      rows.push(closingRow);
+      totalRows += rows.length;
+
+      const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
+      ws["!cols"] = exportCols.map((c) => ({ wch: c.includes("Description") || c.includes("Reason") || c.includes("Proof") ? 34 : 16 }));
+      XLSX.utils.book_append_sheet(wb, ws, `${bucket.year}-${String(bucket.month).padStart(2, "0")}`);
+    }
+
+    if (!totalRows) {
+      toast.error("No data to export");
+      return;
+    }
     const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    XLSX.writeFile(wb, `${sellerSlug}-${sheetName}-ledger.xlsx`);
-    toast.success(`Exported ${monthLabel(exportBucket)}`);
+    const suffix = exportAllMonths ? "month-by-month" : `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `${sellerSlug}-${suffix}-ledger.xlsx`);
+    toast.success(`Exported ${exportAllMonths ? "all months" : monthLabel(exportBucket)}${skippedRows ? ` — ${skippedRows} not calculated listed` : ""}`);
     setShowMonthlyExport(false);
   };
 
