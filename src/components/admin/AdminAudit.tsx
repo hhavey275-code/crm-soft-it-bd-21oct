@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,11 @@ export function AdminAudit() {
   });
 
   // Default to latest month once loaded
-  if (months && months.length && !exportBucket) {
-    setExportBucket(months[0]);
-  }
+  useEffect(() => {
+    if (months && months.length && !exportBucket) {
+      setExportBucket(months[0]);
+    }
+  }, [months, exportBucket]);
 
   const handleExport = async () => {
     if (!exportBucket) return;
