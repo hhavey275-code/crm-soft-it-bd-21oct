@@ -23,7 +23,7 @@ export function AdminAudit() {
 
   const { data: report, isLoading, refetch } = useQuery<AuditReport>({
     queryKey: ["seller-audit-report"],
-    queryFn: runSellerAudit,
+    queryFn: () => runSellerAudit(),
     staleTime: 30_000,
   });
 
