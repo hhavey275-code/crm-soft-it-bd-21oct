@@ -2008,6 +2008,72 @@ export type Database = {
           },
         ]
       }
+      seller_transactions_archive_2026_05: {
+        Row: {
+          admin_note: string | null
+          archive_reason: string | null
+          archived_at: string
+          bank_account_id: string | null
+          bdt_amount: number
+          created_at: string
+          description: string | null
+          entry_by_name: string | null
+          id: string
+          proof_url: string | null
+          rate: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          seller_id: string
+          status: string
+          tenant_payment_id: string | null
+          top_up_request_id: string | null
+          type: string
+          usdt_amount: number
+        }
+        Insert: {
+          admin_note?: string | null
+          archive_reason?: string | null
+          archived_at?: string
+          bank_account_id?: string | null
+          bdt_amount?: number
+          created_at?: string
+          description?: string | null
+          entry_by_name?: string | null
+          id?: string
+          proof_url?: string | null
+          rate?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seller_id: string
+          status?: string
+          tenant_payment_id?: string | null
+          top_up_request_id?: string | null
+          type: string
+          usdt_amount?: number
+        }
+        Update: {
+          admin_note?: string | null
+          archive_reason?: string | null
+          archived_at?: string
+          bank_account_id?: string | null
+          bdt_amount?: number
+          created_at?: string
+          description?: string | null
+          entry_by_name?: string | null
+          id?: string
+          proof_url?: string | null
+          rate?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seller_id?: string
+          status?: string
+          tenant_payment_id?: string | null
+          top_up_request_id?: string | null
+          type?: string
+          usdt_amount?: number
+        }
+        Relationships: []
+      }
       seller_usdt_banks: {
         Row: {
           assigned_at: string
