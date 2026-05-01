@@ -652,11 +652,9 @@ export function AdminSellers() {
     return computeRunningWithOpening(filterMonth(sellerTxns, activeBucket), opening);
   }, [sellerTxns, monthView, activeBucket, closings]);
 
-  // Opening balance for a bucket: previous month's closing or 0
+  // Opening balance for a bucket: live ledger balance before that month.
   const openingFor = (b: MonthBucket): number => {
-    const prev = prevMonth(b);
-    const rec = closingFor(prev);
-    return rec ? Number(rec.closing_due_advance_bdt || 0) : 0;
+    return computeLedgerBalanceBefore(sellerTxns || [], b);
   };
 
   const activeOpening = openingFor(activeBucket);
