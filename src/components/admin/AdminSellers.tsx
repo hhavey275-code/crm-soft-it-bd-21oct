@@ -1701,7 +1701,12 @@ export function AdminSellers() {
                         );
                       })()}
                       <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
-                        <span className="text-muted-foreground break-all max-w-[70%]">{t.description || "—"}</span>
+                        <div className="text-muted-foreground break-all max-w-[70%] space-y-0.5">
+                          <div>{t.description || "—"}</div>
+                          {t.top_up_requests?.payment_reference && (
+                            <div className="text-[10px] font-mono text-primary">TrxID: {t.top_up_requests.payment_reference}</div>
+                          )}
+                        </div>
                         {t.proof_url ? (
                           <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
                             <ImageIcon className="h-3 w-3" /> View
