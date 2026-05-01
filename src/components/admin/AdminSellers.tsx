@@ -119,6 +119,19 @@ function sortSellerTxnsAsc(txns: any[]) {
   });
 }
 
+/** Extract a transaction reference id from the description text.
+ *  e.g. "TrxID: 1188006260920088" → "1188006260920088".
+ *  Falls back to a long digit sequence (>=8 digits) anywhere in the text,
+ *  otherwise returns the raw description (or "" if none). */
+function extractTrxId(desc: string | null | undefined): string {
+  if (!desc) return "";
+  const m1 = desc.match(/Tr[xn]\s*ID\s*[:\-]?\s*([A-Za-z0-9]+)/i);
+  if (m1) return m1[1];
+  const m2 = desc.match(/\b(\d{8,})\b/);
+  if (m2) return m2[1];
+  return desc.trim();
+}
+
 function nextMonthBucket({ year, month }: MonthBucket): MonthBucket {
   return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
 }
