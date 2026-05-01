@@ -60,6 +60,7 @@ export type SellerBalanceRow = {
 
 export type AuditReport = {
   generated_at: string;
+  since: string;
   orphans: OrphanTopup[];
   skipped: SkippedSellerTxn[];
   balances: SellerBalanceRow[];
@@ -87,11 +88,19 @@ function reasonForSkip(t: any): string | null {
   return `Unknown type: ${t.type || "(blank)"}`;
 }
 
+/** Default audit cutoff: today 00:00 in local time (ISO). Older data is ignored. */
+export function defaultAuditSince(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 /**
  * Run a full audit. Reads top_up_requests, seller_transactions, bank_accounts,
  * profiles and cross-checks them. Returns a structured report.
  */
-export async function runSellerAudit(): Promise<AuditReport> {
+export async function runSellerAudit(since?: string): Promise<AuditReport> {
+  const sinceIso = since || defaultAuditSince();
   // Pull everything we need in parallel.
   const [
     { data: topups },
@@ -104,11 +113,13 @@ export async function runSellerAudit(): Promise<AuditReport> {
       .select("id, user_id, amount, bdt_amount, bank_account_id, status, created_at, updated_at")
       .eq("status", "approved")
       .not("bank_account_id", "is", null)
+      .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase
       .from("seller_transactions")
       .select("id, seller_id, type, bdt_amount, usdt_amount, rate, status, top_up_request_id, created_at, description")
+      .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .limit(10000),
     supabase
@@ -235,6 +246,7 @@ export async function runSellerAudit(): Promise<AuditReport> {
 
   return {
     generated_at: new Date().toISOString(),
+    since: sinceIso,
     orphans,
     skipped,
     balances,
