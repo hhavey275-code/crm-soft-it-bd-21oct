@@ -429,21 +429,31 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
               type="number"
               value={obValue}
               onChange={(e) => setObValue(e.target.value)}
-              placeholder="amount (BDT)"
+              placeholder="manual amount (optional)"
               className="flex-1"
             />
             <Button
+              variant="outline"
+              onClick={() => setOpeningBalance(true)}
+              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
+              title="Auto = previous month closing balance theke calculate kore boshabe"
+            >
+              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Auto
+            </Button>
+            <Button
               variant="secondary"
-              onClick={setOpeningBalance}
+              onClick={() => setOpeningBalance(false)}
               disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
               title={!form.opening_balance_cell ? "Opening balance cell set kore Save korun" : ""}
             >
               {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Set opening balance
+              Set manual
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Opening balance cell ({form.opening_balance_cell || "set korun"}) e ei value boshbe. Tab missing thakle auto create hobe.
+            Opening balance cell ({form.opening_balance_cell || "set korun"}) e value boshbe.
+            Backfill chalalei prottek month er jonno auto opening balance system theke boshe jabe.
           </p>
         </div>
 
