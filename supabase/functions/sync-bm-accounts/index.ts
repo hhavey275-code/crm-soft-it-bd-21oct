@@ -133,6 +133,8 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const now = new Date().toISOString();
+
     // Include assigned_users so we can filter to System-User-assigned accounts only.
     const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name,assigned_users.limit(250){id,role}";
     const baseUrl = `https://graph.facebook.com/v23.0/${bm.bm_id}`;
