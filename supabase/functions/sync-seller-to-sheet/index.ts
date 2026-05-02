@@ -269,12 +269,22 @@ serve(async (req) => {
   try {
     const { seller_transaction_id, dry_run, backfill, seller_id, months, limit } = bodyJson;
 
-    // ---- BACKFILL MODE ----
+    // ---- BACKFILL MODE (optimized: 1 meta read + 1 probe per tab + 1 batch write per tab) ----
     if (backfill) {
       if (!seller_id) throw new Error("seller_id required for backfill");
       if (!Array.isArray(months) || months.length === 0)
         throw new Error("months[] required (e.g. ['2026-04','2026-05'])");
 
+      // Load seller config
+      const { data: cfg, error: cfgErr } = await supabase
+        .from("seller_sheet_config")
+        .select("*")
+        .eq("seller_id", seller_id)
+        .maybeSingle();
+      if (cfgErr) throw new Error(`config: ${cfgErr.message}`);
+      if (!cfg || !cfg.enabled) throw new Error("seller has no enabled sheet config");
+
+      // Pull all approved txns in months (full row needed for mapping)
       let allTxns: any[] = [];
       for (const m of months) {
         const [y, mo] = m.split("-").map(Number);
@@ -282,7 +292,7 @@ serve(async (req) => {
         const end = new Date(Date.UTC(y, mo, 1)).toISOString();
         const { data, error } = await supabase
           .from("seller_transactions")
-          .select("id, created_at")
+          .select("*")
           .eq("seller_id", seller_id)
           .eq("status", "approved")
           .gte("created_at", start)
@@ -292,38 +302,131 @@ serve(async (req) => {
         if (data) allTxns = allTxns.concat(data);
       }
 
-      // Filter out already-synced txns up front
+      // Skip already synced
       const ids = allTxns.map((t) => t.id);
-      const { data: doneRows } = await supabase
-        .from("sheet_sync_log")
-        .select("seller_transaction_id")
-        .in("seller_transaction_id", ids)
-        .eq("status", "success");
-      const doneSet = new Set((doneRows || []).map((r: any) => r.seller_transaction_id));
+      let doneSet = new Set<string>();
+      if (ids.length > 0) {
+        const { data: doneRows } = await supabase
+          .from("sheet_sync_log")
+          .select("seller_transaction_id")
+          .in("seller_transaction_id", ids)
+          .eq("status", "success");
+        doneSet = new Set((doneRows || []).map((r: any) => r.seller_transaction_id));
+      }
       const remaining = allTxns.filter((t) => !doneSet.has(t.id));
-      const cap = typeof limit === "number" && limit > 0 ? limit : 30;
-      const batch = remaining.slice(0, cap);
 
-      let success = 0, failed = 0;
-      const errors: any[] = [];
-      for (const t of batch) {
-        try {
-          const r = await syncOneTransaction(supabase, t.id, false);
-          if (!r.skipped) success++;
-        } catch (err: any) {
-          failed++;
-          errors.push({ id: t.id, error: err?.message || String(err) });
+      // Group by target tab
+      const tabPattern = cfg.tab_pattern || "{MMMM-YYYY}";
+      const groups = new Map<string, any[]>();
+      for (const t of remaining) {
+        const tab = formatTabName(tabPattern, new Date(t.created_at));
+        if (!groups.has(tab)) groups.set(tab, []);
+        groups.get(tab)!.push(t);
+      }
+
+      // 1 meta call
+      const meta = await getSheetsMeta(cfg.spreadsheet_id);
+      const sheets = meta.sheets || [];
+      const titleSet = new Set(sheets.map((s: any) => s.properties.title));
+
+      // Ensure all needed tabs exist (create missing ones, cloning template if set)
+      for (const tab of groups.keys()) {
+        if (!titleSet.has(tab)) {
+          const tmpl = cfg.template_tab
+            ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
+            : null;
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          titleSet.add(tab);
         }
       }
+
+      const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
+      const dataStart = cfg.data_start_row || 7;
+
+      const buildCells = (txn: any) => {
+        const txnDate = new Date(txn.created_at);
+        const cells: { col: string; value: string | number }[] = [];
+        const push = (col: string | null, val: any) => {
+          if (col && val !== undefined && val !== null && val !== "") cells.push({ col, value: val });
+        };
+        push(cfg.col_datetime, formatDateTimeBn(txnDate));
+        const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
+        const isUsdt = txn.type === "usdt_received";
+        const isWithdraw = txn.type === "withdraw";
+        if (isPayment) push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
+        else if (isWithdraw) push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        else if (isUsdt) {
+          push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
+          push(cfg.col_payo_rate, Number(txn.rate || 0));
+          push(cfg.col_payo_bdt, Number((Number(txn.usdt_amount || 0) * Number(txn.rate || 0)).toFixed(2)));
+        }
+        push(cfg.col_description, txn.description || "");
+        push(cfg.col_proof_url, txn.proof_url || "");
+        push(cfg.col_txn_id, txn.id);
+        return cells;
+      };
+
+      let totalRowsWritten = 0;
+      const tabResults: any[] = [];
+
+      for (const [tab, txns] of groups.entries()) {
+        // 1 probe per tab
+        const startRow = await findFirstEmptyDataRow(cfg.spreadsheet_id, tab, dataStart, probeCol);
+
+        // Build batch data for all txns in this tab
+        const data: any[] = [];
+        const logRows: any[] = [];
+        txns.forEach((t, i) => {
+          const rowNumber = startRow + i;
+          const cells = buildCells(t);
+          for (const c of cells) {
+            data.push({
+              range: `'${tab}'!${normalizeCol(c.col)}${rowNumber}`,
+              values: [[c.value]],
+            });
+          }
+          logRows.push({
+            seller_transaction_id: t.id,
+            spreadsheet_id: cfg.spreadsheet_id,
+            tab_name: tab,
+            row_number: rowNumber,
+            status: "success",
+            error_message: null,
+            synced_at: new Date().toISOString(),
+          });
+        });
+
+        if (data.length > 0) {
+          const r = await fetch(
+            `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values:batchUpdate`,
+            {
+              method: "POST",
+              headers: gwHeaders,
+              body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),
+            },
+          );
+          const j = await r.json();
+          if (!r.ok) throw new Error(`batchWrite failed [${r.status}]: ${JSON.stringify(j)}`);
+        }
+
+        // Log to sheet_sync_log in chunks
+        if (logRows.length > 0) {
+          await supabase.from("sheet_sync_log").upsert(logRows, { onConflict: "seller_transaction_id" });
+        }
+        totalRowsWritten += txns.length;
+        tabResults.push({ tab, rows_written: txns.length, start_row: startRow });
+      }
+
+      await supabase.from("seller_sheet_config")
+        .update({ last_synced_at: new Date().toISOString(), last_error: null })
+        .eq("id", cfg.id);
+
       return jsonResp({
         ok: true, backfill: true,
         total_in_months: allTxns.length,
         already_synced: doneSet.size,
-        remaining_before: remaining.length,
-        processed: batch.length,
-        success, failed,
-        more: remaining.length > batch.length,
-        errors: errors.slice(0, 10),
+        processed: totalRowsWritten,
+        tabs: tabResults,
       });
     }
 
