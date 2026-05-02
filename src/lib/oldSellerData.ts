@@ -25,6 +25,16 @@ const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
   "db54a642-969b-4e14-b911-463ea5972365", // 17 Apr 2026 · ৳2,500
   "4b48c94b-3227-4495-bea2-f159c02de114", // 26 Apr 2026 · ৳13,000
   "1e8ac1c4-0db3-483b-b746-2dec2e685a8d", // 29 Apr 2026 · ৳1,950
+  // Najmul Hossen — confirmed forwarded; flag never persisted
+  "5f667836-8b5f-4649-bcd5-82a8f51eebd3", // 4 Apr 2026 · ৳90,000
+  "c4abee5b-7d12-40a1-9bf0-e6e90c3cb3d2", // 4 Apr 2026 · ৳1,950
+  "cd12754a-0af3-4203-af3f-ee6c1084abbd", // 4 Apr 2026 · ৳12,900
+  "ca428dac-6492-4abc-8f8a-29b5cabca4c1", // 4 Apr 2026 · ৳129,000
+  "802f662e-fad5-4951-896e-d697319dbae4", // 5 Apr 2026 · ৳1,950
+  "a04b64f8-87ea-4c72-ae77-953eff414c7d", // 5 Apr 2026 · ৳120,000
+  "2891f39c-1be8-488f-b530-7f8e58289b13", // 5 Apr 2026 · ৳38,100
+  "fb0628df-e593-44bd-878a-b532f4203dd9", // 28 Apr 2026 · ৳50,000
+  "1be63fc0-a596-44ff-90ba-9fb0ca94b387", // 28 Apr 2026 · ৳100,000
 ]);
 
 export type ArchiveTxn = {
