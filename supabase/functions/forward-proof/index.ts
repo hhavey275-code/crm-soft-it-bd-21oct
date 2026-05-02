@@ -4,8 +4,9 @@ import {
   buildTotalLine,
   fetchAllSellerTxns,
   fetchPendingTopupCredits,
-  checkForwardLog,
-  writeForwardLog,
+  claimForwardSlot,
+  completeForwardSlot,
+  releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
@@ -31,14 +32,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Durable dedupe — return the prior message_id if we already forwarded this top-up.
-    const dedupe = await checkForwardLog(supabase, 'client_topup', request_id);
-    if (dedupe.alreadyForwarded) {
-      return new Response(
-        JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: dedupe.messageId }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    // (Atomic dedupe via claim_forward_slot happens AFTER we resolve the
+    // target group and BEFORE we actually POST to Telegram — so concurrent
+    // invocations cannot both send the same message.)
 
     const { data: reqData, error: reqErr } = await supabase
       .from('top_up_requests')
