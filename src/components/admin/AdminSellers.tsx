@@ -2594,9 +2594,17 @@ export function AdminSellers() {
             <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
               <Download className="h-4 w-4 mr-1" /> Download
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      {selectedSeller && (
+        <SellerSheetConfigDialog
+          open={showSheetConfig}
+          onOpenChange={setShowSheetConfig}
+          sellerId={selectedSeller.user_id}
+          sellerName={selectedSeller.full_name || selectedSeller.email}
+        />
+      )}
     </div>
   );
 }
