@@ -267,7 +267,7 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit } = bodyJson;
 
     // ---- BACKFILL MODE ----
     if (backfill) {
@@ -292,18 +292,39 @@ serve(async (req) => {
         if (data) allTxns = allTxns.concat(data);
       }
 
-      let success = 0, skipped = 0, failed = 0;
+      // Filter out already-synced txns up front
+      const ids = allTxns.map((t) => t.id);
+      const { data: doneRows } = await supabase
+        .from("sheet_sync_log")
+        .select("seller_transaction_id")
+        .in("seller_transaction_id", ids)
+        .eq("status", "success");
+      const doneSet = new Set((doneRows || []).map((r: any) => r.seller_transaction_id));
+      const remaining = allTxns.filter((t) => !doneSet.has(t.id));
+      const cap = typeof limit === "number" && limit > 0 ? limit : 30;
+      const batch = remaining.slice(0, cap);
+
+      let success = 0, failed = 0;
       const errors: any[] = [];
-      for (const t of allTxns) {
+      for (const t of batch) {
         try {
           const r = await syncOneTransaction(supabase, t.id, false);
-          if (r.skipped) skipped++; else success++;
+          if (!r.skipped) success++;
         } catch (err: any) {
           failed++;
           errors.push({ id: t.id, error: err?.message || String(err) });
         }
       }
-      return jsonResp({ ok: true, backfill: true, total: allTxns.length, success, skipped, failed, errors: errors.slice(0, 10) });
+      return jsonResp({
+        ok: true, backfill: true,
+        total_in_months: allTxns.length,
+        already_synced: doneSet.size,
+        remaining_before: remaining.length,
+        processed: batch.length,
+        success, failed,
+        more: remaining.length > batch.length,
+        errors: errors.slice(0, 10),
+      });
     }
 
     if (!seller_transaction_id) throw new Error("seller_transaction_id required");
