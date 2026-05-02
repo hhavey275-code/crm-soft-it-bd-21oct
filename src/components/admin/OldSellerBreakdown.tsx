@@ -854,7 +854,7 @@ function AllTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      <DeleteBtn row={r} onDelete={onDelete} />
                     </TableCell>
                   </TableRow>
                 );
