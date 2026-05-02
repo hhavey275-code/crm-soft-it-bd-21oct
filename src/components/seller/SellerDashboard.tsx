@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { MonthlyDueAdvanceCard } from "./MonthlyDueAdvanceCard";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -359,6 +360,9 @@ export function SellerDashboard() {
           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-rose-500/60 to-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       </div>
+
+      {/* Month-by-Month Due/Advance */}
+      <MonthlyDueAdvanceCard transactions={transactions as any} />
 
       {/* Bank Chips */}
       {banks.length > 0 && (

@@ -29,6 +29,7 @@ import {
   type ArchiveTxn,
 } from "@/lib/oldSellerData";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
+import { MigrateForwardedButton } from "./MigrateForwardedButton";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -337,6 +338,14 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           )}
         </CardContent>
       </Card>
+
+      {/* Forwarded → Live Ledger migration */}
+      <MigrateForwardedButton
+        sellerId={sellerId}
+        sellerName={sellerName}
+        forwardedRows={buckets.forwardedIn}
+        withdrawRows={buckets.withdraws}
+      />
 
       {/* Search */}
       <div className="flex items-center gap-2">
