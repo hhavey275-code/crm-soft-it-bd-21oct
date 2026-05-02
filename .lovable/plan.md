@@ -1,84 +1,82 @@
-Bujhlam. Current v2.0 implementation faltu hoyeche mainly karon eta generic GraphQL text parse kortese, exact Meta operation/doc_id capture kortese na, and card remove mutation blank doc_id diye call kortese. Tai card details wrong, threshold miss, remove fail. Ami eta v2.1 e properly fix korbo without tomake aro question kora.
+## লক্ষ্য
+"Old Seller" নামে একটা read-only admin menu, যেখানে প্রতিটা seller এর archive ডাটা (`seller_transactions_archive_2026_05`) detailed breakdown সহ দেখা যাবে — forwarded vs not-forwarded আলাদা, USDT/withdraw আলাদা, এবং দুই রকম Due/Advance total (forwarded-only এবং সব মিলিয়ে)।
 
-Plan:
+## নতুন Menu
+- Sidebar এ admin section এ "Old Seller" (Archive icon), শুধু admin/superadmin
+- Route: `/old-seller` → `src/routes/old-seller.tsx` → `OldSellerPage`
 
-1. Extension data capture reliable korbo
-- `hook.js` e shudhu response text na, request body-o capture korbo:
-  - `fb_api_req_friendly_name`
-  - `doc_id`
-  - `variables`
-  - `fb_dtsg`, `lsd`, `jazoest`, actor/user id
-  - current URL/account id
-- Per account operation cache rakha hobe, jate Meta er exact query/mutation replay kora jay.
-- Generic parser er upor depend komabo.
+## Page Structure
 
-2. Card details thik korbo
-- Payment methods section theke visible DOM parse fallback add korbo, exactly page e jeta dekha jay:
-  - brand/name
-  - last 4
-  - expiry
-  - default/backup status
-  - row/menu/remove availability
-- GraphQL parser e only real card/payment method IDs accept korbo. Fake `local:visa:7144` type ID diye Remove button dekhabo na.
-- Duplicate card issue fix korbo by merging on real funding source/payment method id first, then last4+brand fallback only for display.
-- Extension panel e card row display Meta billing page er sathe match korbe.
+### 1. Seller Selector (top)
+Dropdown: archive এ ডাটা আছে এমন seller list (name + email)। Default — প্রথম জন।
 
-3. Threshold / hidden daily limit sync fix korbo
-- DOM parser add korbo for these exact Meta billing page texts:
-  - `Your balance reaches $...` = billing threshold
-  - `Daily spending limit (set by Meta): $...` = hidden daily limit / DSL
-  - `Current balance $...`
-  - `Funds $...`
-- GraphQL fields theke threshold/daily limit pele use korbo, na pele DOM fallback use korbo.
-- CRM sync payload mapping fix korbo so:
-  - `hidden_daily_limit` CRM e hidden DSL hisebe jay
-  - `billing_threshold` CRM e threshold hisebe jay
-  - balance/outstanding/total spending jodi available hoy store hoy
-- `get-ad-account-limits` function update korbo so old `daily_spend_limit` column na pele `hidden_daily_limit` column theke DSL return kore.
+### 2. Summary Cards (selected seller এর জন্য — ৬টা card grid)
 
-4. Card removal properly fix korbo
-- Current blank `doc_id` GraphQL replay remove korbo.
-- Captured exact delete mutation/doc_id/variables use kore removal call korbo.
-- If exact mutation not captured, extension same-page context e Meta UI fallback korbe:
-  - correct card row find
-  - menu open
-  - Remove click
-  - confirmation dialog confirm
-  - success/failure verify
-- Remove button only show korbo when:
-  - real payment method/funding source id ase, or
-  - visible Meta UI row remove action available
-- Remove fail hole fake success dekhabe na; clear error dekhabe.
-- Remove success hole panel theke card remove kore CRM sync e detached event pathabe.
+প্রতিটা card এ count + BDT (এবং relevant হলে USD/USDT):
 
-5. CRM card list/update fix korbo
-- `ingest-dsl` e detached/removed card events support add korbo.
-- `ad_account_last_known_state.cards` theke removed card remove korbo.
-- `AdAccountSyncedCards` current card list e detached card current card hisebe dekhabe na; needed hole only history/cache context e show korbe.
-- Sync button click korle updated card count CRM e reflect korbe.
+| Card | কী count হবে |
+|---|---|
+| 🟢 Forwarded payments IN | `client_topup` যেখানে linked top-up এর `telegram_forwarded=true` + `bdt_payment` যেখানে live table এর forwarded flag true ছিল* |
+| 🔴 Not-forwarded payments IN | বাকি approved client_topup + bdt_payment + tenant_payment |
+| 💵 USDT Given | `type=usdt_received` — count, total USDT, avg rate, total BDT cost (=Σ usdt×rate) |
+| 💸 Withdraw | `type=withdraw` — count, total BDT |
+| ⚖️ Due/Advance (Forwarded only) | (Forwarded payments IN) − USDT cost − Withdraw |
+| ⚖️ Due/Advance (All) | (All payments IN) − USDT cost − Withdraw |
 
-6. CRM sync button reliability fix korbo
-- Current hidden tab 4.5s wait kore immediately collect kore, tai often snapshot empty hoy. Eta change korbo:
-  - billing page load wait
-  - hook ready wait
-  - DOM + GraphQL data wait loop up to ~25s
-  - minimum expected fields/card rows found hole then push
-- Sync result e matched/unmatched info/status better show korbo.
+*Note: archive table এ `telegram_forwarded` column নাই। তাই detection rule:
+- `client_topup` → `top_up_requests.telegram_forwarded` join করে দেখব
+- `bdt_payment / tenant_payment / withdraw / usdt_received` → archive এ flag নাই, তাই এদের সবাইকে "not forwarded বা unknown" হিসাবে dashboard এ ২টা bucket এ দেখাব এবং note দিব। But USDT/Withdraw সবসময় উভয় total এ count হবে (যেমন তুমি বললে)।
 
-7. Payment method add support answer + implementation boundary
-- New card number directly add kora practical/safe na: Meta card add flow uses tokenization, bank/3DS/payment verification, and PCI-sensitive fields. Eta extension diye raw card add kora uchit na.
-- But existing saved BM/card/funding source ke ad account e attach/add kora possible hote pare, if Meta page exposes an attach/add GraphQL mutation. Ami hook e add/attach mutation recorder add korbo.
-- If captured attach mutation available hoy, extension e “Attach existing payment method” support add korbo for already-saved payment methods only.
-- If Meta mutation/doc_id not captured, button disabled thakbe with reason. Fake add success dekhabo na.
+### 3. Reconciliation Note (small panel)
+Forwarded-only Due/Advance ↔ All Due/Advance এর difference exact কত, এবং সেটাই "not forwarded payment IN" এর সমান হওয়ার কথা — যদি না হয় lal warning।
 
-8. Version/package update
-- Extension version bump korbo to `2.1.0`.
-- `public/dsl-sync-extension.zip` rebuild korbo.
-- CRM page extension version text/update instructions update korbo.
+### 4. Detailed Breakdown (Tabs)
 
-Expected result:
-- Billing page e card count/details Meta page er sathe match korbe.
-- Threshold and hidden daily limit CRM e sync hobe jodi page e visible/API response e available thake.
-- Card remove real action korbe, fake/local ID diye remove korbe na.
-- CRM synced cards remove er por current card list theke disappear korbe.
-- Existing payment method attach/add technically possible hole support thakbe; new raw card add korbo na.
+৫টা tab, প্রতিটায় full table + CSV export + search box:
+
+**A. Forwarded Payments (IN)**
+| Date/Time | TrxID / Ref | Type | BDT | USD (top-up হলে) | Bank | Entry by | Telegram msg id |
+
+**B. Not-forwarded Payments (IN)**
+একই columns, কিন্তু "Forwarded?" column এ ❌ badge
+
+**C. USDT Given**
+| Date/Time | USDT | Rate | BDT cost | Bank | Description | Entry by |
+
+**D. Withdraw**
+| Date/Time | BDT | Description (Rifat / Whatsapp group ইত্যাদি) | Entry by | Reviewed by |
+
+**E. All Transactions (raw)**
+সব archive rows একসাথে, sortable, type badge সহ — manual deep-check এর জন্য।
+
+প্রতিটা table এর footer এ subtotal।
+
+### 5. Top-up Requests panel (collapsible)
+আলাদা একটা section এ archive period এর সব `top_up_requests` (status=approved, এই seller এর bank দিয়ে) — যাতে তুমি দেখতে পারো কোন top-up গুলো archive-ledger এ ঢুকেছে আর কোনগুলো ঢুকে নাই (orphan)। Columns: time, USD, rate, BDT, bank, telegram_forwarded badge, "ledger entry আছে?" tick/cross।
+
+## Technical Details
+
+**Files create:**
+- `src/routes/old-seller.tsx` — TanStack route, admin guard
+- `src/components/pages/OldSellerPage.tsx` — selector + layout
+- `src/components/admin/OldSellerBreakdown.tsx` — summary cards + tabs
+- `src/lib/oldSellerData.ts` — data fetching:
+  - `fetchArchivedSellers()` → distinct seller_id from archive + profile names
+  - `fetchSellerArchiveBundle(sellerId)` → all archive txns + linked top_up_requests in one go
+  - `splitForwardedBuckets(rows, topupMap)` → returns `{forwardedIn, notForwardedIn, usdtGiven, withdraws}`
+  - `computeDueAdvancePair(...)` → returns `{forwardedOnly, all}` using existing logic from `sellerRunningTotal.ts`
+
+**Edit:**
+- `src/components/AppSidebar.tsx` — add "Old Seller" menu item under admin section
+- `src/routeTree.gen.ts` — auto-regen by Vite plugin
+
+**Data source:** `seller_transactions_archive_2026_05` + `top_up_requests` (live, joined by `top_up_request_id`) + `bank_accounts` (for bank name) + `profiles` (seller name)
+
+**RLS:** Archive table inherits from migration; verify admin/superadmin SELECT works. Add policy if missing।
+
+**No mutations** — pure read-only audit UI। কিছু ঠিক করতে হলে আলাদা request দিবে।
+
+## Out of scope
+- Archive ডাটা edit/delete
+- Live `seller_transactions` কোনো change
+- নতুন archive তৈরি (monthly close flow এ আগে থেকেই আছে)
