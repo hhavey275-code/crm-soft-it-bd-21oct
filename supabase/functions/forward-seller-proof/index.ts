@@ -4,7 +4,7 @@ import {
   buildTotalLine,
   formatBdtIN,
   fetchAllSellerTxns,
-  fetchPendingTopupCredits,
+  fetchForwardedBalanceMismatches,
   claimForwardSlot,
   completeForwardSlot,
   releaseForwardSlot,
@@ -129,20 +129,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build Due/Advance running total — paginated + pending top-ups included.
+    // Build Due/Advance running total from live seller_transactions only — this
+    // is the same source the dashboard uses, so Telegram Total cannot drift.
     let runningTotalLine = '';
     let finalBalance: number | null = null;
     if (resolvedSellerId) {
       try {
         const txns = await fetchAllSellerTxns(supabase, resolvedSellerId);
-        const pending = await fetchPendingTopupCredits(supabase, resolvedSellerId);
-        let balance = computeDueAdvance([...txns, ...pending]);
+        let balance = computeDueAdvance(txns);
 
-        // If this txn isn't in the ledger yet, factor in the pending change
         const alreadyInLedger = seller_transaction_id
           ? txns.some((t: any) => (t as any).id === seller_transaction_id)
           : false;
         if (!alreadyInLedger) {
+          console.warn('forward-seller-proof balance mismatch: txn missing from dashboard ledger', {
+            seller_transaction_id,
+            resolvedSellerId,
+            payment_kind,
+          });
+          await supabase.from('system_logs').insert({
+            action: 'Telegram Balance Mismatch',
+            details: `Seller txn ${seller_transaction_id || 'unknown'} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance before fallback.`,
+          }).catch(() => {});
           if (payment_kind === 'usdt_received') {
             balance -= Number(usdt_amount || 0) * Number(rate || 0);
           } else if (payment_kind === 'withdraw') {
@@ -153,6 +161,10 @@ Deno.serve(async (req) => {
         }
         finalBalance = balance;
         runningTotalLine = buildTotalLine(balance);
+        const mismatch = await fetchForwardedBalanceMismatches(supabase, resolvedSellerId);
+        if (mismatch.pendingTopupCount > 0) {
+          console.warn('forward-seller-proof balance probe: pending/unmirrored topups excluded to match dashboard', mismatch);
+        }
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
       }
