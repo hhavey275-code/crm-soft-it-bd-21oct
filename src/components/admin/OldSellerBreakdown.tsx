@@ -399,6 +399,26 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           />
         </TabsContent>
       </Tabs>
+
+      <ConfirmActionDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
+        title="Delete duplicate entry?"
+        description={
+          <span>
+            This will permanently remove this archive row. TRX ID:{" "}
+            <strong>{extractTrxId(pendingDelete?.description) || "—"}</strong>{" "}
+            · Amount: <strong>৳{pendingDelete?.bdt_amount?.toLocaleString() || 0}</strong>.
+            Type <strong>delete</strong> to confirm.
+          </span>
+        }
+        confirmWord="delete"
+        actionLabel="Delete"
+        onConfirm={() => {
+          if (pendingDelete) handleDelete(pendingDelete);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }
