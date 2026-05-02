@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
+import { Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -59,8 +63,63 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Extract a likely TRX ID from a description string.
+ * Looks for explicit "trx[id]: XXXX" / "txn id XXXX" patterns first, then
+ * falls back to any alphanumeric token of length >= 6 (typical bank trxIDs).
+ * Returns null if nothing usable is found.
+ */
+export function extractTrxId(desc: string | null | undefined): string | null {
+  if (!desc) return null;
+  const s = String(desc);
+  const labeled = s.match(/(?:trx\s*id|txn\s*id|trxn|trx|txn|reference|ref)\s*[:#\-]?\s*([A-Za-z0-9]{4,})/i);
+  if (labeled?.[1]) return labeled[1].toUpperCase();
+  const tokens = s.match(/[A-Za-z0-9]{6,}/g);
+  if (tokens && tokens.length) {
+    // Prefer tokens that contain at least one digit (transaction IDs usually do)
+    const withDigit = tokens.find((t) => /\d/.test(t));
+    return (withDigit || tokens[0]).toUpperCase();
+  }
+  return null;
+}
+
+/** Build a Set of archive row IDs that are duplicates (same trxId + bdt + type). */
+export function buildDuplicateIdSet(rows: ArchiveTxn[]): Set<string> {
+  const groups = new Map<string, ArchiveTxn[]>();
+  for (const r of rows) {
+    const trx = extractTrxId(r.description);
+    if (!trx) continue;
+    const key = `${trx}|${Math.round(r.bdt_amount)}|${r.type}`;
+    const arr = groups.get(key) || [];
+    arr.push(r);
+    groups.set(key, arr);
+  }
+  const dupes = new Set<string>();
+  for (const arr of groups.values()) {
+    if (arr.length > 1) for (const r of arr) dupes.add(r.id);
+  }
+  return dupes;
+}
+
 export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string; sellerName: string }) {
   const [search, setSearch] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<ArchiveTxn | null>(null);
+  const queryClient = useQueryClient();
+
+  const handleDelete = async (row: ArchiveTxn) => {
+    const { error: delErr } = await (supabase as any)
+      .from("seller_transactions_archive_2026_05")
+      .delete()
+      .eq("id", row.id);
+    if (delErr) {
+      toast.error(`Delete failed: ${delErr.message}`);
+      return;
+    }
+    toast.success("Duplicate entry deleted");
+    queryClient.invalidateQueries({ queryKey: ["old-seller-bundle", sellerId] });
+    queryClient.invalidateQueries({ queryKey: ["archived-sellers"] });
+  };
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["old-seller-bundle", sellerId],
@@ -79,6 +138,12 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
       due: computeDueAdvancePair(buckets),
     };
   }, [buckets]);
+
+  // Duplicate detection (same TRX ID + same BDT + same type) across all archive rows.
+  const duplicateIds = useMemo(
+    () => (data ? buildDuplicateIdSet(data.txns) : new Set<string>()),
+    [data],
+  );
 
   // Orphan check: top_up_requests during archive period that don't appear in archive ledger
   const orphans = useMemo(() => {
@@ -247,6 +312,16 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
               </div>
             </div>
           )}
+          {duplicateIds.size > 0 && (
+            <div className="mt-2 rounded border border-rose-500/40 bg-rose-500/5 p-3">
+              <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-medium">
+                <AlertTriangle className="h-4 w-4" /> {duplicateIds.size} duplicate entries detected (same TRX ID + same amount)
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Duplicate rows are highlighted in red across every sheet. Use the trash icon on each duplicate row to delete it from the archive.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -277,6 +352,8 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             rows={filterRows(buckets.forwardedIn)}
             forwarded
             csvName={`${sellerName}-forwarded.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
           />
         </TabsContent>
         <TabsContent value="notForwarded">
@@ -284,16 +361,33 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             rows={filterRows(buckets.notForwardedIn)}
             forwarded={false}
             csvName={`${sellerName}-not-forwarded.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
           />
         </TabsContent>
         <TabsContent value="usdt">
-          <UsdtTable rows={filterRows(buckets.usdtGiven)} csvName={`${sellerName}-usdt.csv`} />
+          <UsdtTable
+            rows={filterRows(buckets.usdtGiven)}
+            csvName={`${sellerName}-usdt.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="withdraw">
-          <WithdrawTable rows={filterRows(buckets.withdraws)} csvName={`${sellerName}-withdraw.csv`} />
+          <WithdrawTable
+            rows={filterRows(buckets.withdraws)}
+            csvName={`${sellerName}-withdraw.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="all">
-          <AllTable rows={filterRows(data.txns)} csvName={`${sellerName}-all.csv`} />
+          <AllTable
+            rows={filterRows(data.txns)}
+            csvName={`${sellerName}-all.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="topups">
           <TopupsTable
@@ -305,6 +399,26 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           />
         </TabsContent>
       </Tabs>
+
+      <ConfirmActionDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
+        title="Delete duplicate entry?"
+        description={
+          <span>
+            This will permanently remove this archive row. TRX ID:{" "}
+            <strong>{extractTrxId(pendingDelete?.description) || "—"}</strong>{" "}
+            · Amount: <strong>৳{pendingDelete?.bdt_amount?.toLocaleString() || 0}</strong>.
+            Type <strong>delete</strong> to confirm.
+          </span>
+        }
+        confirmWord="delete"
+        actionLabel="Delete"
+        onConfirm={() => {
+          if (pendingDelete) handleDelete(pendingDelete);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }
@@ -355,7 +469,24 @@ function typeBadge(type: string) {
   return <Badge variant="outline" className="text-[10px]">{map[type] || type}</Badge>;
 }
 
-function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string }) {
+type DupProps = { duplicateIds?: Set<string>; onDelete?: (r: ArchiveTxn) => void };
+
+function DeleteBtn({ row, onDelete }: { row: ArchiveTxn; onDelete?: (r: ArchiveTxn) => void }) {
+  if (!onDelete) return <span className="text-muted-foreground text-xs">—</span>;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+      onClick={() => onDelete(row)}
+      title="Delete this entry"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </Button>
+  );
+}
+
+function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string } & DupProps) {
   // Sort chronologically and compute running total (seller-sheet style).
   const sorted = useMemo(
     () => [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
@@ -416,24 +547,32 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
                 <TableHead>Description / TrxID</TableHead>
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {withRunning.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">No entries</TableCell>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">No entries</TableCell>
                 </TableRow>
               ) : (
                 withRunning.map(({ row: r, delta, after }) => {
                   const isManual = r.type === "bdt_payment" || r.type === "tenant_payment";
+                  const isDup = duplicateIds?.has(r.id);
+                  const rowClass = isDup
+                    ? "bg-rose-500/10 hover:bg-rose-500/15"
+                    : isManual
+                      ? "bg-amber-500/5"
+                      : undefined;
                   return (
-                    <TableRow key={r.id} className={isManual ? "bg-amber-500/5" : undefined}>
+                    <TableRow key={r.id} className={rowClass}>
                       <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
                       <TableCell>
                         {typeBadge(r.type)}
                         {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
+                        {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUPLICATE</span>}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
+                      <TableCell className={`text-right tabular-nums ${isDup ? "text-rose-600 dark:text-rose-400" : ""}`}>{formatBdt(r.bdt_amount)}</TableCell>
                       <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
                         +{formatBdt(delta)}
                       </TableCell>
@@ -443,6 +582,9 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
                         {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
                       </TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -454,7 +596,7 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={4} />
               </TableRow>
             </TableFooter>
           </Table>
@@ -464,7 +606,7 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
   );
 }
 
-function UsdtTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   const totalUsdt = rows.reduce((s, r) => s + r.usdt_amount, 0);
   const totalBdt = rows.reduce((s, r) => s + r.usdt_amount * r.rate, 0);
   return (
@@ -497,23 +639,30 @@ function UsdtTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 <TableHead>Bank</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Entry by</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.usdt_amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">৳{r.rate}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.usdt_amount * r.rate)}</TableCell>
-                    <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                rows.map((r) => {
+                  const isDup = duplicateIds?.has(r.id);
+                  return (
+                    <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.usdt_amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right tabular-nums">৳{r.rate}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.usdt_amount * r.rate)}</TableCell>
+                      <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
@@ -522,7 +671,7 @@ function UsdtTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 <TableCell className="text-right tabular-nums font-bold">{totalUsdt.toLocaleString()}</TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(totalBdt)}</TableCell>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={4} />
               </TableRow>
             </TableFooter>
           </Table>
@@ -532,7 +681,7 @@ function UsdtTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
   );
 }
 
-function WithdrawTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function WithdrawTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   const total = rows.reduce((s, r) => s + r.bdt_amount, 0);
   return (
     <Card>
@@ -561,27 +710,34 @@ function WithdrawTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string 
                 <TableHead className="text-right">BDT</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Entry by</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
-                    <TableCell className="text-xs">{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                rows.map((r) => {
+                  const isDup = duplicateIds?.has(r.id);
+                  return (
+                    <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
+                      <TableCell className="text-xs">{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
               <TableRow>
                 <TableCell>Total ({rows.length})</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={2} />
+                <TableCell colSpan={3} />
               </TableRow>
             </TableFooter>
           </Table>
@@ -591,7 +747,7 @@ function WithdrawTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string 
   );
 }
 
-function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function AllTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -602,7 +758,7 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Type", "Status", "BDT", "USDT", "Rate", "Description", "Bank", "Account #", "Entry by", "Forwarded?"],
+              ["Date", "Type", "Status", "BDT", "USDT", "Rate", "Description", "Bank", "Account #", "Entry by", "Forwarded?", "Duplicate?"],
               rows.map((r) => [
                 fmtDate(r.created_at),
                 r.type,
@@ -615,6 +771,7 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 r.account_number,
                 r.entry_by_name,
                 r.topup_forwarded == null ? "" : r.topup_forwarded ? "yes" : "no",
+                duplicateIds?.has(r.id) ? "yes" : "",
               ]),
             )
           }
@@ -635,29 +792,39 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
                 <TableHead>Fwd?</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                  <TableCell>{typeBadge(r.type)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.bdt_amount ? formatBdt(r.bdt_amount) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.usdt_amount ? r.usdt_amount.toLocaleString() : "—"}</TableCell>
-                  <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                  <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
-                  <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  <TableCell>
-                    {r.topup_forwarded === true ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : r.topup_forwarded === false ? (
-                      <XCircle className="h-4 w-4 text-rose-500" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const isDup = duplicateIds?.has(r.id);
+                return (
+                  <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                    <TableCell>
+                      {typeBadge(r.type)}
+                      {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUP</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{r.bdt_amount ? formatBdt(r.bdt_amount) : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.usdt_amount ? r.usdt_amount.toLocaleString() : "—"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                    <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
+                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                    <TableCell>
+                      {r.topup_forwarded === true ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : r.topup_forwarded === false ? (
+                        <XCircle className="h-4 w-4 text-rose-500" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
