@@ -128,7 +128,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
       toast.error(`Delete failed: ${delErr.message}`);
       return;
     }
-    toast.success("Duplicate entry deleted");
+    toast.success("Archive entry deleted");
     queryClient.invalidateQueries({ queryKey: ["old-seller-bundle", sellerId] });
     queryClient.invalidateQueries({ queryKey: ["archived-sellers"] });
   };
@@ -416,7 +416,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
       <ConfirmActionDialog
         open={!!pendingDelete}
         onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
-        title="Delete duplicate entry?"
+        title="Delete archive entry?"
         description={
           <span>
             This will permanently remove this archive row. TRX ID:{" "}
@@ -586,6 +586,14 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                       <TableCell>
                         {typeBadge(r.type)}
                         {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
+                        {r.is_forced_forwarded && (
+                          <span
+                            className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300"
+                            title="Manually added to Forwarded sheet (not auto-detected from Telegram flag)"
+                          >
+                            ➕ manually added
+                          </span>
+                        )}
                         {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUPLICATE</span>}
                       </TableCell>
                       <TableCell className={`text-right tabular-nums ${isDup ? "text-rose-600 dark:text-rose-400" : ""}`}>{formatBdt(r.bdt_amount)}</TableCell>
@@ -609,7 +617,7 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                       </TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                        <DeleteBtn row={r} onDelete={onDelete} />
                       </TableCell>
                     </TableRow>
                   );
@@ -684,7 +692,7 @@ function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn
                       <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                        <DeleteBtn row={r} onDelete={onDelete} />
                       </TableCell>
                     </TableRow>
                   );
@@ -752,7 +760,7 @@ function WithdrawTable({ rows, csvName, duplicateIds, onDelete }: { rows: Archiv
                       <TableCell className="text-xs">{r.description || "—"}</TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                        <DeleteBtn row={r} onDelete={onDelete} />
                       </TableCell>
                     </TableRow>
                   );
@@ -846,7 +854,7 @@ function AllTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      <DeleteBtn row={r} onDelete={onDelete} />
                     </TableCell>
                   </TableRow>
                 );
