@@ -148,6 +148,8 @@ export async function fetchPendingTopupCredits(
   return topups
     .filter((t: any) => !mirroredSet.has(t.id))
     .map((t: any) => ({
+      id: `pending-topup:${t.id}`,
+      top_up_request_id: t.id,
       type: 'client_topup',
       bdt_amount: t.bdt_amount,
       usdt_amount: 0,
@@ -155,6 +157,48 @@ export async function fetchPendingTopupCredits(
       status: 'approved',
       created_at: t.created_at,
     }));
+}
+
+/**
+ * Dashboard source of truth: current live seller_transactions only.
+ * Use this for Telegram totals so forwarded proof/text always matches the
+ * seller dashboard headline. Pending top-ups / archive recovery are excluded.
+ */
+export async function computeDashboardSellerBalance(supabase: any, sellerId: string): Promise<number> {
+  return computeDueAdvance(await fetchAllSellerTxns(supabase, sellerId));
+}
+
+export async function fetchForwardedBalanceMismatches(
+  supabase: any,
+  sellerId: string,
+): Promise<{ pendingTopupCount: number; pendingTopupBdt: number; previousForwardDiff: number | null }> {
+  let pendingTopupCount = 0;
+  let pendingTopupBdt = 0;
+  try {
+    const pending = await fetchPendingTopupCredits(supabase, sellerId);
+    pendingTopupCount = pending.length;
+    pendingTopupBdt = pending.reduce((sum, t) => sum + Number(t.bdt_amount || 0), 0);
+  } catch (e) {
+    console.warn('pending top-up mismatch probe failed:', (e as any)?.message || e);
+  }
+
+  let previousForwardDiff: number | null = null;
+  try {
+    const { data: lastLog } = await supabase
+      .from('telegram_forward_log')
+      .select('caption_total_bdt')
+      .not('caption_total_bdt', 'is', null)
+      .order('forwarded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastLog?.caption_total_bdt != null) {
+      previousForwardDiff = Number(lastLog.caption_total_bdt) - await computeDashboardSellerBalance(supabase, sellerId);
+    }
+  } catch (e) {
+    console.warn('previous forward mismatch probe failed:', (e as any)?.message || e);
+  }
+
+  return { pendingTopupCount, pendingTopupBdt, previousForwardDiff };
 }
 
 /**
