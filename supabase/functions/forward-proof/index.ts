@@ -128,10 +128,12 @@ Deno.serve(async (req) => {
         const balance = computeDueAdvance(txns);
         if (!txns.some((t: any) => (t as any).top_up_request_id === request_id)) {
           console.warn('forward-proof balance mismatch: top-up mirror missing after upsert', { request_id, sellerId });
-          await supabase.from('system_logs').insert({
-            action: 'Telegram Balance Mismatch',
-            details: `Top-up ${request_id} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance.`,
-          }).catch(() => {});
+          try {
+            await supabase.from('system_logs').insert({
+              action: 'Telegram Balance Mismatch',
+              details: `Top-up ${request_id} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance.`,
+            });
+          } catch { /* best-effort log */ }
         }
         finalBalance = balance;
         runningTotalLine = buildTotalLine(balance);

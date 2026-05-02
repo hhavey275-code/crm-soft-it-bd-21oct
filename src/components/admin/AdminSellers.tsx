@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle, Send } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
@@ -675,6 +675,44 @@ export function AdminSellers() {
       queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller?.user_id] });
     },
     onError: (e: any) => toast.error(e.message),
+  });
+
+  // Manual "Resend to Telegram" — for rows that approved successfully but the
+  // forward never reached Telegram (e.g. browser tab was closed during approval).
+  // Server-side claim_forward_slot guarantees this is idempotent — clicking twice
+  // does NOT produce duplicate messages.
+  const resendForwardMutation = useMutation({
+    mutationFn: async (txn: any) => {
+      const sellerProfile = selectedSeller as any;
+      const isOthers = !txn.bank_account_id;
+      const { data, error } = await (supabase as any).functions.invoke("forward-seller-proof", {
+        body: {
+          seller_transaction_id: txn.id,
+          payment_kind: txn.type,
+          proof_url: txn.proof_url || null,
+          seller_id: txn.seller_id,
+          seller_name: sellerProfile?.full_name || sellerProfile?.email,
+          usdt_amount: Number(txn.usdt_amount || 0),
+          rate: Number(txn.rate || 0),
+          bdt_amount: Number(txn.bdt_amount || 0),
+          bank_account_id: isOthers ? undefined : txn.bank_account_id,
+          reference: extractTrxId(txn.description) || txn.description || null,
+          others_telegram_group_id: isOthers ? sellerProfile?.others_telegram_group_id : undefined,
+          withdraw_note: txn.type === "withdraw" ? txn.description : undefined,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data?.skipped) {
+        toast.info("Already forwarded to Telegram");
+      } else {
+        toast.success("Resent to Telegram!");
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(`Resend failed: ${e.message}`),
   });
 
   // Lifetime Due/Advance — ALWAYS computed from the full ledger, independent
@@ -2133,18 +2171,32 @@ export function AdminSellers() {
                               );
                             })()}
                             <td className="border border-border px-1 py-1.5 text-center">
-                              <button
-                                onClick={() => setConfirmDialog({
-                                  title: "Delete this row?",
-                                  description: <>This transaction row will be permanently deleted from the ledger. Type <strong>confirm</strong> to proceed.</>,
-                                  actionLabel: "Delete",
-                                  onConfirm: () => deleteTxnMutation.mutate(t.id),
-                                })}
-                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
-                                title="Delete row"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              <div className="inline-flex items-center gap-0.5">
+                                {(t.status || "approved").toLowerCase() === "approved" &&
+                                 t.type !== "client_topup" &&
+                                 !t.telegram_forwarded && (
+                                  <button
+                                    onClick={() => resendForwardMutation.mutate(t)}
+                                    disabled={resendForwardMutation.isPending}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 p-1 rounded disabled:opacity-50"
+                                    title="Resend to Telegram (was not forwarded)"
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setConfirmDialog({
+                                    title: "Delete this row?",
+                                    description: <>This transaction row will be permanently deleted from the ledger. Type <strong>confirm</strong> to proceed.</>,
+                                    actionLabel: "Delete",
+                                    onConfirm: () => deleteTxnMutation.mutate(t.id),
+                                  })}
+                                  className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                  title="Delete row"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
