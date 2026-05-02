@@ -595,9 +595,11 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                     ? "bg-rose-500/10 hover:bg-rose-500/20"
                     : isDup
                       ? "bg-rose-500/10 hover:bg-rose-500/15"
-                      : isManual
-                        ? "bg-amber-500/5"
-                        : undefined;
+                      : r.is_forced_forwarded
+                        ? "bg-gradient-to-r from-blue-500/15 to-emerald-500/15 hover:from-blue-500/25 hover:to-emerald-500/25"
+                        : isManual
+                          ? "bg-amber-500/5"
+                          : undefined;
                   const runDisp = formatDueAdvance(after);
                   const runClass = runDisp.isAdvance
                     ? "text-emerald-600 dark:text-emerald-400"
