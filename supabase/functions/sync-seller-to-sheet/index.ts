@@ -156,7 +156,56 @@ serve(async (req) => {
   );
 
   try {
-    const { seller_transaction_id, dry_run } = await req.json();
+    const body = await req.json();
+    const { seller_transaction_id, dry_run, backfill, seller_id, months } = body;
+
+    // ---- BACKFILL MODE ----
+    if (backfill) {
+      if (!seller_id) throw new Error("seller_id required for backfill");
+      if (!Array.isArray(months) || months.length === 0) throw new Error("months[] required (e.g. ['2026-04','2026-05'])");
+
+      // Fetch approved txns for this seller in those months
+      const conditions = months.map((m: string) => {
+        const [y, mo] = m.split("-").map(Number);
+        const start = new Date(Date.UTC(y, mo - 1, 1)).toISOString();
+        const end = new Date(Date.UTC(y, mo, 1)).toISOString();
+        return { start, end };
+      });
+
+      let allTxns: any[] = [];
+      for (const c of conditions) {
+        const { data, error } = await supabase
+          .from("seller_transactions")
+          .select("id, created_at")
+          .eq("seller_id", seller_id)
+          .eq("status", "approved")
+          .gte("created_at", c.start)
+          .lt("created_at", c.end)
+          .order("created_at", { ascending: true });
+        if (error) throw new Error(`txn fetch failed: ${error.message}`);
+        if (data) allTxns = allTxns.concat(data);
+      }
+
+      const results: any[] = [];
+      for (const t of allTxns) {
+        try {
+          const r = await fetch(req.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: req.headers.get("Authorization") || "" },
+            body: JSON.stringify({ seller_transaction_id: t.id }),
+          });
+          const j = await r.json();
+          results.push({ id: t.id, ok: r.ok, ...j });
+        } catch (err: any) {
+          results.push({ id: t.id, ok: false, error: err?.message });
+        }
+      }
+      const success = results.filter((r) => r.ok).length;
+      return new Response(JSON.stringify({ ok: true, backfill: true, total: allTxns.length, success, failed: allTxns.length - success, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!seller_transaction_id) throw new Error("seller_transaction_id required");
 
     // Already synced?
