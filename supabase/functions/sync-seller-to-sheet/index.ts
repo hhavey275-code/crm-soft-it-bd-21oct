@@ -85,7 +85,12 @@ async function getSheetsMeta(spreadsheetId: string) {
   return j;
 }
 
-async function createTab(spreadsheetId: string, title: string, sourceSheetId: number | null) {
+async function createTab(
+  spreadsheetId: string,
+  title: string,
+  sourceSheetId: number | null,
+  clearFromRow: number | null = null,
+) {
   // If sourceSheetId provided, duplicate it (preserves header, formatting). Otherwise add blank.
   const body = sourceSheetId != null
     ? { requests: [{ duplicateSheet: { sourceSheetId, newSheetName: title, insertSheetIndex: 0 } }] }
@@ -97,8 +102,36 @@ async function createTab(spreadsheetId: string, title: string, sourceSheetId: nu
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`createTab failed [${r.status}]: ${JSON.stringify(j)}`);
+
+  // After cloning a template, wipe the data rows (keep header + opening balance rows).
+  if (sourceSheetId != null && clearFromRow && clearFromRow > 0) {
+    const newSheetId = j.replies?.[0]?.duplicateSheet?.properties?.sheetId;
+    if (newSheetId != null) {
+      const clearReq = {
+        requests: [{
+          updateCells: {
+            range: {
+              sheetId: newSheetId,
+              startRowIndex: clearFromRow - 1, // 0-indexed
+            },
+            fields: "userEnteredValue",
+          },
+        }],
+      };
+      const cr = await fetch(`${GATEWAY}/spreadsheets/${spreadsheetId}:batchUpdate`, {
+        method: "POST",
+        headers: gwHeaders,
+        body: JSON.stringify(clearReq),
+      });
+      if (!cr.ok) {
+        const cj = await cr.json();
+        console.warn("clear cloned data failed:", JSON.stringify(cj));
+      }
+    }
+  }
   return j;
 }
+
 
 async function findFirstEmptyDataRow(
   spreadsheetId: string,
@@ -191,7 +224,7 @@ async function syncOneTransaction(
     const tmpl = cfg.template_tab
       ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
       : null;
-    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
+    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
   }
 
   const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
@@ -358,7 +391,7 @@ serve(async (req) => {
           const tmpl = cfg.template_tab
             ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
             : null;
-          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
           titleSet.add(tab);
         }
       }
