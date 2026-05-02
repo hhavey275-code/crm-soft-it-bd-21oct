@@ -1219,6 +1219,17 @@ export function AdminSellers() {
         }
       }
 
+      // Fire-and-forget Google Sheet sync
+      if (result?.insertedId) {
+        try {
+          await (supabase as any).functions.invoke("sync-seller-to-sheet", {
+            body: { seller_transaction_id: result.insertedId },
+          });
+        } catch (e: any) {
+          console.warn("Sheet sync (entry) failed:", e?.message);
+        }
+      }
+
       setShowEntryDialog(false);
       setEntryForm({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
     },
