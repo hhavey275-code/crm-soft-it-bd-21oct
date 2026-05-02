@@ -196,14 +196,14 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
   });
   const [obValue, setObValue] = useState("");
 
-  const setOpeningBalance = async () => {
+  const setOpeningBalance = async (auto = false) => {
     if (!sellerId) return;
     if (!/^\d{4}-\d{2}$/.test(obMonth)) {
       toast.error("Month format: YYYY-MM");
       return;
     }
-    if (obValue === "" || isNaN(Number(obValue))) {
-      toast.error("Opening balance number diye den");
+    if (!auto && (obValue === "" || isNaN(Number(obValue)))) {
+      toast.error("Opening balance number diye den (or use Auto)");
       return;
     }
     if (!form.opening_balance_cell) {
@@ -215,13 +215,13 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
       const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
         body: {
           seller_id: sellerId,
-          set_opening_balance: { month: obMonth, value: Number(obValue) },
+          set_opening_balance: { month: obMonth, value: auto ? undefined : Number(obValue) },
         },
       });
       if (error) throw error;
       const d = data as any;
       if (!d?.ok) throw new Error(d?.error || "Set failed");
-      toast.success(`Opening balance set — ${d.tab} ${d.cell} = ${d.value}`);
+      toast.success(`Opening balance set — ${d.tab} ${d.cell} = ${d.value}${d.auto ? " (auto)" : ""}`);
     } catch (e: any) {
       toast.error(e?.message || "Set failed");
     } finally {
