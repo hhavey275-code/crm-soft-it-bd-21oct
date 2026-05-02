@@ -194,12 +194,13 @@ export function splitBuckets(txns: ArchiveTxn[]): Buckets {
       usdtGiven.push(t);
     } else if (IN_TYPES.has(t.type)) {
       // Operator rule:
-      //  • Forwarded sheet = all top-ups + all manual entries (OCR-forwarded by default)
-      //  • Not-Forwarded sheet = top-ups explicitly marked forwarded=false
-      //    PLUS all manual entries (so manual entries appear in BOTH sheets)
+      //  • Forwarded sheet = top-ups with telegram_forwarded === true
+      //    (or in the FORCE_FORWARDED override list) + all manual entries.
+      //  • Not-Forwarded sheet = every top-up that did NOT get forwarded
+      //    (NULL or false) + all manual entries (mirrored in both sheets).
       if (t.type === "client_topup") {
-        if (t.topup_forwarded === false) notForwardedIn.push(t);
-        else forwardedIn.push(t);
+        if (t.topup_forwarded === true) forwardedIn.push(t);
+        else notForwardedIn.push(t);
       } else if (MANUAL_TYPES.has(t.type)) {
         forwardedIn.push(t);
         notForwardedIn.push(t);
