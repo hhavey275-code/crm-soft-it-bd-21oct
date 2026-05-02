@@ -207,6 +207,47 @@ Deno.serve(async (req) => {
     });
 
     // ============================================================
+    // Auto-upsert synced rows so DB matches Meta's System User assignments.
+    // Then delete any ad_accounts under this BM whose account_id is NOT
+    // in the freshly-synced set (i.e. no longer assigned to the System User).
+    // ============================================================
+    let upsertedCount = 0;
+    let deletedCount = 0;
+    const deletedAccountIds: string[] = [];
+    try {
+      if (rows.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from("ad_accounts")
+          .upsert(rows, { onConflict: "account_id" });
+        if (upsertErr) console.error("ad_accounts upsert error:", upsertErr);
+        else upsertedCount = rows.length;
+      }
+
+      const keepIds = new Set(rows.map((r) => r.account_id));
+      const { data: existingForBm, error: existingErr } = await supabase
+        .from("ad_accounts")
+        .select("id, account_id")
+        .eq("business_manager_id", bm.id);
+      if (existingErr) {
+        console.error("fetch existing ad_accounts error:", existingErr);
+      } else if (existingForBm && existingForBm.length > 0) {
+        const stale = existingForBm.filter((a: any) => !keepIds.has(a.account_id));
+        if (stale.length > 0) {
+          const staleIds = stale.map((a: any) => a.id);
+          deletedAccountIds.push(...stale.map((a: any) => a.account_id));
+          const { error: delErr } = await supabase
+            .from("ad_accounts")
+            .delete()
+            .in("id", staleIds);
+          if (delErr) console.error("ad_accounts delete error:", delErr);
+          else deletedCount = stale.length;
+        }
+      }
+    } catch (e) {
+      console.error("auto-sync upsert/delete failed:", e);
+    }
+
+    // ============================================================
     // Auto-apply pending invitation permissions
     // For each pending invitation on this BM, check if invitee has accepted
     // (i.e., now appears in BM business_users). If yes, apply stored
@@ -334,6 +375,9 @@ Deno.serve(async (req) => {
       accounts: rows,
       total: totalBeforeFilter,
       filtered: rows.length,
+      upserted: upsertedCount,
+      deleted: deletedCount,
+      deleted_account_ids: deletedAccountIds,
       skipped_unassigned: skippedUnassigned,
       system_user_id: systemUserId,
       owned: ownedAccounts.length,
