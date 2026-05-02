@@ -30,6 +30,7 @@ import {
 } from "@/lib/oldSellerData";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import { MigrateForwardedButton } from "./MigrateForwardedButton";
+import { AddForwardedEntryDialog } from "./AddForwardedEntryDialog";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
