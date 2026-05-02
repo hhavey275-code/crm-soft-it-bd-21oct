@@ -361,6 +361,9 @@ export function SellerDashboard() {
         </button>
       </div>
 
+      {/* Month-by-Month Due/Advance */}
+      <MonthlyDueAdvanceCard transactions={transactions as any} />
+
       {/* Bank Chips */}
       {banks.length > 0 && (
         <div className="flex flex-wrap gap-2">
