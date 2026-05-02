@@ -224,7 +224,7 @@ async function syncOneTransaction(
     const tmpl = cfg.template_tab
       ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
       : null;
-    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
+    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
   }
 
   const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
