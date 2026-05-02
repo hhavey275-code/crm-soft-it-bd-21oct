@@ -1986,6 +1986,7 @@ export type Database = {
           col_wise_bdt: string | null
           col_wise_rate: string | null
           col_wise_usd: string | null
+          col_withdraw: string | null
           created_at: string
           data_start_row: number
           enabled: boolean
@@ -1993,6 +1994,7 @@ export type Database = {
           id: string
           last_error: string | null
           last_synced_at: string | null
+          opening_balance_cell: string | null
           seller_id: string
           spreadsheet_id: string
           spreadsheet_url: string | null
@@ -2014,6 +2016,7 @@ export type Database = {
           col_wise_bdt?: string | null
           col_wise_rate?: string | null
           col_wise_usd?: string | null
+          col_withdraw?: string | null
           created_at?: string
           data_start_row?: number
           enabled?: boolean
@@ -2021,6 +2024,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_synced_at?: string | null
+          opening_balance_cell?: string | null
           seller_id: string
           spreadsheet_id: string
           spreadsheet_url?: string | null
@@ -2042,6 +2046,7 @@ export type Database = {
           col_wise_bdt?: string | null
           col_wise_rate?: string | null
           col_wise_usd?: string | null
+          col_withdraw?: string | null
           created_at?: string
           data_start_row?: number
           enabled?: boolean
@@ -2049,6 +2054,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_synced_at?: string | null
+          opening_balance_cell?: string | null
           seller_id?: string
           spreadsheet_id?: string
           spreadsheet_url?: string | null
