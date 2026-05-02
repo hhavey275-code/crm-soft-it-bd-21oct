@@ -760,7 +760,7 @@ function WithdrawTable({ rows, csvName, duplicateIds, onDelete }: { rows: Archiv
                       <TableCell className="text-xs">{r.description || "—"}</TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                        <DeleteBtn row={r} onDelete={onDelete} />
                       </TableCell>
                     </TableRow>
                   );
