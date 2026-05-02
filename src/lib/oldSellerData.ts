@@ -227,8 +227,9 @@ export function sumWithdraw(rows: ArchiveTxn[]): Totals {
 
 /**
  * Two due/advance numbers:
- *   forwardedOnly: forwarded payments IN − usdt cost − withdraw
- *   all:          (forwarded + not-forwarded) payments IN − usdt cost − withdraw
+ *   forwardedOnly: forwarded payments IN (top-ups + manual) − usdt cost − withdraw
+ *   all:          forwardedOnly + un-forwarded top-ups (manual entries are NOT
+ *                 added again because they already counted in forwardedOnly).
  * Positive = Advance, Negative = Due.
  */
 export function computeDueAdvancePair(b: Buckets): {
@@ -236,11 +237,16 @@ export function computeDueAdvancePair(b: Buckets): {
   all: number;
 } {
   const fwdIn = sumIn(b.forwardedIn).bdt;
-  const notFwdIn = sumIn(b.notForwardedIn).bdt;
+  // Only client_topup rows are unique to the not-forwarded bucket; manual
+  // entries are mirrored from forwardedIn so we exclude them here to avoid
+  // double counting.
+  const notFwdTopupOnly = b.notForwardedIn
+    .filter((t) => t.type === "client_topup")
+    .reduce((s, t) => s + t.bdt_amount, 0);
   const usdtCost = sumUsdt(b.usdtGiven).bdtFromUsdt;
   const wd = sumWithdraw(b.withdraws).bdt;
   return {
     forwardedOnly: fwdIn - usdtCost - wd,
-    all: fwdIn + notFwdIn - usdtCost - wd,
+    all: fwdIn + notFwdTopupOnly - usdtCost - wd,
   };
 }
