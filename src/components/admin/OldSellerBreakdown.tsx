@@ -137,7 +137,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
         />
         <SummaryCard
           title="🔴 Not-Forwarded Payments IN"
-          subtitle="Manual entries + un-forwarded top-ups"
+          subtitle="Top-ups not forwarded + all manual entries (mirrored)"
           primary={formatBdt(totals.notForwardedIn.bdt)}
           secondary={`${totals.notForwardedIn.count} entries`}
           tone="danger"
