@@ -596,11 +596,10 @@ serve(async (req) => {
       }
       for (const tab of groups.keys()) {
         if (!titleSet.has(tab)) {
-          const tmpl = cfg.template_tab
-            ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
-            : null;
+          const tmpl = resolveTemplateSheet(sheets, cfg, tab);
           // Fall back to blank tab if template missing/not found (no crash)
-          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          if (tmpl) await clearInputColumns(cfg.spreadsheet_id, tab, cfg);
           titleSet.add(tab);
         }
         // Auto write opening balance if cell configured and we know the month
