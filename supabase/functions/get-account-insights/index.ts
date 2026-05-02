@@ -78,6 +78,7 @@ async function metaBatchGet(accessToken: string, relativeUrls: string[]): Promis
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form,
+    allowDirectFallback: true,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
