@@ -171,7 +171,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
     setBackfilling(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: { backfill: true, seller_id: sellerId, months },
+        body: { backfill: true, seller_id: sellerId, months, recreate: recreateTabs },
       });
       if (error) throw error;
       const d = data as any;
