@@ -119,7 +119,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
     queryClient.invalidateQueries({ queryKey: ["old-seller-bundle", sellerId] });
     queryClient.invalidateQueries({ queryKey: ["archived-sellers"] });
   };
-  const [search, setSearch] = useState("");
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["old-seller-bundle", sellerId],
