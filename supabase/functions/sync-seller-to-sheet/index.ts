@@ -39,7 +39,13 @@ function formatTabName(pattern: string, date: Date): string {
   const mmmm = MONTH_NAMES[date.getMonth()];
   const mmm = mmmm.slice(0, 3);
   const mm = String(date.getMonth() + 1).padStart(2, "0");
+  // Support compound tokens like {MMMM-YYYY} as well as individual tokens.
+  // Order matters: longer/compound tokens FIRST.
   return pattern
+    .replace(/\{MMMM-YYYY\}/g, `${mmmm}-${yyyy}`)
+    .replace(/\{MMM-YYYY\}/g, `${mmm}-${yyyy}`)
+    .replace(/\{MMMM_YYYY\}/g, `${mmmm}_${yyyy}`)
+    .replace(/\{MM-YYYY\}/g, `${mm}-${yyyy}`)
     .replace(/\{MMMM\}/g, mmmm)
     .replace(/\{MMM\}/g, mmm)
     .replace(/\{MM\}/g, mm)
