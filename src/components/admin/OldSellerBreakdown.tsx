@@ -606,7 +606,7 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
   );
 }
 
-function UsdtTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   const totalUsdt = rows.reduce((s, r) => s + r.usdt_amount, 0);
   const totalBdt = rows.reduce((s, r) => s + r.usdt_amount * r.rate, 0);
   return (
