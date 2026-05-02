@@ -247,13 +247,18 @@ async function syncOneTransaction(
   if (isPayment) {
     push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
   } else if (isWithdraw) {
-    push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+    if (cfg.col_withdraw) {
+      push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
+    } else {
+      push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+    }
   } else if (isUsdt) {
     push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
     push(cfg.col_payo_rate, Number(txn.rate || 0));
     const converted = Number(txn.usdt_amount || 0) * Number(txn.rate || 0);
     push(cfg.col_payo_bdt, Number(converted.toFixed(2)));
   }
+
 
   push(cfg.col_description, txn.description || "");
   push(cfg.col_proof_url, txn.proof_url || "");
@@ -300,7 +305,46 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance } = bodyJson;
+
+    // ---- SET OPENING BALANCE for a specific month tab ----
+    if (set_opening_balance) {
+      if (!seller_id) throw new Error("seller_id required");
+      const { month, value } = set_opening_balance; // month: "YYYY-MM", value: number
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("month required (YYYY-MM)");
+      if (value === undefined || value === null || isNaN(Number(value)))
+        throw new Error("value (number) required");
+
+      const { data: cfg } = await supabase
+        .from("seller_sheet_config").select("*").eq("seller_id", seller_id).maybeSingle();
+      if (!cfg) throw new Error("config not found");
+      if (!cfg.opening_balance_cell)
+        throw new Error("opening_balance_cell not configured (e.g. I6)");
+
+      const [y, mo] = month.split("-").map(Number);
+      const tabName = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", new Date(Date.UTC(y, mo - 1, 1)));
+
+      // Ensure tab exists (clone template if needed)
+      const meta = await getSheetsMeta(cfg.spreadsheet_id);
+      const sheets = meta.sheets || [];
+      if (!sheets.find((s: any) => s.properties.title === tabName)) {
+        const tmpl = cfg.template_tab
+          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
+        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+      }
+
+      const cell = String(cfg.opening_balance_cell).toUpperCase();
+      const range = `'${tabName}'!${cell}`;
+      const r = await fetch(
+        `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values/${range}?valueInputOption=USER_ENTERED`,
+        { method: "PUT", headers: gwHeaders, body: JSON.stringify({ values: [[Number(value)]] }) },
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(`opening balance write failed [${r.status}]: ${JSON.stringify(j)}`);
+      return jsonResp({ ok: true, tab: tabName, cell, value: Number(value) });
+    }
+
+
 
     // ---- BACKFILL MODE (optimized: 1 meta read + 1 probe per tab + 1 batch write per tab) ----
     if (backfill) {
@@ -410,7 +454,10 @@ serve(async (req) => {
         const isUsdt = txn.type === "usdt_received";
         const isWithdraw = txn.type === "withdraw";
         if (isPayment) push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
-        else if (isWithdraw) push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        else if (isWithdraw) {
+          if (cfg.col_withdraw) push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
+          else push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        }
         else if (isUsdt) {
           push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
           push(cfg.col_payo_rate, Number(txn.rate || 0));

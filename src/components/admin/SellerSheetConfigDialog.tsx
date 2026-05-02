@@ -26,6 +26,7 @@ interface Props {
 const MAPPING_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "col_datetime", label: "Date & Time", hint: "e.g. B" },
   { key: "col_payment_bdt", label: "Payment (BDT in)", hint: "e.g. C" },
+  { key: "col_withdraw", label: "Withdraw (BDT out)", hint: "alada column thakle" },
   { key: "col_payo_usd", label: "Dollar (Payo / USDT given)", hint: "e.g. D" },
   { key: "col_payo_rate", label: "Rate (Payo)", hint: "e.g. E" },
   { key: "col_payo_bdt", label: "Converted BDT (Payo)", hint: "e.g. F" },
@@ -38,6 +39,7 @@ const MAPPING_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "col_proof_url", label: "Proof URL — optional" },
   { key: "col_txn_id", label: "Hidden Txn ID (dedupe) — optional" },
 ];
+
 
 function extractSpreadsheetId(input: string): string {
   const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -85,9 +87,11 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
         template_tab: form.template_tab || null,
         header_row: Number(form.header_row) || 1,
         data_start_row: Number(form.data_start_row) || 7,
+        opening_balance_cell: form.opening_balance_cell || null,
         enabled: !!form.enabled,
         col_datetime: form.col_datetime || null,
         col_payment_bdt: form.col_payment_bdt || null,
+        col_withdraw: form.col_withdraw || null,
         col_payo_usd: form.col_payo_usd || null,
         col_payo_rate: form.col_payo_rate || null,
         col_payo_bdt: form.col_payo_bdt || null,
@@ -184,6 +188,46 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
     }
   };
 
+  const [obSetting, setObSetting] = useState(false);
+  const [obMonth, setObMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [obValue, setObValue] = useState("");
+
+  const setOpeningBalance = async () => {
+    if (!sellerId) return;
+    if (!/^\d{4}-\d{2}$/.test(obMonth)) {
+      toast.error("Month format: YYYY-MM");
+      return;
+    }
+    if (obValue === "" || isNaN(Number(obValue))) {
+      toast.error("Opening balance number diye den");
+      return;
+    }
+    if (!form.opening_balance_cell) {
+      toast.error("Age 'Opening balance cell' (e.g. I6) set kore Save korun");
+      return;
+    }
+    setObSetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
+        body: {
+          seller_id: sellerId,
+          set_opening_balance: { month: obMonth, value: Number(obValue) },
+        },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.ok) throw new Error(d?.error || "Set failed");
+      toast.success(`Opening balance set — ${d.tab} ${d.cell} = ${d.value}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Set failed");
+    } finally {
+      setObSetting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -260,7 +304,21 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
                     onChange={(e) => setForm({ ...form, data_start_row: e.target.value })}
                   />
                 </div>
+                <div>
+                  <Label>Opening balance cell</Label>
+                  <Input
+                    value={form.opening_balance_cell || ""}
+                    onChange={(e) =>
+                      setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })
+                    }
+                    placeholder="e.g. I6"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Template e opening balance jaiga (cell ref)
+                  </p>
+                </div>
               </div>
+
 
               <div className="flex items-center gap-3 pt-2">
                 <Switch
@@ -326,6 +384,37 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
           </div>
           <p className="text-xs text-muted-foreground">
             Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
+          </p>
+        </div>
+
+        <div className="border-t pt-4 mt-2 space-y-2">
+          <Label className="text-sm">Opening balance (month er shurute boshbe)</Label>
+          <div className="flex gap-2">
+            <Input
+              value={obMonth}
+              onChange={(e) => setObMonth(e.target.value)}
+              placeholder="2026-05"
+              className="w-32"
+            />
+            <Input
+              type="number"
+              value={obValue}
+              onChange={(e) => setObValue(e.target.value)}
+              placeholder="amount (BDT)"
+              className="flex-1"
+            />
+            <Button
+              variant="secondary"
+              onClick={setOpeningBalance}
+              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
+              title={!form.opening_balance_cell ? "Opening balance cell set kore Save korun" : ""}
+            >
+              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Set opening balance
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Opening balance cell ({form.opening_balance_cell || "set korun"}) e ei value boshbe. Tab missing thakle auto create hobe.
           </p>
         </div>
 
