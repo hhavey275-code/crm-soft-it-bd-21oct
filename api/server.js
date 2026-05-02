@@ -86,6 +86,17 @@ export default async function handler(req, res) {
     const server = await getServer();
     const request = buildRequest(req);
     const response = await server.fetch(request);
+
+    // If SSR returned a 5xx for a page request, fall back to the static client shell
+    // so the SPA can boot in the browser instead of showing a JSON error page.
+    const acceptsHtml = String(req.headers.accept || "").includes("text/html");
+    const isPageRequest = (!req.method || ["GET", "HEAD"].includes(req.method.toUpperCase())) && acceptsHtml;
+    const isApi = String(req.url || "").startsWith("/api/");
+    if (response.status >= 500 && isPageRequest && !isApi) {
+      await writeClientFallback(req, res, new Error(`SSR returned ${response.status}`));
+      return;
+    }
+
     await writeResponse(response, res);
   } catch (err) {
     await writeClientFallback(req, res, err);
