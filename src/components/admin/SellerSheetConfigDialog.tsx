@@ -26,6 +26,7 @@ interface Props {
 const MAPPING_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "col_datetime", label: "Date & Time", hint: "e.g. B" },
   { key: "col_payment_bdt", label: "Payment (BDT in)", hint: "e.g. C" },
+  { key: "col_withdraw", label: "Withdraw (BDT out)", hint: "alada column thakle" },
   { key: "col_payo_usd", label: "Dollar (Payo / USDT given)", hint: "e.g. D" },
   { key: "col_payo_rate", label: "Rate (Payo)", hint: "e.g. E" },
   { key: "col_payo_bdt", label: "Converted BDT (Payo)", hint: "e.g. F" },
@@ -38,6 +39,7 @@ const MAPPING_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "col_proof_url", label: "Proof URL — optional" },
   { key: "col_txn_id", label: "Hidden Txn ID (dedupe) — optional" },
 ];
+
 
 function extractSpreadsheetId(input: string): string {
   const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
