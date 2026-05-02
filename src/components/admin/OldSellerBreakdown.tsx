@@ -639,23 +639,30 @@ function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn
                 <TableHead>Bank</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Entry by</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.usdt_amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">৳{r.rate}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.usdt_amount * r.rate)}</TableCell>
-                    <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                rows.map((r) => {
+                  const isDup = duplicateIds?.has(r.id);
+                  return (
+                    <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.usdt_amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right tabular-nums">৳{r.rate}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.usdt_amount * r.rate)}</TableCell>
+                      <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
@@ -664,7 +671,7 @@ function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn
                 <TableCell className="text-right tabular-nums font-bold">{totalUsdt.toLocaleString()}</TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(totalBdt)}</TableCell>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={4} />
               </TableRow>
             </TableFooter>
           </Table>
