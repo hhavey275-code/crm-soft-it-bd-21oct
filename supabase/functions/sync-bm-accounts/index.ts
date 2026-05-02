@@ -136,8 +136,8 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     // Include assigned_users so we can filter to System-User-assigned accounts only.
-    // Meta requires `business` param when querying assigned_users on ad accounts.
-    const fields = `id,name,account_id,account_status,spend_cap,amount_spent,business_name,assigned_users.business(${bm.bm_id}).limit(250){id,role}`;
+    // Meta requires `business` param here; `assigned_users` does not expose `role` on ad accounts.
+    const fields = `id,name,account_id,account_status,spend_cap,amount_spent,business_name,assigned_users.business(${bm.bm_id}).limit(250){id}`;
     const baseUrl = `https://graph.facebook.com/v23.0/${bm.bm_id}`;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bmAccessToken = await decryptToken(bm.access_token, serviceKey);
@@ -163,14 +163,21 @@ Deno.serve(async (req) => {
     if (clientResult.status === "rejected") console.error("client_ad_accounts:", clientResult.reason);
 
     if (ownedAccounts.length === 0 && clientAccounts.length === 0) {
+      const endpointErrors = [
+        ownedResult.status === "rejected" ? `owned_ad_accounts: ${ownedResult.reason instanceof Error ? ownedResult.reason.message : String(ownedResult.reason)}` : null,
+        clientResult.status === "rejected" ? `client_ad_accounts: ${clientResult.reason instanceof Error ? clientResult.reason.message : String(clientResult.reason)}` : null,
+      ].filter(Boolean);
+      const errorMessage = endpointErrors.length > 0
+        ? `Meta API failed — ${endpointErrors.join("; ")}`
+        : "No ad accounts found from Meta API";
       await supabase.from("sync_logs").insert({
         business_manager_id: bm.id,
         synced_count: 0,
         total_count: 0,
         status: "error",
-        error_message: "No accounts returned from owned or client endpoints"
+        error_message: errorMessage
       });
-      return new Response(JSON.stringify({ error: "No ad accounts found from Meta API" }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: errorMessage }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Dedupe
