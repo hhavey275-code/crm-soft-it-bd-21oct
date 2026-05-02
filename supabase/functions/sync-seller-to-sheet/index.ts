@@ -130,7 +130,7 @@ async function writeRowCells(
   if (cells.length === 0) return;
   // Build batchUpdate values payload — one range per cell so non-contiguous columns work.
   const data = cells.map((c) => ({
-    range: `'${tabName}'!${c.col.toUpperCase()}${rowNumber}`,
+    range: `'${tabName}'!${normalizeCol(c.col)}${rowNumber}`,
     values: [[c.value]],
   }));
   const r = await fetch(
