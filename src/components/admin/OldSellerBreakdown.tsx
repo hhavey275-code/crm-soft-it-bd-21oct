@@ -681,7 +681,7 @@ function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn
   );
 }
 
-function WithdrawTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function WithdrawTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   const total = rows.reduce((s, r) => s + r.bdt_amount, 0);
   return (
     <Card>
@@ -710,27 +710,34 @@ function WithdrawTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string 
                 <TableHead className="text-right">BDT</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Entry by</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No entries</TableCell></TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
-                    <TableCell className="text-xs">{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                rows.map((r) => {
+                  const isDup = duplicateIds?.has(r.id);
+                  return (
+                    <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
+                      <TableCell className="text-xs">{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
               <TableRow>
                 <TableCell>Total ({rows.length})</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={2} />
+                <TableCell colSpan={3} />
               </TableRow>
             </TableFooter>
           </Table>
