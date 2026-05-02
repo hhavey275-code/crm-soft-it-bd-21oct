@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
   "a8788536-839d-4d10-be20-d5f5f76fa2cc", // DCV6NSLQ6M · Rasel · 31 Mar 2026
   "35777582-cd93-4324-8ad0-ee1d2e1dbe9d", // DD19P4W5U3 · Rasel · 1 Apr 2026
+  "b36c9ced-710c-42b3-b9f3-9207d4f37e7e", // DD58TGDTOQ · Ahmed Saad · 5 Apr 2026 · ৳1,600
 ]);
 
 export type ArchiveTxn = {
