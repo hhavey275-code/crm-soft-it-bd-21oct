@@ -560,15 +560,17 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Kind", "Type", "BDT in", "BDT out", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
+              ["Date", "Kind", "Type", "BDT in", "BDT out", "USDT", "Rate", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
               withRunning.map(({ row: r, kind, delta, after }) => [
                 fmtDate(r.created_at),
                 kind,
                 r.type,
                 kind === "in" ? r.bdt_amount : "",
-                kind === "withdraw" ? r.bdt_amount : "",
-                delta,
-                after,
+                kind === "withdraw" ? r.bdt_amount : kind === "usdt" ? Math.round(r.usdt_amount * r.rate) : "",
+                kind === "usdt" ? r.usdt_amount : "",
+                kind === "usdt" ? r.rate : "",
+                Math.round(delta),
+                Math.round(after),
                 r.description,
                 r.bank_name,
                 r.account_number,
