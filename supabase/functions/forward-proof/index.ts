@@ -3,7 +3,7 @@ import {
   computeDueAdvance,
   buildTotalLine,
   fetchAllSellerTxns,
-  fetchPendingTopupCredits,
+  fetchForwardedBalanceMismatches,
   claimForwardSlot,
   completeForwardSlot,
   releaseForwardSlot,
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     const { data: reqData, error: reqErr } = await supabase
       .from('top_up_requests')
-      .select('id, proof_url, bank_account_id, amount, bdt_amount, payment_reference, user_id')
+      .select('id, proof_url, bank_account_id, amount, bdt_amount, payment_reference, user_id, created_at, status, reviewed_by')
       .eq('id', request_id)
       .single();
     if (reqErr || !reqData) {
