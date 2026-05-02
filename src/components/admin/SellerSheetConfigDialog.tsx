@@ -401,6 +401,16 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
               Backfill now
             </Button>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={recreateTabs}
+              onCheckedChange={setRecreateTabs}
+              id="recreate-tabs"
+            />
+            <Label htmlFor="recreate-tabs" className="text-xs cursor-pointer">
+              Recreate tabs from template (existing month tab delete kore template theke abar clone hobe)
+            </Label>
+          </div>
           <p className="text-xs text-muted-foreground">
             Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
           </p>
