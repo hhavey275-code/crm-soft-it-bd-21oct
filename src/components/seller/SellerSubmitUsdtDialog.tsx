@@ -121,8 +121,8 @@ export function SellerSubmitUsdtDialog({ open, onOpenChange, sellerId, invalidat
       const r = Number(rate);
       if (!usdt || usdt <= 0) throw new Error("Valid USDT amount দিন");
       if (!r || r <= 0) throw new Error("Valid rate দিন");
-      if (!proofUrl) throw new Error("Payment screenshot upload করুন");
       if (!bankAccountId) throw new Error("যে bank-এ USDT পাঠানো হয়েছে সেটা select করুন");
+      // proof_url is optional — admin can approve without proof; text-only Telegram forward will be sent on approval.
 
       const targetSellerId = sellerId || currentUserId;
       const isAdminEntry = !!sellerId && sellerId !== currentUserId;
@@ -233,7 +233,7 @@ export function SellerSubmitUsdtDialog({ open, onOpenChange, sellerId, invalidat
           </div>
 
           <div>
-            <Label className="text-xs mb-1.5 block">Payment Screenshot</Label>
+            <Label className="text-xs mb-1.5 block">Payment Screenshot <span className="text-muted-foreground">(optional)</span></Label>
             {previewUrl ? (
               <div className="relative rounded-lg border overflow-hidden bg-muted">
                 <img src={previewUrl} alt="proof" className="w-full max-h-48 object-contain" />
