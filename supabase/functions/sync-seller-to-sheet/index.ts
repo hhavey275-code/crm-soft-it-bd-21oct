@@ -459,7 +459,7 @@ async function syncOneTransaction(
 
     return { ok: true, tab: targetTab, start_row: startRow, rows_written: pending.length };
   } finally {
-    await supabase.rpc("pg_advisory_unlock", { key: lockBig.toString() }).catch(() => {});
+    try { await supabase.rpc("pg_advisory_unlock", { key: lockBig.toString() }); } catch { /* ignore */ }
   }
 }
 
