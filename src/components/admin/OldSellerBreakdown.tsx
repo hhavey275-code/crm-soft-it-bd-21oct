@@ -29,6 +29,7 @@ import {
   type ArchiveTxn,
 } from "@/lib/oldSellerData";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
+import { MigrateForwardedButton } from "./MigrateForwardedButton";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
