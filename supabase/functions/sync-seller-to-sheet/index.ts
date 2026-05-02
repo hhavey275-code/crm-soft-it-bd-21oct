@@ -305,7 +305,7 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance, recreate } = bodyJson;
 
     // ---- SET OPENING BALANCE for a specific month tab ----
     if (set_opening_balance) {
@@ -374,6 +374,33 @@ serve(async (req) => {
       if (!seller_id) throw new Error("seller_id required for backfill");
       if (!Array.isArray(months) || months.length === 0)
         throw new Error("months[] required (e.g. ['2026-04','2026-05'])");
+
+      // If recreate=true, derive tab names from months + config pattern, delete & reset logs.
+      if (recreate) {
+        const { data: cfgPre2 } = await supabase
+          .from("seller_sheet_config").select("spreadsheet_id, tab_pattern")
+          .eq("seller_id", seller_id).maybeSingle();
+        if (cfgPre2?.spreadsheet_id) {
+          const pattern = cfgPre2.tab_pattern || "{MMMM-YYYY}";
+          const tabsToDelete = months.map((m: string) => {
+            const [y, mo] = m.split("-").map(Number);
+            return formatTabName(pattern, new Date(Date.UTC(y, mo - 1, 1)));
+          });
+          const metaPre2 = await getSheetsMeta(cfgPre2.spreadsheet_id);
+          const reqs2: any[] = [];
+          for (const title of tabsToDelete) {
+            const sh = (metaPre2.sheets || []).find((s: any) => s.properties.title === title);
+            if (sh) reqs2.push({ deleteSheet: { sheetId: sh.properties.sheetId } });
+          }
+          if (reqs2.length > 0) {
+            await fetch(`${GATEWAY}/spreadsheets/${cfgPre2.spreadsheet_id}:batchUpdate`, {
+              method: "POST", headers: gwHeaders,
+              body: JSON.stringify({ requests: reqs2 }),
+            });
+          }
+          await supabase.from("sheet_sync_log").delete().in("tab_name", tabsToDelete);
+        }
+      }
 
       // Load seller config
       const { data: cfg, error: cfgErr } = await supabase

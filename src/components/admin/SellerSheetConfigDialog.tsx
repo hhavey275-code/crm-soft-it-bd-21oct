@@ -149,6 +149,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
   };
 
   const [backfilling, setBackfilling] = useState(false);
+  const [recreateTabs, setRecreateTabs] = useState(false);
   const [backfillMonths, setBackfillMonths] = useState(() => {
     const now = new Date();
     const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -170,7 +171,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
     setBackfilling(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: { backfill: true, seller_id: sellerId, months },
+        body: { backfill: true, seller_id: sellerId, months, recreate: recreateTabs },
       });
       if (error) throw error;
       const d = data as any;
@@ -349,8 +350,26 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
                     />
                   </div>
                 ))}
+                <div className="flex items-center gap-2 md:col-span-2 bg-muted/40 p-2 rounded">
+                  <Label className="flex-1 text-sm font-medium">
+                    Opening balance cell
+                    <span className="block text-[10px] text-muted-foreground font-normal">
+                      Cell ref (e.g. I6) — month er shurute opening balance ekhane boshbe
+                    </span>
+                  </Label>
+                  <Input
+                    className="w-28 uppercase"
+                    value={form.opening_balance_cell || ""}
+                    onChange={(e) =>
+                      setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })
+                    }
+                    placeholder="I6"
+                    maxLength={6}
+                  />
+                </div>
               </div>
             </div>
+
 
             {cfg?.last_synced_at && (
               <div className="text-xs text-muted-foreground border-t pt-2">
@@ -381,6 +400,16 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
               {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Backfill now
             </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={recreateTabs}
+              onCheckedChange={setRecreateTabs}
+              id="recreate-tabs"
+            />
+            <Label htmlFor="recreate-tabs" className="text-xs cursor-pointer">
+              Recreate tabs from template (existing month tab delete kore template theke abar clone hobe)
+            </Label>
           </div>
           <p className="text-xs text-muted-foreground">
             Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
