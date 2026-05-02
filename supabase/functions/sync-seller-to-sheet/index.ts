@@ -247,13 +247,18 @@ async function syncOneTransaction(
   if (isPayment) {
     push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
   } else if (isWithdraw) {
-    push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+    if (cfg.col_withdraw) {
+      push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
+    } else {
+      push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+    }
   } else if (isUsdt) {
     push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
     push(cfg.col_payo_rate, Number(txn.rate || 0));
     const converted = Number(txn.usdt_amount || 0) * Number(txn.rate || 0);
     push(cfg.col_payo_bdt, Number(converted.toFixed(2)));
   }
+
 
   push(cfg.col_description, txn.description || "");
   push(cfg.col_proof_url, txn.proof_url || "");
