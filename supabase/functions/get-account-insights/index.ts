@@ -196,6 +196,14 @@ function parseAccountBatchResults(account: any, batchResults: any[], parseMeta: 
       rateLimit: { account_id: actId, account_name: account.account_name || actId, error_code: rlCode }
     };
   }
+  const blockingError = getBlockingMetaError(todayData, yesterdayData, accountData, paymentCycleData, campaignsData);
+  if (blockingError) {
+    return {
+      id: account.id,
+      insight: { ...EMPTY_INSIGHT },
+      syncError: blockingError
+    };
+  }
   let todaySpend = 0;
   let yesterdaySpend = 0;
   if (combinedTodayYesterday && Array.isArray(todayData?.data)) {
