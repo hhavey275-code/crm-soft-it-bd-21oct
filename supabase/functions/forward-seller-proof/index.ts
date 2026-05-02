@@ -5,8 +5,9 @@ import {
   formatBdtIN,
   fetchAllSellerTxns,
   fetchPendingTopupCredits,
-  checkForwardLog,
-  writeForwardLog,
+  claimForwardSlot,
+  completeForwardSlot,
+  releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
@@ -50,22 +51,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Durable dedupe via telegram_forward_log (works even when seller_transaction_id missing).
+    // Source-type for the telegram_forward_log table (atomic dedupe happens
+    // RIGHT BEFORE the Telegram POST below — not here — so concurrent invocations
+    // can't both pass an early read-then-act check).
     const sourceTypeMap: Record<string, string> = {
       bdt_payment: 'seller_payment',
       usdt_received: 'usdt_received',
       withdraw: 'withdraw',
     };
     const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
+
+    // Cheap early bail-out via the legacy mirror flag (saves work when we can
+    // tell upfront the row was already forwarded). Authoritative dedupe is
+    // still the atomic claim_forward_slot below.
     if (seller_transaction_id) {
-      const dedupe = await checkForwardLog(supabase, sourceType, seller_transaction_id);
-      if (dedupe.alreadyForwarded) {
-        return new Response(
-          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: dedupe.messageId }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
-      }
-      // Legacy mirror flag check
       const { data: existing } = await supabase
         .from('seller_transactions')
         .select('telegram_forwarded, telegram_message_id')
@@ -186,7 +185,21 @@ Deno.serve(async (req) => {
       caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     }
 
-    // Send: photo if proof, text-only otherwise (withdraw without proof)
+    // ATOMIC CLAIM — race-safe: if seller_transaction_id is provided, only the
+    // first concurrent caller wins the slot. Without an id we fall through (legacy
+    // callers without a row id — extremely rare).
+    if (seller_transaction_id) {
+      const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
+      if (!claimed) {
+        console.log(`forward-seller-proof: slot already claimed for ${seller_transaction_id}, skipping`);
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+    // Send: photo if proof, text-only otherwise
     let tgResult: any;
     if (proof_url) {
       const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
@@ -206,19 +219,22 @@ Deno.serve(async (req) => {
 
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
+      // Release the slot so a manual retry can resend.
+      if (seller_transaction_id) {
+        await releaseForwardSlot(supabase, sourceType, seller_transaction_id);
+      }
       return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Persist dedupe log + mirror flag
+    // Persist message_id + balance into the previously-claimed row, plus mirror flag.
     if (seller_transaction_id) {
-      await writeForwardLog(
+      await completeForwardSlot(
         supabase,
         sourceType,
         seller_transaction_id,
-        groupId,
         tgResult.result?.message_id ?? null,
         finalBalance,
       );

@@ -117,8 +117,8 @@ export async function fetchPendingTopupCredits(
 }
 
 /**
- * Atomic dedupe via telegram_forward_log. Returns the existing message_id
- * if this source was already forwarded, or null if forwarding should proceed.
+ * Atomic dedupe check (read-only, legacy). Prefer `claimForwardSlot` for new code
+ * because it claims the slot atomically before the Telegram POST.
  */
 export async function checkForwardLog(
   supabase: any,
@@ -135,6 +135,66 @@ export async function checkForwardLog(
   return { alreadyForwarded: false, messageId: null };
 }
 
+/**
+ * Atomically reserve the forward slot BEFORE calling Telegram.
+ * Returns true if THIS caller won the slot; false if a concurrent caller
+ * already claimed (or already completed) it. Race-safe at the SQL level.
+ */
+export async function claimForwardSlot(
+  supabase: any,
+  sourceType: string,
+  sourceId: string,
+  groupId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('claim_forward_slot', {
+    p_source_type: sourceType,
+    p_source_id: sourceId,
+    p_group_id: groupId,
+  });
+  if (error) {
+    console.warn('claimForwardSlot RPC failed:', error.message);
+    return false; // Fail-closed: don't double-send if we can't claim.
+  }
+  return data === true;
+}
+
+/** Fill in message_id + balance after a successful Telegram POST. */
+export async function completeForwardSlot(
+  supabase: any,
+  sourceType: string,
+  sourceId: string,
+  messageId: number | null,
+  totalBdt: number | null,
+): Promise<void> {
+  try {
+    await supabase.rpc('complete_forward_slot', {
+      p_source_type: sourceType,
+      p_source_id: sourceId,
+      p_message_id: messageId,
+      p_caption_total: totalBdt,
+    });
+  } catch (e) {
+    console.warn('completeForwardSlot failed:', (e as any)?.message);
+  }
+}
+
+/** Release the slot when the Telegram POST itself failed, so a retry can succeed. */
+export async function releaseForwardSlot(
+  supabase: any,
+  sourceType: string,
+  sourceId: string,
+): Promise<void> {
+  try {
+    await supabase.rpc('release_forward_slot', {
+      p_source_type: sourceType,
+      p_source_id: sourceId,
+    });
+  } catch (e) {
+    console.warn('releaseForwardSlot failed:', (e as any)?.message);
+  }
+}
+
+/** @deprecated Use claimForwardSlot + completeForwardSlot. Kept for back-compat. */
 export async function writeForwardLog(
   supabase: any,
   sourceType: string,
@@ -152,7 +212,6 @@ export async function writeForwardLog(
       caption_total_bdt: totalBdt,
     });
   } catch (e) {
-    // Unique violation = someone else logged it first; that's fine.
     console.warn('writeForwardLog: insert failed (likely race):', (e as any)?.message);
   }
 }

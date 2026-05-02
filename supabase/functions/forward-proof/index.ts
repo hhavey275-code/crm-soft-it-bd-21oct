@@ -4,8 +4,9 @@ import {
   buildTotalLine,
   fetchAllSellerTxns,
   fetchPendingTopupCredits,
-  checkForwardLog,
-  writeForwardLog,
+  claimForwardSlot,
+  completeForwardSlot,
+  releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
@@ -31,14 +32,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Durable dedupe — return the prior message_id if we already forwarded this top-up.
-    const dedupe = await checkForwardLog(supabase, 'client_topup', request_id);
-    if (dedupe.alreadyForwarded) {
-      return new Response(
-        JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: dedupe.messageId }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    // (Atomic dedupe via claim_forward_slot happens AFTER we resolve the
+    // target group and BEFORE we actually POST to Telegram — so concurrent
+    // invocations cannot both send the same message.)
 
     const { data: reqData, error: reqErr } = await supabase
       .from('top_up_requests')
@@ -123,6 +119,16 @@ Deno.serve(async (req) => {
 
     const caption = `✅ <b>Approved Top-Up</b>\n👤 ${clientName}\n💰 $${reqData.amount} (৳${reqData.bdt_amount ? Number(reqData.bdt_amount).toLocaleString() : 'N/A'})\n🔖 Ref: ${reqData.payment_reference || 'N/A'}${runningTotalLine}`;
 
+    // ATOMIC CLAIM — race-safe: only the first concurrent caller wins this slot.
+    const claimed = await claimForwardSlot(supabase, 'client_topup', request_id, targetGroupId);
+    if (!claimed) {
+      console.log(`forward-proof: slot already claimed for ${request_id}, skipping`);
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -136,17 +142,17 @@ Deno.serve(async (req) => {
     const tgResult = await tgResp.json();
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
+      // Release the slot so a manual retry can resend.
+      await releaseForwardSlot(supabase, 'client_topup', request_id);
       return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    // Persist dedupe log + mirror flag
-    await writeForwardLog(
+    await completeForwardSlot(
       supabase,
       'client_topup',
       request_id,
-      targetGroupId,
       tgResult.result?.message_id ?? null,
       finalBalance,
     );
