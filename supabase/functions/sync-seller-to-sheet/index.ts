@@ -534,13 +534,33 @@ serve(async (req) => {
       const titleSet = new Set(sheets.map((s: any) => s.properties.title));
 
       // Ensure all needed tabs exist (create missing ones, cloning template if set)
+      // and write opening balance (auto-derived from monthly view) for each.
+      const monthByTab = new Map<string, string>();
+      for (const m of months) {
+        const [y, mo] = m.split("-").map(Number);
+        const tab = formatTabName(tabPattern, new Date(Date.UTC(y, mo - 1, 1)));
+        monthByTab.set(tab, m);
+      }
       for (const tab of groups.keys()) {
         if (!titleSet.has(tab)) {
           const tmpl = cfg.template_tab
             ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
             : null;
-          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+          if (!tmpl) throw new Error(`template_tab "${cfg.template_tab || ''}" not found in sheet — set Template tab first`);
+          await createTab(cfg.spreadsheet_id, tab, tmpl.properties.sheetId, cfg.data_start_row || 7);
           titleSet.add(tab);
+        }
+        // Auto write opening balance if cell configured and we know the month
+        if (cfg.opening_balance_cell && monthByTab.has(tab)) {
+          const m = monthByTab.get(tab)!;
+          const [y, mo] = m.split("-").map(Number);
+          const opening = await autoOpeningBalance(seller_id, y, mo);
+          const cell = String(cfg.opening_balance_cell).toUpperCase();
+          const range = `'${tab}'!${cell}`;
+          await fetch(
+            `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values/${range}?valueInputOption=USER_ENTERED`,
+            { method: "PUT", headers: gwHeaders, body: JSON.stringify({ values: [[opening]] }) },
+          );
         }
       }
 
