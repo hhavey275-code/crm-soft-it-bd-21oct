@@ -5,8 +5,9 @@ import {
   formatBdtIN,
   fetchAllSellerTxns,
   fetchPendingTopupCredits,
-  checkForwardLog,
-  writeForwardLog,
+  claimForwardSlot,
+  completeForwardSlot,
+  releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
