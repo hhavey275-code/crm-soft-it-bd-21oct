@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { MonthlyDueAdvanceCard } from "./MonthlyDueAdvanceCard";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
