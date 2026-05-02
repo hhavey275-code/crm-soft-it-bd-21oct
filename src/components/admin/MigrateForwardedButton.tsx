@@ -182,7 +182,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
           </div>
           <p className="text-xs text-muted-foreground">
             {candidates.length} eligible rows ({forwardedRows.length} payments IN +{" "}
-            {withdrawRows.length} withdraws) for <b>{sellerName}</b>.{" "}
+            {withdrawRows.length} withdraws + {usdtGivenRows.length} USDT given) for <b>{sellerName}</b>.{" "}
             {migratedCount > 0 && (
               <span className="text-emerald-600 dark:text-emerald-400">
                 {migratedCount} already in live ledger.
@@ -190,7 +190,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
             )}{" "}
             {pendingCount > 0 && <span>{pendingCount} pending.</span>}
             <br />
-            Manual entries become <b>client_topup</b> · withdraws stay as withdraw · IDs preserved (idempotent).
+            Manual entries become <b>client_topup</b> · withdraws stay as withdraw · USDT given stays as usdt_received · IDs preserved (idempotent).
           </p>
         </div>
         <Button
