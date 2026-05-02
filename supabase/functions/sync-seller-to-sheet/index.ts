@@ -305,43 +305,114 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance, recreate } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance, recreate, ensure_month, prepare_next_month } = bodyJson;
+
+    // Helper: compute opening balance for a given month from seller_monthly_balance_view.
+    // Returns the closing_balance of the previous month, or 0 if none.
+    async function autoOpeningBalance(sId: string, year: number, month1to12: number): Promise<number> {
+      const monthStart = `${year}-${String(month1to12).padStart(2, "0")}-01`;
+      const { data } = await supabase
+        .from("seller_monthly_balance_view")
+        .select("opening_balance, month_start")
+        .eq("seller_id", sId)
+        .eq("month_start", monthStart)
+        .maybeSingle();
+      if (data && data.opening_balance != null) return Number(data.opening_balance);
+      // Fallback: take last available month <= monthStart-1 closing
+      const { data: prev } = await supabase
+        .from("seller_monthly_balance_view")
+        .select("closing_balance, month_start")
+        .eq("seller_id", sId)
+        .lt("month_start", monthStart)
+        .order("month_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return prev?.closing_balance != null ? Number(prev.closing_balance) : 0;
+    }
+
+    // Helper: ensure a month tab exists (clone template if missing) and write opening balance if cell configured.
+    async function ensureMonthTab(sId: string, monthStr: string, openingValueOverride?: number) {
+      if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new Error("month must be YYYY-MM");
+      const { data: cfg } = await supabase
+        .from("seller_sheet_config").select("*").eq("seller_id", sId).maybeSingle();
+      if (!cfg) throw new Error("config not found");
+      const [y, mo] = monthStr.split("-").map(Number);
+      const tabName = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", new Date(Date.UTC(y, mo - 1, 1)));
+
+      const meta = await getSheetsMeta(cfg.spreadsheet_id);
+      const sheets = meta.sheets || [];
+      const exists = sheets.find((s: any) => s.properties.title === tabName);
+      let createdNow = false;
+      if (!exists) {
+        const tmpl = cfg.template_tab
+          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
+        if (!tmpl) throw new Error(`template_tab "${cfg.template_tab || ''}" not found in sheet — set Template tab first`);
+        await createTab(cfg.spreadsheet_id, tabName, tmpl.properties.sheetId, cfg.data_start_row || 7);
+        createdNow = true;
+      }
+
+      let openingWritten: number | null = null;
+      if (cfg.opening_balance_cell) {
+        const opening = openingValueOverride !== undefined
+          ? Number(openingValueOverride)
+          : await autoOpeningBalance(sId, y, mo);
+        const cell = String(cfg.opening_balance_cell).toUpperCase();
+        const range = `'${tabName}'!${cell}`;
+        const r = await fetch(
+          `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values/${range}?valueInputOption=USER_ENTERED`,
+          { method: "PUT", headers: gwHeaders, body: JSON.stringify({ values: [[opening]] }) },
+        );
+        const j = await r.json();
+        if (!r.ok) throw new Error(`opening balance write failed [${r.status}]: ${JSON.stringify(j)}`);
+        openingWritten = opening;
+      }
+      return { tab: tabName, created: createdNow, opening_balance: openingWritten };
+    }
+
+    // ---- ENSURE MONTH TAB (manual) ----
+    if (ensure_month) {
+      if (!seller_id) throw new Error("seller_id required");
+      const result = await ensureMonthTab(seller_id, ensure_month);
+      return jsonResp({ ok: true, ...result });
+    }
+
+    // ---- PREPARE NEXT MONTH (cron-friendly: for all enabled sellers, or one) ----
+    if (prepare_next_month) {
+      const now = new Date();
+      const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      const monthStr = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+      let q = supabase.from("seller_sheet_config").select("seller_id").eq("enabled", true);
+      if (seller_id) q = q.eq("seller_id", seller_id);
+      const { data: cfgs } = await q;
+      const out: any[] = [];
+      for (const c of cfgs || []) {
+        try {
+          const r = await ensureMonthTab(c.seller_id, monthStr);
+          out.push({ seller_id: c.seller_id, ...r });
+        } catch (e: any) {
+          out.push({ seller_id: c.seller_id, error: e?.message || String(e) });
+        }
+      }
+      return jsonResp({ ok: true, month: monthStr, results: out });
+    }
 
     // ---- SET OPENING BALANCE for a specific month tab ----
     if (set_opening_balance) {
       if (!seller_id) throw new Error("seller_id required");
-      const { month, value } = set_opening_balance; // month: "YYYY-MM", value: number
+      const { month, value } = set_opening_balance; // month: "YYYY-MM", value?: number (auto if omitted)
       if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("month required (YYYY-MM)");
-      if (value === undefined || value === null || isNaN(Number(value)))
-        throw new Error("value (number) required");
-
-      const { data: cfg } = await supabase
-        .from("seller_sheet_config").select("*").eq("seller_id", seller_id).maybeSingle();
-      if (!cfg) throw new Error("config not found");
-      if (!cfg.opening_balance_cell)
-        throw new Error("opening_balance_cell not configured (e.g. I6)");
-
-      const [y, mo] = month.split("-").map(Number);
-      const tabName = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", new Date(Date.UTC(y, mo - 1, 1)));
-
-      // Ensure tab exists (clone template if needed)
-      const meta = await getSheetsMeta(cfg.spreadsheet_id);
-      const sheets = meta.sheets || [];
-      if (!sheets.find((s: any) => s.properties.title === tabName)) {
-        const tmpl = cfg.template_tab
-          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
-        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
-      }
-
-      const cell = String(cfg.opening_balance_cell).toUpperCase();
-      const range = `'${tabName}'!${cell}`;
-      const r = await fetch(
-        `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values/${range}?valueInputOption=USER_ENTERED`,
-        { method: "PUT", headers: gwHeaders, body: JSON.stringify({ values: [[Number(value)]] }) },
-      );
-      const j = await r.json();
-      if (!r.ok) throw new Error(`opening balance write failed [${r.status}]: ${JSON.stringify(j)}`);
-      return jsonResp({ ok: true, tab: tabName, cell, value: Number(value) });
+      const override = (value === undefined || value === null || value === "") ? undefined : Number(value);
+      if (override !== undefined && isNaN(override)) throw new Error("value must be a number");
+      const result = await ensureMonthTab(seller_id, month, override);
+      if (!result.opening_balance && result.opening_balance !== 0)
+        throw new Error("opening_balance_cell not configured (e.g. I6) — set it in mapping and Save");
+      return jsonResp({
+        ok: true,
+        tab: result.tab,
+        cell: String((await supabase.from("seller_sheet_config").select("opening_balance_cell").eq("seller_id", seller_id).maybeSingle()).data?.opening_balance_cell || "").toUpperCase(),
+        value: result.opening_balance,
+        auto: override === undefined,
+      });
     }
 
 
