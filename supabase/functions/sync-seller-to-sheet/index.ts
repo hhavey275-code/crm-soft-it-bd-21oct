@@ -305,7 +305,7 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance, recreate } = bodyJson;
 
     // ---- SET OPENING BALANCE for a specific month tab ----
     if (set_opening_balance) {
