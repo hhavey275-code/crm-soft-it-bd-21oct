@@ -1,7 +1,12 @@
 // Vercel Node.js Function entry that hosts the TanStack Start server bundle.
 // Vercel rewrites every request to /api/server, then this handler converts
 // the Node IncomingMessage into a Web Request and forwards it to TanStack Start.
-import server from "../dist/server/server.js";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const distClientDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist/client");
+let serverPromise;
 
 export const config = {
   runtime: "nodejs",
@@ -45,15 +50,44 @@ async function writeResponse(webRes, res) {
   res.end();
 }
 
+async function getServer() {
+  serverPromise ??= import("../dist/server/server.js").then((mod) => mod.default ?? mod);
+  return serverPromise;
+}
+
+async function writeClientFallback(req, res, err) {
+  console.error("[ssr] handler error:", err);
+  const acceptsHtml = String(req.headers.accept || "").includes("text/html");
+  const isPageRequest = (!req.method || ["GET", "HEAD"].includes(req.method.toUpperCase())) && acceptsHtml;
+
+  if (!isPageRequest || String(req.url || "").startsWith("/api/")) {
+    res.statusCode = 500;
+    res.setHeader("content-type", "text/plain; charset=utf-8");
+    res.end("Internal Server Error");
+    return;
+  }
+
+  try {
+    const html = await readFile(path.join(distClientDir, "index.html"), "utf8");
+    res.statusCode = 200;
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.setHeader("cache-control", "no-store");
+    res.end(html);
+  } catch (fallbackErr) {
+    console.error("[ssr] client fallback failed:", fallbackErr);
+    res.statusCode = 500;
+    res.setHeader("content-type", "text/plain; charset=utf-8");
+    res.end("Internal Server Error");
+  }
+}
+
 export default async function handler(req, res) {
   try {
+    const server = await getServer();
     const request = buildRequest(req);
     const response = await server.fetch(request);
     await writeResponse(response, res);
   } catch (err) {
-    console.error("[ssr] handler error:", err);
-    res.statusCode = 500;
-    res.setHeader("content-type", "text/plain");
-    res.end("Internal Server Error");
+    await writeClientFallback(req, res, err);
   }
 }
