@@ -104,6 +104,41 @@ export async function fetchPendingTopupCredits(
     .in('top_up_request_id', ids);
   const mirroredSet = new Set((mirrored || []).map((m: any) => m.top_up_request_id));
 
+  // Also exclude top_ups already mirrored into the archive tables. Without
+  // this, old (pre-archive) top_ups appear "unmirrored" and get re-credited
+  // into the running balance, inflating Telegram totals.
+  try {
+    const { data: archiveTables } = await supabase
+      .from('information_schema.tables' as any)
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .like('table_name', 'seller_transactions_archive_%');
+    for (const tbl of (archiveTables || []) as Array<{ table_name: string }>) {
+      const { data: archMirrored } = await supabase
+        .from(tbl.table_name as any)
+        .select('top_up_request_id')
+        .in('top_up_request_id', ids);
+      for (const m of (archMirrored || []) as any[]) {
+        if (m.top_up_request_id) mirroredSet.add(m.top_up_request_id);
+      }
+    }
+  } catch (e) {
+    // information_schema may not be exposed via PostgREST; fall back to a
+    // hardcoded list of known archive months. Safe no-op if missing.
+    const knownArchives = ['seller_transactions_archive_2026_05'];
+    for (const tbl of knownArchives) {
+      try {
+        const { data: archMirrored } = await supabase
+          .from(tbl as any)
+          .select('top_up_request_id')
+          .in('top_up_request_id', ids);
+        for (const m of (archMirrored || []) as any[]) {
+          if (m.top_up_request_id) mirroredSet.add(m.top_up_request_id);
+        }
+      } catch { /* archive table absent — ignore */ }
+    }
+  }
+
   return topups
     .filter((t: any) => !mirroredSet.has(t.id))
     .map((t: any) => ({
