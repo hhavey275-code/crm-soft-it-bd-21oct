@@ -458,6 +458,21 @@ function checkRateLimit(data) {
   if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
   return null;
 }
+function getBlockingMetaError(...payloads: any[]) {
+  for (const payload of payloads) {
+    if (!payload) continue;
+    if (payload.__batch_error) return `Meta batch failed (${payload.status || "unknown"})`;
+    const err = payload.error;
+    if (!err) continue;
+    const code = Number(err.code ?? 0);
+    const type = String(err.type ?? "");
+    const message = String(err.message ?? "Meta API error");
+    if (code === 599 || type.includes("Proxy") || code === 190 || code === 10 || code === 200) {
+      return message;
+    }
+  }
+  return null;
+}
 function extractNumericValue(input) {
   if (input === null || input === undefined) return null;
   if (typeof input === "number") {
