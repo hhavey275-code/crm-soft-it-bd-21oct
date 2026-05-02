@@ -149,6 +149,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
   };
 
   const [backfilling, setBackfilling] = useState(false);
+  const [recreateTabs, setRecreateTabs] = useState(false);
   const [backfillMonths, setBackfillMonths] = useState(() => {
     const now = new Date();
     const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
