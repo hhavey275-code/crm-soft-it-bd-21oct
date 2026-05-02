@@ -186,12 +186,27 @@ export function AdminBusinessManagers() {
         business_manager_id: businessManagerId,
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result: any) => {
       const accounts: SyncedAccount[] = result.accounts ?? [];
+      const upserted = Number(result.upserted ?? 0);
+      const deleted = Number(result.deleted ?? 0);
+      const skipped = Number(result.skipped_unassigned ?? 0);
+
+      // Refresh ad-account-related queries since the function now upserts/deletes server-side.
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+
+      const summary = `Synced ${upserted} • Removed ${deleted}${skipped ? ` • Skipped ${skipped}` : ""}`;
       if (accounts.length === 0) {
-        toast.info("No accounts found from Meta");
+        toast.info(`No System User assigned accounts found. ${summary}`);
         return;
       }
+      toast.success(summary);
+
+      // Still open the import dialog so admin can review the synced list.
       const { data: existing } = await supabase.from("ad_accounts").select("account_id");
       const existingIds = new Set((existing ?? []).map((a: any) => a.account_id));
       setExistingAccountIds(existingIds);
@@ -200,8 +215,6 @@ export function AdminBusinessManagers() {
       setImportStatusFilter("all");
       setImportSearch("");
       setImportDialogOpen(true);
-      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
     onError: (err: any) => { toast.error(err.message); setSyncingBmId(null); },
     onSettled: () => setSyncingBmId(null),
