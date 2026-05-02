@@ -45,6 +45,7 @@ export type ArchiveTxn = {
   topup_forwarded: boolean | null; // null when no linked top_up_request
   topup_amount_usd: number | null;
   topup_telegram_message_id: number | null;
+  is_forced_forwarded: boolean; // true when forwarded status came from manual override list
 };
 
 export type ArchivedSeller = {
