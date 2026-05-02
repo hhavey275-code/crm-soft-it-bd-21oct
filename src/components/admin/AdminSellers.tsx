@@ -2171,18 +2171,32 @@ export function AdminSellers() {
                               );
                             })()}
                             <td className="border border-border px-1 py-1.5 text-center">
-                              <button
-                                onClick={() => setConfirmDialog({
-                                  title: "Delete this row?",
-                                  description: <>This transaction row will be permanently deleted from the ledger. Type <strong>confirm</strong> to proceed.</>,
-                                  actionLabel: "Delete",
-                                  onConfirm: () => deleteTxnMutation.mutate(t.id),
-                                })}
-                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
-                                title="Delete row"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              <div className="inline-flex items-center gap-0.5">
+                                {(t.status || "approved").toLowerCase() === "approved" &&
+                                 t.type !== "client_topup" &&
+                                 !t.telegram_forwarded && (
+                                  <button
+                                    onClick={() => resendForwardMutation.mutate(t)}
+                                    disabled={resendForwardMutation.isPending}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 p-1 rounded disabled:opacity-50"
+                                    title="Resend to Telegram (was not forwarded)"
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setConfirmDialog({
+                                    title: "Delete this row?",
+                                    description: <>This transaction row will be permanently deleted from the ledger. Type <strong>confirm</strong> to proceed.</>,
+                                    actionLabel: "Delete",
+                                    onConfirm: () => deleteTxnMutation.mutate(t.id),
+                                  })}
+                                  className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                  title="Delete row"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
