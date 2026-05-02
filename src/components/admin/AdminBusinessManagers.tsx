@@ -34,7 +34,20 @@ interface SyncedAccount {
 
 async function invokeBmFunction<T = any>(functionName: string, body?: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke(functionName, { body });
-  if (error) throw error;
+  if (error) {
+    let edgeMessage = "";
+    const response = (error as any)?.context;
+    if (response && typeof response.clone === "function") {
+      try {
+        const text = await response.clone().text();
+        const parsed = text ? JSON.parse(text) : null;
+        edgeMessage = parsed?.error || parsed?.message || text;
+      } catch {
+        // Keep the original Supabase error if the response body is not readable JSON.
+      }
+    }
+    throw new Error(edgeMessage || error.message);
+  }
   if (data && typeof data === "object" && "error" in data && data.error) {
     throw new Error(String(data.error));
   }
