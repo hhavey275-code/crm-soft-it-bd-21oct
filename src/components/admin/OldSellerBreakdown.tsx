@@ -312,6 +312,16 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
               </div>
             </div>
           )}
+          {duplicateIds.size > 0 && (
+            <div className="mt-2 rounded border border-rose-500/40 bg-rose-500/5 p-3">
+              <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-medium">
+                <AlertTriangle className="h-4 w-4" /> {duplicateIds.size} duplicate entries detected (same TRX ID + same amount)
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Duplicate rows are highlighted in red across every sheet. Use the trash icon on each duplicate row to delete it from the archive.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
