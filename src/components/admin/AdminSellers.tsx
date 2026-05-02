@@ -1457,6 +1457,9 @@ export function AdminSellers() {
                 <Button size="sm" variant="outline" onClick={() => recalcClosedMonthsMutation.mutate()} disabled={recalcClosedMonthsMutation.isPending || !(closings || []).length}>
                   <RefreshCw className="h-4 w-4 mr-1" /> Recalc Closed
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowSheetConfig(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1" /> Sheet Sync
+                </Button>
             </div>
           </div>
 
