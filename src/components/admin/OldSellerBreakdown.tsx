@@ -266,6 +266,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
               sellerName={sellerName}
               forwardedRows={buckets.forwardedIn}
               withdrawRows={buckets.withdraws}
+              usdtGivenRows={buckets.usdtGiven}
             />
             <AddForwardedEntryDialog sellerId={sellerId} sellerName={sellerName} />
           </div>

@@ -14,6 +14,8 @@ type Props = {
   forwardedRows: ArchiveTxn[];
   /** All withdraws from the archive (always migrated alongside). */
   withdrawRows: ArchiveTxn[];
+  /** All usdt_received (USDT given) rows from the archive — needed for Due/Adv math. */
+  usdtGivenRows?: ArchiveTxn[];
 };
 
 /**
@@ -36,18 +38,18 @@ function useAlreadyMigrated(sellerId: string, candidateIds: string[]) {
   });
 }
 
-export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, withdrawRows }: Props) {
+export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, withdrawRows, usdtGivenRows = [] }: Props) {
   const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [running, setRunning] = useState(false);
 
   // All rows we plan to move into the live ledger.
   const candidates = useMemo(() => {
-    const all = [...forwardedRows, ...withdrawRows];
+    const all = [...forwardedRows, ...withdrawRows, ...usdtGivenRows];
     // Dedupe by id (a withdraw could in theory also appear via merge — defensive).
     const seen = new Set<string>();
     return all.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-  }, [forwardedRows, withdrawRows]);
+  }, [forwardedRows, withdrawRows, usdtGivenRows]);
 
   const candidateIds = useMemo(() => candidates.map((r) => r.id), [candidates]);
   const { data: alreadyMigratedSet } = useAlreadyMigrated(sellerId, candidateIds);
@@ -71,8 +73,13 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
       // so the seller dashboard treats them uniformly.
       const payload = toInsert.map((r) => {
         const isWithdraw = r.type === "withdraw";
+        const isUsdtGiven = r.type === "usdt_received";
         const isManualIn = r.type === "bdt_payment" || r.type === "tenant_payment";
-        const newType = isWithdraw ? "withdraw" : "client_topup";
+        const newType = isWithdraw
+          ? "withdraw"
+          : isUsdtGiven
+          ? "usdt_received"
+          : "client_topup";
         return {
           id: r.id,
           seller_id: r.seller_id,
@@ -85,7 +92,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
           // Only client_topup rows that came from a real top_up_request retain it.
           // Manuals had no top_up_request_id; keep that null so the unique index
           // (one active topup per request) doesn't fight us.
-          top_up_request_id: isManualIn ? null : r.top_up_request_id,
+          top_up_request_id: isManualIn || isUsdtGiven ? null : r.top_up_request_id,
           proof_url: r.proof_url,
           created_at: r.created_at,
           status: "approved",
@@ -175,7 +182,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
           </div>
           <p className="text-xs text-muted-foreground">
             {candidates.length} eligible rows ({forwardedRows.length} payments IN +{" "}
-            {withdrawRows.length} withdraws) for <b>{sellerName}</b>.{" "}
+            {withdrawRows.length} withdraws + {usdtGivenRows.length} USDT given) for <b>{sellerName}</b>.{" "}
             {migratedCount > 0 && (
               <span className="text-emerald-600 dark:text-emerald-400">
                 {migratedCount} already in live ledger.
@@ -183,7 +190,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
             )}{" "}
             {pendingCount > 0 && <span>{pendingCount} pending.</span>}
             <br />
-            Manual entries become <b>client_topup</b> · withdraws stay as withdraw · IDs preserved (idempotent).
+            Manual entries become <b>client_topup</b> · withdraws stay as withdraw · USDT given stays as usdt_received · IDs preserved (idempotent).
           </p>
         </div>
         <Button
