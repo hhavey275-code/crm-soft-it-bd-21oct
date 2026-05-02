@@ -5,7 +5,10 @@
   "installCommand": "npm install",
   "functions": {
     "api/server.js": {
-      "includeFiles": ["dist/server/**", "dist/client/index.html"]
+      "includeFiles": "dist/server/**/*"
+    },
+    "api/server-fallback.js": {
+      "includeFiles": "dist/client/index.html"
     }
   },
   "rewrites": [
