@@ -516,6 +516,12 @@ serve(async (req) => {
       // Group by target tab
       const tabPattern = cfg.tab_pattern || "{MMMM-YYYY}";
       const groups = new Map<string, any[]>();
+      // Seed with every requested month so even empty months get a tab created.
+      for (const m of months) {
+        const [y, mo] = m.split("-").map(Number);
+        const tab = formatTabName(tabPattern, new Date(Date.UTC(y, mo - 1, 1)));
+        if (!groups.has(tab)) groups.set(tab, []);
+      }
       for (const t of remaining) {
         const tab = formatTabName(tabPattern, new Date(t.created_at));
         if (!groups.has(tab)) groups.set(tab, []);
