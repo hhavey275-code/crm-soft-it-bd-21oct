@@ -305,6 +305,30 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
           </div>
         )}
 
+        <div className="border-t pt-4 mt-2 space-y-2">
+          <Label className="text-sm">Backfill months (YYYY-MM, comma separated)</Label>
+          <div className="flex gap-2">
+            <Input
+              value={backfillMonths}
+              onChange={(e) => setBackfillMonths(e.target.value)}
+              placeholder="2026-04,2026-05"
+              className="flex-1"
+            />
+            <Button
+              variant="secondary"
+              onClick={runBackfill}
+              disabled={backfilling || !cfg?.id}
+              title={!cfg?.id ? "Save config first" : ""}
+            >
+              {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Backfill now
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
+          </p>
+        </div>
+
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={testSync} disabled={testing || !form.spreadsheet_url}>
             {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
