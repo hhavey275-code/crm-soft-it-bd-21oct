@@ -64,6 +64,12 @@ function formatDateTimeBn(d: Date): string {
   return `${day} ${mon} ${String(h).padStart(2, "0")}.${m} ${ap}`;
 }
 
+function normalizeCol(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const m = String(v).toUpperCase().match(/[A-Z]+/);
+  return m ? m[0] : null;
+}
+
 function colLetterToIndex(letter: string): number {
   // "A" -> 0, "Z" -> 25, "AA" -> 26
   const s = letter.trim().toUpperCase();
@@ -124,7 +130,7 @@ async function writeRowCells(
   if (cells.length === 0) return;
   // Build batchUpdate values payload — one range per cell so non-contiguous columns work.
   const data = cells.map((c) => ({
-    range: `'${tabName}'!${c.col.toUpperCase()}${rowNumber}`,
+    range: `'${tabName}'!${normalizeCol(c.col)}${rowNumber}`,
     values: [[c.value]],
   }));
   const r = await fetch(
@@ -139,6 +145,108 @@ async function writeRowCells(
   if (!r.ok) throw new Error(`writeRowCells failed [${r.status}]: ${JSON.stringify(j)}`);
 }
 
+// ---- core sync ----------------------------------------------------------------
+
+async function syncOneTransaction(
+  supabase: any,
+  seller_transaction_id: string,
+  dry_run = false,
+): Promise<any> {
+  // Already synced?
+  const { data: existing } = await supabase
+    .from("sheet_sync_log")
+    .select("id, row_number, tab_name, status")
+    .eq("seller_transaction_id", seller_transaction_id)
+    .maybeSingle();
+  if (existing && existing.status === "success") {
+    return { ok: true, skipped: "already_synced", ...existing };
+  }
+
+  const { data: txn, error: txnErr } = await supabase
+    .from("seller_transactions")
+    .select("*")
+    .eq("id", seller_transaction_id)
+    .maybeSingle();
+  if (txnErr || !txn) throw new Error(`txn not found: ${txnErr?.message}`);
+
+  if ((txn.status || "approved") !== "approved") {
+    return { ok: true, skipped: "not_approved" };
+  }
+
+  const { data: cfg, error: cfgErr } = await supabase
+    .from("seller_sheet_config")
+    .select("*")
+    .eq("seller_id", txn.seller_id)
+    .maybeSingle();
+  if (cfgErr) throw new Error(`config lookup failed: ${cfgErr.message}`);
+  if (!cfg || !cfg.enabled) return { ok: true, skipped: "no_config_or_disabled" };
+
+  const txnDate = new Date(txn.created_at);
+  const targetTab = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", txnDate);
+
+  const meta = await getSheetsMeta(cfg.spreadsheet_id);
+  const sheets = meta.sheets || [];
+  const existingTab = sheets.find((s: any) => s.properties.title === targetTab);
+  if (!existingTab) {
+    const tmpl = cfg.template_tab
+      ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
+      : null;
+    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
+  }
+
+  const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
+  const rowNumber = await findFirstEmptyDataRow(
+    cfg.spreadsheet_id, targetTab, cfg.data_start_row || 7, probeCol,
+  );
+
+  const cells: { col: string; value: string | number }[] = [];
+  const push = (col: string | null, val: any) => {
+    if (col && val !== undefined && val !== null && val !== "") {
+      cells.push({ col, value: val });
+    }
+  };
+
+  push(cfg.col_datetime, formatDateTimeBn(txnDate));
+  const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
+  const isUsdt = txn.type === "usdt_received";
+  const isWithdraw = txn.type === "withdraw";
+
+  if (isPayment) {
+    push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
+  } else if (isWithdraw) {
+    push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+  } else if (isUsdt) {
+    push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
+    push(cfg.col_payo_rate, Number(txn.rate || 0));
+    const converted = Number(txn.usdt_amount || 0) * Number(txn.rate || 0);
+    push(cfg.col_payo_bdt, Number(converted.toFixed(2)));
+  }
+
+  push(cfg.col_description, txn.description || "");
+  push(cfg.col_proof_url, txn.proof_url || "");
+  push(cfg.col_txn_id, txn.id);
+
+  if (dry_run) return { ok: true, dry_run: true, targetTab, rowNumber, cells };
+
+  await writeRowCells(cfg.spreadsheet_id, targetTab, rowNumber, cells);
+
+  await supabase.from("sheet_sync_log").upsert({
+    seller_transaction_id,
+    spreadsheet_id: cfg.spreadsheet_id,
+    tab_name: targetTab,
+    row_number: rowNumber,
+    status: "success",
+    error_message: null,
+    synced_at: new Date().toISOString(),
+  }, { onConflict: "seller_transaction_id" });
+
+  await supabase.from("seller_sheet_config")
+    .update({ last_synced_at: new Date().toISOString(), last_error: null })
+    .eq("id", cfg.id);
+
+  return { ok: true, tab: targetTab, row: rowNumber };
+}
+
 // ---- handler ----------------------------------------------------------------
 
 serve(async (req) => {
@@ -149,149 +257,196 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  try {
-    const { seller_transaction_id, dry_run } = await req.json();
-    if (!seller_transaction_id) throw new Error("seller_transaction_id required");
-
-    // Already synced?
-    const { data: existing } = await supabase
-      .from("sheet_sync_log")
-      .select("id, row_number, tab_name, status")
-      .eq("seller_transaction_id", seller_transaction_id)
-      .maybeSingle();
-    if (existing && existing.status === "success") {
-      return new Response(JSON.stringify({ ok: true, skipped: "already_synced", ...existing }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load txn
-    const { data: txn, error: txnErr } = await supabase
-      .from("seller_transactions")
-      .select("*")
-      .eq("id", seller_transaction_id)
-      .maybeSingle();
-    if (txnErr || !txn) throw new Error(`txn not found: ${txnErr?.message}`);
-
-    // Only sync approved txns
-    if ((txn.status || "approved") !== "approved") {
-      return new Response(JSON.stringify({ ok: true, skipped: "not_approved" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load seller config
-    const { data: cfg, error: cfgErr } = await supabase
-      .from("seller_sheet_config")
-      .select("*")
-      .eq("seller_id", txn.seller_id)
-      .maybeSingle();
-    if (cfgErr) throw new Error(`config lookup failed: ${cfgErr.message}`);
-    if (!cfg || !cfg.enabled) {
-      return new Response(JSON.stringify({ ok: true, skipped: "no_config_or_disabled" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Determine target tab name
-    const txnDate = new Date(txn.created_at);
-    const targetTab = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", txnDate);
-
-    // Ensure tab exists
-    const meta = await getSheetsMeta(cfg.spreadsheet_id);
-    const sheets = meta.sheets || [];
-    const existingTab = sheets.find((s: any) => s.properties.title === targetTab);
-    if (!existingTab) {
-      const tmpl = cfg.template_tab
-        ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
-        : null;
-      await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
-    }
-
-    // Pick a probe column for finding next empty row — prefer date col, fallback to payment, else A
-    const probeCol = (cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A").toUpperCase();
-    const rowNumber = await findFirstEmptyDataRow(
-      cfg.spreadsheet_id,
-      targetTab,
-      cfg.data_start_row || 7,
-      probeCol,
-    );
-
-    // Build cells based on mapping + txn type
-    const cells: { col: string; value: string | number }[] = [];
-    const push = (col: string | null, val: any) => {
-      if (col && val !== undefined && val !== null && val !== "") {
-        cells.push({ col, value: val });
-      }
-    };
-
-    push(cfg.col_datetime, formatDateTimeBn(txnDate));
-
-    const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
-    const isUsdt = txn.type === "usdt_received";
-    const isWithdraw = txn.type === "withdraw";
-
-    if (isPayment) {
-      push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
-    } else if (isWithdraw) {
-      // Withdraw shown as negative in Payment column
-      push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
-    } else if (isUsdt) {
-      // USDT given — populate Payo columns
-      push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
-      push(cfg.col_payo_rate, Number(txn.rate || 0));
-      const converted = Number(txn.usdt_amount || 0) * Number(txn.rate || 0);
-      push(cfg.col_payo_bdt, Number(converted.toFixed(2)));
-    }
-
-    push(cfg.col_description, txn.description || "");
-    push(cfg.col_proof_url, txn.proof_url || "");
-    push(cfg.col_txn_id, txn.id);
-
-    if (dry_run) {
-      return new Response(JSON.stringify({ ok: true, dry_run: true, targetTab, rowNumber, cells }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    await writeRowCells(cfg.spreadsheet_id, targetTab, rowNumber, cells);
-
-    // Log success
-    await supabase.from("sheet_sync_log").upsert({
-      seller_transaction_id,
-      spreadsheet_id: cfg.spreadsheet_id,
-      tab_name: targetTab,
-      row_number: rowNumber,
-      status: "success",
-      error_message: null,
-      synced_at: new Date().toISOString(),
-    }, { onConflict: "seller_transaction_id" });
-
-    await supabase.from("seller_sheet_config")
-      .update({ last_synced_at: new Date().toISOString(), last_error: null })
-      .eq("id", cfg.id);
-
-    return new Response(JSON.stringify({ ok: true, tab: targetTab, row: rowNumber }), {
+  const jsonResp = (obj: any, status = 200) =>
+    new Response(JSON.stringify(obj), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
+  let bodyJson: any = {};
+  try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
+
+  try {
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit } = bodyJson;
+
+    // ---- BACKFILL MODE (optimized: 1 meta read + 1 probe per tab + 1 batch write per tab) ----
+    if (backfill) {
+      if (!seller_id) throw new Error("seller_id required for backfill");
+      if (!Array.isArray(months) || months.length === 0)
+        throw new Error("months[] required (e.g. ['2026-04','2026-05'])");
+
+      // Load seller config
+      const { data: cfg, error: cfgErr } = await supabase
+        .from("seller_sheet_config")
+        .select("*")
+        .eq("seller_id", seller_id)
+        .maybeSingle();
+      if (cfgErr) throw new Error(`config: ${cfgErr.message}`);
+      if (!cfg || !cfg.enabled) throw new Error("seller has no enabled sheet config");
+
+      // Pull all approved txns in months (full row needed for mapping)
+      let allTxns: any[] = [];
+      for (const m of months) {
+        const [y, mo] = m.split("-").map(Number);
+        const start = new Date(Date.UTC(y, mo - 1, 1)).toISOString();
+        const end = new Date(Date.UTC(y, mo, 1)).toISOString();
+        const { data, error } = await supabase
+          .from("seller_transactions")
+          .select("*")
+          .eq("seller_id", seller_id)
+          .eq("status", "approved")
+          .gte("created_at", start)
+          .lt("created_at", end)
+          .order("created_at", { ascending: true });
+        if (error) throw new Error(`txn fetch failed: ${error.message}`);
+        if (data) allTxns = allTxns.concat(data);
+      }
+
+      // Skip already synced
+      const ids = allTxns.map((t) => t.id);
+      let doneSet = new Set<string>();
+      if (ids.length > 0) {
+        const { data: doneRows } = await supabase
+          .from("sheet_sync_log")
+          .select("seller_transaction_id")
+          .in("seller_transaction_id", ids)
+          .eq("status", "success");
+        doneSet = new Set((doneRows || []).map((r: any) => r.seller_transaction_id));
+      }
+      const remaining = allTxns.filter((t) => !doneSet.has(t.id));
+
+      // Group by target tab
+      const tabPattern = cfg.tab_pattern || "{MMMM-YYYY}";
+      const groups = new Map<string, any[]>();
+      for (const t of remaining) {
+        const tab = formatTabName(tabPattern, new Date(t.created_at));
+        if (!groups.has(tab)) groups.set(tab, []);
+        groups.get(tab)!.push(t);
+      }
+
+      // 1 meta call
+      const meta = await getSheetsMeta(cfg.spreadsheet_id);
+      const sheets = meta.sheets || [];
+      const titleSet = new Set(sheets.map((s: any) => s.properties.title));
+
+      // Ensure all needed tabs exist (create missing ones, cloning template if set)
+      for (const tab of groups.keys()) {
+        if (!titleSet.has(tab)) {
+          const tmpl = cfg.template_tab
+            ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
+            : null;
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          titleSet.add(tab);
+        }
+      }
+
+      const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
+      const dataStart = cfg.data_start_row || 7;
+
+      const buildCells = (txn: any) => {
+        const txnDate = new Date(txn.created_at);
+        const cells: { col: string; value: string | number }[] = [];
+        const push = (col: string | null, val: any) => {
+          if (col && val !== undefined && val !== null && val !== "") cells.push({ col, value: val });
+        };
+        push(cfg.col_datetime, formatDateTimeBn(txnDate));
+        const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
+        const isUsdt = txn.type === "usdt_received";
+        const isWithdraw = txn.type === "withdraw";
+        if (isPayment) push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
+        else if (isWithdraw) push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        else if (isUsdt) {
+          push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
+          push(cfg.col_payo_rate, Number(txn.rate || 0));
+          push(cfg.col_payo_bdt, Number((Number(txn.usdt_amount || 0) * Number(txn.rate || 0)).toFixed(2)));
+        }
+        push(cfg.col_description, txn.description || "");
+        push(cfg.col_proof_url, txn.proof_url || "");
+        push(cfg.col_txn_id, txn.id);
+        return cells;
+      };
+
+      let totalRowsWritten = 0;
+      const tabResults: any[] = [];
+
+      for (const [tab, txns] of groups.entries()) {
+        // 1 probe per tab
+        const startRow = await findFirstEmptyDataRow(cfg.spreadsheet_id, tab, dataStart, probeCol);
+
+        // Build batch data for all txns in this tab
+        const data: any[] = [];
+        const logRows: any[] = [];
+        txns.forEach((t, i) => {
+          const rowNumber = startRow + i;
+          const cells = buildCells(t);
+          for (const c of cells) {
+            data.push({
+              range: `'${tab}'!${normalizeCol(c.col)}${rowNumber}`,
+              values: [[c.value]],
+            });
+          }
+          logRows.push({
+            seller_transaction_id: t.id,
+            spreadsheet_id: cfg.spreadsheet_id,
+            tab_name: tab,
+            row_number: rowNumber,
+            status: "success",
+            error_message: null,
+            synced_at: new Date().toISOString(),
+          });
+        });
+
+        if (data.length > 0) {
+          const r = await fetch(
+            `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values:batchUpdate`,
+            {
+              method: "POST",
+              headers: gwHeaders,
+              body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),
+            },
+          );
+          const j = await r.json();
+          if (!r.ok) throw new Error(`batchWrite failed [${r.status}]: ${JSON.stringify(j)}`);
+        }
+
+        // Log to sheet_sync_log in chunks
+        if (logRows.length > 0) {
+          await supabase.from("sheet_sync_log").upsert(logRows, { onConflict: "seller_transaction_id" });
+        }
+        totalRowsWritten += txns.length;
+        tabResults.push({ tab, rows_written: txns.length, start_row: startRow });
+      }
+
+      await supabase.from("seller_sheet_config")
+        .update({ last_synced_at: new Date().toISOString(), last_error: null })
+        .eq("id", cfg.id);
+
+      return jsonResp({
+        ok: true, backfill: true,
+        total_in_months: allTxns.length,
+        already_synced: doneSet.size,
+        processed: totalRowsWritten,
+        tabs: tabResults,
+      });
+    }
+
+    if (!seller_transaction_id) throw new Error("seller_transaction_id required");
+    const result = await syncOneTransaction(supabase, seller_transaction_id, !!dry_run);
+    return jsonResp(result);
   } catch (e: any) {
     const msg = e?.message || String(e);
     console.error("sync-seller-to-sheet error:", msg);
     try {
-      const body = await req.clone().json().catch(() => ({}));
-      if (body?.seller_transaction_id) {
+      if (bodyJson?.seller_transaction_id) {
         await supabase.from("sheet_sync_log").upsert({
-          seller_transaction_id: body.seller_transaction_id,
+          seller_transaction_id: bodyJson.seller_transaction_id,
           spreadsheet_id: "unknown",
           tab_name: "unknown",
           status: "error",
           error_message: msg,
         }, { onConflict: "seller_transaction_id" });
       }
-    } catch (_) { /* ignore logging error */ }
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    } catch (_) { /* ignore */ }
+    return jsonResp({ ok: false, error: msg }, 500);
   }
 });
