@@ -342,13 +342,12 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
         )}
 
         <div className="border-t pt-4 mt-2 space-y-2">
-          <Label className="text-sm">Backfill months (YYYY-MM, comma separated)</Label>
-          <div className="flex gap-2">
+          <Label className="text-sm">Kon month er sheet ready korben</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
             <Input
-              value={backfillMonths}
-              onChange={(e) => setBackfillMonths(e.target.value)}
-              placeholder="2026-04,2026-05"
-              className="flex-1"
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
             />
             <Button
               variant="secondary"
@@ -357,7 +356,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
               title={!cfg?.id ? "Save config first" : ""}
             >
               {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Backfill now
+              Sheet ready — CRM sync
             </Button>
           </div>
           <div className="flex items-center gap-2">
@@ -371,48 +370,21 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
             </Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
+            April select korle April er CRM data, May select korle May er CRM data oi month er sheet e boshbe.
           </p>
         </div>
 
         <div className="border-t pt-4 mt-2 space-y-2">
-          <Label className="text-sm">Opening balance (month er shurute boshbe)</Label>
-          <div className="flex gap-2">
-            <Input
-              value={obMonth}
-              onChange={(e) => setObMonth(e.target.value)}
-              placeholder="2026-05"
-              className="w-32"
-            />
-            <Input
-              type="number"
-              value={obValue}
-              onChange={(e) => setObValue(e.target.value)}
-              placeholder="manual amount (optional)"
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              onClick={() => setOpeningBalance(true)}
-              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
-              title="Auto = previous month closing balance theke calculate kore boshabe"
-            >
-              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Auto
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setOpeningBalance(false)}
-              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
-              title={!form.opening_balance_cell ? "Opening balance cell set kore Save korun" : ""}
-            >
-              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Set manual
-            </Button>
-          </div>
+          <Label className="text-sm">Opening balance cell</Label>
+          <Input
+            className="w-32 uppercase"
+            value={form.opening_balance_cell || ""}
+            onChange={(e) => setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })}
+            placeholder="e.g. I6"
+            maxLength={6}
+          />
           <p className="text-xs text-muted-foreground">
-            Opening balance cell ({form.opening_balance_cell || "set korun"}) e value boshbe.
-            Backfill chalalei prottek month er jonno auto opening balance system theke boshe jabe.
+            Sudhu kon box e opening balance boshbe seta din; value CRM/sheet balance theke automatic boshbe.
           </p>
         </div>
 
