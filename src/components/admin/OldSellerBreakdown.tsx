@@ -692,7 +692,7 @@ function UsdtTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn
                       <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
                       <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                        <DeleteBtn row={r} onDelete={onDelete} />
                       </TableCell>
                     </TableRow>
                   );
