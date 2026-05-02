@@ -168,7 +168,7 @@ export function AdminAdAccounts() {
     queryFn: async () => {
       if (!accounts || accounts.length === 0) return {};
       const ids = accounts.map((a: any) => a.id);
-      const [edgeRes, dbRes] = await Promise.all([
+      const [edgeRes, dbRes, lastKnownRes] = await Promise.all([
         supabase.functions.invoke("get-account-insights", {
           body: { ad_account_ids: ids, source: "cache" },
         }),
