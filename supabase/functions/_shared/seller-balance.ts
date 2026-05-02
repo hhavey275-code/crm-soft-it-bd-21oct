@@ -3,6 +3,8 @@
 // needs the same balance/total-line semantics.
 
 export type Txn = {
+  id?: string;
+  top_up_request_id?: string | null;
   type: string;
   bdt_amount: number | string | null;
   usdt_amount: number | string | null;
@@ -21,9 +23,12 @@ export type Txn = {
  */
 export function computeDueAdvance(txns: Txn[]): number {
   let running = 0;
-  const sorted = [...(txns || [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  const sorted = [...(txns || [])].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
   for (const t of sorted) {
     if ((t.status || 'approved') !== 'approved') continue;
     if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
@@ -62,6 +67,7 @@ export async function fetchAllSellerTxns(supabase: any, sellerId: string): Promi
       .select('id, type, bdt_amount, usdt_amount, rate, status, created_at, top_up_request_id')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
     const rows = (data || []) as Txn[];
@@ -142,6 +148,8 @@ export async function fetchPendingTopupCredits(
   return topups
     .filter((t: any) => !mirroredSet.has(t.id))
     .map((t: any) => ({
+      id: `pending-topup:${t.id}`,
+      top_up_request_id: t.id,
       type: 'client_topup',
       bdt_amount: t.bdt_amount,
       usdt_amount: 0,
@@ -149,6 +157,48 @@ export async function fetchPendingTopupCredits(
       status: 'approved',
       created_at: t.created_at,
     }));
+}
+
+/**
+ * Dashboard source of truth: current live seller_transactions only.
+ * Use this for Telegram totals so forwarded proof/text always matches the
+ * seller dashboard headline. Pending top-ups / archive recovery are excluded.
+ */
+export async function computeDashboardSellerBalance(supabase: any, sellerId: string): Promise<number> {
+  return computeDueAdvance(await fetchAllSellerTxns(supabase, sellerId));
+}
+
+export async function fetchForwardedBalanceMismatches(
+  supabase: any,
+  sellerId: string,
+): Promise<{ pendingTopupCount: number; pendingTopupBdt: number; previousForwardDiff: number | null }> {
+  let pendingTopupCount = 0;
+  let pendingTopupBdt = 0;
+  try {
+    const pending = await fetchPendingTopupCredits(supabase, sellerId);
+    pendingTopupCount = pending.length;
+    pendingTopupBdt = pending.reduce((sum, t) => sum + Number(t.bdt_amount || 0), 0);
+  } catch (e) {
+    console.warn('pending top-up mismatch probe failed:', (e as any)?.message || e);
+  }
+
+  let previousForwardDiff: number | null = null;
+  try {
+    const { data: lastLog } = await supabase
+      .from('telegram_forward_log')
+      .select('caption_total_bdt')
+      .not('caption_total_bdt', 'is', null)
+      .order('forwarded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastLog?.caption_total_bdt != null) {
+      previousForwardDiff = Number(lastLog.caption_total_bdt) - await computeDashboardSellerBalance(supabase, sellerId);
+    }
+  } catch (e) {
+    console.warn('previous forward mismatch probe failed:', (e as any)?.message || e);
+  }
+
+  return { pendingTopupCount, pendingTopupBdt, previousForwardDiff };
 }
 
 /**
