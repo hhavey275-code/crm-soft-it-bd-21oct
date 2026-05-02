@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
     let bankName = 'Unknown';
     let accountNumber = 'N/A';
     let resolvedSellerId: string | null = seller_id || null;
+    let resolvedSellerName: string | null = seller_name || null;
 
     if (bank_account_id) {
       const { data: bankData } = await supabase
@@ -127,6 +128,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_group_id' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Resolve seller name from profiles when not supplied (e.g., DB trigger path)
+    if (!resolvedSellerName && resolvedSellerId) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('user_id', resolvedSellerId)
+        .maybeSingle();
+      resolvedSellerName = prof?.full_name || prof?.email || null;
     }
 
     // Build Due/Advance running total from live seller_transactions only — this
@@ -178,7 +189,7 @@ Deno.serve(async (req) => {
       const usdt = Number(usdt_amount || 0);
       const r = Number(rate || 0);
       const converted = usdt * r;
-      caption = `🔻 <b>USDT Given</b>\n👤 ${seller_name || 'Unknown'}`;
+      caption = `🔻 <b>USDT Given</b>\n👤 ${resolvedSellerName || 'Unknown'}`;
       if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n💲 USDT: ${usdt.toLocaleString()}`;
@@ -187,14 +198,14 @@ Deno.serve(async (req) => {
       caption += `\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     } else if (payment_kind === 'withdraw') {
       const w = Number(bdt_amount || 0);
-      caption = `🔻 <b>Withdraw</b>\n👤 ${seller_name || 'Unknown'}`;
+      caption = `🔻 <b>Withdraw</b>\n👤 ${resolvedSellerName || 'Unknown'}`;
       if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
       caption += `\n💰 ৳${formatBdtIN(w)}`;
       if (withdraw_note) caption += `\n📝 ${withdraw_note}`;
       if (reference) caption += `\n🔖 Ref: ${reference}`;
       caption += runningTotalLine;
     } else {
-      caption = `💰 <b>Seller Payment</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
+      caption = `💰 <b>Seller Payment</b>\n👤 ${resolvedSellerName || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     }
