@@ -163,14 +163,21 @@ Deno.serve(async (req) => {
     if (clientResult.status === "rejected") console.error("client_ad_accounts:", clientResult.reason);
 
     if (ownedAccounts.length === 0 && clientAccounts.length === 0) {
+      const endpointErrors = [
+        ownedResult.status === "rejected" ? `owned_ad_accounts: ${ownedResult.reason instanceof Error ? ownedResult.reason.message : String(ownedResult.reason)}` : null,
+        clientResult.status === "rejected" ? `client_ad_accounts: ${clientResult.reason instanceof Error ? clientResult.reason.message : String(clientResult.reason)}` : null,
+      ].filter(Boolean);
+      const errorMessage = endpointErrors.length > 0
+        ? `Meta API failed — ${endpointErrors.join("; ")}`
+        : "No ad accounts found from Meta API";
       await supabase.from("sync_logs").insert({
         business_manager_id: bm.id,
         synced_count: 0,
         total_count: 0,
         status: "error",
-        error_message: "No accounts returned from owned or client endpoints"
+        error_message: errorMessage
       });
-      return new Response(JSON.stringify({ error: "No ad accounts found from Meta API" }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: errorMessage }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Dedupe
