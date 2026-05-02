@@ -120,8 +120,10 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
   const due = totals.due;
   const fwdDisplay = formatDueAdvance(due.forwardedOnly);
   const allDisplay = formatDueAdvance(due.all);
-  const drift = due.all - due.forwardedOnly; // should equal not-forwarded payments IN
-  const expectedDrift = totals.notForwardedIn.bdt;
+  const drift = due.all - due.forwardedOnly; // should equal not-forwarded TOP-UPS only (manuals are mirrored, not added)
+  const expectedDrift = buckets.notForwardedIn
+    .filter((t) => t.type === "client_topup")
+    .reduce((s, t) => s + t.bdt_amount, 0);
   const driftMatches = Math.abs(drift - expectedDrift) < 0.5;
 
   return (
@@ -137,7 +139,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
         />
         <SummaryCard
           title="🔴 Not-Forwarded Payments IN"
-          subtitle="Manual entries + un-forwarded top-ups"
+          subtitle="Top-ups not forwarded + all manual entries (mirrored)"
           primary={formatBdt(totals.notForwardedIn.bdt)}
           secondary={`${totals.notForwardedIn.count} entries`}
           tone="danger"
@@ -194,8 +196,55 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             </div>
           )}
           {orphans.length > 0 && (
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-4 w-4" /> {orphans.length} approved top-up request(s) during archive period have no matching ledger entry.
+            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-medium">
+                <AlertTriangle className="h-4 w-4" /> {orphans.length} approved top-up request(s) missing from ledger
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                These top-ups were approved during the archive period but never produced a seller_transactions row.
+                Their BDT is NOT counted in any total above. Review and decide if they need manual entry.
+              </p>
+              <div className="mt-2 overflow-x-auto rounded border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">USD</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">BDT</TableHead>
+                      <TableHead>Forwarded</TableHead>
+                      <TableHead className="text-xs">Top-up ID</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orphans.map((o: any) => (
+                      <TableRow key={o.id}>
+                        <TableCell className="whitespace-nowrap text-xs">{fmtDate(o.created_at)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">${Number(o.amount).toFixed(2)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">৳{o.usd_rate}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBdt(Number(o.bdt_amount || 0))}</TableCell>
+                        <TableCell>
+                          {o.telegram_forwarded ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-rose-500" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-[10px] text-muted-foreground">{o.id.slice(0, 8)}…</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={3}>Total ({orphans.length})</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">
+                        {formatBdt(orphans.reduce((s: number, o: any) => s + Number(o.bdt_amount || 0), 0))}
+                      </TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>
@@ -307,23 +356,42 @@ function typeBadge(type: string) {
 }
 
 function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string }) {
-  const total = rows.reduce((s, r) => s + r.bdt_amount, 0);
+  // Sort chronologically and compute running total (seller-sheet style).
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [rows],
+  );
+  let running = 0;
+  const withRunning = sorted.map((r) => {
+    const prev = running;
+    running += r.bdt_amount;
+    const delta = r.bdt_amount;
+    return { row: r, prev, after: running, delta };
+  });
+  const total = running;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">{forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}</CardTitle>
+        <CardTitle className="text-base">
+          {forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            (Manual entries shown in both sheets · running total updates per row)
+          </span>
+        </CardTitle>
         <Button
           variant="outline"
           size="sm"
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Type", "BDT", "USD (top-up)", "Description / TrxID", "Bank", "Account #", "Entry by"],
-              rows.map((r) => [
+              ["Date", "Type", "BDT in", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
+              withRunning.map(({ row: r, delta, after }) => [
                 fmtDate(r.created_at),
                 r.type,
                 r.bdt_amount,
-                r.topup_amount_usd ?? "",
+                delta,
+                after,
                 r.description,
                 r.bank_name,
                 r.account_number,
@@ -336,45 +404,57 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="rounded border">
+        <div className="rounded border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Date / Time</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">BDT</TableHead>
-                <TableHead className="text-right">USD</TableHead>
+                <TableHead className="text-right">BDT in</TableHead>
+                <TableHead className="text-right">Change</TableHead>
+                <TableHead className="text-right">Running total</TableHead>
                 <TableHead>Description / TrxID</TableHead>
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.length === 0 ? (
+              {withRunning.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">No entries</TableCell>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">No entries</TableCell>
                 </TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell>{typeBadge(r.type)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground">{fmtUsd(r.topup_amount_usd)}</TableCell>
-                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">
-                      {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                withRunning.map(({ row: r, delta, after }) => {
+                  const isManual = r.type === "bdt_payment" || r.type === "tenant_payment";
+                  return (
+                    <TableRow key={r.id} className={isManual ? "bg-amber-500/5" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell>
+                        {typeBadge(r.type)}
+                        {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                        +{formatBdt(delta)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold">{formatBdt(after)}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={2}>Total ({rows.length})</TableCell>
+                <TableCell colSpan={2}>Total ({withRunning.length})</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={4} />
+                <TableCell />
+                <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
+                <TableCell colSpan={3} />
               </TableRow>
             </TableFooter>
           </Table>
