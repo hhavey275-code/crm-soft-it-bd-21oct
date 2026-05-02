@@ -85,7 +85,12 @@ async function getSheetsMeta(spreadsheetId: string) {
   return j;
 }
 
-async function createTab(spreadsheetId: string, title: string, sourceSheetId: number | null) {
+async function createTab(
+  spreadsheetId: string,
+  title: string,
+  sourceSheetId: number | null,
+  clearFromRow: number | null = null,
+) {
   // If sourceSheetId provided, duplicate it (preserves header, formatting). Otherwise add blank.
   const body = sourceSheetId != null
     ? { requests: [{ duplicateSheet: { sourceSheetId, newSheetName: title, insertSheetIndex: 0 } }] }
@@ -97,8 +102,36 @@ async function createTab(spreadsheetId: string, title: string, sourceSheetId: nu
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`createTab failed [${r.status}]: ${JSON.stringify(j)}`);
+
+  // After cloning a template, wipe the data rows (keep header + opening balance rows).
+  if (sourceSheetId != null && clearFromRow && clearFromRow > 0) {
+    const newSheetId = j.replies?.[0]?.duplicateSheet?.properties?.sheetId;
+    if (newSheetId != null) {
+      const clearReq = {
+        requests: [{
+          updateCells: {
+            range: {
+              sheetId: newSheetId,
+              startRowIndex: clearFromRow - 1, // 0-indexed
+            },
+            fields: "userEnteredValue",
+          },
+        }],
+      };
+      const cr = await fetch(`${GATEWAY}/spreadsheets/${spreadsheetId}:batchUpdate`, {
+        method: "POST",
+        headers: gwHeaders,
+        body: JSON.stringify(clearReq),
+      });
+      if (!cr.ok) {
+        const cj = await cr.json();
+        console.warn("clear cloned data failed:", JSON.stringify(cj));
+      }
+    }
+  }
   return j;
 }
+
 
 async function findFirstEmptyDataRow(
   spreadsheetId: string,
