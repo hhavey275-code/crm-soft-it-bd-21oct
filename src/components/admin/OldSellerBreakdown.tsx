@@ -30,6 +30,7 @@ import {
 } from "@/lib/oldSellerData";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import { MigrateForwardedButton } from "./MigrateForwardedButton";
+import { AddForwardedEntryDialog } from "./AddForwardedEntryDialog";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -259,12 +260,15 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           <CardTitle className="text-base">Reconciliation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <MigrateForwardedButton
-            sellerId={sellerId}
-            sellerName={sellerName}
-            forwardedRows={buckets.forwardedIn}
-            withdrawRows={buckets.withdraws}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <MigrateForwardedButton
+              sellerId={sellerId}
+              sellerName={sellerName}
+              forwardedRows={buckets.forwardedIn}
+              withdrawRows={buckets.withdraws}
+            />
+            <AddForwardedEntryDialog sellerId={sellerId} sellerName={sellerName} />
+          </div>
           <div>
             Difference between <b>All</b> and <b>Forwarded-only</b> Due/Advance: <b>{formatBdt(drift)}</b>
           </div>
@@ -372,6 +376,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             rows={filterRows(buckets.forwardedIn)}
             forwarded
             withdrawRows={filterRows(buckets.withdraws)}
+            usdtRows={filterRows(buckets.usdtGiven)}
             csvName={`${sellerName}-forwarded.csv`}
             duplicateIds={duplicateIds}
             onDelete={(r) => setPendingDelete(r)}
@@ -507,28 +512,35 @@ function DeleteBtn({ row, onDelete }: { row: ArchiveTxn; onDelete?: (r: ArchiveT
   );
 }
 
-function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withdrawRows }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string; withdrawRows?: ArchiveTxn[] } & DupProps) {
-  // Merge in-rows with withdraw rows (if provided), sort chronologically and
-  // compute running total. Withdraws subtract from running total.
-  const merged = useMemo(() => {
-    const items: { row: ArchiveTxn; kind: "in" | "withdraw" }[] = [
+function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withdrawRows, usdtRows }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string; withdrawRows?: ArchiveTxn[]; usdtRows?: ArchiveTxn[] } & DupProps) {
+  // Merge in-rows with withdraw + usdt rows (if provided), sort chronologically and
+  // compute running total. Withdraws subtract face value; USDT given subtracts
+  // (usdt_amount × rate) BDT cost.
+  type MergedItem = { row: ArchiveTxn; kind: "in" | "withdraw" | "usdt" };
+  const merged = useMemo<MergedItem[]>(() => {
+    const items: MergedItem[] = [
       ...rows.map((r) => ({ row: r, kind: "in" as const })),
       ...((withdrawRows || []).map((r) => ({ row: r, kind: "withdraw" as const }))),
+      ...((usdtRows || []).map((r) => ({ row: r, kind: "usdt" as const }))),
     ];
     items.sort((a, b) => new Date(a.row.created_at).getTime() - new Date(b.row.created_at).getTime());
     return items;
-  }, [rows, withdrawRows]);
+  }, [rows, withdrawRows, usdtRows]);
 
   let running = 0;
   const withRunning = merged.map(({ row: r, kind }) => {
-    const delta = kind === "in" ? r.bdt_amount : -r.bdt_amount;
+    let delta = 0;
+    if (kind === "in") delta = r.bdt_amount;
+    else if (kind === "withdraw") delta = -r.bdt_amount;
+    else delta = -(r.usdt_amount * r.rate); // usdt cost
     const prev = running;
     running += delta;
     return { row: r, kind, prev, after: running, delta };
   });
   const totalIn = rows.reduce((s, r) => s + r.bdt_amount, 0);
   const totalOut = (withdrawRows || []).reduce((s, r) => s + r.bdt_amount, 0);
-  const net = totalIn - totalOut;
+  const totalUsdtCost = (usdtRows || []).reduce((s, r) => s + r.usdt_amount * r.rate, 0);
+  const net = totalIn - totalOut - totalUsdtCost;
   const netDisplay = formatDueAdvance(net);
 
   return (
@@ -537,8 +549,8 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
         <CardTitle className="text-base">
           {forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}
           <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {withdrawRows && withdrawRows.length > 0
-              ? "(Withdraws merged chronologically · running total = Adv/Due after each entry)"
+            {((withdrawRows && withdrawRows.length > 0) || (usdtRows && usdtRows.length > 0))
+              ? "(Withdraws + USDT cost merged chronologically · running total = Adv/Due after each entry)"
               : "(Manual entries shown in both sheets · running total updates per row)"}
           </span>
         </CardTitle>
@@ -548,15 +560,17 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Kind", "Type", "BDT in", "BDT out", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
+              ["Date", "Kind", "Type", "BDT in", "BDT out", "USDT", "Rate", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
               withRunning.map(({ row: r, kind, delta, after }) => [
                 fmtDate(r.created_at),
                 kind,
                 r.type,
                 kind === "in" ? r.bdt_amount : "",
-                kind === "withdraw" ? r.bdt_amount : "",
-                delta,
-                after,
+                kind === "withdraw" ? r.bdt_amount : kind === "usdt" ? Math.round(r.usdt_amount * r.rate) : "",
+                kind === "usdt" ? r.usdt_amount : "",
+                kind === "usdt" ? r.rate : "",
+                Math.round(delta),
+                Math.round(after),
                 r.description,
                 r.bank_name,
                 r.account_number,
@@ -595,31 +609,40 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
               ) : (
                 withRunning.map(({ row: r, kind, delta, after }) => {
                   const isWithdraw = kind === "withdraw";
-                  const isManual = !isWithdraw && (r.type === "bdt_payment" || r.type === "tenant_payment");
+                  const isUsdt = kind === "usdt";
+                  const isOut = isWithdraw || isUsdt;
+                  const isManual = !isOut && (r.type === "bdt_payment" || r.type === "tenant_payment");
                   const isDup = duplicateIds?.has(r.id);
                   const trxId = extractTrxId(r.description);
                   const rowClass = isWithdraw
                     ? "bg-rose-500/10 hover:bg-rose-500/20"
-                    : isDup
-                      ? "bg-rose-500/10 hover:bg-rose-500/15"
-                      : r.is_forced_forwarded
-                        ? "bg-gradient-to-r from-blue-500/15 to-emerald-500/15 hover:from-blue-500/25 hover:to-emerald-500/25"
-                        : isManual
-                          ? "bg-amber-500/5"
-                          : undefined;
+                    : isUsdt
+                      ? "bg-amber-500/10 hover:bg-amber-500/20"
+                      : isDup
+                        ? "bg-rose-500/10 hover:bg-rose-500/15"
+                        : r.is_forced_forwarded
+                          ? "bg-gradient-to-r from-blue-500/15 to-emerald-500/15 hover:from-blue-500/25 hover:to-emerald-500/25"
+                          : isManual
+                            ? "bg-amber-500/5"
+                            : undefined;
                   const runDisp = formatDueAdvance(after);
                   const runClass = runDisp.isAdvance
                     ? "text-emerald-600 dark:text-emerald-400"
                     : runDisp.isZero
                       ? "text-muted-foreground"
                       : "text-rose-600 dark:text-rose-400";
+                  const usdtCost = isUsdt ? r.usdt_amount * r.rate : 0;
                   return (
-                    <TableRow key={r.id} className={rowClass}>
+                    <TableRow key={`${kind}-${r.id}`} className={rowClass}>
                       <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
                       <TableCell>
                         {isWithdraw ? (
                           <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300">
                             ↓ WITHDRAW
+                          </span>
+                        ) : isUsdt ? (
+                          <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                            💵 USDT GIVEN
                           </span>
                         ) : (
                           <>
@@ -638,13 +661,17 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                         )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {isWithdraw ? <span className="text-muted-foreground">—</span> : formatBdt(r.bdt_amount)}
+                        {isOut ? <span className="text-muted-foreground">—</span> : formatBdt(r.bdt_amount)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-rose-600 dark:text-rose-400 font-semibold">
-                        {isWithdraw ? formatBdt(r.bdt_amount) : <span className="text-muted-foreground font-normal">—</span>}
+                        {isWithdraw
+                          ? formatBdt(r.bdt_amount)
+                          : isUsdt
+                            ? <span title={`${r.usdt_amount} USDT × ৳${r.rate}`}>{formatBdt(usdtCost)}</span>
+                            : <span className="text-muted-foreground font-normal">—</span>}
                       </TableCell>
-                      <TableCell className={`text-right tabular-nums font-medium ${isWithdraw ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {isWithdraw ? `−${formatBdt(r.bdt_amount)}` : `+${formatBdt(delta)}`}
+                      <TableCell className={`text-right tabular-nums font-medium ${isOut ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {isOut ? `−${formatBdt(Math.abs(delta))}` : `+${formatBdt(delta)}`}
                       </TableCell>
                       <TableCell className={`text-right tabular-nums font-bold ${runClass}`}>
                         {runDisp.text}
@@ -659,7 +686,9 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>
+                        {isUsdt ? `${r.usdt_amount.toLocaleString()} USDT × ৳${r.rate} · ${r.description || ""}` : (r.description || "—")}
+                      </TableCell>
                       <TableCell className="text-xs">
                         {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
                       </TableCell>
@@ -677,11 +706,16 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                 <TableCell colSpan={2}>Total ({withRunning.length} entries)</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(totalIn)}</TableCell>
                 <TableCell className="text-right tabular-nums font-bold text-rose-600 dark:text-rose-400">
-                  {totalOut > 0 ? formatBdt(totalOut) : "—"}
+                  {(totalOut + totalUsdtCost) > 0
+                    ? <span title={totalUsdtCost > 0 ? `Withdraw ${formatBdt(totalOut)} + USDT cost ${formatBdt(totalUsdtCost)}` : undefined}>{formatBdt(totalOut + totalUsdtCost)}</span>
+                    : "—"}
                 </TableCell>
                 <TableCell />
-                <TableCell className={`text-right tabular-nums font-bold ${netDisplay.isAdvance ? "text-emerald-600 dark:text-emerald-400" : netDisplay.isZero ? "" : "text-rose-600 dark:text-rose-400"}`}>
+                <TableCell className={`text-right tabular-nums font-bold text-base ${netDisplay.isAdvance ? "text-emerald-600 dark:text-emerald-400" : netDisplay.isZero ? "" : "text-rose-600 dark:text-rose-400"}`}>
                   {netDisplay.text}
+                  <div className="text-[10px] font-normal text-muted-foreground">
+                    {netDisplay.isAdvance ? "Advance" : netDisplay.isZero ? "Settled" : "Due"}
+                  </div>
                 </TableCell>
                 <TableCell colSpan={6} />
               </TableRow>

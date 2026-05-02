@@ -1,43 +1,55 @@
-## Implementation Plan
+## Goal
 
-User approved. Final numbers confirmed: **+৳1,46,117.25 Adv** after migration (154 archive + 3 existing live rows).
+Faisal seller-er **Forwarded** sheet ekhon shudhu payments IN dekhay. Apni chacchen:
+1. Ey EBL Skybanking receipt-ta (BDT 38,400, REF 1188006261200122, 30-Apr-2026 11:10 PM, EBL, A/C 301107***7229 — PRANTIK BAJAR) Faisal-er Forwarded entry hisebe archive-e dhukbe.
+2. Faisal-er existing **withdraw** entry-gula ar **USDT given** entry-gula Forwarded view-er ek table-ei integrate kore dekhabe (so combined running Due/Adv ek jaygay bojha jay).
+3. Final Due/Adv (Forwarded IN − USDT cost − Withdraw) prominently show korbe — eta backend-e already calculated, just UI-te unified table-e visible kore dewa.
 
-### Step 1 — Migration via admin button (no schema change)
+## Step 1 — Find Faisal & insert the EBL receipt
 
-`code--exec` e psql nei, schema migration tool nei. Tai ami `OldSellerBreakdown` e ekta **"Migrate Forwarded → Live Ledger"** button add korbo (admin-only, RLS satisfied — admin er sob seller_transactions e access ase). Button click korle:
+- `OldSellerBreakdown.tsx` e ekta admin-only **"➕ Add Forwarded Entry"** button add korbo (Reconciliation card-er moddhe, MigrateForwardedButton-er pashe).
+- Click korle ekta dialog open hobe with pre-filled fields:
+  - Type: `bdt_payment` (manual entry — Forwarded sheet-e auto-mirror hobe per existing splitBuckets logic line 212-215)
+  - BDT Amount: editable (default 38400 jodi current seller Faisal hoy)
+  - Date: editable datetime (default 2026-04-30 23:10)
+  - Description: editable (default `"EBL Skybanking Transfer · REF: 1188006261200122 · From Acc 118107***1604 → 301107***7229 PRANTIK BAJAR"`)
+  - Bank: dropdown of seller-er existing bank_accounts (EBL select kora jabe)
+  - Status: `approved`
+- Insert into `seller_transactions_archive_2026_05` with seller_id = current selected seller.
+- React Query invalidate kore page refresh — receipt immediately Forwarded sheet-e dekhabe ar Due/Adv automatically recalculate hobe.
 
-- Archive er Forwarded sheet er 154 rows fetch
-- `bdt_payment` / `tenant_payment` → type rewritten to `client_topup` (manual badge dekhabe na)
-- `withdraw` as-is
-- Original `id` retain — re-clicking idempotent (PK conflict skip)
-- `telegram_forwarded = true` for all client_topup rows
-- Confirmation dialog before insert
-- Toast result after
+Eta generic dialog — future-e onno kono receipt o ey button diye add kora jabe, shudhu Faisal-er ey ekta noy.
 
-Duplicate insert protection: 409/duplicate errors per row caught and counted as "already migrated".
+## Step 2 — Unified Forwarded view (withdraws + USDT inline)
 
-### Step 2 — Monthly Summary card in `SellerDashboard`
+`PaymentsTable` (Forwarded tab) currently shudhu IN rows + ek footer row ("Less: withdrawals") dekhay. Notun behavior:
 
-Notun file: `src/components/seller/MonthlyDueAdvanceCard.tsx` — month-by-month aggregation:
-- Group transactions by `YYYY-MM` (UTC)
-- Per month: Payments IN, Withdraw, USDT cost, Net Δ, Running cumsum
-- Existing `formatDueAdvance()` helper for Adv/Due colors
-- Table on `md+`, stacked cards on mobile
+- Forwarded tab-e **3-section table** korbo (chronologically merged):
+  - Payments IN rows (green +amount)
+  - USDT given rows (orange −bdt cost, with "X USDT × ৳rate" annotation)
+  - Withdraw rows (red −amount)
+- Per-row **Running Balance** column add korbo using `computeDueAdvanceRunning` (already exists in `sellerRunningTotal.ts`) — chronological order-e.
+- Footer-e summary:
+  - Total IN: ৳XX,XXX
+  - Less USDT cost: −৳XX,XXX (XX USDT)
+  - Less Withdraw: −৳XX,XXX
+  - **Final Due/Advance: +৳XX,XXX (Adv) / −৳XX,XXX (Due)** — large bold
 
-Mount in `SellerDashboard.tsx` between summary cards and the bank chips.
+Ey way-te apni Forwarded tab-e single chronological ledger dekhben — receipt insert korar pore final number eki jaygay dekha jabe.
 
-### Step 3 — Banner in `OldSellerBreakdown`
+## Step 3 — Verify with Faisal
 
-Migration sefe-i hoyese kina detect kore (live ledger query) ar banner show kore: "✅ Forwarded sheet er XXX entry live ledger e migrate hoyese."
+- Plan approve hole ami first dekhbo Faisal-er existing seller_id ki, ar ar koy ta withdraw / USDT entry ase tar archive-e (read-only query)
+- Tarpor receipt insert + UI changes apply korbo
+- Done hole Faisal-er Forwarded tab-e: existing entries + notun EBL receipt ek list-e, with running balance ar bottom-e final Due/Adv
 
-### Files Touched
+## Files Touched
 
-- New: `src/components/seller/MonthlyDueAdvanceCard.tsx`
-- Edit: `src/components/seller/SellerDashboard.tsx` (mount card)
-- Edit: `src/components/admin/OldSellerBreakdown.tsx` (migrate button + status banner)
+- New: `src/components/admin/AddForwardedEntryDialog.tsx` — receipt entry dialog
+- Edit: `src/components/admin/OldSellerBreakdown.tsx` — add button + restructure PaymentsTable rendering for Forwarded tab to merge withdraw + USDT rows with running balance
 
-### Non-goals
+## Non-goals
 
-- Not-Forwarded data NOT migrated.
-- Other sellers untouched (button hard-checks Rasel's seller_id only as a safety guard, with override toggle for future use).
-- No DB schema changes.
+- Onno seller (Rasel etc.) er existing UI untouched — only PaymentsTable Forwarded tab affected, ar dialog generic.
+- Withdraw/USDT physical row-gula archive-e same-i thake; just UI te Forwarded view-tay merged kore dekhano hochhe (Withdraw ar USDT tab-o intact thakbe).
+- No DB schema change.
