@@ -78,6 +78,7 @@ async function metaBatchGet(accessToken: string, relativeUrls: string[]): Promis
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form,
+    allowDirectFallback: true,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -194,6 +195,14 @@ function parseAccountBatchResults(account: any, batchResults: any[], parseMeta: 
       id: account.id,
       insight: { ...EMPTY_INSIGHT },
       rateLimit: { account_id: actId, account_name: account.account_name || actId, error_code: rlCode }
+    };
+  }
+  const blockingError = getBlockingMetaError(todayData, yesterdayData, accountData, paymentCycleData, campaignsData);
+  if (blockingError) {
+    return {
+      id: account.id,
+      insight: { ...EMPTY_INSIGHT },
+      syncError: blockingError
     };
   }
   let todaySpend = 0;
@@ -456,6 +465,21 @@ async function fetchActiveDailyBudget(actId, accessToken) {
 // Check for Meta API rate limit errors
 function checkRateLimit(data) {
   if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
+  return null;
+}
+function getBlockingMetaError(...payloads: any[]) {
+  for (const payload of payloads) {
+    if (!payload) continue;
+    if (payload.__batch_error) return `Meta batch failed (${payload.status || "unknown"})`;
+    const err = payload.error;
+    if (!err) continue;
+    const code = Number(err.code ?? 0);
+    const type = String(err.type ?? "");
+    const message = String(err.message ?? "Meta API error");
+    if (code === 599 || type.includes("Proxy") || code === 190 || code === 10 || code === 200) {
+      return message;
+    }
+  }
   return null;
 }
 function extractNumericValue(input) {
@@ -1069,6 +1093,7 @@ Deno.serve(async (req)=>{
         }
       }
       const upsertRows = Object.entries(insights).map(([adAccountId, data])=>{
+        if (syncErrors[adAccountId]) return null;
         const row = {
           ad_account_id: adAccountId,
           today_spend: data.today_spend,
@@ -1099,7 +1124,7 @@ Deno.serve(async (req)=>{
         // If both today=0 AND yesterday=0 AND no lookback hit, leave field unset
         // so we DON'T overwrite a previously recorded last_spend_date with NULL.
         return row;
-      });
+      }).filter(Boolean);
       const upsertBatches = chunk(upsertRows, 30);
       for (const batch of upsertBatches){
         await supabase.from("ad_account_insights").upsert(batch, {
