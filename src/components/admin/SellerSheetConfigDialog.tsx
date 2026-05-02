@@ -387,6 +387,37 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
           </p>
         </div>
 
+        <div className="border-t pt-4 mt-2 space-y-2">
+          <Label className="text-sm">Opening balance (month er shurute boshbe)</Label>
+          <div className="flex gap-2">
+            <Input
+              value={obMonth}
+              onChange={(e) => setObMonth(e.target.value)}
+              placeholder="2026-05"
+              className="w-32"
+            />
+            <Input
+              type="number"
+              value={obValue}
+              onChange={(e) => setObValue(e.target.value)}
+              placeholder="amount (BDT)"
+              className="flex-1"
+            />
+            <Button
+              variant="secondary"
+              onClick={setOpeningBalance}
+              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
+              title={!form.opening_balance_cell ? "Opening balance cell set kore Save korun" : ""}
+            >
+              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Set opening balance
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Opening balance cell ({form.opening_balance_cell || "set korun"}) e ei value boshbe. Tab missing thakle auto create hobe.
+          </p>
+        </div>
+
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={testSync} disabled={testing || !form.spreadsheet_url}>
             {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
