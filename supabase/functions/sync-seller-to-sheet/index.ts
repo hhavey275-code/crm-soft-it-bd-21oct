@@ -39,6 +39,8 @@ function formatTabName(pattern: string, date: Date): string {
   const mmmm = MONTH_NAMES[date.getMonth()];
   const mmm = mmmm.slice(0, 3);
   const mm = String(date.getMonth() + 1).padStart(2, "0");
+  // Order matters: replace longer tokens first so {MMMM} doesn't get partially
+  // matched by {MMM}, and {YYYY} not by {YY}.
   return pattern
     .replace(/\{MMMM\}/g, mmmm)
     .replace(/\{MMM\}/g, mmm)
