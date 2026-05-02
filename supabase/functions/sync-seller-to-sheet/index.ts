@@ -215,7 +215,7 @@ serve(async (req) => {
     }
 
     // Pick a probe column for finding next empty row — prefer date col, fallback to payment, else A
-    const probeCol = (cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A").toUpperCase();
+    const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
     const rowNumber = await findFirstEmptyDataRow(
       cfg.spreadsheet_id,
       targetTab,
