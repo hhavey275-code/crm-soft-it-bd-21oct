@@ -664,28 +664,7 @@ Deno.serve(async (req)=>{
     // STEP 5: Report usage to master (Tenant mode)
     // ============================================
     if (isTenantMode) {
-      try {
-        const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Tenant-Key": licenseMap["tenant_api_key"]
-          },
-          body: JSON.stringify({
-            action: "report-usage",
-            amount
-          })
-        });
-        const reportData = await reportRes.json();
-        // Update local cache
-        if (reportData.total_used !== undefined) {
-          await supabase.from("site_settings").update({
-            value: String(reportData.total_used)
-          }).eq("key", "license_total_used");
-        }
-      } catch (reportErr) {
-        console.warn("Failed to report usage to master:", reportErr);
-      }
+      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
     }
     console.log("Spend cap update SUCCESS", {
       actId,
