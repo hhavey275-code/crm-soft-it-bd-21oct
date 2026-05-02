@@ -73,8 +73,13 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
       // so the seller dashboard treats them uniformly.
       const payload = toInsert.map((r) => {
         const isWithdraw = r.type === "withdraw";
+        const isUsdtGiven = r.type === "usdt_received";
         const isManualIn = r.type === "bdt_payment" || r.type === "tenant_payment";
-        const newType = isWithdraw ? "withdraw" : "client_topup";
+        const newType = isWithdraw
+          ? "withdraw"
+          : isUsdtGiven
+          ? "usdt_received"
+          : "client_topup";
         return {
           id: r.id,
           seller_id: r.seller_id,
@@ -87,7 +92,7 @@ export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, wi
           // Only client_topup rows that came from a real top_up_request retain it.
           // Manuals had no top_up_request_id; keep that null so the unique index
           // (one active topup per request) doesn't fight us.
-          top_up_request_id: isManualIn ? null : r.top_up_request_id,
+          top_up_request_id: isManualIn || isUsdtGiven ? null : r.top_up_request_id,
           proof_url: r.proof_url,
           created_at: r.created_at,
           status: "approved",
