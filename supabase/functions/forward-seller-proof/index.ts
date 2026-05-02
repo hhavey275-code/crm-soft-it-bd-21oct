@@ -1,39 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  computeDueAdvance,
+  buildTotalLine,
+  formatBdtIN,
+  fetchAllSellerTxns,
+  fetchPendingTopupCredits,
+  checkForwardLog,
+  writeForwardLog,
+} from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-/**
- * Compute single global Due/Advance running balance for a seller.
- * Positive = Advance (seller has received extra), Negative = Due (seller owes).
- *  +bdt_amount on bdt_payment / client_topup
- *  -bdt_amount on withdraw
- *  -(usdt_amount * rate) on usdt_received
- * Only approved entries count.
- */
-function computeDueAdvance(txns: any[]): number {
-  let running = 0;
-  const sorted = [...(txns || [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
-  for (const t of sorted) {
-    if ((t.status || 'approved') !== 'approved') continue;
-    if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
-      running += Number(t.bdt_amount || 0);
-    } else if (t.type === 'withdraw') {
-      running -= Number(t.bdt_amount || 0);
-    } else if (t.type === 'usdt_received') {
-      running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-    }
-  }
-  return running;
-}
-
-function formatBdtIN(value: number): string {
-  return Math.round(Math.abs(value)).toLocaleString('en-IN');
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -56,24 +35,37 @@ Deno.serve(async (req) => {
       bank_name: otherBankName,
       account_number: otherAccountNumber,
       account_holder_name: otherAccountHolderName,
-      // New (idempotency + USDT support)
       seller_transaction_id,
-      payment_kind, // 'bdt_payment' | 'usdt_received'
+      payment_kind, // 'bdt_payment' | 'usdt_received' | 'withdraw'
       usdt_amount,
       rate,
+      withdraw_note,
     } = await req.json();
 
-    if (!proof_url) {
+    // Withdraw can be text-only (no proof). Everything else needs a proof_url.
+    if (!proof_url && payment_kind !== 'withdraw') {
       return new Response(JSON.stringify({ error: 'proof_url required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Idempotency lock: if a seller_transaction_id is provided and it's already
-    // been forwarded, skip silently. Prevents duplicate Telegram messages on
-    // retries, double clicks, or replays.
+    // Durable dedupe via telegram_forward_log (works even when seller_transaction_id missing).
+    const sourceTypeMap: Record<string, string> = {
+      bdt_payment: 'seller_payment',
+      usdt_received: 'usdt_received',
+      withdraw: 'withdraw',
+    };
+    const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
     if (seller_transaction_id) {
+      const dedupe = await checkForwardLog(supabase, sourceType, seller_transaction_id);
+      if (dedupe.alreadyForwarded) {
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: dedupe.messageId }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      // Legacy mirror flag check
       const { data: existing } = await supabase
         .from('seller_transactions')
         .select('telegram_forwarded, telegram_message_id')
@@ -81,7 +73,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (existing?.telegram_forwarded) {
         return new Response(
-          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: existing.telegram_message_id }),
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded_flag', message_id: existing.telegram_message_id }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
@@ -120,69 +112,97 @@ Deno.serve(async (req) => {
       accountNumber = otherAccountNumber || 'N/A';
     }
 
+    // For withdraw with no bank, fall back to seller's primary group via any of their bank accounts.
+    if (!groupId && resolvedSellerId) {
+      const { data: anyBank } = await supabase
+        .from('bank_accounts')
+        .select('telegram_group_id')
+        .eq('seller_id', resolvedSellerId)
+        .not('telegram_group_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (anyBank?.telegram_group_id) groupId = anyBank.telegram_group_id;
+    }
+
     if (!groupId) {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_group_id' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Build Due/Advance running total line for THIS seller (single global balance).
-    // Include THIS pending bdt_payment as a credit so the forwarded total shows
-    // what the seller's balance will be once admin approves the entry.
+    // Build Due/Advance running total — paginated + pending top-ups included.
     let runningTotalLine = '';
+    let finalBalance: number | null = null;
     if (resolvedSellerId) {
       try {
-        const { data: txns } = await supabase
-          .from('seller_transactions')
-          .select('type, bdt_amount, usdt_amount, rate, status, created_at')
-          .eq('seller_id', resolvedSellerId);
-        let balance = computeDueAdvance((txns as any[]) || []);
-        // If the current transaction is already in the ledger (we received an id),
-        // the running total already accounts for it — do NOT add again.
-        // Otherwise, factor in the pending entry so the forwarded total reflects
-        // what the balance WILL be once admin approves.
-        if (!seller_transaction_id) {
+        const txns = await fetchAllSellerTxns(supabase, resolvedSellerId);
+        const pending = await fetchPendingTopupCredits(supabase, resolvedSellerId);
+        let balance = computeDueAdvance([...txns, ...pending]);
+
+        // If this txn isn't in the ledger yet, factor in the pending change
+        const alreadyInLedger = seller_transaction_id
+          ? txns.some((t: any) => (t as any).id === seller_transaction_id)
+          : false;
+        if (!alreadyInLedger) {
           if (payment_kind === 'usdt_received') {
             balance -= Number(usdt_amount || 0) * Number(rate || 0);
+          } else if (payment_kind === 'withdraw') {
+            balance -= Number(bdt_amount || 0);
           } else {
             balance += Number(bdt_amount || 0);
           }
         }
-        if (balance > 0) {
-          runningTotalLine = `\n🟢 Total: Advance +৳${formatBdtIN(balance)}`;
-        } else if (balance < 0) {
-          runningTotalLine = `\n🔴 Total: Due −৳${formatBdtIN(balance)}`;
-        } else {
-          runningTotalLine = `\n⚪ Total: ৳0`;
-        }
+        finalBalance = balance;
+        runningTotalLine = buildTotalLine(balance);
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
       }
     }
 
+    // Compose caption per kind
     let caption: string;
     if (payment_kind === 'usdt_received') {
       const usdt = Number(usdt_amount || 0);
       const r = Number(rate || 0);
       const converted = usdt * r;
-      caption = `💵 <b>USDT Given (Approved)</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
+      caption = `🔻 <b>USDT Given</b>\n👤 ${seller_name || 'Unknown'}`;
+      if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n💲 USDT: ${usdt.toLocaleString()}`;
       caption += `\n📈 Rate: ৳${r.toLocaleString()}`;
       caption += `\n💰 BDT: ৳${formatBdtIN(converted)}`;
       caption += `\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
+    } else if (payment_kind === 'withdraw') {
+      const w = Number(bdt_amount || 0);
+      caption = `🔻 <b>Withdraw</b>\n👤 ${seller_name || 'Unknown'}`;
+      if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
+      caption += `\n💰 ৳${formatBdtIN(w)}`;
+      if (withdraw_note) caption += `\n📝 ${withdraw_note}`;
+      if (reference) caption += `\n🔖 Ref: ${reference}`;
+      caption += runningTotalLine;
     } else {
       caption = `💰 <b>Seller Payment</b>\n👤 ${seller_name || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     }
 
-    const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: groupId, photo: proof_url, caption, parse_mode: 'HTML' }),
-    });
-    const tgResult = await tgResp.json();
+    // Send: photo if proof, text-only otherwise (withdraw without proof)
+    let tgResult: any;
+    if (proof_url) {
+      const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: groupId, photo: proof_url, caption, parse_mode: 'HTML' }),
+      });
+      tgResult = await tgResp.json();
+    } else {
+      const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: groupId, text: caption, parse_mode: 'HTML' }),
+      });
+      tgResult = await tgResp.json();
+    }
 
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
@@ -192,8 +212,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Mark as forwarded (idempotency lock) — best-effort.
+    // Persist dedupe log + mirror flag
     if (seller_transaction_id) {
+      await writeForwardLog(
+        supabase,
+        sourceType,
+        seller_transaction_id,
+        groupId,
+        tgResult.result?.message_id ?? null,
+        finalBalance,
+      );
       try {
         await supabase
           .from('seller_transactions')
@@ -203,12 +231,12 @@ Deno.serve(async (req) => {
             telegram_forwarded_at: new Date().toISOString(),
           })
           .eq('id', seller_transaction_id)
-          .eq('telegram_forwarded', false); // double-safety against race
+          .eq('telegram_forwarded', false);
       } catch (e) {
         console.error('Failed to mark seller_transaction as forwarded:', e);
       }
     }
-    console.log(`✅ Forwarded seller proof to group ${groupId}`);
+    console.log(`✅ Forwarded ${payment_kind || 'bdt_payment'} to group ${groupId} (msg ${tgResult.result?.message_id})`);
     return new Response(JSON.stringify({ ok: true, message_id: tgResult.result?.message_id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
