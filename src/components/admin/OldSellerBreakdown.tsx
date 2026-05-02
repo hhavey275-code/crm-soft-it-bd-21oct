@@ -512,28 +512,35 @@ function DeleteBtn({ row, onDelete }: { row: ArchiveTxn; onDelete?: (r: ArchiveT
   );
 }
 
-function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withdrawRows }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string; withdrawRows?: ArchiveTxn[] } & DupProps) {
-  // Merge in-rows with withdraw rows (if provided), sort chronologically and
-  // compute running total. Withdraws subtract from running total.
-  const merged = useMemo(() => {
-    const items: { row: ArchiveTxn; kind: "in" | "withdraw" }[] = [
+function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withdrawRows, usdtRows }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string; withdrawRows?: ArchiveTxn[]; usdtRows?: ArchiveTxn[] } & DupProps) {
+  // Merge in-rows with withdraw + usdt rows (if provided), sort chronologically and
+  // compute running total. Withdraws subtract face value; USDT given subtracts
+  // (usdt_amount × rate) BDT cost.
+  type MergedItem = { row: ArchiveTxn; kind: "in" | "withdraw" | "usdt" };
+  const merged = useMemo<MergedItem[]>(() => {
+    const items: MergedItem[] = [
       ...rows.map((r) => ({ row: r, kind: "in" as const })),
       ...((withdrawRows || []).map((r) => ({ row: r, kind: "withdraw" as const }))),
+      ...((usdtRows || []).map((r) => ({ row: r, kind: "usdt" as const }))),
     ];
     items.sort((a, b) => new Date(a.row.created_at).getTime() - new Date(b.row.created_at).getTime());
     return items;
-  }, [rows, withdrawRows]);
+  }, [rows, withdrawRows, usdtRows]);
 
   let running = 0;
   const withRunning = merged.map(({ row: r, kind }) => {
-    const delta = kind === "in" ? r.bdt_amount : -r.bdt_amount;
+    let delta = 0;
+    if (kind === "in") delta = r.bdt_amount;
+    else if (kind === "withdraw") delta = -r.bdt_amount;
+    else delta = -(r.usdt_amount * r.rate); // usdt cost
     const prev = running;
     running += delta;
     return { row: r, kind, prev, after: running, delta };
   });
   const totalIn = rows.reduce((s, r) => s + r.bdt_amount, 0);
   const totalOut = (withdrawRows || []).reduce((s, r) => s + r.bdt_amount, 0);
-  const net = totalIn - totalOut;
+  const totalUsdtCost = (usdtRows || []).reduce((s, r) => s + r.usdt_amount * r.rate, 0);
+  const net = totalIn - totalOut - totalUsdtCost;
   const netDisplay = formatDueAdvance(net);
 
   return (
