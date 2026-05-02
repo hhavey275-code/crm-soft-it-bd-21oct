@@ -21,6 +21,10 @@ const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
   "35777582-cd93-4324-8ad0-ee1d2e1dbe9d", // DD19P4W5U3 · Rasel · 1 Apr 2026
   "b36c9ced-710c-42b3-b9f3-9207d4f37e7e", // DD58TGDTOQ · Ahmed Saad · 5 Apr 2026 · ৳1,600
   "7d506183-13ea-4eb9-9a8c-ba2fd9f3cff2", // 757KVXKC · NAIMUL ISLAM · 13 Apr 2026 · ৳14,000
+  // Rasel Hossain — manually confirmed forwarded but flag never persisted
+  "db54a642-969b-4e14-b911-463ea5972365", // 17 Apr 2026 · ৳2,500
+  "4b48c94b-3227-4495-bea2-f159c02de114", // 26 Apr 2026 · ৳13,000
+  "1e8ac1c4-0db3-483b-b746-2dec2e685a8d", // 29 Apr 2026 · ৳1,950
 ]);
 
 export type ArchiveTxn = {
