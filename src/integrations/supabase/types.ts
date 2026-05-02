@@ -2310,6 +2310,36 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_forward_log: {
+        Row: {
+          caption_total_bdt: number | null
+          forwarded_at: string
+          id: string
+          source_id: string
+          source_type: string
+          telegram_group_id: string | null
+          telegram_message_id: number | null
+        }
+        Insert: {
+          caption_total_bdt?: number | null
+          forwarded_at?: string
+          id?: string
+          source_id: string
+          source_type: string
+          telegram_group_id?: string | null
+          telegram_message_id?: number | null
+        }
+        Update: {
+          caption_total_bdt?: number | null
+          forwarded_at?: string
+          id?: string
+          source_id?: string
+          source_type?: string
+          telegram_group_id?: string | null
+          telegram_message_id?: number | null
+        }
+        Relationships: []
+      }
       telegram_messages: {
         Row: {
           chat_id: number

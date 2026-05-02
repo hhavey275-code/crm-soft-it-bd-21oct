@@ -1,46 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  computeDueAdvance,
+  buildTotalLine,
+  fetchAllSellerTxns,
+  fetchPendingTopupCredits,
+  checkForwardLog,
+  writeForwardLog,
+} from '../_shared/seller-balance.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-/**
- * Compute single global Due/Advance running balance for a seller.
- * Positive = Advance, Negative = Due. Same formula as forward-seller-proof.
- *  +bdt_amount on bdt_payment / client_topup
- *  -bdt_amount on withdraw
- *  -(usdt_amount * rate) on usdt_received
- * Only approved entries count.
- */
-function computeDueAdvance(txns: any[]): number {
-  let running = 0;
-  const sorted = [...(txns || [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
-  for (const t of sorted) {
-    if ((t.status || 'approved') !== 'approved') continue;
-    if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
-      running += Number(t.bdt_amount || 0);
-    } else if (t.type === 'withdraw') {
-      running -= Number(t.bdt_amount || 0);
-    } else if (t.type === 'usdt_received') {
-      running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
-    }
-  }
-  return running;
-}
-
-function formatBdtIN(value: number): string {
-  return Math.round(Math.abs(value)).toLocaleString('en-IN');
-}
-
-function buildTotalLine(balance: number): string {
-  if (balance > 0) return `\n🟢 Total: Advance +৳${formatBdtIN(balance)}`;
-  if (balance < 0) return `\n🔴 Total: Due −৳${formatBdtIN(balance)}`;
-  return `\n⚪ Total: ৳0`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -57,6 +29,15 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Durable dedupe — return the prior message_id if we already forwarded this top-up.
+    const dedupe = await checkForwardLog(supabase, 'client_topup', request_id);
+    if (dedupe.alreadyForwarded) {
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: dedupe.messageId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     const { data: reqData, error: reqErr } = await supabase
@@ -115,19 +96,25 @@ Deno.serve(async (req) => {
       .single();
     const clientName = profile?.full_name || profile?.email || reqData.user_id.slice(0, 8);
 
-    // Global Due/Advance running balance for this seller (matches forward-seller-proof).
-    // Include THIS pending top-up as a credit so the forwarded message shows the
-    // total the seller will have once admin approves it.
+    // Global Due/Advance running balance for this seller.
+    // - paginate past 1000-row default
+    // - include approved top_up_requests not yet mirrored into seller_transactions
+    // - include THIS pending top-up unless it's already mirrored
     let runningTotalLine = '';
+    let finalBalance: number | null = null;
     if (sellerId) {
       try {
-        const { data: txns } = await supabase
-          .from('seller_transactions')
-          .select('type, bdt_amount, usdt_amount, rate, status, created_at')
-          .eq('seller_id', sellerId);
-        let balance = computeDueAdvance((txns as any[]) || []);
-        // Add this pending client top-up amount (it isn't in seller_transactions yet)
-        balance += Number(reqData.bdt_amount || 0);
+        const txns = await fetchAllSellerTxns(supabase, sellerId);
+        const pending = await fetchPendingTopupCredits(supabase, sellerId);
+        let balance = computeDueAdvance([...txns, ...pending]);
+        // If THIS top-up is not yet in either set, factor it in
+        const alreadyCounted =
+          txns.some((t: any) => (t as any).top_up_request_id === request_id) ||
+          pending.some((p: any) => (p as any).top_up_request_id === request_id);
+        if (!alreadyCounted) {
+          balance += Number(reqData.bdt_amount || 0);
+        }
+        finalBalance = balance;
         runningTotalLine = buildTotalLine(balance);
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
@@ -154,7 +141,24 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log(`✅ Forwarded proof for ${request_id} to group ${targetGroupId}`);
+    // Persist dedupe log + mirror flag
+    await writeForwardLog(
+      supabase,
+      'client_topup',
+      request_id,
+      targetGroupId,
+      tgResult.result?.message_id ?? null,
+      finalBalance,
+    );
+    try {
+      await supabase
+        .from('top_up_requests')
+        .update({ telegram_forwarded: true })
+        .eq('id', request_id);
+    } catch (e) {
+      console.warn('top_up_requests flag update failed:', (e as any)?.message);
+    }
+    console.log(`✅ Forwarded proof for ${request_id} to group ${targetGroupId} (msg ${tgResult.result?.message_id})`);
     return new Response(JSON.stringify({ ok: true, message_id: tgResult.result?.message_id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

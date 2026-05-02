@@ -1152,7 +1152,9 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // Add entry (USDT received or BDT payment)
+  // Add entry (USDT received, BDT payment, or Withdraw).
+  // Auto-forwards USDT/Withdraw to seller's Telegram group with the new running total
+  // so operators can see the balance change in real time.
   const addEntryMutation = useMutation({
     mutationFn: async () => {
       const entry: any = {
@@ -1177,14 +1179,43 @@ export function AdminSellers() {
         entry.rate = 0;
         if (!entry.bdt_amount) throw new Error("Enter BDT amount");
       }
-      const { error } = await (supabase as any).from("seller_transactions").insert(entry);
+      const { data: inserted, error } = await (supabase as any)
+        .from("seller_transactions")
+        .insert(entry)
+        .select("id")
+        .single();
       if (error) throw error;
+      return { insertedId: inserted?.id, kind: entryType, payload: entry };
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       const label = entryType === "usdt_received" ? "USDT Received" : entryType === "withdraw" ? "Withdraw" : "BDT Payment";
       toast.success(`${label} recorded!`);
       logSystemAction(`Seller ${label}`, `Seller: ${selectedSeller.full_name || selectedSeller.email}`, user?.id, user?.email);
       queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+
+      // Fire-and-forget Telegram forward for USDT/Withdraw so the seller's group
+      // sees the new total. (BDT payments are already forwarded via existing flow.)
+      if (result?.insertedId && (result.kind === "usdt_received" || result.kind === "withdraw")) {
+        try {
+          await (supabase as any).functions.invoke("forward-seller-proof", {
+            body: {
+              seller_transaction_id: result.insertedId,
+              seller_id: selectedSeller.user_id,
+              seller_name: selectedSeller.full_name || selectedSeller.email,
+              payment_kind: result.kind,
+              bdt_amount: result.payload.bdt_amount,
+              usdt_amount: result.payload.usdt_amount,
+              rate: result.payload.rate,
+              reference: result.payload.description,
+              withdraw_note: result.kind === "withdraw" ? result.payload.description : undefined,
+              proof_url: null,
+            },
+          });
+        } catch (e: any) {
+          console.warn("Telegram forward (entry) failed:", e?.message);
+        }
+      }
+
       setShowEntryDialog(false);
       setEntryForm({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
     },
