@@ -14,6 +14,8 @@ type Props = {
   forwardedRows: ArchiveTxn[];
   /** All withdraws from the archive (always migrated alongside). */
   withdrawRows: ArchiveTxn[];
+  /** All usdt_received (USDT given) rows from the archive — needed for Due/Adv math. */
+  usdtGivenRows?: ArchiveTxn[];
 };
 
 /**
