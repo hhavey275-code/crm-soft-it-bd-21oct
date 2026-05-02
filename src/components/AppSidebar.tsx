@@ -23,6 +23,7 @@ import {
   Trophy,
   Wallet,
   RefreshCw,
+  Archive,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
