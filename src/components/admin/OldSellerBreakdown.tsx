@@ -706,11 +706,16 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                 <TableCell colSpan={2}>Total ({withRunning.length} entries)</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(totalIn)}</TableCell>
                 <TableCell className="text-right tabular-nums font-bold text-rose-600 dark:text-rose-400">
-                  {totalOut > 0 ? formatBdt(totalOut) : "—"}
+                  {(totalOut + totalUsdtCost) > 0
+                    ? <span title={totalUsdtCost > 0 ? `Withdraw ${formatBdt(totalOut)} + USDT cost ${formatBdt(totalUsdtCost)}` : undefined}>{formatBdt(totalOut + totalUsdtCost)}</span>
+                    : "—"}
                 </TableCell>
                 <TableCell />
-                <TableCell className={`text-right tabular-nums font-bold ${netDisplay.isAdvance ? "text-emerald-600 dark:text-emerald-400" : netDisplay.isZero ? "" : "text-rose-600 dark:text-rose-400"}`}>
+                <TableCell className={`text-right tabular-nums font-bold text-base ${netDisplay.isAdvance ? "text-emerald-600 dark:text-emerald-400" : netDisplay.isZero ? "" : "text-rose-600 dark:text-rose-400"}`}>
                   {netDisplay.text}
+                  <div className="text-[10px] font-normal text-muted-foreground">
+                    {netDisplay.isAdvance ? "Advance" : netDisplay.isZero ? "Settled" : "Due"}
+                  </div>
                 </TableCell>
                 <TableCell colSpan={6} />
               </TableRow>
