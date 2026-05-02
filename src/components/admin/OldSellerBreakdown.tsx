@@ -69,16 +69,29 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
  * falls back to any alphanumeric token of length >= 6 (typical bank trxIDs).
  * Returns null if nothing usable is found.
  */
+// Common English words that appear in auto-generated descriptions and must
+// NEVER be treated as a transaction ID (otherwise every "Client top-up
+// approved — $50" row collides and gets falsely marked duplicate).
+const TRX_STOPWORDS = new Set([
+  "CLIENT", "TOPUP", "TOP-UP", "APPROVED", "AUTOAPPROVED", "AUTO-APPROVED",
+  "PAYMENT", "MANUAL", "TENANT", "WITHDRAW", "WITHDRAWAL", "USDT", "BDT",
+  "RECEIVED", "ENTRY", "TRANSACTION", "DEPOSIT", "TRANSFER", "BKASH",
+  "NAGAD", "ROCKET", "AGENT", "ADMIN", "SELLER", "ACCOUNT", "BALANCE",
+  "ARCHIVE", "ARCHIVED", "DESCRIPTION", "AMOUNT",
+]);
+
 export function extractTrxId(desc: string | null | undefined): string | null {
   if (!desc) return null;
   const s = String(desc);
+  // 1) Explicit label like "TrxID: ABC123" — trust it.
   const labeled = s.match(/(?:trx\s*id|txn\s*id|trxn|trx|txn|reference|ref)\s*[:#\-]?\s*([A-Za-z0-9]{4,})/i);
   if (labeled?.[1]) return labeled[1].toUpperCase();
-  const tokens = s.match(/[A-Za-z0-9]{6,}/g);
+  // 2) Otherwise only accept a token that LOOKS like a real transaction id:
+  //    - at least 8 chars, contains a digit, not a common stopword.
+  const tokens = s.match(/[A-Za-z0-9]{8,}/g);
   if (tokens && tokens.length) {
-    // Prefer tokens that contain at least one digit (transaction IDs usually do)
-    const withDigit = tokens.find((t) => /\d/.test(t));
-    return (withDigit || tokens[0]).toUpperCase();
+    const candidate = tokens.find((t) => /\d/.test(t) && !TRX_STOPWORDS.has(t.toUpperCase()));
+    if (candidate) return candidate.toUpperCase();
   }
   return null;
 }
