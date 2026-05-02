@@ -1,0 +1,3 @@
+DELETE FROM public.seller_transactions_archive_2026_05 WHERE id='6f838513-a095-4e9e-a2c3-598d914ca223';
+
+INSERT INTO public.seller_transactions_archive_2026_05 (seller_id, type, bdt_amount, description, status, created_at, archived_at, archive_reason, entry_by_name) VALUES ('95a5c5aa-1130-416a-b818-7af64f1e2989', 'bdt_payment', 38400, 'EBL Skybanking Receipt - REF: 1188006261200122', 'approved', '2026-04-30 12:00:00+06', now(), 'manual_admin_entry', 'Admin Manual Entry');
