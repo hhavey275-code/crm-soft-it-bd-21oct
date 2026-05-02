@@ -64,6 +64,12 @@ function formatDateTimeBn(d: Date): string {
   return `${day} ${mon} ${String(h).padStart(2, "0")}.${m} ${ap}`;
 }
 
+function normalizeCol(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const m = String(v).toUpperCase().match(/[A-Z]+/);
+  return m ? m[0] : null;
+}
+
 function colLetterToIndex(letter: string): number {
   // "A" -> 0, "Z" -> 25, "AA" -> 26
   const s = letter.trim().toUpperCase();
