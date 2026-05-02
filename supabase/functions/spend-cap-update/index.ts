@@ -558,6 +558,11 @@ Deno.serve(async (req)=>{
             action: "Spend Cap Updated",
             details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg})${metaCallSummary()}`
           });
+          // Report usage to master so tenant total_used stays accurate even
+          // on recovered-after-network-error successes.
+          if (isTenantMode) {
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+          }
           return json({
             success: true,
             old_spend_cap: oldSpendCapDollars,
