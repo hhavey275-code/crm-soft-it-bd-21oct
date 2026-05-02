@@ -373,6 +373,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           <PaymentsTable
             rows={filterRows(buckets.notForwardedIn)}
             forwarded={false}
+            withdrawRows={filterRows(buckets.withdraws)}
             csvName={`${sellerName}-not-forwarded.csv`}
             duplicateIds={duplicateIds}
             onDelete={(r) => setPendingDelete(r)}
@@ -499,20 +500,29 @@ function DeleteBtn({ row, onDelete }: { row: ArchiveTxn; onDelete?: (r: ArchiveT
   );
 }
 
-function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string } & DupProps) {
-  // Sort chronologically and compute running total (seller-sheet style).
-  const sorted = useMemo(
-    () => [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
-    [rows],
-  );
+function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withdrawRows }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string; withdrawRows?: ArchiveTxn[] } & DupProps) {
+  // Merge in-rows with withdraw rows (if provided), sort chronologically and
+  // compute running total. Withdraws subtract from running total.
+  const merged = useMemo(() => {
+    const items: { row: ArchiveTxn; kind: "in" | "withdraw" }[] = [
+      ...rows.map((r) => ({ row: r, kind: "in" as const })),
+      ...((withdrawRows || []).map((r) => ({ row: r, kind: "withdraw" as const }))),
+    ];
+    items.sort((a, b) => new Date(a.row.created_at).getTime() - new Date(b.row.created_at).getTime());
+    return items;
+  }, [rows, withdrawRows]);
+
   let running = 0;
-  const withRunning = sorted.map((r) => {
+  const withRunning = merged.map(({ row: r, kind }) => {
+    const delta = kind === "in" ? r.bdt_amount : -r.bdt_amount;
     const prev = running;
-    running += r.bdt_amount;
-    const delta = r.bdt_amount;
-    return { row: r, prev, after: running, delta };
+    running += delta;
+    return { row: r, kind, prev, after: running, delta };
   });
-  const total = running;
+  const totalIn = rows.reduce((s, r) => s + r.bdt_amount, 0);
+  const totalOut = (withdrawRows || []).reduce((s, r) => s + r.bdt_amount, 0);
+  const net = totalIn - totalOut;
+  const netDisplay = formatDueAdvance(net);
 
   return (
     <Card>
@@ -520,7 +530,9 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
         <CardTitle className="text-base">
           {forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}
           <span className="ml-2 text-xs font-normal text-muted-foreground">
-            (Manual entries shown in both sheets · running total updates per row)
+            {withdrawRows && withdrawRows.length > 0
+              ? "(Withdraws merged chronologically · running total = Adv/Due after each entry)"
+              : "(Manual entries shown in both sheets · running total updates per row)"}
           </span>
         </CardTitle>
         <Button
@@ -529,11 +541,13 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Type", "BDT in", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
-              withRunning.map(({ row: r, delta, after }) => [
+              ["Date", "Kind", "Type", "BDT in", "BDT out", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
+              withRunning.map(({ row: r, kind, delta, after }) => [
                 fmtDate(r.created_at),
+                kind,
                 r.type,
-                r.bdt_amount,
+                kind === "in" ? r.bdt_amount : "",
+                kind === "withdraw" ? r.bdt_amount : "",
                 delta,
                 after,
                 r.description,
@@ -555,8 +569,9 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                 <TableHead>Date / Time</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">BDT in</TableHead>
+                <TableHead className="text-right">BDT out</TableHead>
                 <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">Running total</TableHead>
+                <TableHead className="text-right">Running (Adv/Due)</TableHead>
                 <TableHead>TRX ID</TableHead>
                 <TableHead>Proof</TableHead>
                 <TableHead>Description</TableHead>
@@ -568,39 +583,63 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
             <TableBody>
               {withRunning.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground">No entries</TableCell>
+                  <TableCell colSpan={12} className="text-center text-muted-foreground">No entries</TableCell>
                 </TableRow>
               ) : (
-                withRunning.map(({ row: r, delta, after }) => {
-                  const isManual = r.type === "bdt_payment" || r.type === "tenant_payment";
+                withRunning.map(({ row: r, kind, delta, after }) => {
+                  const isWithdraw = kind === "withdraw";
+                  const isManual = !isWithdraw && (r.type === "bdt_payment" || r.type === "tenant_payment");
                   const isDup = duplicateIds?.has(r.id);
                   const trxId = extractTrxId(r.description);
-                  const rowClass = isDup
-                    ? "bg-rose-500/10 hover:bg-rose-500/15"
-                    : isManual
-                      ? "bg-amber-500/5"
-                      : undefined;
+                  const rowClass = isWithdraw
+                    ? "bg-rose-500/10 hover:bg-rose-500/20"
+                    : isDup
+                      ? "bg-rose-500/10 hover:bg-rose-500/15"
+                      : isManual
+                        ? "bg-amber-500/5"
+                        : undefined;
+                  const runDisp = formatDueAdvance(after);
+                  const runClass = runDisp.isAdvance
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : runDisp.isZero
+                      ? "text-muted-foreground"
+                      : "text-rose-600 dark:text-rose-400";
                   return (
                     <TableRow key={r.id} className={rowClass}>
                       <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
                       <TableCell>
-                        {typeBadge(r.type)}
-                        {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
-                        {r.is_forced_forwarded && (
-                          <span
-                            className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300"
-                            title="Manually added to Forwarded sheet (not auto-detected from Telegram flag)"
-                          >
-                            ➕ manually added
+                        {isWithdraw ? (
+                          <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300">
+                            ↓ WITHDRAW
                           </span>
+                        ) : (
+                          <>
+                            {typeBadge(r.type)}
+                            {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
+                            {r.is_forced_forwarded && (
+                              <span
+                                className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300"
+                                title="Manually added to Forwarded sheet (not auto-detected from Telegram flag)"
+                              >
+                                ➕ manually added
+                              </span>
+                            )}
+                            {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUPLICATE</span>}
+                          </>
                         )}
-                        {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUPLICATE</span>}
                       </TableCell>
-                      <TableCell className={`text-right tabular-nums ${isDup ? "text-rose-600 dark:text-rose-400" : ""}`}>{formatBdt(r.bdt_amount)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                        +{formatBdt(delta)}
+                      <TableCell className="text-right tabular-nums">
+                        {isWithdraw ? <span className="text-muted-foreground">—</span> : formatBdt(r.bdt_amount)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold">{formatBdt(after)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-rose-600 dark:text-rose-400 font-semibold">
+                        {isWithdraw ? formatBdt(r.bdt_amount) : <span className="text-muted-foreground font-normal">—</span>}
+                      </TableCell>
+                      <TableCell className={`text-right tabular-nums font-medium ${isWithdraw ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {isWithdraw ? `−${formatBdt(r.bdt_amount)}` : `+${formatBdt(delta)}`}
+                      </TableCell>
+                      <TableCell className={`text-right tabular-nums font-bold ${runClass}`}>
+                        {runDisp.text}
+                      </TableCell>
                       <TableCell className="font-mono text-[11px] whitespace-nowrap">{trxId || <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>
                         {r.proof_url ? (
@@ -626,11 +665,16 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={2}>Total ({withRunning.length})</TableCell>
-                <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
+                <TableCell colSpan={2}>Total ({withRunning.length} entries)</TableCell>
+                <TableCell className="text-right tabular-nums font-bold">{formatBdt(totalIn)}</TableCell>
+                <TableCell className="text-right tabular-nums font-bold text-rose-600 dark:text-rose-400">
+                  {totalOut > 0 ? formatBdt(totalOut) : "—"}
+                </TableCell>
                 <TableCell />
-                <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={5} />
+                <TableCell className={`text-right tabular-nums font-bold ${netDisplay.isAdvance ? "text-emerald-600 dark:text-emerald-400" : netDisplay.isZero ? "" : "text-rose-600 dark:text-rose-400"}`}>
+                  {netDisplay.text}
+                </TableCell>
+                <TableCell colSpan={6} />
               </TableRow>
             </TableFooter>
           </Table>
