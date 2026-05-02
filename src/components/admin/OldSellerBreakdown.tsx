@@ -747,7 +747,7 @@ function WithdrawTable({ rows, csvName, duplicateIds, onDelete }: { rows: Archiv
   );
 }
 
-function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
+function AllTable({ rows, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; csvName: string } & DupProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -758,7 +758,7 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Type", "Status", "BDT", "USDT", "Rate", "Description", "Bank", "Account #", "Entry by", "Forwarded?"],
+              ["Date", "Type", "Status", "BDT", "USDT", "Rate", "Description", "Bank", "Account #", "Entry by", "Forwarded?", "Duplicate?"],
               rows.map((r) => [
                 fmtDate(r.created_at),
                 r.type,
@@ -771,6 +771,7 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 r.account_number,
                 r.entry_by_name,
                 r.topup_forwarded == null ? "" : r.topup_forwarded ? "yes" : "no",
+                duplicateIds?.has(r.id) ? "yes" : "",
               ]),
             )
           }
@@ -791,29 +792,39 @@ function AllTable({ rows, csvName }: { rows: ArchiveTxn[]; csvName: string }) {
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
                 <TableHead>Fwd?</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                  <TableCell>{typeBadge(r.type)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.bdt_amount ? formatBdt(r.bdt_amount) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.usdt_amount ? r.usdt_amount.toLocaleString() : "—"}</TableCell>
-                  <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                  <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
-                  <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  <TableCell>
-                    {r.topup_forwarded === true ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : r.topup_forwarded === false ? (
-                      <XCircle className="h-4 w-4 text-rose-500" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const isDup = duplicateIds?.has(r.id);
+                return (
+                  <TableRow key={r.id} className={isDup ? "bg-rose-500/10" : undefined}>
+                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                    <TableCell>
+                      {typeBadge(r.type)}
+                      {isDup && <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">DUP</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{r.bdt_amount ? formatBdt(r.bdt_amount) : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.usdt_amount ? r.usdt_amount.toLocaleString() : "—"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                    <TableCell className="text-xs">{r.bank_name || "—"}</TableCell>
+                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                    <TableCell>
+                      {r.topup_forwarded === true ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : r.topup_forwarded === false ? (
+                        <XCircle className="h-4 w-4 text-rose-500" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isDup ? <DeleteBtn row={r} onDelete={onDelete} /> : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
