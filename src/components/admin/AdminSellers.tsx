@@ -677,6 +677,44 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Manual "Resend to Telegram" — for rows that approved successfully but the
+  // forward never reached Telegram (e.g. browser tab was closed during approval).
+  // Server-side claim_forward_slot guarantees this is idempotent — clicking twice
+  // does NOT produce duplicate messages.
+  const resendForwardMutation = useMutation({
+    mutationFn: async (txn: any) => {
+      const sellerProfile = selectedSeller as any;
+      const isOthers = !txn.bank_account_id;
+      const { data, error } = await (supabase as any).functions.invoke("forward-seller-proof", {
+        body: {
+          seller_transaction_id: txn.id,
+          payment_kind: txn.type,
+          proof_url: txn.proof_url || null,
+          seller_id: txn.seller_id,
+          seller_name: sellerProfile?.full_name || sellerProfile?.email,
+          usdt_amount: Number(txn.usdt_amount || 0),
+          rate: Number(txn.rate || 0),
+          bdt_amount: Number(txn.bdt_amount || 0),
+          bank_account_id: isOthers ? undefined : txn.bank_account_id,
+          reference: extractTrxId(txn.description) || txn.description || null,
+          others_telegram_group_id: isOthers ? sellerProfile?.others_telegram_group_id : undefined,
+          withdraw_note: txn.type === "withdraw" ? txn.description : undefined,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data?.skipped) {
+        toast.info("Already forwarded to Telegram");
+      } else {
+        toast.success("Resent to Telegram!");
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller?.user_id] });
+    },
+    onError: (e: any) => toast.error(`Resend failed: ${e.message}`),
+  });
+
   // Lifetime Due/Advance — ALWAYS computed from the full ledger, independent
   // of typeFilter / bankFilter / datePreset. This is what the All-Time hero
   // card must show so changing a filter never changes the headline balance.
