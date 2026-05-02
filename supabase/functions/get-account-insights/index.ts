@@ -1092,6 +1092,7 @@ Deno.serve(async (req)=>{
         }
       }
       const upsertRows = Object.entries(insights).map(([adAccountId, data])=>{
+        if (syncErrors[adAccountId]) return null;
         const row = {
           ad_account_id: adAccountId,
           today_spend: data.today_spend,
@@ -1122,7 +1123,7 @@ Deno.serve(async (req)=>{
         // If both today=0 AND yesterday=0 AND no lookback hit, leave field unset
         // so we DON'T overwrite a previously recorded last_spend_date with NULL.
         return row;
-      });
+      }).filter(Boolean);
       const upsertBatches = chunk(upsertRows, 30);
       for (const batch of upsertBatches){
         await supabase.from("ad_account_insights").upsert(batch, {
