@@ -374,12 +374,82 @@ async function syncOneTransaction(
       };
     }
 
+    // Compute opening balance = sum of ALL approved txns BEFORE this month.
+    // Then walk pending txns in chronological order accumulating the running
+    // Due/Advance — same formula as Telegram caption (computeDueAdvance).
+    let openingBalance = 0;
+    {
+      const PAGE = 1000;
+      let from = 0;
+      const prior: any[] = [];
+      while (true) {
+        const { data: prevPage, error: prevErr } = await supabase
+          .from("seller_transactions")
+          .select("type, bdt_amount, usdt_amount, rate, status, created_at")
+          .eq("seller_id", txn.seller_id)
+          .eq("status", "approved")
+          .lt("created_at", monthStart)
+          .order("created_at", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (prevErr) throw new Error(`opening balance fetch failed: ${prevErr.message}`);
+        const rows = prevPage || [];
+        prior.push(...rows);
+        if (rows.length < PAGE) break;
+        from += PAGE;
+      }
+      openingBalance = computeDueAdvance(prior as any);
+    }
+
+    // Also include approved top_up_requests not yet mirrored into seller_transactions
+    // (verify-topup runs async — race window). Without this, the running total
+    // can briefly diverge from Telegram captions.
+    {
+      const { data: banks } = await supabase
+        .from("bank_accounts").select("id").eq("seller_id", txn.seller_id);
+      const bankIds = (banks || []).map((b: any) => b.id);
+      if (bankIds.length > 0) {
+        const { data: tops } = await supabase
+          .from("top_up_requests")
+          .select("id, bdt_amount, created_at, status")
+          .in("bank_account_id", bankIds)
+          .eq("status", "approved")
+          .lt("created_at", monthStart);
+        const topIds = (tops || []).map((t: any) => t.id);
+        let mirroredSet = new Set<string>();
+        if (topIds.length > 0) {
+          const { data: mir } = await supabase
+            .from("seller_transactions")
+            .select("top_up_request_id")
+            .in("top_up_request_id", topIds);
+          mirroredSet = new Set((mir || []).map((m: any) => m.top_up_request_id));
+        }
+        const extras = (tops || [])
+          .filter((t: any) => !mirroredSet.has(t.id))
+          .map((t: any) => ({
+            type: "client_topup",
+            bdt_amount: t.bdt_amount, usdt_amount: 0, rate: 0,
+            status: "approved", created_at: t.created_at,
+          }));
+        openingBalance += computeDueAdvance(extras as any);
+      }
+    }
+
     // Build batch payload — append all pending rows in created_at order, contiguous.
+    // Track running balance as we append each row.
     const data: any[] = [];
     const logRows: any[] = [];
+    let running = openingBalance;
     pending.forEach((t: any, i: number) => {
+      // Apply this row's delta to the running balance (same logic as computeDueAdvance).
+      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
+        running += Number(t.bdt_amount || 0);
+      } else if (t.type === "withdraw") {
+        running -= Number(t.bdt_amount || 0);
+      } else if (t.type === "usdt_received") {
+        running -= Number(t.usdt_amount || 0) * Number(t.rate || 0);
+      }
       const rowNumber = startRow + i;
-      const cells = buildCellsForTxn(cfg, t);
+      const cells = buildCellsForTxn(cfg, t, running);
       for (const c of cells) {
         data.push({
           range: `'${targetTab}'!${normalizeCol(c.col)}${rowNumber}`,
