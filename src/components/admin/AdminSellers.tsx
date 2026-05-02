@@ -21,6 +21,8 @@ import { logSystemAction } from "@/lib/systemLog";
 import { SellerSubmitUsdtDialog } from "@/components/seller/SellerSubmitUsdtDialog";
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ManageSellerUsdtBanksDialog } from "@/components/admin/ManageSellerUsdtBanksDialog";
+import { SellerSheetConfigDialog } from "@/components/admin/SellerSheetConfigDialog";
+import { FileSpreadsheet } from "lucide-react";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, getSellerTransactionSkipReason, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
@@ -162,6 +164,7 @@ export function AdminSellers() {
   const [showConvert, setShowConvert] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedSeller, setSelectedSeller] = useState<any>(null);
+  const [showSheetConfig, setShowSheetConfig] = useState(false);
   const [entryType, setEntryType] = useState<"usdt_received" | "bdt_payment" | "withdraw">("usdt_received");
   const [entryForm, setEntryForm] = useState({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
   const [showEntryDialog, setShowEntryDialog] = useState(false);
@@ -1216,6 +1219,17 @@ export function AdminSellers() {
         }
       }
 
+      // Fire-and-forget Google Sheet sync
+      if (result?.insertedId) {
+        try {
+          await (supabase as any).functions.invoke("sync-seller-to-sheet", {
+            body: { seller_transaction_id: result.insertedId },
+          });
+        } catch (e: any) {
+          console.warn("Sheet sync (entry) failed:", e?.message);
+        }
+      }
+
       setShowEntryDialog(false);
       setEntryForm({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
     },
@@ -1453,6 +1467,9 @@ export function AdminSellers() {
                </Button>
                 <Button size="sm" variant="outline" onClick={() => recalcClosedMonthsMutation.mutate()} disabled={recalcClosedMonthsMutation.isPending || !(closings || []).length}>
                   <RefreshCw className="h-4 w-4 mr-1" /> Recalc Closed
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowSheetConfig(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1" /> Sheet Sync
                 </Button>
             </div>
           </div>
@@ -2577,9 +2594,17 @@ export function AdminSellers() {
             <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
               <Download className="h-4 w-4 mr-1" /> Download
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      {selectedSeller && (
+        <SellerSheetConfigDialog
+          open={showSheetConfig}
+          onOpenChange={setShowSheetConfig}
+          sellerId={selectedSeller.user_id}
+          sellerName={selectedSeller.full_name || selectedSeller.email}
+        />
+      )}
     </div>
   );
 }

@@ -1971,6 +1971,101 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_sheet_config: {
+        Row: {
+          col_datetime: string | null
+          col_description: string | null
+          col_due_adv: string | null
+          col_payment_bdt: string | null
+          col_payo_bdt: string | null
+          col_payo_rate: string | null
+          col_payo_usd: string | null
+          col_proof_url: string | null
+          col_total: string | null
+          col_txn_id: string | null
+          col_wise_bdt: string | null
+          col_wise_rate: string | null
+          col_wise_usd: string | null
+          created_at: string
+          data_start_row: number
+          enabled: boolean
+          header_row: number
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          seller_id: string
+          spreadsheet_id: string
+          spreadsheet_url: string | null
+          tab_pattern: string
+          template_tab: string | null
+          updated_at: string
+        }
+        Insert: {
+          col_datetime?: string | null
+          col_description?: string | null
+          col_due_adv?: string | null
+          col_payment_bdt?: string | null
+          col_payo_bdt?: string | null
+          col_payo_rate?: string | null
+          col_payo_usd?: string | null
+          col_proof_url?: string | null
+          col_total?: string | null
+          col_txn_id?: string | null
+          col_wise_bdt?: string | null
+          col_wise_rate?: string | null
+          col_wise_usd?: string | null
+          created_at?: string
+          data_start_row?: number
+          enabled?: boolean
+          header_row?: number
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          seller_id: string
+          spreadsheet_id: string
+          spreadsheet_url?: string | null
+          tab_pattern?: string
+          template_tab?: string | null
+          updated_at?: string
+        }
+        Update: {
+          col_datetime?: string | null
+          col_description?: string | null
+          col_due_adv?: string | null
+          col_payment_bdt?: string | null
+          col_payo_bdt?: string | null
+          col_payo_rate?: string | null
+          col_payo_usd?: string | null
+          col_proof_url?: string | null
+          col_total?: string | null
+          col_txn_id?: string | null
+          col_wise_bdt?: string | null
+          col_wise_rate?: string | null
+          col_wise_usd?: string | null
+          created_at?: string
+          data_start_row?: number
+          enabled?: boolean
+          header_row?: number
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          seller_id?: string
+          spreadsheet_id?: string
+          spreadsheet_url?: string | null
+          tab_pattern?: string
+          template_tab?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_sheet_config_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       seller_transactions: {
         Row: {
           admin_note: string | null
@@ -2153,6 +2248,47 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sheet_sync_log: {
+        Row: {
+          error_message: string | null
+          id: string
+          row_number: number | null
+          seller_transaction_id: string
+          spreadsheet_id: string
+          status: string
+          synced_at: string
+          tab_name: string
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          row_number?: number | null
+          seller_transaction_id: string
+          spreadsheet_id: string
+          status?: string
+          synced_at?: string
+          tab_name: string
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          row_number?: number | null
+          seller_transaction_id?: string
+          spreadsheet_id?: string
+          status?: string
+          synced_at?: string
+          tab_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheet_sync_log_seller_transaction_id_fkey"
+            columns: ["seller_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "seller_transactions"
             referencedColumns: ["id"]
           },
         ]
