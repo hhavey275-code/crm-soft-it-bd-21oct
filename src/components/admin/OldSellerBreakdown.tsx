@@ -339,6 +339,14 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
         </CardContent>
       </Card>
 
+      {/* Forwarded → Live Ledger migration */}
+      <MigrateForwardedButton
+        sellerId={sellerId}
+        sellerName={sellerName}
+        forwardedRows={buckets.forwardedIn}
+        withdrawRows={buckets.withdraws}
+      />
+
       {/* Search */}
       <div className="flex items-center gap-2">
         <Input
