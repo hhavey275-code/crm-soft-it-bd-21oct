@@ -304,7 +304,21 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
                     onChange={(e) => setForm({ ...form, data_start_row: e.target.value })}
                   />
                 </div>
+                <div>
+                  <Label>Opening balance cell</Label>
+                  <Input
+                    value={form.opening_balance_cell || ""}
+                    onChange={(e) =>
+                      setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })
+                    }
+                    placeholder="e.g. I6"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Template e opening balance jaiga (cell ref)
+                  </p>
+                </div>
               </div>
+
 
               <div className="flex items-center gap-3 pt-2">
                 <Switch
