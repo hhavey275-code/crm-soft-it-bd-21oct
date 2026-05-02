@@ -3,6 +3,8 @@
 // needs the same balance/total-line semantics.
 
 export type Txn = {
+  id?: string;
+  top_up_request_id?: string | null;
   type: string;
   bdt_amount: number | string | null;
   usdt_amount: number | string | null;
@@ -21,9 +23,12 @@ export type Txn = {
  */
 export function computeDueAdvance(txns: Txn[]): number {
   let running = 0;
-  const sorted = [...(txns || [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  const sorted = [...(txns || [])].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    if (ta !== tb) return ta - tb;
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
   for (const t of sorted) {
     if ((t.status || 'approved') !== 'approved') continue;
     if (t.type === 'bdt_payment' || t.type === 'client_topup' || t.type === 'tenant_payment') {
@@ -62,6 +67,7 @@ export async function fetchAllSellerTxns(supabase: any, sellerId: string): Promi
       .select('id, type, bdt_amount, usdt_amount, rate, status, created_at, top_up_request_id')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
     const rows = (data || []) as Txn[];
