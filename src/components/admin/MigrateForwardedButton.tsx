@@ -38,18 +38,18 @@ function useAlreadyMigrated(sellerId: string, candidateIds: string[]) {
   });
 }
 
-export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, withdrawRows }: Props) {
+export function MigrateForwardedButton({ sellerId, sellerName, forwardedRows, withdrawRows, usdtGivenRows = [] }: Props) {
   const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [running, setRunning] = useState(false);
 
   // All rows we plan to move into the live ledger.
   const candidates = useMemo(() => {
-    const all = [...forwardedRows, ...withdrawRows];
+    const all = [...forwardedRows, ...withdrawRows, ...usdtGivenRows];
     // Dedupe by id (a withdraw could in theory also appear via merge — defensive).
     const seen = new Set<string>();
     return all.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-  }, [forwardedRows, withdrawRows]);
+  }, [forwardedRows, withdrawRows, usdtGivenRows]);
 
   const candidateIds = useMemo(() => candidates.map((r) => r.id), [candidates]);
   const { data: alreadyMigratedSet } = useAlreadyMigrated(sellerId, candidateIds);
