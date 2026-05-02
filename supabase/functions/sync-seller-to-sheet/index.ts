@@ -304,9 +304,11 @@ async function syncOneTransaction(
   let lockBig = ((BigInt(h1) << 32n) | BigInt(h2)) & 0xFFFFFFFFFFFFFFFFn;
   // Convert to signed: if >= 2^63, subtract 2^64.
   if (lockBig >= (1n << 63n)) lockBig = lockBig - (1n << 64n);
-  await supabase.rpc("pg_advisory_lock", { key: lockBig.toString() }).catch((e: any) => {
+  try {
+    await supabase.rpc("pg_advisory_lock", { key: lockBig.toString() });
+  } catch (e: any) {
     console.warn("advisory lock failed (degrading to unlocked):", e?.message);
-  });
+  }
 
   try {
     // Re-check after acquiring lock (another worker may have synced this row).
