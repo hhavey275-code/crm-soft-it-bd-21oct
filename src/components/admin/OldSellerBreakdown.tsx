@@ -416,7 +416,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
       <ConfirmActionDialog
         open={!!pendingDelete}
         onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
-        title="Delete duplicate entry?"
+        title="Delete archive entry?"
         description={
           <span>
             This will permanently remove this archive row. TRX ID:{" "}
