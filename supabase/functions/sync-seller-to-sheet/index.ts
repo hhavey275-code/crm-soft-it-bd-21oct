@@ -346,8 +346,8 @@ serve(async (req) => {
       if (!exists) {
         const tmpl = cfg.template_tab
           ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
-        if (!tmpl) throw new Error(`template_tab "${cfg.template_tab || ''}" not found in sheet — set Template tab first`);
-        await createTab(cfg.spreadsheet_id, tabName, tmpl.properties.sheetId, cfg.data_start_row || 7);
+        // If template missing or not found, fall back to a blank tab (no crash).
+        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
         createdNow = true;
       }
 
@@ -546,8 +546,8 @@ serve(async (req) => {
           const tmpl = cfg.template_tab
             ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
             : null;
-          if (!tmpl) throw new Error(`template_tab "${cfg.template_tab || ''}" not found in sheet — set Template tab first`);
-          await createTab(cfg.spreadsheet_id, tab, tmpl.properties.sheetId, cfg.data_start_row || 7);
+          // Fall back to blank tab if template missing/not found (no crash)
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
           titleSet.add(tab);
         }
         // Auto write opening balance if cell configured and we know the month
