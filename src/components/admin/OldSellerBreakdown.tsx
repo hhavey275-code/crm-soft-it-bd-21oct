@@ -63,7 +63,62 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Extract a likely TRX ID from a description string.
+ * Looks for explicit "trx[id]: XXXX" / "txn id XXXX" patterns first, then
+ * falls back to any alphanumeric token of length >= 6 (typical bank trxIDs).
+ * Returns null if nothing usable is found.
+ */
+export function extractTrxId(desc: string | null | undefined): string | null {
+  if (!desc) return null;
+  const s = String(desc);
+  const labeled = s.match(/(?:trx\s*id|txn\s*id|trxn|trx|txn|reference|ref)\s*[:#\-]?\s*([A-Za-z0-9]{4,})/i);
+  if (labeled?.[1]) return labeled[1].toUpperCase();
+  const tokens = s.match(/[A-Za-z0-9]{6,}/g);
+  if (tokens && tokens.length) {
+    // Prefer tokens that contain at least one digit (transaction IDs usually do)
+    const withDigit = tokens.find((t) => /\d/.test(t));
+    return (withDigit || tokens[0]).toUpperCase();
+  }
+  return null;
+}
+
+/** Build a Set of archive row IDs that are duplicates (same trxId + bdt + type). */
+export function buildDuplicateIdSet(rows: ArchiveTxn[]): Set<string> {
+  const groups = new Map<string, ArchiveTxn[]>();
+  for (const r of rows) {
+    const trx = extractTrxId(r.description);
+    if (!trx) continue;
+    const key = `${trx}|${Math.round(r.bdt_amount)}|${r.type}`;
+    const arr = groups.get(key) || [];
+    arr.push(r);
+    groups.set(key, arr);
+  }
+  const dupes = new Set<string>();
+  for (const arr of groups.values()) {
+    if (arr.length > 1) for (const r of arr) dupes.add(r.id);
+  }
+  return dupes;
+}
+
 export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string; sellerName: string }) {
+  const [search, setSearch] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<ArchiveTxn | null>(null);
+  const queryClient = useQueryClient();
+
+  const handleDelete = async (row: ArchiveTxn) => {
+    const { error: delErr } = await (supabase as any)
+      .from("seller_transactions_archive_2026_05")
+      .delete()
+      .eq("id", row.id);
+    if (delErr) {
+      toast.error(`Delete failed: ${delErr.message}`);
+      return;
+    }
+    toast.success("Duplicate entry deleted");
+    queryClient.invalidateQueries({ queryKey: ["old-seller-bundle", sellerId] });
+    queryClient.invalidateQueries({ queryKey: ["archived-sellers"] });
+  };
   const [search, setSearch] = useState("");
 
   const { data, isLoading, error } = useQuery({
