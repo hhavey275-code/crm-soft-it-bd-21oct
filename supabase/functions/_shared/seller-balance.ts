@@ -59,7 +59,7 @@ export async function fetchAllSellerTxns(supabase: any, sellerId: string): Promi
   while (true) {
     const { data, error } = await supabase
       .from('seller_transactions')
-      .select('type, bdt_amount, usdt_amount, rate, status, created_at')
+      .select('id, type, bdt_amount, usdt_amount, rate, status, created_at, top_up_request_id')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: true })
       .range(from, from + PAGE - 1);
