@@ -128,7 +128,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
       toast.error(`Delete failed: ${delErr.message}`);
       return;
     }
-    toast.success("Duplicate entry deleted");
+    toast.success("Archive entry deleted");
     queryClient.invalidateQueries({ queryKey: ["old-seller-bundle", sellerId] });
     queryClient.invalidateQueries({ queryKey: ["archived-sellers"] });
   };
