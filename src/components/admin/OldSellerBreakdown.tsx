@@ -139,6 +139,12 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
     };
   }, [buckets]);
 
+  // Duplicate detection (same TRX ID + same BDT + same type) across all archive rows.
+  const duplicateIds = useMemo(
+    () => (data ? buildDuplicateIdSet(data.txns) : new Set<string>()),
+    [data],
+  );
+
   // Orphan check: top_up_requests during archive period that don't appear in archive ledger
   const orphans = useMemo(() => {
     if (!data) return [];
