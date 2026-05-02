@@ -147,10 +147,12 @@ Deno.serve(async (req) => {
             resolvedSellerId,
             payment_kind,
           });
-          await supabase.from('system_logs').insert({
-            action: 'Telegram Balance Mismatch',
-            details: `Seller txn ${seller_transaction_id || 'unknown'} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance before fallback.`,
-          }).catch(() => {});
+          try {
+            await supabase.from('system_logs').insert({
+              action: 'Telegram Balance Mismatch',
+              details: `Seller txn ${seller_transaction_id || 'unknown'} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance before fallback.`,
+            });
+          } catch { /* best-effort log */ }
           if (payment_kind === 'usdt_received') {
             balance -= Number(usdt_amount || 0) * Number(rate || 0);
           } else if (payment_kind === 'withdraw') {
