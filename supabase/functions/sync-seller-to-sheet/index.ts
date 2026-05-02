@@ -391,7 +391,7 @@ serve(async (req) => {
           const tmpl = cfg.template_tab
             ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
             : null;
-          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
           titleSet.add(tab);
         }
       }
