@@ -168,6 +168,7 @@ export async function fetchSellerArchiveBundle(sellerId: string): Promise<{
         : null,
       topup_amount_usd: tu ? Number(tu.amount || 0) : null,
       topup_telegram_message_id: null,
+      is_forced_forwarded: !!(tu && tu.telegram_forwarded !== true && FORCE_FORWARDED_TOPUP_IDS.has(tu.id)),
     };
   });
 
