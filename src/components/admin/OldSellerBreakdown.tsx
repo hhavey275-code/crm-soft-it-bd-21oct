@@ -260,12 +260,15 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           <CardTitle className="text-base">Reconciliation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <MigrateForwardedButton
-            sellerId={sellerId}
-            sellerName={sellerName}
-            forwardedRows={buckets.forwardedIn}
-            withdrawRows={buckets.withdraws}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <MigrateForwardedButton
+              sellerId={sellerId}
+              sellerName={sellerName}
+              forwardedRows={buckets.forwardedIn}
+              withdrawRows={buckets.withdraws}
+            />
+            <AddForwardedEntryDialog sellerId={sellerId} sellerName={sellerName} />
+          </div>
           <div>
             Difference between <b>All</b> and <b>Forwarded-only</b> Due/Advance: <b>{formatBdt(drift)}</b>
           </div>
