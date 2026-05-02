@@ -46,6 +46,35 @@ function centsToDollars(cents) {
   return cents / 100;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+
+// Idempotent usage report to master CRM. The same idempotency_key (typically
+// per ad_account+amount+timestamp tuple) MUST be used for every retry of the
+// same logical top-up — including network-error / POST-error recovery paths —
+// so master never double-counts. Master dedupes by (tenant_id, idempotency_key).
+async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any) {
+  try {
+    const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-Key": licenseMap["tenant_api_key"],
+      },
+      body: JSON.stringify({
+        action: "report-usage",
+        amount,
+        idempotency_key: idempotencyKey,
+      }),
+    });
+    const reportData = await reportRes.json().catch(() => ({}));
+    if (reportData?.total_used !== undefined) {
+      await supabase.from("site_settings").update({
+        value: String(reportData.total_used),
+      }).eq("key", "license_total_used");
+    }
+  } catch (reportErr) {
+    console.warn("Failed to report usage to master:", reportErr);
+  }
+}
 // Tolerance for "verified == expected" comparisons. Meta sometimes stores
 // caps with small currency-conversion / rounding offsets (often ±1¢).
 // We accept anything within $1 OR any value >= expected as success.
