@@ -144,6 +144,46 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
     }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillMonths, setBackfillMonths] = useState(() => {
+    const now = new Date();
+    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevS = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+    return `${prevS},${cur}`;
+  });
+
+  const runBackfill = async () => {
+    if (!sellerId) return;
+    const months = backfillMonths
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^\d{4}-\d{2}$/.test(s));
+    if (months.length === 0) {
+      toast.error("Months format: YYYY-MM (comma separated). E.g. 2026-04,2026-05");
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
+        body: { backfill: true, seller_id: sellerId, months },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.ok) throw new Error(d?.error || "Backfill failed");
+      const tabSummary = (d.tabs || [])
+        .map((t: any) => `${t.tab}: +${t.rows_written}`)
+        .join(", ");
+      toast.success(
+        `Backfill done — total ${d.total_in_months}, already ${d.already_synced}, written ${d.processed}. ${tabSummary}`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message || "Backfill failed");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
