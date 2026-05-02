@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { computeDueAdvance, formatBdtIN } from "../_shared/seller-balance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -196,7 +197,13 @@ async function writeRowCells(
 // ---- core sync ----------------------------------------------------------------
 
 // Helper: build cells for a txn given the cfg mapping (extracted so single + batch share logic).
-function buildCellsForTxn(cfg: any, txn: any): { col: string; value: string | number }[] {
+// `runningBalance` is the seller's full Due/Advance balance INCLUDING this txn —
+// passed in so the same value lands in the sheet AND the Telegram caption.
+function buildCellsForTxn(
+  cfg: any,
+  txn: any,
+  runningBalance?: number,
+): { col: string; value: string | number }[] {
   const cells: { col: string; value: string | number }[] = [];
   const push = (col: string | null, val: any) => {
     if (col && val !== undefined && val !== null && val !== "") cells.push({ col, value: val });
@@ -219,6 +226,22 @@ function buildCellsForTxn(cfg: any, txn: any): { col: string; value: string | nu
   push(cfg.col_description, txn.description || "");
   push(cfg.col_proof_url, txn.proof_url || "");
   push(cfg.col_txn_id, txn.id);
+
+  // Running balance — same formula as Telegram caption (computeDueAdvance).
+  // col_total = signed numeric (positive = advance, negative = due)
+  // col_due_adv = formatted human-readable string
+  if (runningBalance !== undefined && runningBalance !== null) {
+    const signed = Number(runningBalance.toFixed(2));
+    push(cfg.col_total, signed);
+    if (cfg.col_due_adv) {
+      const label = signed > 0
+        ? `Advance ৳${formatBdtIN(signed)}`
+        : signed < 0
+          ? `Due ৳${formatBdtIN(signed)}`
+          : `৳0`;
+      push(cfg.col_due_adv, label);
+    }
+  }
   return cells;
 }
 
