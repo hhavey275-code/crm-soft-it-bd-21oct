@@ -383,6 +383,45 @@ serve(async (req) => {
       return { tab: tabName, created: createdNow, opening_balance: openingWritten };
     }
 
+    async function ensureConfigForSheetLink(sId: string, spreadsheetUrlOrId: string) {
+      const spreadsheetIdMatch = String(spreadsheetUrlOrId || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const spreadsheet_id = spreadsheetIdMatch ? spreadsheetIdMatch[1] : String(spreadsheetUrlOrId || "").trim();
+      if (!sId || !spreadsheet_id) return null;
+      const { data: existing } = await supabase
+        .from("seller_sheet_config")
+        .select("*")
+        .eq("seller_id", sId)
+        .maybeSingle();
+      if (existing) {
+        const patch: any = { spreadsheet_id, spreadsheet_url: spreadsheetUrlOrId, enabled: true };
+        if (!existing.tab_pattern) patch.tab_pattern = "{MMMM-YYYY}";
+        if (!existing.header_row) patch.header_row = 1;
+        if (!existing.data_start_row) patch.data_start_row = 7;
+        await supabase.from("seller_sheet_config").update(patch).eq("id", existing.id);
+        return { ...existing, ...patch };
+      }
+      const payload = {
+        seller_id: sId,
+        spreadsheet_id,
+        spreadsheet_url: spreadsheetUrlOrId,
+        tab_pattern: "{MMMM-YYYY}",
+        header_row: 1,
+        data_start_row: 7,
+        enabled: true,
+      };
+      const { data, error } = await supabase
+        .from("seller_sheet_config")
+        .insert(payload)
+        .select("*")
+        .single();
+      if (error) throw new Error(`config create failed: ${error.message}`);
+      return data;
+    }
+
+    if (seller_id && bodyJson.spreadsheet_url) {
+      await ensureConfigForSheetLink(seller_id, bodyJson.spreadsheet_url);
+    }
+
     // ---- ENSURE MONTH TAB (manual) ----
     if (ensure_month) {
       if (!seller_id) throw new Error("seller_id required");
