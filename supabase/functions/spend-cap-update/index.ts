@@ -286,6 +286,11 @@ Deno.serve(async (req)=>{
     // --- Determine wallet user ---
     const shouldDeductWallet = !!deduct_wallet;
     const walletUserId = target_user_id || userId;
+
+    // Stable idempotency key for any usage report this invocation may emit
+    // (success, POST-error recovery, network-error recovery). Same logical
+    // top-up = same key, so master never double-counts.
+    const usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 60000)}`;
     // ============================================
     // STEP 1: Deduct wallet FIRST (before Meta API)
     // ============================================
