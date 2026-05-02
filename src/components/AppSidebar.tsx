@@ -60,6 +60,7 @@ const adminNavItems = [
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
   { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
+  { title: "Old Seller", url: "/old-seller", icon: Archive, key: "old-seller" },
   { title: "Accounts Audit", url: "/audit", icon: Shield, key: "audit" },
   { title: "Agencies", url: "/agencies", icon: Building2, key: "agencies" },
   { title: "Spend Report", url: "/client-spend-report", icon: Receipt, key: "spend-report" },

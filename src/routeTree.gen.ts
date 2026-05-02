@@ -25,6 +25,7 @@ import { Route as SellersRouteImport } from './routes/sellers'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OldSellerRouteImport } from './routes/old-seller'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
 import { Route as FeedbackRouteImport } from './routes/feedback'
@@ -136,6 +137,11 @@ const RequestsRoute = RequestsRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OldSellerRoute = OldSellerRouteImport.update({
+  id: '/old-seller',
+  path: '/old-seller',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyUnusedRoute = MyUnusedRouteImport.update({
@@ -321,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
+  '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -371,6 +378,7 @@ export interface FileRoutesByTo {
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
+  '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -421,6 +429,7 @@ export interface FileRoutesById {
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
+  '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -473,6 +482,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/meta-oauth-callback'
     | '/my-unused'
+    | '/old-seller'
     | '/privacy'
     | '/requests'
     | '/reset-password'
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/meta-oauth-callback'
     | '/my-unused'
+    | '/old-seller'
     | '/privacy'
     | '/requests'
     | '/reset-password'
@@ -572,6 +583,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/meta-oauth-callback'
     | '/my-unused'
+    | '/old-seller'
     | '/privacy'
     | '/requests'
     | '/reset-password'
@@ -623,6 +635,7 @@ export interface RootRouteChildren {
   FeedbackRoute: typeof FeedbackRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
   MyUnusedRoute: typeof MyUnusedRoute
+  OldSellerRoute: typeof OldSellerRoute
   PrivacyRoute: typeof PrivacyRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -760,6 +773,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/old-seller': {
+      id: '/old-seller'
+      path: '/old-seller'
+      fullPath: '/old-seller'
+      preLoaderRoute: typeof OldSellerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-unused': {
@@ -1048,6 +1068,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeedbackRoute: FeedbackRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,
   MyUnusedRoute: MyUnusedRoute,
+  OldSellerRoute: OldSellerRoute,
   PrivacyRoute: PrivacyRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
