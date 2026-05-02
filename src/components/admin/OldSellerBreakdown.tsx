@@ -373,6 +373,7 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           <PaymentsTable
             rows={filterRows(buckets.notForwardedIn)}
             forwarded={false}
+            withdrawRows={filterRows(buckets.withdraws)}
             csvName={`${sellerName}-not-forwarded.csv`}
             duplicateIds={duplicateIds}
             onDelete={(r) => setPendingDelete(r)}

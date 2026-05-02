@@ -1,64 +1,93 @@
-## সমস্যা
+## Goal
 
-আগের fix এ আমি `telegram_forwarded = NULL` কে "forwarded" ধরেছিলাম, যার ফলে Forwarded sheet এ এমন সব পুরোনো top-ups চলে এসেছে যেগুলো actually Telegram এ forward হয়নি (12,700 / 14,000 / 30,000 ইত্যাদি — screenshot এ দেখা যাচ্ছে)। User এর rule:
+Not-Forwarded sheet e withdraw entries gula chronologically inject korbo (date order e), withdraw rows lal mark thakbe, ar running total prottek withdraw er por update hoye dekhabe — kothon koto Advance/Due chilo.
 
-- **Forwarded sheet** = শুধু সেগুলো যেগুলো actually forward হয়েছে
-- **jegula forword hoy ne segula not forworded e niye jao** 
-- **DCV6NSLQ6M (6,500 · 31 Mar)** ও **DD19P4W5U3 (6,500 · 1 Apr)** — Telegram এ forward হয়েছিল কিন্তু DB এর `telegram_forwarded` flag set হয়নি, তাই এদের manually forwarded ধরতে হবে
+Seller sheet e kichu kora hobe na (user explicitly bolechen).
 
-## পরিবর্তন
+---
 
-### 1. `src/lib/oldSellerData.ts`
+## Changes — `src/components/admin/OldSellerBreakdown.tsx` only
 
-**(a)** ফাইলের উপরে একটা override set যোগ করা:
+### 1. `PaymentsTable` component — withdraw rows accept korar capability
 
-```ts
-// Top-up requests that were actually forwarded to Telegram but whose
-// `telegram_forwarded` flag was never persisted (legacy rows). Treat these
-// as forwarded for the archive audit view.
-const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
-  "a8788536-839d-4d10-be20-d5f5f76fa2cc", // DCV6NSLQ6M · Rasel · 31 Mar 2026
-  "35777582-cd93-4324-8ad0-ee1d2e1dbe9d", // DD19P4W5U3 · Rasel · 1 Apr 2026
-]);
-```
+**(a)** Notun optional prop add: `withdrawRows?: ArchiveTxn[]`. Forwarded sheet er jonno ei prop pass korbo na (unchanged thakbe). Not-Forwarded sheet er jonno `buckets.withdraws` pass korbo.
 
-**(b)** `topup_forwarded` mapping এ কঠোর rule:
+**(b)** Sort/running-total logic update — withdraws merge:
 
 ```ts
-topup_forwarded: tu
-  ? (tu.telegram_forwarded === true || FORCE_FORWARDED_TOPUP_IDS.has(tu.id))
-  : null,
+const merged = [
+  ...rows.map((r) => ({ row: r, kind: "in" as const })),
+  ...(withdrawRows || []).map((r) => ({ row: r, kind: "withdraw" as const })),
+].sort(
+  (a, b) => new Date(a.row.created_at).getTime() - new Date(b.row.created_at).getTime(),
+);
+
+let running = 0;
+const withRunning = merged.map(({ row: r, kind }) => {
+  const delta = kind === "in" ? r.bdt_amount : -r.bdt_amount;
+  const prev = running;
+  running += delta;
+  return { row: r, kind, prev, after: running, delta };
+});
 ```
 
-NULL বা false → আর forwarded ধরা হবে না।
+**(c)** Render-time changes per row:
+- `kind === "withdraw"` hole row class: `bg-rose-500/10 hover:bg-rose-500/15` (lal background, jemon duplicate row).
+- Type column e ekta lal "WITHDRAW −" badge.
+- "BDT in" column e withdraw er jonno `—` show korbo (in column, withdraw na).
+- Notun column ba existing "Change" column: withdraw hole `−৳X,XXX` (lal text), top-up/manual hole `+৳X,XXX` (sobuj — already ase).
+- "Running total" column e `formatDueAdvance(after)` style use kore Advance (sobuj) / Due (lal) dekhabo: positive = `+৳X (Adv)` sobuj, negative = `−৳X (Due)` lal, zero = `Settled`.
+- Existing `prev`/`after` semantics stable thakbe (carry forward porer rate amount er bhitor).
 
-**(c)** `splitBuckets` এ rule আপডেট — non-forwarded top-up কোথাও যাবে না:
+**(d)** Footer total line update — net total (in − withdraw) dekhabe with Advance/Due label.
 
-```ts
-if (t.type === "client_topup") {
-  // Only forwarded top-ups appear (in Forwarded sheet).
-  // Non-forwarded top-ups are intentionally hidden from BOTH sheets.
-  if (t.topup_forwarded === true) forwardedIn.push(t);
-} else if (MANUAL_TYPES.has(t.type)) {
-  // Manual entries continue to mirror in both sheets.
-  forwardedIn.push(t);
-  notForwardedIn.push(t);
-}
+**(e)** CSV export e withdraw rows include korbo with sign (negative for withdraw) ar ekta `Kind` column ("payment" / "withdraw").
+
+### 2. Caller site — `<TabsContent value="notForwarded">`
+
+```tsx
+<PaymentsTable
+  rows={filterRows(buckets.notForwardedIn)}
+  forwarded={false}
+  withdrawRows={filterRows(buckets.withdraws)}   // NEW
+  csvName={`${sellerName}-not-forwarded.csv`}
+  duplicateIds={duplicateIds}
+  onDelete={(r) => setPendingDelete(r)}
+/>
 ```
 
-### 2. `src/components/admin/OldSellerBreakdown.tsx`
+Forwarded tab er PaymentsTable e `withdrawRows` pass korbo na — oitar behavior unchanged (only positive in's, jemon ase).
 
-Reconciliation card এ যেহেতু এখন non-forwarded top-ups কোথাও দেখানো হচ্ছে না, একটা info note যোগ করা যে কতগুলো top-up hidden আছে (আগের orphan top-up panel এর মতো — ইতিমধ্যে আছে কিনা চেক করে আপডেট করা)।
+Withdraws tab (existing standalone `WithdrawTable`) — unchanged, intact thakbe extra reference er jonno.
 
-## ফলাফল (Rasel এর জন্য)
+---
 
-Forwarded sheet এ থাকবে শুধু:
+## Result — Rasel er Not-Forwarded sheet (preview)
 
-- **DCV6NSLQ6M** — 6,500 BDT (31 Mar)
-- **DD19P4W5U3** — 6,500 BDT (1 Apr)
-- 82,400 manual entry
-- বাকি সব manual entries
+Existing carry: forwarded chara shudhu manual + non-forwarded top-ups. Manual entries forwarded sheet theke mirrored. So ekhane ja running total dekhabe oitai `due.all` er chronological breakdown with withdraws.
 
-Forwarded sheet থেকে সরে যাবে: 12,700 / 6,500 (23 Mar) / 14,000 / 30,000 / 6,500 (27 Mar) / 4,900 / 6,500 (28 Mar) / 6,500 (29 Mar) / 14,000 (31 Mar) — এগুলো কোনো sheet এ থাকবে না।
+Approximate timeline jeta dekhabe (chronological, withdraw sorgula lal):
 
-ভবিষ্যতে যদি আরও legacy top-up পাওয়া যায় যেগুলো actually forward হয়েছিল কিন্তু flag missing, শুধু `FORCE_FORWARDED_TOPUP_IDS` set এ ID যোগ করতে হবে।
+| Date | Type | In | Out | Running |
+|---|---|---:|---:|---:|
+| ... March manual + topups | various | +X | — | builds up |
+| Apr 9 | **WITHDRAW** | — | **−34,021** | (drops) |
+| Apr 12 | **WITHDRAW** | — | **−3,00,000** | (drops more) |
+| Apr 18 | **WITHDRAW** | — | **−2,50,000** | |
+| Apr 30 | **WITHDRAW** | — | **−2,00,000** | |
+| ... May entries | | | | final = +1,22,167.25 Adv |
+
+Final running total existing "All combined Due/Advance" card er sathe match korbe (verification check).
+
+---
+
+## Non-goals
+
+- Seller sheet (production ledger) untouched.
+- Forwarded sheet untouched.
+- USDT tab, All tab, Top-ups tab — untouched.
+- Database e kono change nai — purely UI merge of existing rows.
+
+## Files touched
+
+- `src/components/admin/OldSellerBreakdown.tsx` (only)
