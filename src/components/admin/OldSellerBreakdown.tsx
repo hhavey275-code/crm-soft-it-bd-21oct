@@ -259,6 +259,12 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           <CardTitle className="text-base">Reconciliation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
+          <MigrateForwardedButton
+            sellerId={sellerId}
+            sellerName={sellerName}
+            forwardedRows={buckets.forwardedIn}
+            withdrawRows={buckets.withdraws}
+          />
           <div>
             Difference between <b>All</b> and <b>Forwarded-only</b> Due/Advance: <b>{formatBdt(drift)}</b>
           </div>
@@ -338,14 +344,6 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
           )}
         </CardContent>
       </Card>
-
-      {/* Forwarded → Live Ledger migration */}
-      <MigrateForwardedButton
-        sellerId={sellerId}
-        sellerName={sellerName}
-        forwardedRows={buckets.forwardedIn}
-        withdrawRows={buckets.withdraws}
-      />
 
       {/* Search */}
       <div className="flex items-center gap-2">
