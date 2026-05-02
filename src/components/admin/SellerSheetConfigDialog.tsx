@@ -350,8 +350,26 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
                     />
                   </div>
                 ))}
+                <div className="flex items-center gap-2 md:col-span-2 bg-muted/40 p-2 rounded">
+                  <Label className="flex-1 text-sm font-medium">
+                    Opening balance cell
+                    <span className="block text-[10px] text-muted-foreground font-normal">
+                      Cell ref (e.g. I6) — month er shurute opening balance ekhane boshbe
+                    </span>
+                  </Label>
+                  <Input
+                    className="w-28 uppercase"
+                    value={form.opening_balance_cell || ""}
+                    onChange={(e) =>
+                      setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })
+                    }
+                    placeholder="I6"
+                    maxLength={6}
+                  />
+                </div>
               </div>
             </div>
+
 
             {cfg?.last_synced_at && (
               <div className="text-xs text-muted-foreground border-t pt-2">
