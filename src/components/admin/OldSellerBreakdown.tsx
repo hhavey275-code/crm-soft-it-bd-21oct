@@ -469,7 +469,24 @@ function typeBadge(type: string) {
   return <Badge variant="outline" className="text-[10px]">{map[type] || type}</Badge>;
 }
 
-function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string }) {
+type DupProps = { duplicateIds?: Set<string>; onDelete?: (r: ArchiveTxn) => void };
+
+function DeleteBtn({ row, onDelete }: { row: ArchiveTxn; onDelete?: (r: ArchiveTxn) => void }) {
+  if (!onDelete) return <span className="text-muted-foreground text-xs">—</span>;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+      onClick={() => onDelete(row)}
+      title="Delete this entry"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </Button>
+  );
+}
+
+function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string } & DupProps) {
   // Sort chronologically and compute running total (seller-sheet style).
   const sorted = useMemo(
     () => [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
