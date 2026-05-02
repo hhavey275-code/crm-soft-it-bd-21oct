@@ -157,9 +157,12 @@ export async function fetchSellerArchiveBundle(sellerId: string): Promise<{
       reviewed_at: t.reviewed_at,
       bank_name: bank?.bank_name || null,
       account_number: bank?.account_number || null,
-      // Preserve NULL (legacy / unknown) so splitBuckets treats it as forwarded.
-      // Only an explicit `false` means the operator marked it as NOT forwarded.
-      topup_forwarded: tu ? (tu.telegram_forwarded === null || tu.telegram_forwarded === undefined ? null : Boolean(tu.telegram_forwarded)) : null,
+      // Forwarded only when explicitly true. NULL or false → not forwarded.
+      // Exception: hard-coded override list for legacy top-ups whose flag was
+      // never persisted (see FORCE_FORWARDED_TOPUP_IDS above).
+      topup_forwarded: tu
+        ? (tu.telegram_forwarded === true || FORCE_FORWARDED_TOPUP_IDS.has(tu.id))
+        : null,
       topup_amount_usd: tu ? Number(tu.amount || 0) : null,
       topup_telegram_message_id: null,
     };
