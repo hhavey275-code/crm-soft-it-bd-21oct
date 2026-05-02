@@ -130,6 +130,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Resolve seller name from profiles when not supplied (e.g., DB trigger path)
+    if (!resolvedSellerName && resolvedSellerId) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('user_id', resolvedSellerId)
+        .maybeSingle();
+      resolvedSellerName = prof?.full_name || prof?.email || null;
+    }
+
     // Build Due/Advance running total from live seller_transactions only — this
     // is the same source the dashboard uses, so Telegram Total cannot drift.
     let runningTotalLine = '';
