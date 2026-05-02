@@ -358,10 +358,10 @@ serve(async (req) => {
       const exists = sheets.find((s: any) => s.properties.title === tabName);
       let createdNow = false;
       if (!exists) {
-        const tmpl = cfg.template_tab
-          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
+        const tmpl = resolveTemplateSheet(sheets, cfg, tabName);
         // If template missing or not found, fall back to a blank tab (no crash).
-        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null);
+        if (tmpl) await clearInputColumns(cfg.spreadsheet_id, tabName, cfg);
         createdNow = true;
       }
 
