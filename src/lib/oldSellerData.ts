@@ -179,13 +179,14 @@ export function splitBuckets(txns: ArchiveTxn[]): Buckets {
     } else if (t.type === "usdt_received") {
       usdtGiven.push(t);
     } else if (IN_TYPES.has(t.type)) {
-      // For client_topup we trust the linked top_up_request's flag.
-      // For bdt_payment / tenant_payment we cannot retroactively tell —
-      // bucket them as "not forwarded / manual" so the operator can audit.
-      if (t.type === "client_topup" && t.topup_forwarded === true) {
-        forwardedIn.push(t);
-      } else {
+      // Per operator rule: all top-ups AND all manual entries (bdt_payment /
+      // tenant_payment) were OCR-forwarded, so treat every approved IN row as
+      // "forwarded". The notForwardedIn bucket is kept only for client_topup
+      // rows whose linked top_up_request explicitly says forwarded=false.
+      if (t.type === "client_topup" && t.topup_forwarded === false) {
         notForwardedIn.push(t);
+      } else {
+        forwardedIn.push(t);
       }
     }
   }
