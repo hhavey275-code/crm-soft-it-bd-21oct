@@ -1,93 +1,43 @@
-## Goal
+## Implementation Plan
 
-Not-Forwarded sheet e withdraw entries gula chronologically inject korbo (date order e), withdraw rows lal mark thakbe, ar running total prottek withdraw er por update hoye dekhabe — kothon koto Advance/Due chilo.
+User approved. Final numbers confirmed: **+৳1,46,117.25 Adv** after migration (154 archive + 3 existing live rows).
 
-Seller sheet e kichu kora hobe na (user explicitly bolechen).
+### Step 1 — Migration via admin button (no schema change)
 
----
+`code--exec` e psql nei, schema migration tool nei. Tai ami `OldSellerBreakdown` e ekta **"Migrate Forwarded → Live Ledger"** button add korbo (admin-only, RLS satisfied — admin er sob seller_transactions e access ase). Button click korle:
 
-## Changes — `src/components/admin/OldSellerBreakdown.tsx` only
+- Archive er Forwarded sheet er 154 rows fetch
+- `bdt_payment` / `tenant_payment` → type rewritten to `client_topup` (manual badge dekhabe na)
+- `withdraw` as-is
+- Original `id` retain — re-clicking idempotent (PK conflict skip)
+- `telegram_forwarded = true` for all client_topup rows
+- Confirmation dialog before insert
+- Toast result after
 
-### 1. `PaymentsTable` component — withdraw rows accept korar capability
+Duplicate insert protection: 409/duplicate errors per row caught and counted as "already migrated".
 
-**(a)** Notun optional prop add: `withdrawRows?: ArchiveTxn[]`. Forwarded sheet er jonno ei prop pass korbo na (unchanged thakbe). Not-Forwarded sheet er jonno `buckets.withdraws` pass korbo.
+### Step 2 — Monthly Summary card in `SellerDashboard`
 
-**(b)** Sort/running-total logic update — withdraws merge:
+Notun file: `src/components/seller/MonthlyDueAdvanceCard.tsx` — month-by-month aggregation:
+- Group transactions by `YYYY-MM` (UTC)
+- Per month: Payments IN, Withdraw, USDT cost, Net Δ, Running cumsum
+- Existing `formatDueAdvance()` helper for Adv/Due colors
+- Table on `md+`, stacked cards on mobile
 
-```ts
-const merged = [
-  ...rows.map((r) => ({ row: r, kind: "in" as const })),
-  ...(withdrawRows || []).map((r) => ({ row: r, kind: "withdraw" as const })),
-].sort(
-  (a, b) => new Date(a.row.created_at).getTime() - new Date(b.row.created_at).getTime(),
-);
+Mount in `SellerDashboard.tsx` between summary cards and the bank chips.
 
-let running = 0;
-const withRunning = merged.map(({ row: r, kind }) => {
-  const delta = kind === "in" ? r.bdt_amount : -r.bdt_amount;
-  const prev = running;
-  running += delta;
-  return { row: r, kind, prev, after: running, delta };
-});
-```
+### Step 3 — Banner in `OldSellerBreakdown`
 
-**(c)** Render-time changes per row:
-- `kind === "withdraw"` hole row class: `bg-rose-500/10 hover:bg-rose-500/15` (lal background, jemon duplicate row).
-- Type column e ekta lal "WITHDRAW −" badge.
-- "BDT in" column e withdraw er jonno `—` show korbo (in column, withdraw na).
-- Notun column ba existing "Change" column: withdraw hole `−৳X,XXX` (lal text), top-up/manual hole `+৳X,XXX` (sobuj — already ase).
-- "Running total" column e `formatDueAdvance(after)` style use kore Advance (sobuj) / Due (lal) dekhabo: positive = `+৳X (Adv)` sobuj, negative = `−৳X (Due)` lal, zero = `Settled`.
-- Existing `prev`/`after` semantics stable thakbe (carry forward porer rate amount er bhitor).
+Migration sefe-i hoyese kina detect kore (live ledger query) ar banner show kore: "✅ Forwarded sheet er XXX entry live ledger e migrate hoyese."
 
-**(d)** Footer total line update — net total (in − withdraw) dekhabe with Advance/Due label.
+### Files Touched
 
-**(e)** CSV export e withdraw rows include korbo with sign (negative for withdraw) ar ekta `Kind` column ("payment" / "withdraw").
+- New: `src/components/seller/MonthlyDueAdvanceCard.tsx`
+- Edit: `src/components/seller/SellerDashboard.tsx` (mount card)
+- Edit: `src/components/admin/OldSellerBreakdown.tsx` (migrate button + status banner)
 
-### 2. Caller site — `<TabsContent value="notForwarded">`
+### Non-goals
 
-```tsx
-<PaymentsTable
-  rows={filterRows(buckets.notForwardedIn)}
-  forwarded={false}
-  withdrawRows={filterRows(buckets.withdraws)}   // NEW
-  csvName={`${sellerName}-not-forwarded.csv`}
-  duplicateIds={duplicateIds}
-  onDelete={(r) => setPendingDelete(r)}
-/>
-```
-
-Forwarded tab er PaymentsTable e `withdrawRows` pass korbo na — oitar behavior unchanged (only positive in's, jemon ase).
-
-Withdraws tab (existing standalone `WithdrawTable`) — unchanged, intact thakbe extra reference er jonno.
-
----
-
-## Result — Rasel er Not-Forwarded sheet (preview)
-
-Existing carry: forwarded chara shudhu manual + non-forwarded top-ups. Manual entries forwarded sheet theke mirrored. So ekhane ja running total dekhabe oitai `due.all` er chronological breakdown with withdraws.
-
-Approximate timeline jeta dekhabe (chronological, withdraw sorgula lal):
-
-| Date | Type | In | Out | Running |
-|---|---|---:|---:|---:|
-| ... March manual + topups | various | +X | — | builds up |
-| Apr 9 | **WITHDRAW** | — | **−34,021** | (drops) |
-| Apr 12 | **WITHDRAW** | — | **−3,00,000** | (drops more) |
-| Apr 18 | **WITHDRAW** | — | **−2,50,000** | |
-| Apr 30 | **WITHDRAW** | — | **−2,00,000** | |
-| ... May entries | | | | final = +1,22,167.25 Adv |
-
-Final running total existing "All combined Due/Advance" card er sathe match korbe (verification check).
-
----
-
-## Non-goals
-
-- Seller sheet (production ledger) untouched.
-- Forwarded sheet untouched.
-- USDT tab, All tab, Top-ups tab — untouched.
-- Database e kono change nai — purely UI merge of existing rows.
-
-## Files touched
-
-- `src/components/admin/OldSellerBreakdown.tsx` (only)
+- Not-Forwarded data NOT migrated.
+- Other sellers untouched (button hard-checks Rasel's seller_id only as a safety guard, with override toggle for future use).
+- No DB schema changes.
