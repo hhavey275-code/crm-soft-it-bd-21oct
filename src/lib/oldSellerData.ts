@@ -13,6 +13,14 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Top-up requests that were actually forwarded to Telegram but whose
+// `telegram_forwarded` flag was never persisted (legacy rows). Treat these
+// as forwarded for the archive audit view.
+const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
+  "a8788536-839d-4d10-be20-d5f5f76fa2cc", // DCV6NSLQ6M · Rasel · 31 Mar 2026
+  "35777582-cd93-4324-8ad0-ee1d2e1dbe9d", // DD19P4W5U3 · Rasel · 1 Apr 2026
+]);
+
 export type ArchiveTxn = {
   id: string;
   seller_id: string;
@@ -149,9 +157,12 @@ export async function fetchSellerArchiveBundle(sellerId: string): Promise<{
       reviewed_at: t.reviewed_at,
       bank_name: bank?.bank_name || null,
       account_number: bank?.account_number || null,
-      // Preserve NULL (legacy / unknown) so splitBuckets treats it as forwarded.
-      // Only an explicit `false` means the operator marked it as NOT forwarded.
-      topup_forwarded: tu ? (tu.telegram_forwarded === null || tu.telegram_forwarded === undefined ? null : Boolean(tu.telegram_forwarded)) : null,
+      // Forwarded only when explicitly true. NULL or false → not forwarded.
+      // Exception: hard-coded override list for legacy top-ups whose flag was
+      // never persisted (see FORCE_FORWARDED_TOPUP_IDS above).
+      topup_forwarded: tu
+        ? (tu.telegram_forwarded === true || FORCE_FORWARDED_TOPUP_IDS.has(tu.id))
+        : null,
       topup_amount_usd: tu ? Number(tu.amount || 0) : null,
       topup_telegram_message_id: null,
     };
@@ -183,12 +194,13 @@ export function splitBuckets(txns: ArchiveTxn[]): Buckets {
       usdtGiven.push(t);
     } else if (IN_TYPES.has(t.type)) {
       // Operator rule:
-      //  • Forwarded sheet = all top-ups + all manual entries (OCR-forwarded by default)
-      //  • Not-Forwarded sheet = top-ups explicitly marked forwarded=false
-      //    PLUS all manual entries (so manual entries appear in BOTH sheets)
+      //  • Forwarded sheet = top-ups with telegram_forwarded === true
+      //    (or in the FORCE_FORWARDED override list) + all manual entries.
+      //  • Not-Forwarded sheet = every top-up that did NOT get forwarded
+      //    (NULL or false) + all manual entries (mirrored in both sheets).
       if (t.type === "client_topup") {
-        if (t.topup_forwarded === false) notForwardedIn.push(t);
-        else forwardedIn.push(t);
+        if (t.topup_forwarded === true) forwardedIn.push(t);
+        else notForwardedIn.push(t);
       } else if (MANUAL_TYPES.has(t.type)) {
         forwardedIn.push(t);
         notForwardedIn.push(t);

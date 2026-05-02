@@ -1,82 +1,64 @@
-## লক্ষ্য
-"Old Seller" নামে একটা read-only admin menu, যেখানে প্রতিটা seller এর archive ডাটা (`seller_transactions_archive_2026_05`) detailed breakdown সহ দেখা যাবে — forwarded vs not-forwarded আলাদা, USDT/withdraw আলাদা, এবং দুই রকম Due/Advance total (forwarded-only এবং সব মিলিয়ে)।
+## সমস্যা
 
-## নতুন Menu
-- Sidebar এ admin section এ "Old Seller" (Archive icon), শুধু admin/superadmin
-- Route: `/old-seller` → `src/routes/old-seller.tsx` → `OldSellerPage`
+আগের fix এ আমি `telegram_forwarded = NULL` কে "forwarded" ধরেছিলাম, যার ফলে Forwarded sheet এ এমন সব পুরোনো top-ups চলে এসেছে যেগুলো actually Telegram এ forward হয়নি (12,700 / 14,000 / 30,000 ইত্যাদি — screenshot এ দেখা যাচ্ছে)। User এর rule:
 
-## Page Structure
+- **Forwarded sheet** = শুধু সেগুলো যেগুলো actually forward হয়েছে
+- **jegula forword hoy ne segula not forworded e niye jao** 
+- **DCV6NSLQ6M (6,500 · 31 Mar)** ও **DD19P4W5U3 (6,500 · 1 Apr)** — Telegram এ forward হয়েছিল কিন্তু DB এর `telegram_forwarded` flag set হয়নি, তাই এদের manually forwarded ধরতে হবে
 
-### 1. Seller Selector (top)
-Dropdown: archive এ ডাটা আছে এমন seller list (name + email)। Default — প্রথম জন।
+## পরিবর্তন
 
-### 2. Summary Cards (selected seller এর জন্য — ৬টা card grid)
+### 1. `src/lib/oldSellerData.ts`
 
-প্রতিটা card এ count + BDT (এবং relevant হলে USD/USDT):
+**(a)** ফাইলের উপরে একটা override set যোগ করা:
 
-| Card | কী count হবে |
-|---|---|
-| 🟢 Forwarded payments IN | `client_topup` যেখানে linked top-up এর `telegram_forwarded=true` + `bdt_payment` যেখানে live table এর forwarded flag true ছিল* |
-| 🔴 Not-forwarded payments IN | বাকি approved client_topup + bdt_payment + tenant_payment |
-| 💵 USDT Given | `type=usdt_received` — count, total USDT, avg rate, total BDT cost (=Σ usdt×rate) |
-| 💸 Withdraw | `type=withdraw` — count, total BDT |
-| ⚖️ Due/Advance (Forwarded only) | (Forwarded payments IN) − USDT cost − Withdraw |
-| ⚖️ Due/Advance (All) | (All payments IN) − USDT cost − Withdraw |
+```ts
+// Top-up requests that were actually forwarded to Telegram but whose
+// `telegram_forwarded` flag was never persisted (legacy rows). Treat these
+// as forwarded for the archive audit view.
+const FORCE_FORWARDED_TOPUP_IDS = new Set<string>([
+  "a8788536-839d-4d10-be20-d5f5f76fa2cc", // DCV6NSLQ6M · Rasel · 31 Mar 2026
+  "35777582-cd93-4324-8ad0-ee1d2e1dbe9d", // DD19P4W5U3 · Rasel · 1 Apr 2026
+]);
+```
 
-*Note: archive table এ `telegram_forwarded` column নাই। তাই detection rule:
-- `client_topup` → `top_up_requests.telegram_forwarded` join করে দেখব
-- `bdt_payment / tenant_payment / withdraw / usdt_received` → archive এ flag নাই, তাই এদের সবাইকে "not forwarded বা unknown" হিসাবে dashboard এ ২টা bucket এ দেখাব এবং note দিব। But USDT/Withdraw সবসময় উভয় total এ count হবে (যেমন তুমি বললে)।
+**(b)** `topup_forwarded` mapping এ কঠোর rule:
 
-### 3. Reconciliation Note (small panel)
-Forwarded-only Due/Advance ↔ All Due/Advance এর difference exact কত, এবং সেটাই "not forwarded payment IN" এর সমান হওয়ার কথা — যদি না হয় lal warning।
+```ts
+topup_forwarded: tu
+  ? (tu.telegram_forwarded === true || FORCE_FORWARDED_TOPUP_IDS.has(tu.id))
+  : null,
+```
 
-### 4. Detailed Breakdown (Tabs)
+NULL বা false → আর forwarded ধরা হবে না।
 
-৫টা tab, প্রতিটায় full table + CSV export + search box:
+**(c)** `splitBuckets` এ rule আপডেট — non-forwarded top-up কোথাও যাবে না:
 
-**A. Forwarded Payments (IN)**
-| Date/Time | TrxID / Ref | Type | BDT | USD (top-up হলে) | Bank | Entry by | Telegram msg id |
+```ts
+if (t.type === "client_topup") {
+  // Only forwarded top-ups appear (in Forwarded sheet).
+  // Non-forwarded top-ups are intentionally hidden from BOTH sheets.
+  if (t.topup_forwarded === true) forwardedIn.push(t);
+} else if (MANUAL_TYPES.has(t.type)) {
+  // Manual entries continue to mirror in both sheets.
+  forwardedIn.push(t);
+  notForwardedIn.push(t);
+}
+```
 
-**B. Not-forwarded Payments (IN)**
-একই columns, কিন্তু "Forwarded?" column এ ❌ badge
+### 2. `src/components/admin/OldSellerBreakdown.tsx`
 
-**C. USDT Given**
-| Date/Time | USDT | Rate | BDT cost | Bank | Description | Entry by |
+Reconciliation card এ যেহেতু এখন non-forwarded top-ups কোথাও দেখানো হচ্ছে না, একটা info note যোগ করা যে কতগুলো top-up hidden আছে (আগের orphan top-up panel এর মতো — ইতিমধ্যে আছে কিনা চেক করে আপডেট করা)।
 
-**D. Withdraw**
-| Date/Time | BDT | Description (Rifat / Whatsapp group ইত্যাদি) | Entry by | Reviewed by |
+## ফলাফল (Rasel এর জন্য)
 
-**E. All Transactions (raw)**
-সব archive rows একসাথে, sortable, type badge সহ — manual deep-check এর জন্য।
+Forwarded sheet এ থাকবে শুধু:
 
-প্রতিটা table এর footer এ subtotal।
+- **DCV6NSLQ6M** — 6,500 BDT (31 Mar)
+- **DD19P4W5U3** — 6,500 BDT (1 Apr)
+- 82,400 manual entry
+- বাকি সব manual entries
 
-### 5. Top-up Requests panel (collapsible)
-আলাদা একটা section এ archive period এর সব `top_up_requests` (status=approved, এই seller এর bank দিয়ে) — যাতে তুমি দেখতে পারো কোন top-up গুলো archive-ledger এ ঢুকেছে আর কোনগুলো ঢুকে নাই (orphan)। Columns: time, USD, rate, BDT, bank, telegram_forwarded badge, "ledger entry আছে?" tick/cross।
+Forwarded sheet থেকে সরে যাবে: 12,700 / 6,500 (23 Mar) / 14,000 / 30,000 / 6,500 (27 Mar) / 4,900 / 6,500 (28 Mar) / 6,500 (29 Mar) / 14,000 (31 Mar) — এগুলো কোনো sheet এ থাকবে না।
 
-## Technical Details
-
-**Files create:**
-- `src/routes/old-seller.tsx` — TanStack route, admin guard
-- `src/components/pages/OldSellerPage.tsx` — selector + layout
-- `src/components/admin/OldSellerBreakdown.tsx` — summary cards + tabs
-- `src/lib/oldSellerData.ts` — data fetching:
-  - `fetchArchivedSellers()` → distinct seller_id from archive + profile names
-  - `fetchSellerArchiveBundle(sellerId)` → all archive txns + linked top_up_requests in one go
-  - `splitForwardedBuckets(rows, topupMap)` → returns `{forwardedIn, notForwardedIn, usdtGiven, withdraws}`
-  - `computeDueAdvancePair(...)` → returns `{forwardedOnly, all}` using existing logic from `sellerRunningTotal.ts`
-
-**Edit:**
-- `src/components/AppSidebar.tsx` — add "Old Seller" menu item under admin section
-- `src/routeTree.gen.ts` — auto-regen by Vite plugin
-
-**Data source:** `seller_transactions_archive_2026_05` + `top_up_requests` (live, joined by `top_up_request_id`) + `bank_accounts` (for bank name) + `profiles` (seller name)
-
-**RLS:** Archive table inherits from migration; verify admin/superadmin SELECT works. Add policy if missing।
-
-**No mutations** — pure read-only audit UI। কিছু ঠিক করতে হলে আলাদা request দিবে।
-
-## Out of scope
-- Archive ডাটা edit/delete
-- Live `seller_transactions` কোনো change
-- নতুন archive তৈরি (monthly close flow এ আগে থেকেই আছে)
+ভবিষ্যতে যদি আরও legacy top-up পাওয়া যায় যেগুলো actually forward হয়েছিল কিন্তু flag missing, শুধু `FORCE_FORWARDED_TOPUP_IDS` set এ ID যোগ করতে হবে।
