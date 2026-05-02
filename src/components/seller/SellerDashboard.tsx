@@ -528,8 +528,9 @@ export function SellerDashboard() {
                       </span>
                       <div className="flex items-center gap-1.5">
                         <StatusBadge status={t.status} />
-                        <span className="text-[10px] text-muted-foreground font-medium">
+                        <span className="text-[10px] text-muted-foreground font-medium leading-tight text-right">
                           {format(new Date(t.created_at), "MMM d, yyyy")}
+                          <span className="block text-[9px] opacity-75">{format(new Date(t.created_at), "h:mm a")}</span>
                         </span>
                       </div>
                     </div>
@@ -684,8 +685,9 @@ export function SellerDashboard() {
                     const colorClass = typeColors[t.type] || "text-muted-foreground bg-muted";
                     return (
                       <tr key={t.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-1.5 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                        <td className="px-1.5 py-2 text-xs text-muted-foreground whitespace-nowrap leading-tight">
                           {format(new Date(t.created_at), "MMM d, yyyy")}
+                          <span className="block text-[10px] opacity-75">{format(new Date(t.created_at), "h:mm a")}</span>
                         </td>
                         <td className="px-1.5 py-2">
                           <div className="flex items-center gap-1.5">
