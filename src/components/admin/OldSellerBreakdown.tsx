@@ -307,23 +307,42 @@ function typeBadge(type: string) {
 }
 
 function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwarded: boolean; csvName: string }) {
-  const total = rows.reduce((s, r) => s + r.bdt_amount, 0);
+  // Sort chronologically and compute running total (seller-sheet style).
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [rows],
+  );
+  let running = 0;
+  const withRunning = sorted.map((r) => {
+    const prev = running;
+    running += r.bdt_amount;
+    const delta = r.bdt_amount;
+    return { row: r, prev, after: running, delta };
+  });
+  const total = running;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">{forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}</CardTitle>
+        <CardTitle className="text-base">
+          {forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            (Manual entries shown in both sheets · running total updates per row)
+          </span>
+        </CardTitle>
         <Button
           variant="outline"
           size="sm"
           onClick={() =>
             downloadCsv(
               csvName,
-              ["Date", "Type", "BDT", "USD (top-up)", "Description / TrxID", "Bank", "Account #", "Entry by"],
-              rows.map((r) => [
+              ["Date", "Type", "BDT in", "Change", "Running total", "Description / TrxID", "Bank", "Account #", "Entry by"],
+              withRunning.map(({ row: r, delta, after }) => [
                 fmtDate(r.created_at),
                 r.type,
                 r.bdt_amount,
-                r.topup_amount_usd ?? "",
+                delta,
+                after,
                 r.description,
                 r.bank_name,
                 r.account_number,
@@ -336,45 +355,57 @@ function PaymentsTable({ rows, forwarded, csvName }: { rows: ArchiveTxn[]; forwa
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="rounded border">
+        <div className="rounded border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Date / Time</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">BDT</TableHead>
-                <TableHead className="text-right">USD</TableHead>
+                <TableHead className="text-right">BDT in</TableHead>
+                <TableHead className="text-right">Change</TableHead>
+                <TableHead className="text-right">Running total</TableHead>
                 <TableHead>Description / TrxID</TableHead>
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.length === 0 ? (
+              {withRunning.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">No entries</TableCell>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">No entries</TableCell>
                 </TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
-                    <TableCell>{typeBadge(r.type)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground">{fmtUsd(r.topup_amount_usd)}</TableCell>
-                    <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
-                    <TableCell className="text-xs">
-                      {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
-                  </TableRow>
-                ))
+                withRunning.map(({ row: r, delta, after }) => {
+                  const isManual = r.type === "bdt_payment" || r.type === "tenant_payment";
+                  return (
+                    <TableRow key={r.id} className={isManual ? "bg-amber-500/5" : undefined}>
+                      <TableCell className="whitespace-nowrap text-xs">{fmtDate(r.created_at)}</TableCell>
+                      <TableCell>
+                        {typeBadge(r.type)}
+                        {isManual && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">manual</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBdt(r.bdt_amount)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                        +{formatBdt(delta)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold">{formatBdt(after)}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.entry_by_name || "—"}</TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={2}>Total ({rows.length})</TableCell>
+                <TableCell colSpan={2}>Total ({withRunning.length})</TableCell>
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={4} />
+                <TableCell />
+                <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
+                <TableCell colSpan={3} />
               </TableRow>
             </TableFooter>
           </Table>
