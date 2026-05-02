@@ -194,8 +194,55 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             </div>
           )}
           {orphans.length > 0 && (
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-4 w-4" /> {orphans.length} approved top-up request(s) during archive period have no matching ledger entry.
+            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-medium">
+                <AlertTriangle className="h-4 w-4" /> {orphans.length} approved top-up request(s) missing from ledger
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                These top-ups were approved during the archive period but never produced a seller_transactions row.
+                Their BDT is NOT counted in any total above. Review and decide if they need manual entry.
+              </p>
+              <div className="mt-2 overflow-x-auto rounded border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">USD</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">BDT</TableHead>
+                      <TableHead>Forwarded</TableHead>
+                      <TableHead className="text-xs">Top-up ID</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orphans.map((o: any) => (
+                      <TableRow key={o.id}>
+                        <TableCell className="whitespace-nowrap text-xs">{fmtDate(o.created_at)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">${Number(o.amount).toFixed(2)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">৳{o.usd_rate}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBdt(Number(o.bdt_amount || 0))}</TableCell>
+                        <TableCell>
+                          {o.telegram_forwarded ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-rose-500" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-[10px] text-muted-foreground">{o.id.slice(0, 8)}…</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={3}>Total ({orphans.length})</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">
+                        {formatBdt(orphans.reduce((s: number, o: any) => s + Number(o.bdt_amount || 0), 0))}
+                      </TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>
