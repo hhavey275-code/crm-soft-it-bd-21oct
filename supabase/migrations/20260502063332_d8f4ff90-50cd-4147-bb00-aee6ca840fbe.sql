@@ -1,0 +1,1 @@
+INSERT INTO public.seller_transactions_archive_2026_05 (seller_id, type, bdt_amount, description, status, created_at, archived_at, archive_reason, entry_by_name) VALUES ('d754bae7-9657-4d05-b3c9-9f22ac8a03ab', 'bdt_payment', 38400, 'EBL Skybanking Receipt - REF: 1188006261200122', 'approved', '2026-04-30 12:00:00+06', now(), 'manual_admin_entry', 'Admin Manual Entry');
