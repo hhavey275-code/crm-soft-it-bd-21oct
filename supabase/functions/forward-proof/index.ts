@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
           .eq('top_up_request_id', request_id)
           .maybeSingle();
         if (!existingMirror) {
-          await supabase.from('seller_transactions').upsert({
+          const { error: mirrorErr } = await supabase.from('seller_transactions').insert({
             seller_id: sellerId,
             type: 'client_topup',
             bdt_amount: Number(reqData.bdt_amount || 0),
@@ -119,7 +119,10 @@ Deno.serve(async (req) => {
             reviewed_by: reqData.reviewed_by || null,
             reviewed_at: new Date().toISOString(),
             entry_by_name: clientName,
-          }, { onConflict: 'top_up_request_id' });
+          });
+          if (mirrorErr && !String(mirrorErr.message || '').toLowerCase().includes('duplicate')) {
+            throw mirrorErr;
+          }
         }
         const txns = await fetchAllSellerTxns(supabase, sellerId);
         const balance = computeDueAdvance(txns);
