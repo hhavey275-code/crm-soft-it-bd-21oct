@@ -549,8 +549,8 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
         <CardTitle className="text-base">
           {forwarded ? "Forwarded Payments IN" : "Not-Forwarded Payments IN"}
           <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {withdrawRows && withdrawRows.length > 0
-              ? "(Withdraws merged chronologically · running total = Adv/Due after each entry)"
+            {((withdrawRows && withdrawRows.length > 0) || (usdtRows && usdtRows.length > 0))
+              ? "(Withdraws + USDT cost merged chronologically · running total = Adv/Due after each entry)"
               : "(Manual entries shown in both sheets · running total updates per row)"}
           </span>
         </CardTitle>
