@@ -159,13 +159,14 @@ export async function fetchSellerArchiveBundle(sellerId: string): Promise<{
 }
 
 export type Buckets = {
-  forwardedIn: ArchiveTxn[]; // payments IN that we know were forwarded
-  notForwardedIn: ArchiveTxn[]; // payments IN that we know were NOT forwarded (or unknown / manual)
+  forwardedIn: ArchiveTxn[]; // payments IN that were forwarded (top-ups + all manual entries)
+  notForwardedIn: ArchiveTxn[]; // top-ups that were explicitly NOT forwarded — manual entries are ALSO mirrored here per operator rule
   usdtGiven: ArchiveTxn[];
   withdraws: ArchiveTxn[];
 };
 
 const IN_TYPES = new Set(["bdt_payment", "client_topup", "tenant_payment"]);
+const MANUAL_TYPES = new Set(["bdt_payment", "tenant_payment"]);
 
 export function splitBuckets(txns: ArchiveTxn[]): Buckets {
   const forwardedIn: ArchiveTxn[] = [];
@@ -179,14 +180,16 @@ export function splitBuckets(txns: ArchiveTxn[]): Buckets {
     } else if (t.type === "usdt_received") {
       usdtGiven.push(t);
     } else if (IN_TYPES.has(t.type)) {
-      // Per operator rule: all top-ups AND all manual entries (bdt_payment /
-      // tenant_payment) were OCR-forwarded, so treat every approved IN row as
-      // "forwarded". The notForwardedIn bucket is kept only for client_topup
-      // rows whose linked top_up_request explicitly says forwarded=false.
-      if (t.type === "client_topup" && t.topup_forwarded === false) {
-        notForwardedIn.push(t);
-      } else {
+      // Operator rule:
+      //  • Forwarded sheet = all top-ups + all manual entries (OCR-forwarded by default)
+      //  • Not-Forwarded sheet = top-ups explicitly marked forwarded=false
+      //    PLUS all manual entries (so manual entries appear in BOTH sheets)
+      if (t.type === "client_topup") {
+        if (t.topup_forwarded === false) notForwardedIn.push(t);
+        else forwardedIn.push(t);
+      } else if (MANUAL_TYPES.has(t.type)) {
         forwardedIn.push(t);
+        notForwardedIn.push(t);
       }
     }
   }
