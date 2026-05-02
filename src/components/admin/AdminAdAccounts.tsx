@@ -173,17 +173,26 @@ export function AdminAdAccounts() {
           body: { ad_account_ids: ids, source: "cache" },
         }),
         supabase.from("ad_account_insights").select("ad_account_id, cards, balance, billing_threshold, daily_spend_limit, hidden_daily_limit, daily_spend_limit_currency, daily_spend_limit_synced_at, today_spend, yesterday_spend, last_spend_date, updated_at, active_campaigns, today_orders, yesterday_orders, today_messages, yesterday_messages").in("ad_account_id", ids),
+        supabase.from("ad_account_last_known_state").select("ad_account_id, cards, balance, spend_cap, amount_spent, last_spend_date, last_synced_at").in("ad_account_id", ids),
       ]);
       const edge = (edgeRes.data?.insights as Record<string, InsightsData>) ?? {};
+      const lastKnownMap = new Map((lastKnownRes.data ?? []).map((row: any) => [row.ad_account_id, row]));
       // Merge DB row data so `cards` (and other fields) aren't lost when the edge cache lacks them
       (dbRes.data ?? []).forEach((row: any) => {
         const existing = edge[row.ad_account_id] ?? ({} as any);
+        const lastKnown = lastKnownMap.get(row.ad_account_id) as any;
+        const existingCards = existing.cards && existing.cards.length ? existing.cards : null;
+        const rowCards = row.cards && row.cards.length ? row.cards : null;
+        const lastKnownCards = lastKnown?.cards && lastKnown.cards.length ? lastKnown.cards : null;
         edge[row.ad_account_id] = {
           ...row,
           ...existing,
-          cards: (existing.cards && existing.cards.length ? existing.cards : row.cards) ?? [],
+          cards: existingCards ?? rowCards ?? lastKnownCards ?? [],
+          balance: Number(existing.balance ?? 0) > 0 ? existing.balance : Number(row.balance ?? 0) > 0 ? row.balance : lastKnown?.balance ?? row.balance,
           billing_threshold: existing.billing_threshold && Number(existing.billing_threshold) > 0 ? existing.billing_threshold : row.billing_threshold,
           daily_spend_limit_currency: existing.daily_spend_limit_currency || row.daily_spend_limit_currency,
+          last_spend_date: existing.last_spend_date ?? row.last_spend_date ?? lastKnown?.last_spend_date ?? null,
+          updated_at: existing.updated_at ?? row.updated_at ?? lastKnown?.last_synced_at,
         };
       });
       // Persist to localStorage so the next page reload can show data instantly
