@@ -120,8 +120,10 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
   const due = totals.due;
   const fwdDisplay = formatDueAdvance(due.forwardedOnly);
   const allDisplay = formatDueAdvance(due.all);
-  const drift = due.all - due.forwardedOnly; // should equal not-forwarded payments IN
-  const expectedDrift = totals.notForwardedIn.bdt;
+  const drift = due.all - due.forwardedOnly; // should equal not-forwarded TOP-UPS only (manuals are mirrored, not added)
+  const expectedDrift = buckets.notForwardedIn
+    .filter((t) => t.type === "client_topup")
+    .reduce((s, t) => s + t.bdt_amount, 0);
   const driftMatches = Math.abs(drift - expectedDrift) < 0.5;
 
   return (
