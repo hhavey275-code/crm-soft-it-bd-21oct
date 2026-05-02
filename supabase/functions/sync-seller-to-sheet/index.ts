@@ -305,7 +305,46 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs, set_opening_balance } = bodyJson;
+
+    // ---- SET OPENING BALANCE for a specific month tab ----
+    if (set_opening_balance) {
+      if (!seller_id) throw new Error("seller_id required");
+      const { month, value } = set_opening_balance; // month: "YYYY-MM", value: number
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("month required (YYYY-MM)");
+      if (value === undefined || value === null || isNaN(Number(value)))
+        throw new Error("value (number) required");
+
+      const { data: cfg } = await supabase
+        .from("seller_sheet_config").select("*").eq("seller_id", seller_id).maybeSingle();
+      if (!cfg) throw new Error("config not found");
+      if (!cfg.opening_balance_cell)
+        throw new Error("opening_balance_cell not configured (e.g. I6)");
+
+      const [y, mo] = month.split("-").map(Number);
+      const tabName = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", new Date(Date.UTC(y, mo - 1, 1)));
+
+      // Ensure tab exists (clone template if needed)
+      const meta = await getSheetsMeta(cfg.spreadsheet_id);
+      const sheets = meta.sheets || [];
+      if (!sheets.find((s: any) => s.properties.title === tabName)) {
+        const tmpl = cfg.template_tab
+          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
+        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+      }
+
+      const cell = String(cfg.opening_balance_cell).toUpperCase();
+      const range = `'${tabName}'!${cell}`;
+      const r = await fetch(
+        `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values/${range}?valueInputOption=USER_ENTERED`,
+        { method: "PUT", headers: gwHeaders, body: JSON.stringify({ values: [[Number(value)]] }) },
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(`opening balance write failed [${r.status}]: ${JSON.stringify(j)}`);
+      return jsonResp({ ok: true, tab: tabName, cell, value: Number(value) });
+    }
+
+
 
     // ---- BACKFILL MODE (optimized: 1 meta read + 1 probe per tab + 1 batch write per tab) ----
     if (backfill) {
