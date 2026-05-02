@@ -149,29 +149,28 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
   };
 
   const [backfilling, setBackfilling] = useState(false);
-  const [recreateTabs, setRecreateTabs] = useState(false);
-  const [backfillMonths, setBackfillMonths] = useState(() => {
+  const [recreateTabs, setRecreateTabs] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevS = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
-    return `${prevS},${cur}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
   const runBackfill = async () => {
     if (!sellerId) return;
-    const months = backfillMonths
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => /^\d{4}-\d{2}$/.test(s));
-    if (months.length === 0) {
-      toast.error("Months format: YYYY-MM (comma separated). E.g. 2026-04,2026-05");
+    if (!/^\d{4}-\d{2}$/.test(selectedMonth)) {
+      toast.error("Month select korun");
       return;
     }
     setBackfilling(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: { backfill: true, seller_id: sellerId, months, recreate: recreateTabs },
+        body: {
+          backfill: true,
+          seller_id: sellerId,
+          spreadsheet_url: form.spreadsheet_url,
+          months: [selectedMonth],
+          recreate: recreateTabs,
+        },
       });
       if (error) throw error;
       const d = data as any;
@@ -180,52 +179,12 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
         .map((t: any) => `${t.tab}: +${t.rows_written}`)
         .join(", ");
       toast.success(
-        `Backfill done — total ${d.total_in_months}, already ${d.already_synced}, written ${d.processed}. ${tabSummary}`,
+        `Sheet ready — ${selectedMonth}: CRM theke ${d.processed} row bosheche. ${tabSummary}`,
       );
     } catch (e: any) {
       toast.error(e?.message || "Backfill failed");
     } finally {
       setBackfilling(false);
-    }
-  };
-
-  const [obSetting, setObSetting] = useState(false);
-  const [obMonth, setObMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [obValue, setObValue] = useState("");
-
-  const setOpeningBalance = async (auto = false) => {
-    if (!sellerId) return;
-    if (!/^\d{4}-\d{2}$/.test(obMonth)) {
-      toast.error("Month format: YYYY-MM");
-      return;
-    }
-    if (!auto && (obValue === "" || isNaN(Number(obValue)))) {
-      toast.error("Opening balance number diye den (or use Auto)");
-      return;
-    }
-    if (!form.opening_balance_cell) {
-      toast.error("Age 'Opening balance cell' (e.g. I6) set kore Save korun");
-      return;
-    }
-    setObSetting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: {
-          seller_id: sellerId,
-          set_opening_balance: { month: obMonth, value: auto ? undefined : Number(obValue) },
-        },
-      });
-      if (error) throw error;
-      const d = data as any;
-      if (!d?.ok) throw new Error(d?.error || "Set failed");
-      toast.success(`Opening balance set — ${d.tab} ${d.cell} = ${d.value}${d.auto ? " (auto)" : ""}`);
-    } catch (e: any) {
-      toast.error(e?.message || "Set failed");
-    } finally {
-      setObSetting(false);
     }
   };
 
@@ -383,13 +342,12 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
         )}
 
         <div className="border-t pt-4 mt-2 space-y-2">
-          <Label className="text-sm">Backfill months (YYYY-MM, comma separated)</Label>
-          <div className="flex gap-2">
+          <Label className="text-sm">Kon month er sheet ready korben</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
             <Input
-              value={backfillMonths}
-              onChange={(e) => setBackfillMonths(e.target.value)}
-              placeholder="2026-04,2026-05"
-              className="flex-1"
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
             />
             <Button
               variant="secondary"
@@ -398,7 +356,7 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
               title={!cfg?.id ? "Save config first" : ""}
             >
               {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Backfill now
+              Sheet ready — CRM sync
             </Button>
           </div>
           <div className="flex items-center gap-2">
@@ -412,48 +370,21 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
             </Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Already-synced txns skip hobe. Tab missing thakle auto create hobe (template clone kore).
+            April select korle April er CRM data, May select korle May er CRM data oi month er sheet e boshbe.
           </p>
         </div>
 
         <div className="border-t pt-4 mt-2 space-y-2">
-          <Label className="text-sm">Opening balance (month er shurute boshbe)</Label>
-          <div className="flex gap-2">
-            <Input
-              value={obMonth}
-              onChange={(e) => setObMonth(e.target.value)}
-              placeholder="2026-05"
-              className="w-32"
-            />
-            <Input
-              type="number"
-              value={obValue}
-              onChange={(e) => setObValue(e.target.value)}
-              placeholder="manual amount (optional)"
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              onClick={() => setOpeningBalance(true)}
-              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
-              title="Auto = previous month closing balance theke calculate kore boshabe"
-            >
-              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Auto
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setOpeningBalance(false)}
-              disabled={obSetting || !cfg?.id || !form.opening_balance_cell}
-              title={!form.opening_balance_cell ? "Opening balance cell set kore Save korun" : ""}
-            >
-              {obSetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Set manual
-            </Button>
-          </div>
+          <Label className="text-sm">Opening balance cell</Label>
+          <Input
+            className="w-32 uppercase"
+            value={form.opening_balance_cell || ""}
+            onChange={(e) => setForm({ ...form, opening_balance_cell: e.target.value.toUpperCase() })}
+            placeholder="e.g. I6"
+            maxLength={6}
+          />
           <p className="text-xs text-muted-foreground">
-            Opening balance cell ({form.opening_balance_cell || "set korun"}) e value boshbe.
-            Backfill chalalei prottek month er jonno auto opening balance system theke boshe jabe.
+            Sudhu kon box e opening balance boshbe seta din; value CRM/sheet balance theke automatic boshbe.
           </p>
         </div>
 

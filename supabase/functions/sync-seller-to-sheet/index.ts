@@ -89,7 +89,6 @@ async function createTab(
   spreadsheetId: string,
   title: string,
   sourceSheetId: number | null,
-  clearFromRow: number | null = null,
 ) {
   // If sourceSheetId provided, duplicate it (preserves header, formatting). Otherwise add blank.
   const body = sourceSheetId != null
@@ -102,34 +101,50 @@ async function createTab(
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`createTab failed [${r.status}]: ${JSON.stringify(j)}`);
-
-  // After cloning a template, wipe the data rows (keep header + opening balance rows).
-  if (sourceSheetId != null && clearFromRow && clearFromRow > 0) {
-    const newSheetId = j.replies?.[0]?.duplicateSheet?.properties?.sheetId;
-    if (newSheetId != null) {
-      const clearReq = {
-        requests: [{
-          updateCells: {
-            range: {
-              sheetId: newSheetId,
-              startRowIndex: clearFromRow - 1, // 0-indexed
-            },
-            fields: "userEnteredValue",
-          },
-        }],
-      };
-      const cr = await fetch(`${GATEWAY}/spreadsheets/${spreadsheetId}:batchUpdate`, {
-        method: "POST",
-        headers: gwHeaders,
-        body: JSON.stringify(clearReq),
-      });
-      if (!cr.ok) {
-        const cj = await cr.json();
-        console.warn("clear cloned data failed:", JSON.stringify(cj));
-      }
-    }
-  }
   return j;
+}
+
+function extractGid(input: string | null | undefined): number | null {
+  const m = String(input || "").match(/[?&#]gid=(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function resolveTemplateSheet(sheets: any[], cfg: any, targetTab?: string) {
+  const byName = cfg?.template_tab
+    ? sheets.find((s: any) => s.properties?.title === cfg.template_tab)
+    : null;
+  if (byName && byName.properties?.title !== targetTab) return byName;
+
+  const gid = extractGid(cfg?.spreadsheet_url);
+  const byGid = gid != null
+    ? sheets.find((s: any) => Number(s.properties?.sheetId) === gid)
+    : null;
+  if (byGid && byGid.properties?.title !== targetTab) return byGid;
+
+  return sheets.find((s: any) => s.properties?.title !== targetTab) || null;
+}
+
+function inputColumnsForClear(cfg: any): string[] {
+  const keys = [
+    "col_datetime", "col_payment_bdt", "col_withdraw", "col_payo_usd", "col_payo_rate",
+    "col_payo_bdt", "col_wise_usd", "col_wise_rate", "col_wise_bdt", "col_description",
+    "col_proof_url", "col_txn_id",
+  ];
+  return Array.from(new Set(keys.map((k) => normalizeCol(cfg?.[k])).filter(Boolean) as string[]));
+}
+
+async function clearInputColumns(spreadsheetId: string, tabName: string, cfg: any) {
+  const cols = inputColumnsForClear(cfg);
+  if (cols.length === 0) return;
+  const start = Number(cfg?.data_start_row || 7);
+  const ranges = cols.map((col) => `'${tabName}'!${col}${start}:${col}10000`);
+  const r = await fetch(`${GATEWAY}/spreadsheets/${spreadsheetId}/values:batchClear`, {
+    method: "POST",
+    headers: gwHeaders,
+    body: JSON.stringify({ ranges }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`clearInputColumns failed [${r.status}]: ${JSON.stringify(j)}`);
 }
 
 
@@ -221,10 +236,9 @@ async function syncOneTransaction(
   const sheets = meta.sheets || [];
   const existingTab = sheets.find((s: any) => s.properties.title === targetTab);
   if (!existingTab) {
-    const tmpl = cfg.template_tab
-      ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
-      : null;
-    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+    const tmpl = resolveTemplateSheet(sheets, cfg, targetTab);
+    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
+    if (tmpl) await clearInputColumns(cfg.spreadsheet_id, targetTab, cfg);
   }
 
   const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
@@ -344,10 +358,10 @@ serve(async (req) => {
       const exists = sheets.find((s: any) => s.properties.title === tabName);
       let createdNow = false;
       if (!exists) {
-        const tmpl = cfg.template_tab
-          ? sheets.find((s: any) => s.properties.title === cfg.template_tab) : null;
+        const tmpl = resolveTemplateSheet(sheets, cfg, tabName);
         // If template missing or not found, fall back to a blank tab (no crash).
-        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+        await createTab(cfg.spreadsheet_id, tabName, tmpl ? tmpl.properties.sheetId : null);
+        if (tmpl) await clearInputColumns(cfg.spreadsheet_id, tabName, cfg);
         createdNow = true;
       }
 
@@ -367,6 +381,45 @@ serve(async (req) => {
         openingWritten = opening;
       }
       return { tab: tabName, created: createdNow, opening_balance: openingWritten };
+    }
+
+    async function ensureConfigForSheetLink(sId: string, spreadsheetUrlOrId: string) {
+      const spreadsheetIdMatch = String(spreadsheetUrlOrId || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const spreadsheet_id = spreadsheetIdMatch ? spreadsheetIdMatch[1] : String(spreadsheetUrlOrId || "").trim();
+      if (!sId || !spreadsheet_id) return null;
+      const { data: existing } = await supabase
+        .from("seller_sheet_config")
+        .select("*")
+        .eq("seller_id", sId)
+        .maybeSingle();
+      if (existing) {
+        const patch: any = { spreadsheet_id, spreadsheet_url: spreadsheetUrlOrId, enabled: true };
+        if (!existing.tab_pattern) patch.tab_pattern = "{MMMM-YYYY}";
+        if (!existing.header_row) patch.header_row = 1;
+        if (!existing.data_start_row) patch.data_start_row = 7;
+        await supabase.from("seller_sheet_config").update(patch).eq("id", existing.id);
+        return { ...existing, ...patch };
+      }
+      const payload = {
+        seller_id: sId,
+        spreadsheet_id,
+        spreadsheet_url: spreadsheetUrlOrId,
+        tab_pattern: "{MMMM-YYYY}",
+        header_row: 1,
+        data_start_row: 7,
+        enabled: true,
+      };
+      const { data, error } = await supabase
+        .from("seller_sheet_config")
+        .insert(payload)
+        .select("*")
+        .single();
+      if (error) throw new Error(`config create failed: ${error.message}`);
+      return data;
+    }
+
+    if (seller_id && bodyJson.spreadsheet_url) {
+      await ensureConfigForSheetLink(seller_id, bodyJson.spreadsheet_url);
     }
 
     // ---- ENSURE MONTH TAB (manual) ----
@@ -543,11 +596,10 @@ serve(async (req) => {
       }
       for (const tab of groups.keys()) {
         if (!titleSet.has(tab)) {
-          const tmpl = cfg.template_tab
-            ? sheets.find((s: any) => s.properties.title === cfg.template_tab)
-            : null;
+          const tmpl = resolveTemplateSheet(sheets, cfg, tab);
           // Fall back to blank tab if template missing/not found (no crash)
-          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null, cfg.data_start_row || 7);
+          await createTab(cfg.spreadsheet_id, tab, tmpl ? tmpl.properties.sheetId : null);
+          if (tmpl) await clearInputColumns(cfg.spreadsheet_id, tab, cfg);
           titleSet.add(tab);
         }
         // Auto write opening balance if cell configured and we know the month
