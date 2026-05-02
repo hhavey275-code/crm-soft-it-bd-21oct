@@ -3307,6 +3307,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      pg_advisory_lock: { Args: { key: number }; Returns: undefined }
+      pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "client" | "superadmin" | "seller" | "agency"
