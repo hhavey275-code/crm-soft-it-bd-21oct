@@ -164,6 +164,7 @@ export function AdminSellers() {
   const [showConvert, setShowConvert] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedSeller, setSelectedSeller] = useState<any>(null);
+  const [showSheetConfig, setShowSheetConfig] = useState(false);
   const [entryType, setEntryType] = useState<"usdt_received" | "bdt_payment" | "withdraw">("usdt_received");
   const [entryForm, setEntryForm] = useState({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
   const [showEntryDialog, setShowEntryDialog] = useState(false);
