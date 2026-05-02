@@ -263,6 +263,35 @@ Deno.serve(async (req)=>{
       action: "Failed Top-Up Retried",
       details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — New cap: $${newSpendCapDollars}`
     });
+
+    // Tenant mode: report this successful retry to master so total_used stays
+    // accurate. Use a deterministic idempotency key tied to the failed_topup_id
+    // so even if this retry is itself retried, master only counts it once.
+    try {
+      const { data: licenseRows } = await supabase
+        .from("site_settings")
+        .select("key,value")
+        .in("key", ["master_url", "tenant_api_key"]);
+      const licenseMap: Record<string, string> = {};
+      (licenseRows || []).forEach((r: any) => { licenseMap[r.key] = r.value; });
+      if (licenseMap["master_url"] && licenseMap["tenant_api_key"]) {
+        await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Tenant-Key": licenseMap["tenant_api_key"],
+          },
+          body: JSON.stringify({
+            action: "report-usage",
+            amount: Number(failedTopup.amount),
+            idempotency_key: `retry:${failed_topup_id}`,
+          }),
+        });
+      }
+    } catch (reportErr) {
+      console.warn("retry-failed-topup: report-usage failed", reportErr);
+    }
+
     console.log("Retry SUCCESS", {
       actId,
       newSpendCapDollars
