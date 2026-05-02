@@ -149,29 +149,28 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
   };
 
   const [backfilling, setBackfilling] = useState(false);
-  const [recreateTabs, setRecreateTabs] = useState(false);
-  const [backfillMonths, setBackfillMonths] = useState(() => {
+  const [recreateTabs, setRecreateTabs] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevS = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
-    return `${prevS},${cur}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
   const runBackfill = async () => {
     if (!sellerId) return;
-    const months = backfillMonths
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => /^\d{4}-\d{2}$/.test(s));
-    if (months.length === 0) {
-      toast.error("Months format: YYYY-MM (comma separated). E.g. 2026-04,2026-05");
+    if (!/^\d{4}-\d{2}$/.test(selectedMonth)) {
+      toast.error("Month select korun");
       return;
     }
     setBackfilling(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: { backfill: true, seller_id: sellerId, months, recreate: recreateTabs },
+        body: {
+          backfill: true,
+          seller_id: sellerId,
+          spreadsheet_url: form.spreadsheet_url,
+          months: [selectedMonth],
+          recreate: recreateTabs,
+        },
       });
       if (error) throw error;
       const d = data as any;
@@ -180,52 +179,12 @@ export function SellerSheetConfigDialog({ open, onOpenChange, sellerId, sellerNa
         .map((t: any) => `${t.tab}: +${t.rows_written}`)
         .join(", ");
       toast.success(
-        `Backfill done — total ${d.total_in_months}, already ${d.already_synced}, written ${d.processed}. ${tabSummary}`,
+        `Sheet ready — ${selectedMonth}: CRM theke ${d.processed} row bosheche. ${tabSummary}`,
       );
     } catch (e: any) {
       toast.error(e?.message || "Backfill failed");
     } finally {
       setBackfilling(false);
-    }
-  };
-
-  const [obSetting, setObSetting] = useState(false);
-  const [obMonth, setObMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [obValue, setObValue] = useState("");
-
-  const setOpeningBalance = async (auto = false) => {
-    if (!sellerId) return;
-    if (!/^\d{4}-\d{2}$/.test(obMonth)) {
-      toast.error("Month format: YYYY-MM");
-      return;
-    }
-    if (!auto && (obValue === "" || isNaN(Number(obValue)))) {
-      toast.error("Opening balance number diye den (or use Auto)");
-      return;
-    }
-    if (!form.opening_balance_cell) {
-      toast.error("Age 'Opening balance cell' (e.g. I6) set kore Save korun");
-      return;
-    }
-    setObSetting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-seller-to-sheet", {
-        body: {
-          seller_id: sellerId,
-          set_opening_balance: { month: obMonth, value: auto ? undefined : Number(obValue) },
-        },
-      });
-      if (error) throw error;
-      const d = data as any;
-      if (!d?.ok) throw new Error(d?.error || "Set failed");
-      toast.success(`Opening balance set — ${d.tab} ${d.cell} = ${d.value}${d.auto ? " (auto)" : ""}`);
-    } catch (e: any) {
-      toast.error(e?.message || "Set failed");
-    } finally {
-      setObSetting(false);
     }
   };
 
