@@ -637,14 +637,13 @@ export function AdminSellers() {
         .eq("id", id);
       if (error) throw error;
 
-      // On approval of a USDT-received entry with proof, forward to Telegram.
+      // On approval of a USDT-received entry, forward to Telegram (with photo if proof exists, text-only otherwise).
       // The forward function itself enforces the telegram_forwarded idempotency
       // lock so retries / double-clicks never produce duplicate messages.
       if (
         status === "approved" &&
         before &&
         before.type === "usdt_received" &&
-        before.proof_url &&
         before.telegram_forwarded !== true
       ) {
         try {
@@ -654,7 +653,7 @@ export function AdminSellers() {
             body: {
               seller_transaction_id: before.id,
               payment_kind: "usdt_received",
-              proof_url: before.proof_url,
+              proof_url: before.proof_url || null,
               seller_id: before.seller_id,
               seller_name: sellerProfile?.full_name || sellerProfile?.email,
               usdt_amount: Number(before.usdt_amount || 0),

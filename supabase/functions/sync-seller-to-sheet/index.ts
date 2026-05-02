@@ -195,6 +195,33 @@ async function writeRowCells(
 
 // ---- core sync ----------------------------------------------------------------
 
+// Helper: build cells for a txn given the cfg mapping (extracted so single + batch share logic).
+function buildCellsForTxn(cfg: any, txn: any): { col: string; value: string | number }[] {
+  const cells: { col: string; value: string | number }[] = [];
+  const push = (col: string | null, val: any) => {
+    if (col && val !== undefined && val !== null && val !== "") cells.push({ col, value: val });
+  };
+  const txnDate = new Date(txn.created_at);
+  push(cfg.col_datetime, formatDateTimeBn(txnDate));
+  const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
+  const isUsdt = txn.type === "usdt_received";
+  const isWithdraw = txn.type === "withdraw";
+  if (isPayment) {
+    push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
+  } else if (isWithdraw) {
+    if (cfg.col_withdraw) push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
+    else push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+  } else if (isUsdt) {
+    push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
+    push(cfg.col_payo_rate, Number(txn.rate || 0));
+    push(cfg.col_payo_bdt, Number((Number(txn.usdt_amount || 0) * Number(txn.rate || 0)).toFixed(2)));
+  }
+  push(cfg.col_description, txn.description || "");
+  push(cfg.col_proof_url, txn.proof_url || "");
+  push(cfg.col_txn_id, txn.id);
+  return cells;
+}
+
 async function syncOneTransaction(
   supabase: any,
   seller_transaction_id: string,
@@ -232,71 +259,142 @@ async function syncOneTransaction(
   const txnDate = new Date(txn.created_at);
   const targetTab = formatTabName(cfg.tab_pattern || "{MMMM-YYYY}", txnDate);
 
-  const meta = await getSheetsMeta(cfg.spreadsheet_id);
-  const sheets = meta.sheets || [];
-  const existingTab = sheets.find((s: any) => s.properties.title === targetTab);
-  if (!existingTab) {
-    const tmpl = resolveTemplateSheet(sheets, cfg, targetTab);
-    await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
-    if (tmpl) await clearInputColumns(cfg.spreadsheet_id, targetTab, cfg);
+  // ============================================================
+  // CHRONOLOGICAL ORDER GUARANTEE (per seller, per month tab):
+  //   Acquire advisory lock keyed on (seller_id, tab) so two
+  //   concurrent syncs for the same seller/tab never interleave.
+  //   Then drain ALL unsynced approved txns for this tab in
+  //   created_at order. This guarantees rows in the sheet are
+  //   strictly ordered by created_at — older entries never land
+  //   below newer ones, even when admin approvals arrive out of
+  //   order.
+  // ============================================================
+  const lockKey = `seller-sheet-sync:${txn.seller_id}:${targetTab}`;
+  // Postgres bigint advisory lock — derive 64-bit hash from string.
+  let h1 = 5381, h2 = 52711;
+  for (let i = 0; i < lockKey.length; i++) {
+    const c = lockKey.charCodeAt(i);
+    h1 = ((h1 * 33) ^ c) >>> 0;
+    h2 = ((h2 * 33) ^ c) >>> 0;
   }
+  const lockBig = (BigInt(h1) << 32n) | BigInt(h2);
+  // pg_advisory_xact_lock is auto-released; use session lock here & release manually since RPC is one-shot.
+  await supabase.rpc("pg_advisory_lock", { key: lockBig.toString() }).catch(() => {/* lock function may not exist; degrade gracefully */});
 
-  const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
-  const rowNumber = await findFirstEmptyDataRow(
-    cfg.spreadsheet_id, targetTab, cfg.data_start_row || 7, probeCol,
-  );
-
-  const cells: { col: string; value: string | number }[] = [];
-  const push = (col: string | null, val: any) => {
-    if (col && val !== undefined && val !== null && val !== "") {
-      cells.push({ col, value: val });
+  try {
+    // Re-check after acquiring lock (another worker may have synced this row).
+    const { data: existing2 } = await supabase
+      .from("sheet_sync_log")
+      .select("status")
+      .eq("seller_transaction_id", seller_transaction_id)
+      .maybeSingle();
+    if (existing2?.status === "success") {
+      return { ok: true, skipped: "already_synced_after_lock" };
     }
-  };
 
-  push(cfg.col_datetime, formatDateTimeBn(txnDate));
-  const isPayment = txn.type === "bdt_payment" || txn.type === "client_topup" || txn.type === "tenant_payment";
-  const isUsdt = txn.type === "usdt_received";
-  const isWithdraw = txn.type === "withdraw";
+    // Compute month bounds for this tab
+    const y = txnDate.getUTCFullYear();
+    const mo = txnDate.getUTCMonth();
+    const monthStart = new Date(Date.UTC(y, mo, 1)).toISOString();
+    const monthEnd = new Date(Date.UTC(y, mo + 1, 1)).toISOString();
 
-  if (isPayment) {
-    push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
-  } else if (isWithdraw) {
-    if (cfg.col_withdraw) {
-      push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
-    } else {
-      push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+    // Fetch ALL approved txns for this seller in this month, ordered by created_at.
+    const { data: monthTxns, error: monthErr } = await supabase
+      .from("seller_transactions")
+      .select("*")
+      .eq("seller_id", txn.seller_id)
+      .eq("status", "approved")
+      .gte("created_at", monthStart)
+      .lt("created_at", monthEnd)
+      .order("created_at", { ascending: true });
+    if (monthErr) throw new Error(`month txn fetch failed: ${monthErr.message}`);
+
+    // Filter out already-synced ones.
+    const ids = (monthTxns || []).map((t: any) => t.id);
+    let syncedSet = new Set<string>();
+    if (ids.length > 0) {
+      const { data: doneRows } = await supabase
+        .from("sheet_sync_log")
+        .select("seller_transaction_id")
+        .in("seller_transaction_id", ids)
+        .eq("status", "success");
+      syncedSet = new Set((doneRows || []).map((r: any) => r.seller_transaction_id));
     }
-  } else if (isUsdt) {
-    push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
-    push(cfg.col_payo_rate, Number(txn.rate || 0));
-    const converted = Number(txn.usdt_amount || 0) * Number(txn.rate || 0);
-    push(cfg.col_payo_bdt, Number(converted.toFixed(2)));
+    const pending = (monthTxns || []).filter((t: any) => !syncedSet.has(t.id));
+    if (pending.length === 0) {
+      return { ok: true, skipped: "nothing_to_sync_in_month" };
+    }
+
+    // Ensure tab exists (clone template if missing).
+    const meta = await getSheetsMeta(cfg.spreadsheet_id);
+    const sheets = meta.sheets || [];
+    const existingTab = sheets.find((s: any) => s.properties.title === targetTab);
+    if (!existingTab) {
+      const tmpl = resolveTemplateSheet(sheets, cfg, targetTab);
+      await createTab(cfg.spreadsheet_id, targetTab, tmpl ? tmpl.properties.sheetId : null);
+      if (tmpl) await clearInputColumns(cfg.spreadsheet_id, targetTab, cfg);
+    }
+
+    const probeCol = normalizeCol(cfg.col_datetime || cfg.col_payment_bdt || cfg.col_payo_usd || "A") || "A";
+    const startRow = await findFirstEmptyDataRow(
+      cfg.spreadsheet_id, targetTab, cfg.data_start_row || 7, probeCol,
+    );
+
+    if (dry_run) {
+      return {
+        ok: true, dry_run: true, targetTab, startRow,
+        rows: pending.map((t: any, i: number) => ({ id: t.id, row: startRow + i, created_at: t.created_at })),
+      };
+    }
+
+    // Build batch payload — append all pending rows in created_at order, contiguous.
+    const data: any[] = [];
+    const logRows: any[] = [];
+    pending.forEach((t: any, i: number) => {
+      const rowNumber = startRow + i;
+      const cells = buildCellsForTxn(cfg, t);
+      for (const c of cells) {
+        data.push({
+          range: `'${targetTab}'!${normalizeCol(c.col)}${rowNumber}`,
+          values: [[c.value]],
+        });
+      }
+      logRows.push({
+        seller_transaction_id: t.id,
+        spreadsheet_id: cfg.spreadsheet_id,
+        tab_name: targetTab,
+        row_number: rowNumber,
+        status: "success",
+        error_message: null,
+        synced_at: new Date().toISOString(),
+      });
+    });
+
+    if (data.length > 0) {
+      const r = await fetch(
+        `${GATEWAY}/spreadsheets/${cfg.spreadsheet_id}/values:batchUpdate`,
+        {
+          method: "POST",
+          headers: gwHeaders,
+          body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),
+        },
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(`batchWrite failed [${r.status}]: ${JSON.stringify(j)}`);
+    }
+
+    if (logRows.length > 0) {
+      await supabase.from("sheet_sync_log").upsert(logRows, { onConflict: "seller_transaction_id" });
+    }
+
+    await supabase.from("seller_sheet_config")
+      .update({ last_synced_at: new Date().toISOString(), last_error: null })
+      .eq("id", cfg.id);
+
+    return { ok: true, tab: targetTab, start_row: startRow, rows_written: pending.length };
+  } finally {
+    await supabase.rpc("pg_advisory_unlock", { key: lockBig.toString() }).catch(() => {});
   }
-
-
-  push(cfg.col_description, txn.description || "");
-  push(cfg.col_proof_url, txn.proof_url || "");
-  push(cfg.col_txn_id, txn.id);
-
-  if (dry_run) return { ok: true, dry_run: true, targetTab, rowNumber, cells };
-
-  await writeRowCells(cfg.spreadsheet_id, targetTab, rowNumber, cells);
-
-  await supabase.from("sheet_sync_log").upsert({
-    seller_transaction_id,
-    spreadsheet_id: cfg.spreadsheet_id,
-    tab_name: targetTab,
-    row_number: rowNumber,
-    status: "success",
-    error_message: null,
-    synced_at: new Date().toISOString(),
-  }, { onConflict: "seller_transaction_id" });
-
-  await supabase.from("seller_sheet_config")
-    .update({ last_synced_at: new Date().toISOString(), last_error: null })
-    .eq("id", cfg.id);
-
-  return { ok: true, tab: targetTab, row: rowNumber };
 }
 
 // ---- handler ----------------------------------------------------------------

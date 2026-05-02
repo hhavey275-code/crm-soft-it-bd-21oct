@@ -42,8 +42,8 @@ Deno.serve(async (req) => {
       withdraw_note,
     } = await req.json();
 
-    // Withdraw can be text-only (no proof). Everything else needs a proof_url.
-    if (!proof_url && payment_kind !== 'withdraw') {
+    // Withdraw and usdt_received can be text-only (no proof). bdt_payment still needs proof.
+    if (!proof_url && payment_kind !== 'withdraw' && payment_kind !== 'usdt_received') {
       return new Response(JSON.stringify({ error: 'proof_url required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
