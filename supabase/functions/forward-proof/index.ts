@@ -92,26 +92,50 @@ Deno.serve(async (req) => {
       .single();
     const clientName = profile?.full_name || profile?.email || reqData.user_id.slice(0, 8);
 
-    // Global Due/Advance running balance for this seller.
-    // - paginate past 1000-row default
-    // - include approved top_up_requests not yet mirrored into seller_transactions
-    // - include THIS pending top-up unless it's already mirrored
+    // Ensure the approved top-up exists in seller_transactions BEFORE the
+    // Telegram caption is built. This keeps Total aligned with the dashboard.
     let runningTotalLine = '';
     let finalBalance: number | null = null;
     if (sellerId) {
       try {
+        const { data: existingMirror } = await supabase
+          .from('seller_transactions')
+          .select('id')
+          .eq('top_up_request_id', request_id)
+          .maybeSingle();
+        if (!existingMirror) {
+          await supabase.from('seller_transactions').upsert({
+            seller_id: sellerId,
+            type: 'client_topup',
+            bdt_amount: Number(reqData.bdt_amount || 0),
+            usdt_amount: 0,
+            rate: 0,
+            description: `Client top-up approved — $${reqData.amount || 0}`,
+            bank_account_id: reqData.bank_account_id,
+            top_up_request_id: request_id,
+            proof_url: reqData.proof_url,
+            created_at: reqData.created_at,
+            status: 'approved',
+            reviewed_by: reqData.reviewed_by || null,
+            reviewed_at: new Date().toISOString(),
+            entry_by_name: clientName,
+          }, { onConflict: 'top_up_request_id' });
+        }
         const txns = await fetchAllSellerTxns(supabase, sellerId);
-        const pending = await fetchPendingTopupCredits(supabase, sellerId);
-        let balance = computeDueAdvance([...txns, ...pending]);
-        // If THIS top-up is not yet in either set, factor it in
-        const alreadyCounted =
-          txns.some((t: any) => (t as any).top_up_request_id === request_id) ||
-          pending.some((p: any) => (p as any).top_up_request_id === request_id);
-        if (!alreadyCounted) {
-          balance += Number(reqData.bdt_amount || 0);
+        const balance = computeDueAdvance(txns);
+        if (!txns.some((t: any) => (t as any).top_up_request_id === request_id)) {
+          console.warn('forward-proof balance mismatch: top-up mirror missing after upsert', { request_id, sellerId });
+          await supabase.from('system_logs').insert({
+            action: 'Telegram Balance Mismatch',
+            details: `Top-up ${request_id} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance.`,
+          }).catch(() => {});
         }
         finalBalance = balance;
         runningTotalLine = buildTotalLine(balance);
+        const mismatch = await fetchForwardedBalanceMismatches(supabase, sellerId);
+        if (mismatch.pendingTopupCount > 0) {
+          console.warn('forward-proof balance probe: pending/unmirrored topups excluded to match dashboard', mismatch);
+        }
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
       }
