@@ -557,7 +557,9 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                 <TableHead className="text-right">BDT in</TableHead>
                 <TableHead className="text-right">Change</TableHead>
                 <TableHead className="text-right">Running total</TableHead>
-                <TableHead>Description / TrxID</TableHead>
+                <TableHead>TRX ID</TableHead>
+                <TableHead>Proof</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Bank</TableHead>
                 <TableHead>Entry by</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -566,12 +568,13 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
             <TableBody>
               {withRunning.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">No entries</TableCell>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">No entries</TableCell>
                 </TableRow>
               ) : (
                 withRunning.map(({ row: r, delta, after }) => {
                   const isManual = r.type === "bdt_payment" || r.type === "tenant_payment";
                   const isDup = duplicateIds?.has(r.id);
+                  const trxId = extractTrxId(r.description);
                   const rowClass = isDup
                     ? "bg-rose-500/10 hover:bg-rose-500/15"
                     : isManual
@@ -590,6 +593,16 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                         +{formatBdt(delta)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold">{formatBdt(after)}</TableCell>
+                      <TableCell className="font-mono text-[11px] whitespace-nowrap">{trxId || <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>
+                        {r.proof_url ? (
+                          <a href={r.proof_url} target="_blank" rel="noopener noreferrer" title="Open payment proof">
+                            <img src={r.proof_url} alt="proof" className="h-10 w-10 rounded border object-cover hover:scale-150 hover:z-10 transition-transform" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="max-w-xs truncate text-xs" title={r.description || ""}>{r.description || "—"}</TableCell>
                       <TableCell className="text-xs">
                         {r.bank_name ? `${r.bank_name}${r.account_number ? ` · ${r.account_number}` : ""}` : "—"}
@@ -609,7 +622,7 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete }: { r
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums font-bold">{formatBdt(total)}</TableCell>
-                <TableCell colSpan={4} />
+                <TableCell colSpan={5} />
               </TableRow>
             </TableFooter>
           </Table>
