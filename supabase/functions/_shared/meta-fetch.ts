@@ -11,7 +11,7 @@
 // start of every Deno.serve handler invocation.
 
 const DEFAULT_META_PROXY_URL = "https://app.softitbd.com/api/meta-proxy";
-const PROXY_TIMEOUT_MS = 8000;
+const PROXY_TIMEOUT_MS = 25000;
 
 let lastMetaVia: "proxy" | "direct" = "direct";
 let lastMetaIp: string | null = null;
