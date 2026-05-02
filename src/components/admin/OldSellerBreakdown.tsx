@@ -352,6 +352,8 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             rows={filterRows(buckets.forwardedIn)}
             forwarded
             csvName={`${sellerName}-forwarded.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
           />
         </TabsContent>
         <TabsContent value="notForwarded">
@@ -359,16 +361,33 @@ export function OldSellerBreakdown({ sellerId, sellerName }: { sellerId: string;
             rows={filterRows(buckets.notForwardedIn)}
             forwarded={false}
             csvName={`${sellerName}-not-forwarded.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
           />
         </TabsContent>
         <TabsContent value="usdt">
-          <UsdtTable rows={filterRows(buckets.usdtGiven)} csvName={`${sellerName}-usdt.csv`} />
+          <UsdtTable
+            rows={filterRows(buckets.usdtGiven)}
+            csvName={`${sellerName}-usdt.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="withdraw">
-          <WithdrawTable rows={filterRows(buckets.withdraws)} csvName={`${sellerName}-withdraw.csv`} />
+          <WithdrawTable
+            rows={filterRows(buckets.withdraws)}
+            csvName={`${sellerName}-withdraw.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="all">
-          <AllTable rows={filterRows(data.txns)} csvName={`${sellerName}-all.csv`} />
+          <AllTable
+            rows={filterRows(data.txns)}
+            csvName={`${sellerName}-all.csv`}
+            duplicateIds={duplicateIds}
+            onDelete={(r) => setPendingDelete(r)}
+          />
         </TabsContent>
         <TabsContent value="topups">
           <TopupsTable
