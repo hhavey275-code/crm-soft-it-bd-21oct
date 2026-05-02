@@ -136,7 +136,8 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     // Include assigned_users so we can filter to System-User-assigned accounts only.
-    const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name,assigned_users.limit(250){id,role}";
+    // Meta requires `business` param when querying assigned_users on ad accounts.
+    const fields = `id,name,account_id,account_status,spend_cap,amount_spent,business_name,assigned_users.business(${bm.bm_id}).limit(250){id,role}`;
     const baseUrl = `https://graph.facebook.com/v23.0/${bm.bm_id}`;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bmAccessToken = await decryptToken(bm.access_token, serviceKey);
