@@ -2838,6 +2838,33 @@ export type Database = {
           },
         ]
       }
+      tenant_usage_report_keys: {
+        Row: {
+          action: string
+          amount: number
+          created_at: string
+          id: string
+          idempotency_key: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          amount?: number
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       tenant_withdraw_requests: {
         Row: {
           ad_account_external_id: string

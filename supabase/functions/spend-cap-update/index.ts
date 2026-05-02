@@ -46,6 +46,35 @@ function centsToDollars(cents) {
   return cents / 100;
 }
 const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
+
+// Idempotent usage report to master CRM. The same idempotency_key (typically
+// per ad_account+amount+timestamp tuple) MUST be used for every retry of the
+// same logical top-up — including network-error / POST-error recovery paths —
+// so master never double-counts. Master dedupes by (tenant_id, idempotency_key).
+async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any) {
+  try {
+    const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-Key": licenseMap["tenant_api_key"],
+      },
+      body: JSON.stringify({
+        action: "report-usage",
+        amount,
+        idempotency_key: idempotencyKey,
+      }),
+    });
+    const reportData = await reportRes.json().catch(() => ({}));
+    if (reportData?.total_used !== undefined) {
+      await supabase.from("site_settings").update({
+        value: String(reportData.total_used),
+      }).eq("key", "license_total_used");
+    }
+  } catch (reportErr) {
+    console.warn("Failed to report usage to master:", reportErr);
+  }
+}
 // Tolerance for "verified == expected" comparisons. Meta sometimes stores
 // caps with small currency-conversion / rounding offsets (often ±1¢).
 // We accept anything within $1 OR any value >= expected as success.
@@ -257,6 +286,11 @@ Deno.serve(async (req)=>{
     // --- Determine wallet user ---
     const shouldDeductWallet = !!deduct_wallet;
     const walletUserId = target_user_id || userId;
+
+    // Stable idempotency key for any usage report this invocation may emit
+    // (success, POST-error recovery, network-error recovery). Same logical
+    // top-up = same key, so master never double-counts.
+    const usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 60000)}`;
     // ============================================
     // STEP 1: Deduct wallet FIRST (before Meta API)
     // ============================================
@@ -415,6 +449,11 @@ Deno.serve(async (req)=>{
             action: "Spend Cap Updated",
             details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from POST error)${metaCallSummary()}`
           });
+          // Report usage to master so tenant total_used stays accurate even
+          // on recovered-after-error successes.
+          if (isTenantMode) {
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+          }
           return json({
             success: true,
             old_spend_cap: oldSpendCapDollars,
@@ -519,6 +558,11 @@ Deno.serve(async (req)=>{
             action: "Spend Cap Updated",
             details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars} (recovered from network error: ${metaErrorMsg})${metaCallSummary()}`
           });
+          // Report usage to master so tenant total_used stays accurate even
+          // on recovered-after-network-error successes.
+          if (isTenantMode) {
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+          }
           return json({
             success: true,
             old_spend_cap: oldSpendCapDollars,
@@ -630,28 +674,7 @@ Deno.serve(async (req)=>{
     // STEP 5: Report usage to master (Tenant mode)
     // ============================================
     if (isTenantMode) {
-      try {
-        const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Tenant-Key": licenseMap["tenant_api_key"]
-          },
-          body: JSON.stringify({
-            action: "report-usage",
-            amount
-          })
-        });
-        const reportData = await reportRes.json();
-        // Update local cache
-        if (reportData.total_used !== undefined) {
-          await supabase.from("site_settings").update({
-            value: String(reportData.total_used)
-          }).eq("key", "license_total_used");
-        }
-      } catch (reportErr) {
-        console.warn("Failed to report usage to master:", reportErr);
-      }
+      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
     }
     console.log("Spend cap update SUCCESS", {
       actId,
