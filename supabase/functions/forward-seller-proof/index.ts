@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
     let bankName = 'Unknown';
     let accountNumber = 'N/A';
     let resolvedSellerId: string | null = seller_id || null;
+    let resolvedSellerName: string | null = seller_name || null;
 
     if (bank_account_id) {
       const { data: bankData } = await supabase
