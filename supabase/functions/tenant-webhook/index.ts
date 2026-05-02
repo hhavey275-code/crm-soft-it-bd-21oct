@@ -598,13 +598,49 @@ Deno.serve(async (req) => {
       case "report_usage": {
         const amount = Number(field("amount") ?? 0);
         if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
+        const idempotencyKey = String(field("idempotency_key") ?? "").trim();
+
+        // Deduplicate: if a key was sent and we've already processed it, return current state
+        // without double-counting. This protects against client retries / network duplicates.
+        if (idempotencyKey) {
+          const { data: existing } = await supabase
+            .from("tenant_usage_report_keys")
+            .select("id")
+            .eq("tenant_id", tenant.id)
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (existing) {
+            return json({
+              success: true,
+              ok: true,
+              duplicate: true,
+              total_used: Number(tenant.total_used ?? 0),
+              system_limit: tenant.system_limit ?? null,
+            });
+          }
+        }
+
         const newUsed = Number(tenant.total_used ?? 0) + amount;
         const { error } = await supabase
           .from("tenants")
           .update({ total_used: newUsed } as any)
           .eq("id", tenant.id);
         if (error) throw error;
-        await logSystem("report_usage", { amount, new_total_used: newUsed });
+
+        // Persist idempotency key AFTER the update succeeds. Use insert with
+        // unique-constraint as a final guard against concurrent duplicate calls.
+        if (idempotencyKey) {
+          await supabase
+            .from("tenant_usage_report_keys")
+            .insert({
+              tenant_id: tenant.id,
+              idempotency_key: idempotencyKey,
+              action: "report-usage",
+              amount,
+            } as any);
+        }
+
+        await logSystem("report_usage", { amount, new_total_used: newUsed, idempotency_key: idempotencyKey || null });
         return json({
           success: true,
           ok: true,
@@ -617,13 +653,45 @@ Deno.serve(async (req) => {
       case "refund_usage": {
         const amount = Number(field("amount") ?? 0);
         if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
+        const idempotencyKey = String(field("idempotency_key") ?? "").trim();
+
+        if (idempotencyKey) {
+          const { data: existing } = await supabase
+            .from("tenant_usage_report_keys")
+            .select("id")
+            .eq("tenant_id", tenant.id)
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (existing) {
+            return json({
+              success: true,
+              ok: true,
+              duplicate: true,
+              total_used: Number(tenant.total_used ?? 0),
+              system_limit: tenant.system_limit ?? null,
+            });
+          }
+        }
+
         const newUsed = Math.max(0, Number(tenant.total_used ?? 0) - amount);
         const { error } = await supabase
           .from("tenants")
           .update({ total_used: newUsed } as any)
           .eq("id", tenant.id);
         if (error) throw error;
-        await logSystem("refund_usage", { amount, new_total_used: newUsed });
+
+        if (idempotencyKey) {
+          await supabase
+            .from("tenant_usage_report_keys")
+            .insert({
+              tenant_id: tenant.id,
+              idempotency_key: idempotencyKey,
+              action: "refund-usage",
+              amount,
+            } as any);
+        }
+
+        await logSystem("refund_usage", { amount, new_total_used: newUsed, idempotency_key: idempotencyKey || null });
         return json({
           success: true,
           ok: true,
