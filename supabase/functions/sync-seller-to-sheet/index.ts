@@ -267,10 +267,33 @@ serve(async (req) => {
   try { bodyJson = await req.json(); } catch (_) { /* ignore */ }
 
   try {
-    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit } = bodyJson;
+    const { seller_transaction_id, dry_run, backfill, seller_id, months, limit, delete_tabs } = bodyJson;
 
     // ---- BACKFILL MODE (optimized: 1 meta read + 1 probe per tab + 1 batch write per tab) ----
     if (backfill) {
+      // Optional: delete specified tabs first (used to recreate from template)
+      if (Array.isArray(delete_tabs) && delete_tabs.length > 0) {
+        if (!seller_id) throw new Error("seller_id required");
+        const { data: cfgPre } = await supabase
+          .from("seller_sheet_config").select("spreadsheet_id").eq("seller_id", seller_id).maybeSingle();
+        if (cfgPre?.spreadsheet_id) {
+          const metaPre = await getSheetsMeta(cfgPre.spreadsheet_id);
+          const reqs: any[] = [];
+          for (const title of delete_tabs) {
+            const sh = (metaPre.sheets || []).find((s: any) => s.properties.title === title);
+            if (sh) reqs.push({ deleteSheet: { sheetId: sh.properties.sheetId } });
+          }
+          if (reqs.length > 0) {
+            await fetch(`${GATEWAY}/spreadsheets/${cfgPre.spreadsheet_id}:batchUpdate`, {
+              method: "POST", headers: gwHeaders,
+              body: JSON.stringify({ requests: reqs }),
+            });
+          }
+          // Also clear sync logs for those tabs so backfill re-syncs them
+          await supabase.from("sheet_sync_log").delete().in("tab_name", delete_tabs);
+        }
+      }
+
       if (!seller_id) throw new Error("seller_id required for backfill");
       if (!Array.isArray(months) || months.length === 0)
         throw new Error("months[] required (e.g. ['2026-04','2026-05'])");
