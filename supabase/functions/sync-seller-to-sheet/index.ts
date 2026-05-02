@@ -415,7 +415,10 @@ serve(async (req) => {
         const isUsdt = txn.type === "usdt_received";
         const isWithdraw = txn.type === "withdraw";
         if (isPayment) push(cfg.col_payment_bdt, Number(txn.bdt_amount || 0));
-        else if (isWithdraw) push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        else if (isWithdraw) {
+          if (cfg.col_withdraw) push(cfg.col_withdraw, Math.abs(Number(txn.bdt_amount || 0)));
+          else push(cfg.col_payment_bdt, -Math.abs(Number(txn.bdt_amount || 0)));
+        }
         else if (isUsdt) {
           push(cfg.col_payo_usd, Number(txn.usdt_amount || 0));
           push(cfg.col_payo_rate, Number(txn.rate || 0));
