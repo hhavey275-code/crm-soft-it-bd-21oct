@@ -3297,6 +3297,19 @@ export type Database = {
       }
     }
     Functions: {
+      claim_forward_slot: {
+        Args: { p_group_id: string; p_source_id: string; p_source_type: string }
+        Returns: boolean
+      }
+      complete_forward_slot: {
+        Args: {
+          p_caption_total: number
+          p_message_id: number
+          p_source_id: string
+          p_source_type: string
+        }
+        Returns: undefined
+      }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
       get_user_agency_id: { Args: { _user_id: string }; Returns: string }
@@ -3309,6 +3322,10 @@ export type Database = {
       }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      release_forward_slot: {
+        Args: { p_source_id: string; p_source_type: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "client" | "superadmin" | "seller" | "agency"
