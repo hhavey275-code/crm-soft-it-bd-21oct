@@ -161,9 +161,13 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
   if (isLoading) return null;
   if (!rows || rows.length === 0) return null;
 
+  const allIds = rows.map((r) => r.id);
+  const allSelected = selected.size > 0 && selected.size === allIds.length;
+  const someSelected = selected.size > 0;
+
   return (
     <Card className="border-rose-500/40 bg-rose-500/5">
-      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between gap-2">
+      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between gap-2 flex-wrap">
         <CardTitle className="text-sm flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           Not Forwarded ({rows.length})
@@ -171,22 +175,44 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
             — bank+Telegram assigned but never sent for {sellerName}
           </span>
         </CardTitle>
-        <Button size="sm" variant="destructive" onClick={forwardAll} disabled={bulkRunning} className="gap-1.5">
-          {bulkRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          Forward All
-        </Button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer pr-1">
+            <Checkbox checked={allSelected} onCheckedChange={(v) => toggleAll(!!v, allIds)} />
+            Select all
+          </label>
+          {someSelected && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1.5 text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950"
+              disabled={deleting}
+              onClick={() => { setPendingDeleteIds([...selected]); setConfirmOpen(true); }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete ({selected.size})
+            </Button>
+          )}
+          <Button size="sm" variant="destructive" onClick={forwardAll} disabled={bulkRunning} className="gap-1.5">
+            {bulkRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            Forward All
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-4 pt-2 space-y-2">
         {rows.map((r) => {
           const st = results[r.id];
+          const checked = selected.has(r.id);
           return (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs">
-              <div className="flex flex-col min-w-[200px]">
-                <span className="font-medium">{format(new Date(r.created_at), "MMM d, yyyy HH:mm")} · {r.client_name}</span>
-                <span className="text-muted-foreground">
-                  ${Number(r.amount || 0).toLocaleString()} · ৳{Number(r.bdt_amount || 0).toLocaleString()} · {r.bank_name || "—"}
-                  {!r.mirror_present && <span className="ml-2 text-rose-600 font-semibold">· not in seller sheet</span>}
-                </span>
+              <div className="flex items-start gap-2 min-w-[200px]">
+                <Checkbox className="mt-0.5" checked={checked} onCheckedChange={() => toggleOne(r.id)} />
+                <div className="flex flex-col">
+                  <span className="font-medium">{format(new Date(r.created_at), "MMM d, yyyy HH:mm")} · {r.client_name}</span>
+                  <span className="text-muted-foreground">
+                    ${Number(r.amount || 0).toLocaleString()} · ৳{Number(r.bdt_amount || 0).toLocaleString()} · {r.bank_name || "—"}
+                    {!r.mirror_present && <span className="ml-2 text-rose-600 font-semibold">· not in seller sheet</span>}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-1.5">
                 {r.proof_url && (
@@ -207,6 +233,16 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
                     st === "error" ? <><XCircle className="h-3.5 w-3.5 mr-1" />Retry</> :
                     <><Send className="h-3.5 w-3.5 mr-1" />Forward</>}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950"
+                  disabled={deleting}
+                  onClick={() => { setPendingDeleteIds([r.id]); setConfirmOpen(true); }}
+                  title="Remove from list (won't forward)"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
               {(st === "skipped" || st === "error") && reasons[r.id] && (
                 <span className="basis-full text-[11px] text-muted-foreground">{reasons[r.id]}</span>
@@ -215,6 +251,14 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
           );
         })}
       </CardContent>
+      <ConfirmActionDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Remove from Not-Forwarded list?"
+        description={<>This will mark <strong>{pendingDeleteIds.length}</strong> top-up{pendingDeleteIds.length === 1 ? "" : "s"} as dismissed so they no longer appear here. Telegram will NOT be sent. Type <strong>confirm</strong> to proceed.</>}
+        actionLabel="Remove"
+        onConfirm={() => dismissIds(pendingDeleteIds)}
+      />
     </Card>
   );
 }
