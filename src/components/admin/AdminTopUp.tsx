@@ -252,10 +252,56 @@ export function AdminTopUp() {
   });
 
   const filtered = requests?.filter((r: any) => {
+    // Date range filter (applies to all tabs except bank_sms which has its own data)
+    if (statusFilter !== "bank_sms" && dateRange?.from) {
+      const from = startOfDay(dateRange.from);
+      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      const ts = new Date(r.created_at).getTime();
+      if (ts < from.getTime() || ts > to.getTime()) return false;
+    }
     if (statusFilter === "all" || statusFilter === "bank_sms") return true;
     if (statusFilter === "tenant") return r._source === "tenant";
     return r.status === statusFilter;
   });
+
+  // Approved top-ups whose bank has a Telegram group but were never forwarded
+  const missingForwards = useMemo(() => {
+    if (!requests) return [];
+    return requests.filter((r: any) =>
+      r._source === "client" &&
+      r.status === "approved" &&
+      r.proof_url &&
+      r.bankAccount?.telegram_group_id &&
+      r.telegram_forwarded !== true
+    );
+  }, [requests]);
+
+  const [forwardingMissing, setForwardingMissing] = useState(false);
+  const [forwardMissingOpen, setForwardMissingOpen] = useState(false);
+  const [forwardResults, setForwardResults] = useState<Array<{ id: string; name: string; amount: number; status: "ok" | "skipped" | "error"; reason?: string }>>([]);
+
+  const runForwardMissing = async () => {
+    if (!missingForwards.length) { toast.info("Nothing to forward."); return; }
+    setForwardingMissing(true);
+    setForwardResults([]);
+    const results: typeof forwardResults = [];
+    for (const r of missingForwards) {
+      const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+      try {
+        const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: r.id } });
+        if (error) throw error;
+        if (data?.skipped) results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "skipped", reason: data.reason });
+        else results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "ok" });
+      } catch (e: any) {
+        results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "error", reason: e.message });
+      }
+      setForwardResults([...results]);
+    }
+    setForwardingMissing(false);
+    const okCount = results.filter(r => r.status === "ok").length;
+    toast.success(`Forwarded ${okCount} of ${results.length}`);
+    queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+  };
 
   const summaryMetrics = useMemo(() => {
     if (!requests) return { totalUsd: 0, totalBdt: 0, autoApproved: 0, manualApproved: 0 };
@@ -676,6 +722,12 @@ export function AdminTopUp() {
               />
             </PopoverContent>
           </Popover>
+          {missingForwards.length > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => setForwardMissingOpen(true)} className="gap-1.5">
+              <Send className="h-3.5 w-3.5" />
+              Forward Missing ({missingForwards.length})
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
@@ -1079,6 +1131,57 @@ export function AdminTopUp() {
               disabled={processMutation.isPending || (actionDialog?.action === "rejected" && !adminNote)}
             >
               {processMutation.isPending ? "Processing..." : actionDialog?.action === "approved" ? "Approve" : actionDialog?.action === "rejected" ? "Reject" : "Hold"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={forwardMissingOpen} onOpenChange={(o) => { if (!forwardingMissing) setForwardMissingOpen(o); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Forward Missing Top-Ups</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {missingForwards.length} approved top-up(s) have a bank with Telegram group assigned but were never forwarded.
+              Clicking <b>Forward All</b> will send each to its Telegram group and (if missing) create the matching seller ledger entry.
+            </p>
+            <div className="max-h-80 overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Result</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {missingForwards.map((r: any) => {
+                    const res = forwardResults.find((x) => x.id === r.id);
+                    const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs">{format(new Date(r.created_at), "MMM d, HH:mm")}</TableCell>
+                        <TableCell className="text-sm">{name}</TableCell>
+                        <TableCell className="text-sm font-medium">${Number(r.amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">
+                          {!res ? <span className="text-muted-foreground">—</span> :
+                            res.status === "ok" ? <span className="text-emerald-600">✅ Forwarded</span> :
+                            res.status === "skipped" ? <span className="text-yellow-600">⚠️ {res.reason || "skipped"}</span> :
+                            <span className="text-destructive">❌ {res.reason || "error"}</span>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForwardMissingOpen(false)} disabled={forwardingMissing}>Close</Button>
+            <Button onClick={runForwardMissing} disabled={forwardingMissing || missingForwards.length === 0}>
+              {forwardingMissing ? `Forwarding... (${forwardResults.length}/${missingForwards.length})` : `Forward All (${missingForwards.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>
