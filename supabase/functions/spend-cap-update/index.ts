@@ -51,7 +51,7 @@ const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
 // per ad_account+amount+timestamp tuple) MUST be used for every retry of the
 // same logical top-up — including network-error / POST-error recovery paths —
 // so master never double-counts. Master dedupes by (tenant_id, idempotency_key).
-async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any) {
+async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any, source?: string, meta?: Record<string, unknown>) {
   try {
     const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
       method: "POST",
@@ -63,6 +63,8 @@ async function reportUsageToMaster(licenseMap: Record<string, string>, amount: n
         action: "report-usage",
         amount,
         idempotency_key: idempotencyKey,
+        source: source ?? "spend-cap-update",
+        meta: meta ?? null,
       }),
     });
     const reportData = await reportRes.json().catch(() => ({}));
