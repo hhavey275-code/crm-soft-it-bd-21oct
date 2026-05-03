@@ -272,7 +272,8 @@ export function AdminTopUp() {
       r.status === "approved" &&
       r.proof_url &&
       r.bankAccount?.telegram_group_id &&
-      r.telegram_forwarded !== true
+      r.telegram_forwarded !== true &&
+      !r.forward_dismissed_at
     );
   }, [requests]);
 
@@ -300,6 +301,28 @@ export function AdminTopUp() {
   const [forwardingMissing, setForwardingMissing] = useState(false);
   const [forwardMissingOpen, setForwardMissingOpen] = useState(false);
   const [forwardResults, setForwardResults] = useState<Array<{ id: string; name: string; amount: number; status: "ok" | "skipped" | "error"; reason?: string }>>([]);
+  const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
+
+  const dismissMissing = async (ids: string[]) => {
+    if (!ids.length) return;
+    setDismissingIds((s) => { const n = new Set(s); ids.forEach((i) => n.add(i)); return n; });
+    try {
+      const { error } = await (supabase as any)
+        .from("top_up_requests")
+        .update({
+          forward_dismissed_at: new Date().toISOString(),
+          forward_dismissed_by: user?.id ?? null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+      toast.success(`Removed ${ids.length} from list`);
+      queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove");
+    } finally {
+      setDismissingIds((s) => { const n = new Set(s); ids.forEach((i) => n.delete(i)); return n; });
+    }
+  };
 
   const runForwardMissing = async () => {
     if (!missingForwards.length) { toast.info("Nothing to forward."); return; }
@@ -1158,15 +1181,57 @@ export function AdminTopUp() {
       </Dialog>
 
       <Dialog open={forwardMissingOpen} onOpenChange={(o) => { if (!forwardingMissing) setForwardMissingOpen(o); }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-3 md:p-6">
           <DialogHeader>
-            <DialogTitle>Forward Missing Top-Ups</DialogTitle>
+            <DialogTitle className="text-base md:text-lg">Forward Missing Top-Ups</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              <b>{missingForwards.length}</b> approved top-up(s) Telegram-এ forward হয়নি · এর মধ্যে <b>{willCreateSheetCount}</b>-টি seller sheet-এও যোগ হবে, বাকি <b>{missingForwards.length - willCreateSheetCount}</b>-টি শুধু Telegram-এ forward হবে।
+          <div className="space-y-3 overflow-hidden flex flex-col flex-1">
+            <p className="text-xs md:text-sm text-muted-foreground">
+              <b>{missingForwards.length}</b> approved top-up(s) Telegram-এ forward হয়নি · এর মধ্যে <b>{willCreateSheetCount}</b>-টি sheet-এও যোগ হবে, বাকি <b>{missingForwards.length - willCreateSheetCount}</b>-টি শুধু forward হবে।
             </p>
-            <div className="max-h-80 overflow-auto border rounded-md">
+
+            {/* Mobile: card list */}
+            <div className="md:hidden flex-1 overflow-auto space-y-2 -mx-1 px-1">
+              {missingForwards.map((r: any) => {
+                const res = forwardResults.find((x) => x.id === r.id);
+                const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+                const tg = r.bankAccount?.telegram_group_id || "";
+                const dismissing = dismissingIds.has(r.id);
+                return (
+                  <div key={r.id} className="rounded-md border bg-card p-2.5 text-xs space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{name}</div>
+                        <div className="text-[11px] text-muted-foreground">{format(new Date(r.created_at), "MMM d, HH:mm")} · {r.bankAccount?.bank_name || "—"}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-semibold">${Number(r.amount || 0).toLocaleString()}</div>
+                        <div className="text-[11px] text-muted-foreground">৳{Number(r.bdt_amount || 0).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        {r.mirror_present ? <span className="text-emerald-600">✅ In sheet</span> : <span className="text-amber-600">+ Sheet</span>}
+                        {tg && <span className="font-mono text-muted-foreground truncate max-w-[100px]" title={tg}>📨 {tg.slice(-8)}</span>}
+                        {res && (res.status === "ok" ? <span className="text-emerald-600">Sent ✅</span> : res.status === "skipped" ? <span className="text-yellow-600" title={res.reason}>Skipped</span> : <span className="text-destructive" title={res.reason}>Error</span>)}
+                      </div>
+                      <Button
+                        size="sm" variant="ghost"
+                        className="h-7 px-2 text-rose-600"
+                        disabled={dismissing || forwardingMissing}
+                        onClick={() => dismissMissing([r.id])}
+                        title="Manually handled — remove from list"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block max-h-80 overflow-auto border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1175,10 +1240,10 @@ export function AdminTopUp() {
                     <TableHead className="text-xs">Bank</TableHead>
                     <TableHead className="text-xs">USD</TableHead>
                     <TableHead className="text-xs">BDT</TableHead>
-                    <TableHead className="text-xs">Telegram</TableHead>
-                    <TableHead className="text-xs">In Sheet</TableHead>
-                    <TableHead className="text-xs">Action</TableHead>
+                    <TableHead className="text-xs">TG</TableHead>
+                    <TableHead className="text-xs">Sheet</TableHead>
                     <TableHead className="text-xs">Result</TableHead>
+                    <TableHead className="text-xs"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1186,6 +1251,7 @@ export function AdminTopUp() {
                     const res = forwardResults.find((x) => x.id === r.id);
                     const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
                     const tg = r.bankAccount?.telegram_group_id || "";
+                    const dismissing = dismissingIds.has(r.id);
                     return (
                       <TableRow key={r.id}>
                         <TableCell className="text-xs whitespace-nowrap">{format(new Date(r.created_at), "MMM d, HH:mm")}</TableCell>
@@ -1193,18 +1259,23 @@ export function AdminTopUp() {
                         <TableCell className="text-xs">{r.bankAccount?.bank_name || "—"}</TableCell>
                         <TableCell className="text-xs font-medium">${Number(r.amount || 0).toLocaleString()}</TableCell>
                         <TableCell className="text-xs">৳{Number(r.bdt_amount || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-[10px] font-mono" title={tg}>{tg ? (tg.length > 10 ? tg.slice(0, 10) + "…" : tg) : "—"}</TableCell>
+                        <TableCell className="text-[10px] font-mono" title={tg}>{tg ? tg.slice(-8) : "—"}</TableCell>
                         <TableCell className="text-xs">
-                          {r.mirror_present ? <span className="text-emerald-600">✅ Yes</span> : <span className="text-rose-600">❌ No</span>}
-                        </TableCell>
-                        <TableCell className="text-[11px]">
-                          {r.mirror_present ? <span className="text-muted-foreground">Forward only</span> : <span className="text-amber-600 font-medium">Forward + Add to sheet</span>}
+                          {r.mirror_present ? <span className="text-emerald-600">✅</span> : <span className="text-amber-600">+sheet</span>}
                         </TableCell>
                         <TableCell className="text-xs">
                           {!res ? <span className="text-muted-foreground">—</span> :
                             res.status === "ok" ? <span className="text-emerald-600">✅</span> :
                             res.status === "skipped" ? <span className="text-yellow-600" title={res.reason}>⚠️</span> :
                             <span className="text-destructive" title={res.reason}>❌</span>}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-rose-600"
+                            disabled={dismissing || forwardingMissing}
+                            onClick={() => dismissMissing([r.id])}
+                            title="Manually handled — remove from list">
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -1213,9 +1284,9 @@ export function AdminTopUp() {
               </Table>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setForwardMissingOpen(false)} disabled={forwardingMissing}>Close</Button>
-            <Button onClick={runForwardMissing} disabled={forwardingMissing || missingForwards.length === 0}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setForwardMissingOpen(false)} disabled={forwardingMissing} className="w-full sm:w-auto">Close</Button>
+            <Button onClick={runForwardMissing} disabled={forwardingMissing || missingForwards.length === 0} className="w-full sm:w-auto">
               {forwardingMissing ? `Forwarding... (${forwardResults.length}/${missingForwards.length})` : `Forward All (${missingForwards.length})`}
             </Button>
           </DialogFooter>
