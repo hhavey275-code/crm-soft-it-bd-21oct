@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle, Send } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle, Send, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
@@ -780,7 +781,9 @@ export function AdminSellers() {
   const uncalculatedTxns = useMemo(
     () => (sellerTxns || [])
       .map((t: any) => ({ txn: t, reason: getSellerTransactionSkipReason(t) }))
-      .filter((item) => item.reason),
+      .filter((item) => item.reason)
+      // Hide entries where both BDT and USDT amounts are zero (no real value to show)
+      .filter(({ txn }: any) => Number(txn.bdt_amount || 0) !== 0 || Number(txn.usdt_amount || 0) !== 0),
     [sellerTxns]
   );
 
@@ -1714,6 +1717,19 @@ export function AdminSellers() {
             </button>
           </div>
 
+          {/* Filters & Banks — collapsible on mobile, always visible on desktop */}
+          <Collapsible defaultOpen={!isMobile}>
+            <CollapsibleTrigger asChild>
+              <button className="md:hidden w-full flex items-center justify-between px-3 py-2 rounded-lg border bg-card text-sm font-semibold">
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-primary" />
+                  Filters & Banks
+                  {hasActiveFilter && <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">active</span>}
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 md:space-y-4 data-[state=closed]:md:!block pt-3 md:pt-0">
           {/* Bank filter chips from transactions */}
           {(txnBanks.length > 0 || sellerTxns?.some((t: any) => !t.bank_account_id)) && (
             <div className="flex flex-wrap gap-2">
@@ -1836,6 +1852,8 @@ export function AdminSellers() {
               }}
             />
           </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {selectedSeller && (
             <SellerNotForwardedCard sellerId={selectedSeller.user_id} sellerName={selectedSeller.full_name || selectedSeller.email || "Seller"} />
