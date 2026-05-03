@@ -931,11 +931,25 @@ export function AdminTopUp() {
                         {getProcessedByLabel(r)}
                       </TableCell>
                       <TableCell className="py-2 px-2">
-                        {r.status === "approved" ? (
-                          <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
-                            <Send className="h-2.5 w-2.5" />
-                            {r.telegram_forwarded === true ? "Yes" : r.telegram_forwarded === false ? "No" : "—"}
-                          </span>
+                        {r.status === "approved" && r._source !== "tenant" ? (
+                          <div className="flex items-center gap-1">
+                            <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
+                              <Send className="h-2.5 w-2.5" />
+                              {r.telegram_forwarded === true ? "Yes" : r.telegram_forwarded === false ? "No" : "—"}
+                            </span>
+                            {r.telegram_forwarded === false && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 px-1 text-[9px]"
+                                title="Resend to Telegram"
+                                disabled={resendTopupForwardMutation.isPending}
+                                onClick={() => resendTopupForwardMutation.mutate(r.id)}
+                              >
+                                ↻
+                              </Button>
+                            )}
+                          </div>
                         ) : <span className="text-muted-foreground text-[10px]">—</span>}
                       </TableCell>
                       <TableCell className="py-2 px-2">
