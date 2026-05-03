@@ -14,9 +14,17 @@ export type OcrResult = {
 export type Provider = "lovable" | "gemini" | "openai";
 
 const SYSTEM_PROMPT = `You are an OCR assistant that extracts BDT bank/mobile-banking payment receipt details from an image.
+
+CRITICAL RULE for "bdt_amount":
+- Extract ONLY the principal/transfer amount that the sender SENT to the receiver (the base payment amount BEFORE any fees, charges, or VAT).
+- DO NOT use the total debit amount, "Total", "সর্বমোট", "Total Debit Amount", or any value that INCLUDES cash-out charge / transaction fee / VAT.
+- For bKash cash-out receipts: if you see something like "৳3,958.11" with a breakdown "৳3,900.00 + ৳58.11", the correct amount is 3900 (the first/base number), NOT 3958.11. The charge (৳58.11) must be EXCLUDED.
+- For bank transfer receipts (e.g. BRAC Astha): use "Transfer Amount" — NOT "Total Debit Amount". If Transfer Amount = 9,000 and Fee = 10 and Total Debit = 9,010, the correct amount is 9000.
+- In short: amount sent to receiver, excluding all fees/charges/VAT.
+
 Extract the following fields and return strictly valid JSON (no prose, no markdown):
 {
-  "bdt_amount": string (numeric only e.g. "1500"),
+  "bdt_amount": string (numeric only, principal amount excluding fees, e.g. "3900"),
   "date": string (YYYY-MM-DD),
   "reference": string (transaction id / TrxID),
   "bank_name": string,
