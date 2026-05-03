@@ -3055,6 +3055,8 @@ export type Database = {
           bank_account_id: string | null
           bdt_amount: number | null
           created_at: string
+          forward_dismissed_at: string | null
+          forward_dismissed_by: string | null
           id: string
           last_verify_at: string | null
           payment_method: string
@@ -3078,6 +3080,8 @@ export type Database = {
           bank_account_id?: string | null
           bdt_amount?: number | null
           created_at?: string
+          forward_dismissed_at?: string | null
+          forward_dismissed_by?: string | null
           id?: string
           last_verify_at?: string | null
           payment_method?: string
@@ -3101,6 +3105,8 @@ export type Database = {
           bank_account_id?: string | null
           bdt_amount?: number | null
           created_at?: string
+          forward_dismissed_at?: string | null
+          forward_dismissed_by?: string | null
           id?: string
           last_verify_at?: string | null
           payment_method?: string
