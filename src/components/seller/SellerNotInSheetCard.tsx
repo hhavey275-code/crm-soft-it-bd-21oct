@@ -61,7 +61,7 @@ export function SellerNotInSheetCard({ sellerId }: Props) {
       const missing = candidates.filter((r: any) => !mirrorSet.has(r.id));
       if (!missing.length) return [];
 
-      const userIds = [...new Set(missing.map((r: any) => r.user_id))];
+      const userIds = [...new Set(missing.map((r: any) => r.user_id as string))] as string[];
       const { data: profiles } = await supabase
         .from("profiles").select("user_id, full_name, email").in("user_id", userIds);
       const pMap: Record<string, any> = {};
