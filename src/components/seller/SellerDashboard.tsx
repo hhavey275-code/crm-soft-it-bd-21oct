@@ -364,6 +364,9 @@ export function SellerDashboard() {
         </button>
       </div>
 
+      {/* Not in Seller Sheet — visibility for seller */}
+      {user && <SellerNotInSheetCard sellerId={user.id} />}
+
       {/* Month-by-Month Due/Advance */}
       <MonthlyDueAdvanceCard transactions={transactions as any} />
 
