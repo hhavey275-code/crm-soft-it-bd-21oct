@@ -301,6 +301,28 @@ export function AdminTopUp() {
   const [forwardingMissing, setForwardingMissing] = useState(false);
   const [forwardMissingOpen, setForwardMissingOpen] = useState(false);
   const [forwardResults, setForwardResults] = useState<Array<{ id: string; name: string; amount: number; status: "ok" | "skipped" | "error"; reason?: string }>>([]);
+  const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
+
+  const dismissMissing = async (ids: string[]) => {
+    if (!ids.length) return;
+    setDismissingIds((s) => { const n = new Set(s); ids.forEach((i) => n.add(i)); return n; });
+    try {
+      const { error } = await (supabase as any)
+        .from("top_up_requests")
+        .update({
+          forward_dismissed_at: new Date().toISOString(),
+          forward_dismissed_by: user?.id ?? null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+      toast.success(`Removed ${ids.length} from list`);
+      queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove");
+    } finally {
+      setDismissingIds((s) => { const n = new Set(s); ids.forEach((i) => n.delete(i)); return n; });
+    }
+  };
 
   const runForwardMissing = async () => {
     if (!missingForwards.length) { toast.info("Nothing to forward."); return; }
