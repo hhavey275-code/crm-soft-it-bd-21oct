@@ -234,7 +234,7 @@ export function AdminTopUp() {
 
       const [{ data: profiles }, { data: banks }] = await Promise.all([
         allIds.length > 0 ? supabase.from("profiles").select("user_id, full_name, email").in("user_id", allIds) : Promise.resolve({ data: [] }),
-        bankIds.length > 0 ? supabase.from("bank_accounts").select("id, bank_name, account_number").in("id", bankIds) : Promise.resolve({ data: [] }),
+        bankIds.length > 0 ? supabase.from("bank_accounts").select("id, bank_name, account_number, telegram_group_id").in("id", bankIds) : Promise.resolve({ data: [] }),
       ]);
 
       const profileMap: Record<string, any> = {};
