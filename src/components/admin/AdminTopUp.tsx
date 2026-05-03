@@ -777,12 +777,23 @@ export function AdminTopUp() {
                   <span className="text-muted-foreground">Processed By</span>
                   <span className="font-medium text-foreground">{getProcessedByLabel(r)}</span>
                 </div>
-                {r.status === "approved" && (
+                {r.status === "approved" && r._source !== "tenant" && (
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Telegram</span>
                     <span className={cn("font-medium flex items-center gap-1", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
                       <Send className="h-3 w-3" />
                       {r.telegram_forwarded === true ? "Forwarded" : r.telegram_forwarded === false ? "Not Forwarded" : "—"}
+                      {r.telegram_forwarded === false && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1.5 text-[10px] ml-1"
+                          disabled={resendTopupForwardMutation.isPending}
+                          onClick={() => resendTopupForwardMutation.mutate(r.id)}
+                        >
+                          Resend
+                        </Button>
+                      )}
                     </span>
                   </div>
                 )}
