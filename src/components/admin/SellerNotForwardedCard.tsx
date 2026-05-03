@@ -50,9 +50,13 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
     if (ids.length === 0) return;
     setDeleting(true);
     try {
+      const { data: userData } = await supabase.auth.getUser();
       const { error } = await (supabase as any)
         .from("top_up_requests")
-        .update({ telegram_forwarded: true })
+        .update({
+          forward_dismissed_at: new Date().toISOString(),
+          forward_dismissed_by: userData?.user?.id ?? null,
+        })
         .in("id", ids);
       if (error) throw error;
       toast.success(`Removed ${ids.length} from list`);
