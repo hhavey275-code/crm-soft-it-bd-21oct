@@ -3,9 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Send, AlertTriangle, Loader2, CheckCircle2, XCircle, ImageIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Send, AlertTriangle, Loader2, CheckCircle2, XCircle, ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 
 type Props = { sellerId: string; sellerName: string };
 
@@ -28,6 +30,41 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
   const [results, setResults] = useState<Record<string, "ok" | "skipped" | "error" | "loading">>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [bulkRunning, setBulkRunning] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+
+  const toggleOne = (id: string) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const toggleAll = (all: boolean, ids: string[]) => {
+    setSelected(all ? new Set(ids) : new Set());
+  };
+
+  const dismissIds = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setDeleting(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("top_up_requests")
+        .update({ telegram_forwarded: true })
+        .in("id", ids);
+      if (error) throw error;
+      toast.success(`Removed ${ids.length} from list`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["seller-not-forwarded", sellerId] });
+      refetch();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const { data: rows, isLoading, refetch } = useQuery({
     queryKey: ["seller-not-forwarded", sellerId],
