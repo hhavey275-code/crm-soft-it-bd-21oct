@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CheckCircle2, Download, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { runSellerAudit, backfillOrphan, type AuditReport, type OrphanTopup } from "@/lib/sellerAudit";
+import { ForwardAudit } from "./ForwardAudit";
 import { exportAllSellersMonthly, getAvailableMonths, monthLabel, type Bucket } from "@/lib/sellerMonthlyExportAll";
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import { useAuth } from "@/contexts/AuthContext";
