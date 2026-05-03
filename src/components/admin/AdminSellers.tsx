@@ -1837,6 +1837,10 @@ export function AdminSellers() {
             />
           </div>
 
+          {selectedSeller && (
+            <SellerNotForwardedCard sellerId={selectedSeller.user_id} sellerName={selectedSeller.full_name || selectedSeller.email || "Seller"} />
+          )}
+
           {uncalculatedTxns.length > 0 && (
             <Card className="border-amber-500/30 bg-amber-500/5">
               <CardHeader className="p-4 pb-2">
