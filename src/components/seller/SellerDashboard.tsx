@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
 import { MonthlyDueAdvanceCard } from "./MonthlyDueAdvanceCard";
+import { SellerNotInSheetCard } from "./SellerNotInSheetCard";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -361,122 +364,139 @@ export function SellerDashboard() {
         </button>
       </div>
 
+      {/* Not in Seller Sheet — visibility for seller */}
+      {user && <SellerNotInSheetCard sellerId={user.id} />}
+
       {/* Month-by-Month Due/Advance */}
       <MonthlyDueAdvanceCard transactions={transactions as any} />
 
-      {/* Bank Chips */}
-      {banks.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {banks.map((b) => {
-            const bankTotal = filtered
-              .filter((t: any) => t.bank_account_id === b.id)
-              .reduce((s: number, t: any) => s + Number(t.bdt_amount || 0), 0);
-            return (
-              <button
-                key={b.id}
-                onClick={() => setBankFilter(prev => prev === b.id ? null : b.id)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border font-medium transition-all duration-200",
-                  bankFilter === b.id
-                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
-                    : "bg-card hover:bg-accent border-border hover:border-primary/30 text-foreground"
-                )}
-              >
-                <Landmark className="h-3 w-3 opacity-70" />
-                <span>{b.name}</span>
-                <span className="opacity-60">****{b.account?.slice(-4)}</span>
-                <span className={cn(
-                  "ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold",
-                  bankFilter === b.id ? "bg-primary-foreground/20" : "bg-muted"
-                )}>
-                  ৳{bankTotal.toLocaleString()}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* My Assigned USDT Banks */}
-      {assignedUsdtBanks && assignedUsdtBanks.length > 0 && (
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Landmark className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-bold">My USDT Banks</h3>
-            <span className="text-[10px] text-muted-foreground">(USDT input এ এই bank-গুলো select করতে পারবেন)</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {assignedUsdtBanks.map((b: any) => (
-              <div key={b.id} className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-lg border bg-muted/30">
-                <Landmark className="h-3 w-3 text-primary" />
-                <span className="font-semibold">{b.bank_name}</span>
-                <span className="text-muted-foreground">— {b.account_number}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Date Filter Bar */}
-      <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-muted/50 border border-border/50">
-        {DATE_PRESETS.filter(p => p.key !== "custom").map((p) => (
-          <Button
-            key={p.key}
-            size="sm"
-            variant="ghost"
-            className={cn(
-              "text-xs h-8 rounded-md font-medium transition-all",
-              datePreset === p.key
-                ? "bg-card text-foreground shadow-sm border border-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setDatePreset(p.key)}
-          >
-            {p.label}
-          </Button>
-        ))}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                "text-xs h-8 rounded-md font-medium gap-1 transition-all",
-                datePreset === "custom"
-                  ? "bg-card text-foreground shadow-sm border border-border/60"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <CalendarIcon className="h-3 w-3" /> Custom
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <div className="p-3 space-y-2">
-              <Calendar
-                mode="range"
-                selected={customFrom && customTo ? { from: customFrom, to: customTo } : customFrom ? { from: customFrom, to: undefined } : undefined}
-                onSelect={(range: any) => {
-                  setCustomFrom(range?.from ?? undefined);
-                  setCustomTo(range?.to ?? undefined);
-                  setDatePreset("custom");
-                }}
-                numberOfMonths={1}
-                className="p-2 pointer-events-auto"
-              />
-              {customFrom && (
-                <p className="text-xs text-muted-foreground text-center">
-                  {format(customFrom, "MMM d, yyyy")} {customTo ? `— ${format(customTo, "MMM d, yyyy")}` : "— select end date"}
-                </p>
-              )}
+      {/* Filters & Banks — collapsible on mobile, always visible on desktop */}
+      <Collapsible defaultOpen={!isMobile}>
+        <CollapsibleTrigger asChild>
+          <button className="md:hidden w-full flex items-center justify-between px-3 py-2 rounded-lg border bg-card text-sm font-semibold">
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              Filters & Banks
+              {hasActiveFilter && <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">active</span>}
+            </span>
+            <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 md:space-y-4 data-[state=closed]:md:!block pt-3 md:pt-0">
+          {/* Bank Chips */}
+          {banks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {banks.map((b) => {
+                const bankTotal = filtered
+                  .filter((t: any) => t.bank_account_id === b.id)
+                  .reduce((s: number, t: any) => s + Number(t.bdt_amount || 0), 0);
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setBankFilter(prev => prev === b.id ? null : b.id)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border font-medium transition-all duration-200",
+                      bankFilter === b.id
+                        ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                        : "bg-card hover:bg-accent border-border hover:border-primary/30 text-foreground"
+                    )}
+                  >
+                    <Landmark className="h-3 w-3 opacity-70" />
+                    <span>{b.name}</span>
+                    <span className="opacity-60">****{b.account?.slice(-4)}</span>
+                    <span className={cn(
+                      "ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold",
+                      bankFilter === b.id ? "bg-primary-foreground/20" : "bg-muted"
+                    )}>
+                      ৳{bankTotal.toLocaleString()}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </PopoverContent>
-        </Popover>
-        {hasActiveFilter && (
-          <Button size="sm" variant="ghost" className="text-xs h-8 gap-1 text-destructive hover:text-destructive ml-auto" onClick={clearAllFilters}>
-            <X className="h-3 w-3" /> Clear
-          </Button>
-        )}
-      </div>
+          )}
+
+          {/* My Assigned USDT Banks */}
+          {assignedUsdtBanks && assignedUsdtBanks.length > 0 && (
+            <div className="rounded-xl border bg-card p-3 md:p-4">
+              <div className="flex items-center gap-2 mb-2 md:mb-3">
+                <Landmark className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-bold">My USDT Banks</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {assignedUsdtBanks.map((b: any) => (
+                  <div key={b.id} className="inline-flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border bg-muted/30">
+                    <Landmark className="h-3 w-3 text-primary" />
+                    <span className="font-semibold">{b.bank_name}</span>
+                    <span className="text-muted-foreground">— {b.account_number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Date Filter Bar */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-muted/50 border border-border/50">
+            {DATE_PRESETS.filter(p => p.key !== "custom").map((p) => (
+              <Button
+                key={p.key}
+                size="sm"
+                variant="ghost"
+                className={cn(
+                  "text-xs h-8 rounded-md font-medium transition-all",
+                  datePreset === p.key
+                    ? "bg-card text-foreground shadow-sm border border-border/60"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setDatePreset(p.key)}
+              >
+                {p.label}
+              </Button>
+            ))}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    "text-xs h-8 rounded-md font-medium gap-1 transition-all",
+                    datePreset === "custom"
+                      ? "bg-card text-foreground shadow-sm border border-border/60"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <CalendarIcon className="h-3 w-3" /> Custom
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <div className="p-3 space-y-2">
+                  <Calendar
+                    mode="range"
+                    selected={customFrom && customTo ? { from: customFrom, to: customTo } : customFrom ? { from: customFrom, to: undefined } : undefined}
+                    onSelect={(range: any) => {
+                      setCustomFrom(range?.from ?? undefined);
+                      setCustomTo(range?.to ?? undefined);
+                      setDatePreset("custom");
+                    }}
+                    numberOfMonths={1}
+                    className="p-2 pointer-events-auto"
+                  />
+                  {customFrom && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      {format(customFrom, "MMM d, yyyy")} {customTo ? `— ${format(customTo, "MMM d, yyyy")}` : "— select end date"}
+                    </p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasActiveFilter && (
+              <Button size="sm" variant="ghost" className="text-xs h-8 gap-1 text-destructive hover:text-destructive ml-auto" onClick={clearAllFilters}>
+                <X className="h-3 w-3" /> Clear
+              </Button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Transaction Ledger */}
       <Card className="border-0 shadow-lg shadow-black/5 dark:shadow-black/20 bg-card/80 backdrop-blur-sm overflow-hidden rounded-xl">
