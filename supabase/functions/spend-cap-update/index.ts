@@ -458,7 +458,7 @@ Deno.serve(async (req)=>{
           // Report usage to master so tenant total_used stays accurate even
           // on recovered-after-error successes.
           if (isTenantMode) {
-            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
           }
           return json({
             success: true,
@@ -567,7 +567,7 @@ Deno.serve(async (req)=>{
           // Report usage to master so tenant total_used stays accurate even
           // on recovered-after-network-error successes.
           if (isTenantMode) {
-            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
           }
           return json({
             success: true,
@@ -680,7 +680,7 @@ Deno.serve(async (req)=>{
     // STEP 5: Report usage to master (Tenant mode)
     // ============================================
     if (isTenantMode) {
-      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
     }
     console.log("Spend cap update SUCCESS", {
       actId,
