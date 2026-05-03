@@ -583,6 +583,7 @@ export function AdminTopUp() {
           console.error("Init telegram_forwarded=false failed (non-blocking):", e);
         }
       }
+    },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);
       queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
