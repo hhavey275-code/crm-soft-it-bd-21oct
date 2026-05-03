@@ -265,7 +265,7 @@ export function AdminTopUp() {
   });
 
   // Approved top-ups whose bank has a Telegram group but were never forwarded
-  const missingForwards = useMemo(() => {
+  const missingForwardsBase = useMemo(() => {
     if (!requests) return [];
     return requests.filter((r: any) =>
       r._source === "client" &&
@@ -275,6 +275,27 @@ export function AdminTopUp() {
       r.telegram_forwarded !== true
     );
   }, [requests]);
+
+  const missingIds = useMemo(() => missingForwardsBase.map((r: any) => r.id), [missingForwardsBase]);
+
+  const { data: mirrorSet } = useQuery({
+    queryKey: ["missing-forward-mirrors", missingIds],
+    enabled: missingIds.length > 0,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("seller_transactions")
+        .select("top_up_request_id")
+        .in("top_up_request_id", missingIds);
+      return new Set((data || []).map((m: any) => m.top_up_request_id));
+    },
+  });
+
+  const missingForwards = useMemo(
+    () => missingForwardsBase.map((r: any) => ({ ...r, mirror_present: mirrorSet?.has(r.id) ?? false })),
+    [missingForwardsBase, mirrorSet]
+  );
+
+  const willCreateSheetCount = missingForwards.filter((r: any) => !r.mirror_present).length;
 
   const [forwardingMissing, setForwardingMissing] = useState(false);
   const [forwardMissingOpen, setForwardMissingOpen] = useState(false);
