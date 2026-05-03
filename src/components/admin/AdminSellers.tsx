@@ -1717,6 +1717,19 @@ export function AdminSellers() {
             </button>
           </div>
 
+          {/* Filters & Banks — collapsible on mobile, always visible on desktop */}
+          <Collapsible defaultOpen={!isMobile}>
+            <CollapsibleTrigger asChild>
+              <button className="md:hidden w-full flex items-center justify-between px-3 py-2 rounded-lg border bg-card text-sm font-semibold">
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-primary" />
+                  Filters & Banks
+                  {hasActiveFilter && <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">active</span>}
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 md:space-y-4 data-[state=closed]:md:!block pt-3 md:pt-0">
           {/* Bank filter chips from transactions */}
           {(txnBanks.length > 0 || sellerTxns?.some((t: any) => !t.bank_account_id)) && (
             <div className="flex flex-wrap gap-2">
@@ -1839,6 +1852,8 @@ export function AdminSellers() {
               }}
             />
           </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {selectedSeller && (
             <SellerNotForwardedCard sellerId={selectedSeller.user_id} sellerName={selectedSeller.full_name || selectedSeller.email || "Seller"} />
