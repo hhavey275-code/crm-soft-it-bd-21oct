@@ -2841,26 +2841,38 @@ export type Database = {
       tenant_usage_report_keys: {
         Row: {
           action: string
+          after_total_used: number | null
           amount: number
+          before_total_used: number | null
           created_at: string
           id: string
           idempotency_key: string
+          meta: Json | null
+          source: string | null
           tenant_id: string
         }
         Insert: {
           action: string
+          after_total_used?: number | null
           amount?: number
+          before_total_used?: number | null
           created_at?: string
           id?: string
           idempotency_key: string
+          meta?: Json | null
+          source?: string | null
           tenant_id: string
         }
         Update: {
           action?: string
+          after_total_used?: number | null
           amount?: number
+          before_total_used?: number | null
           created_at?: string
           id?: string
           idempotency_key?: string
+          meta?: Json | null
+          source?: string | null
           tenant_id?: string
         }
         Relationships: []
@@ -3297,6 +3309,17 @@ export type Database = {
       }
     }
     Functions: {
+      apply_tenant_usage: {
+        Args: {
+          p_action: string
+          p_amount: number
+          p_key: string
+          p_meta?: Json
+          p_source?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       claim_forward_slot: {
         Args: { p_group_id: string; p_source_id: string; p_source_type: string }
         Returns: boolean

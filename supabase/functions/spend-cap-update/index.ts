@@ -51,7 +51,7 @@ const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
 // per ad_account+amount+timestamp tuple) MUST be used for every retry of the
 // same logical top-up — including network-error / POST-error recovery paths —
 // so master never double-counts. Master dedupes by (tenant_id, idempotency_key).
-async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any) {
+async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any, source?: string, meta?: Record<string, unknown>) {
   try {
     const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
       method: "POST",
@@ -63,6 +63,8 @@ async function reportUsageToMaster(licenseMap: Record<string, string>, amount: n
         action: "report-usage",
         amount,
         idempotency_key: idempotencyKey,
+        source: source ?? "spend-cap-update",
+        meta: meta ?? null,
       }),
     });
     const reportData = await reportRes.json().catch(() => ({}));
@@ -289,13 +291,15 @@ Deno.serve(async (req)=>{
 
     // Stable idempotency key for any usage report this invocation may emit
     // (success, POST-error recovery, network-error recovery). Same logical
-    // top-up = same key, so master never double-counts.
-    const usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 60000)}`;
+    // top-up = same key, so master never double-counts. Tie to wallet txn id
+    // when possible — globally unique. Fallback uses a coarser tuple.
+    let usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 1000)}`;
     // ============================================
     // STEP 1: Deduct wallet FIRST (before Meta API)
     // ============================================
     let newBalance = null;
     let walletId = null;
+    let walletTxnId: string | null = null;
     if (shouldDeductWallet) {
       const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
       if (walletErr || !wallet) return json({
@@ -315,9 +319,9 @@ Deno.serve(async (req)=>{
       await supabase.from("wallets").update({
         balance: newBalance
       }).eq("id", wallet.id);
-      // Create transaction record
+      // Create transaction record (capture id to use as stable usage idempotency key)
       const cleanAccountId = account.account_id.replace(/^act_/, '');
-      await supabase.from("transactions").insert({
+      const { data: txnRow } = await supabase.from("transactions").insert({
         user_id: walletUserId,
         amount: -amount,
         balance_after: newBalance,
@@ -325,7 +329,9 @@ Deno.serve(async (req)=>{
         description: `${account.account_name}\n${cleanAccountId}`,
         reference_id: ad_account_id,
         processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`
-      });
+      }).select("id").maybeSingle();
+      walletTxnId = (txnRow as any)?.id ?? null;
+      if (walletTxnId) usageIdempotencyKey = `wallet_txn:${walletTxnId}`;
     }
     // ============================================
     // STEP 2: Call Meta API
@@ -452,7 +458,7 @@ Deno.serve(async (req)=>{
           // Report usage to master so tenant total_used stays accurate even
           // on recovered-after-error successes.
           if (isTenantMode) {
-            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
           }
           return json({
             success: true,
@@ -561,7 +567,7 @@ Deno.serve(async (req)=>{
           // Report usage to master so tenant total_used stays accurate even
           // on recovered-after-network-error successes.
           if (isTenantMode) {
-            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+            await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
           }
           return json({
             success: true,
@@ -674,7 +680,7 @@ Deno.serve(async (req)=>{
     // STEP 5: Report usage to master (Tenant mode)
     // ============================================
     if (isTenantMode) {
-      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase);
+      await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
     }
     console.log("Spend cap update SUCCESS", {
       actId,

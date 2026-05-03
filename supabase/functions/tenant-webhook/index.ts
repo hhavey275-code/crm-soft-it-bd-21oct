@@ -595,108 +595,42 @@ Deno.serve(async (req) => {
       }
 
       case "report-usage":
-      case "report_usage": {
-        const amount = Number(field("amount") ?? 0);
-        if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
-        const idempotencyKey = String(field("idempotency_key") ?? "").trim();
-
-        // Deduplicate: if a key was sent and we've already processed it, return current state
-        // without double-counting. This protects against client retries / network duplicates.
-        if (idempotencyKey) {
-          const { data: existing } = await supabase
-            .from("tenant_usage_report_keys")
-            .select("id")
-            .eq("tenant_id", tenant.id)
-            .eq("idempotency_key", idempotencyKey)
-            .maybeSingle();
-          if (existing) {
-            return json({
-              success: true,
-              ok: true,
-              duplicate: true,
-              total_used: Number(tenant.total_used ?? 0),
-              system_limit: tenant.system_limit ?? null,
-            });
-          }
-        }
-
-        const newUsed = Number(tenant.total_used ?? 0) + amount;
-        const { error } = await supabase
-          .from("tenants")
-          .update({ total_used: newUsed } as any)
-          .eq("id", tenant.id);
-        if (error) throw error;
-
-        // Persist idempotency key AFTER the update succeeds. Use insert with
-        // unique-constraint as a final guard against concurrent duplicate calls.
-        if (idempotencyKey) {
-          await supabase
-            .from("tenant_usage_report_keys")
-            .insert({
-              tenant_id: tenant.id,
-              idempotency_key: idempotencyKey,
-              action: "report-usage",
-              amount,
-            } as any);
-        }
-
-        await logSystem("report_usage", { amount, new_total_used: newUsed, idempotency_key: idempotencyKey || null });
-        return json({
-          success: true,
-          ok: true,
-          total_used: newUsed,
-          system_limit: tenant.system_limit ?? null,
-        });
-      }
-
+      case "report_usage":
       case "refund-usage":
       case "refund_usage": {
+        const isRefund = action === "refund-usage" || action === "refund_usage";
         const amount = Number(field("amount") ?? 0);
         if (!amount || amount <= 0) return json({ error: "amount required" }, 400);
         const idempotencyKey = String(field("idempotency_key") ?? "").trim();
+        const source = String(field("source") ?? "") || null;
+        const meta = (field("meta") as any) ?? null;
 
-        if (idempotencyKey) {
-          const { data: existing } = await supabase
-            .from("tenant_usage_report_keys")
-            .select("id")
-            .eq("tenant_id", tenant.id)
-            .eq("idempotency_key", idempotencyKey)
-            .maybeSingle();
-          if (existing) {
-            return json({
-              success: true,
-              ok: true,
-              duplicate: true,
-              total_used: Number(tenant.total_used ?? 0),
-              system_limit: tenant.system_limit ?? null,
-            });
-          }
-        }
-
-        const newUsed = Math.max(0, Number(tenant.total_used ?? 0) - amount);
-        const { error } = await supabase
-          .from("tenants")
-          .update({ total_used: newUsed } as any)
-          .eq("id", tenant.id);
-        if (error) throw error;
-
-        if (idempotencyKey) {
-          await supabase
-            .from("tenant_usage_report_keys")
-            .insert({
-              tenant_id: tenant.id,
-              idempotency_key: idempotencyKey,
-              action: "refund-usage",
-              amount,
-            } as any);
-        }
-
-        await logSystem("refund_usage", { amount, new_total_used: newUsed, idempotency_key: idempotencyKey || null });
+        const { data: rpcData, error: rpcErr } = await supabase.rpc("apply_tenant_usage" as any, {
+          p_tenant_id: tenant.id,
+          p_amount: amount,
+          p_action: isRefund ? "refund-usage" : "report-usage",
+          p_key: idempotencyKey || null,
+          p_source: source,
+          p_meta: meta,
+        });
+        if (rpcErr) throw rpcErr;
+        const result = (rpcData as any) || {};
+        await logSystem(isRefund ? "refund_usage" : "report_usage", {
+          amount,
+          duplicate: !!result.duplicate,
+          before_total_used: result.before_total_used ?? null,
+          after_total_used: result.after_total_used ?? null,
+          idempotency_key: idempotencyKey || null,
+          source,
+        });
         return json({
           success: true,
           ok: true,
-          total_used: newUsed,
-          system_limit: tenant.system_limit ?? null,
+          duplicate: !!result.duplicate,
+          total_used: Number(result.total_used ?? 0),
+          system_limit: result.system_limit ?? null,
+          before_total_used: result.before_total_used ?? null,
+          after_total_used: result.after_total_used ?? null,
         });
       }
 

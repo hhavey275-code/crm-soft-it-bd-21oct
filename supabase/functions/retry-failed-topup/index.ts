@@ -285,6 +285,8 @@ Deno.serve(async (req)=>{
             action: "report-usage",
             amount: Number(failedTopup.amount),
             idempotency_key: `retry:${failed_topup_id}`,
+            source: "retry-failed-topup",
+            meta: { failed_topup_id, ad_account_id: failedTopup.ad_account_id, account_name: account.account_name },
           }),
         });
       }
