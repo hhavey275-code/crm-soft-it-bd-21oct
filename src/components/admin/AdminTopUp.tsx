@@ -595,7 +595,22 @@ export function AdminTopUp() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const openAction = (r: any, action: ActionType) => {
+  // Manual resend for top-up rows where forward-proof never landed in Telegram.
+  // Server-side claim_forward_slot guarantees idempotency — clicking twice
+  // does NOT produce duplicate Telegram messages.
+  const resendTopupForwardMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: requestId } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data?.skipped) toast.info(`Skipped: ${data.reason || "already forwarded"}`);
+      else toast.success("Resent to Telegram!");
+      queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+    },
+    onError: (e: any) => toast.error(`Resend failed: ${e.message}`),
+  });
     setAdminNote("");
     setActionDialog({ id: r.id, action, userId: r.user_id, amount: r.amount, bdtAmount: r.bdt_amount, usdRate: r.usd_rate });
   };
