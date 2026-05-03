@@ -85,13 +85,14 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
       const bankMap: Record<string, any> = {};
       eligibleBanks.forEach((b: any) => { bankMap[b.id] = b; });
 
-      // 2) approved top-up requests on those banks where forwarded != true
+      // 2) approved top-up requests on those banks where forwarded != true and not dismissed
       const { data: reqs } = await (supabase as any)
         .from("top_up_requests")
-        .select("id, amount, bdt_amount, created_at, proof_url, telegram_forwarded, user_id, bank_account_id")
+        .select("id, amount, bdt_amount, created_at, proof_url, telegram_forwarded, user_id, bank_account_id, forward_dismissed_at")
         .in("bank_account_id", bankIds)
         .eq("status", "approved")
         .not("proof_url", "is", null)
+        .is("forward_dismissed_at", null)
         .order("created_at", { ascending: false });
       const candidates = (reqs || []).filter((r: any) => r.telegram_forwarded !== true);
       if (candidates.length === 0) return [];
