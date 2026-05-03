@@ -611,6 +611,8 @@ export function AdminTopUp() {
     },
     onError: (e: any) => toast.error(`Resend failed: ${e.message}`),
   });
+
+  const openAction = (r: any, action: ActionType) => {
     setAdminNote("");
     setActionDialog({ id: r.id, action, userId: r.user_id, amount: r.amount, bdtAmount: r.bdt_amount, usdRate: r.usd_rate });
   };
