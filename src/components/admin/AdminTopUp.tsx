@@ -556,11 +556,10 @@ export function AdminTopUp() {
 
       // Seller ledger sync + Telegram forward are now handled atomically by the
       // database trigger `sync_seller_transaction_for_approved_topup_trigger` on
-      // `top_up_requests` (fires whenever status becomes 'approved'). This avoids
-      // race conditions between admin approve and verify-topup auto-approve, and
-      // guarantees both happen exactly once. We still mark forwarded=true here as
-      // a UI hint when the bank has a Telegram group; the trigger fires the
-      // forward-proof edge function asynchronously.
+      // `top_up_requests`. We mark telegram_forwarded=false up-front when the
+      // bank has a Telegram group — the forward-proof edge function flips it to
+      // true ONLY when Telegram actually accepts the message. This gives a
+      // truthful Forwarded / Not-Forwarded / "—" signal in the UI.
       if (action === "approved") {
         try {
           const reqForSeller = requests?.find((r: any) => r.id === id);
@@ -571,17 +570,19 @@ export function AdminTopUp() {
               .eq("id", reqForSeller.bank_account_id)
               .single();
             if (bankRow?.telegram_group_id) {
+              // Only initialize to false if it's still null — never overwrite a
+              // true that forward-proof may already have set (race-safe).
               await (supabase as any)
                 .from("top_up_requests")
-                .update({ telegram_forwarded: true })
-                .eq("id", id);
+                .update({ telegram_forwarded: false })
+                .eq("id", id)
+                .is("telegram_forwarded", null);
             }
           }
         } catch (e) {
-          console.error("Mark telegram_forwarded failed (non-blocking):", e);
+          console.error("Init telegram_forwarded=false failed (non-blocking):", e);
         }
       }
-    },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);
       queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
