@@ -289,13 +289,15 @@ Deno.serve(async (req)=>{
 
     // Stable idempotency key for any usage report this invocation may emit
     // (success, POST-error recovery, network-error recovery). Same logical
-    // top-up = same key, so master never double-counts.
-    const usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 60000)}`;
+    // top-up = same key, so master never double-counts. Tie to wallet txn id
+    // when possible — globally unique. Fallback uses a coarser tuple.
+    let usageIdempotencyKey = `topup:${ad_account_id}:${amount}:${Math.floor(Date.now() / 1000)}`;
     // ============================================
     // STEP 1: Deduct wallet FIRST (before Meta API)
     // ============================================
     let newBalance = null;
     let walletId = null;
+    let walletTxnId: string | null = null;
     if (shouldDeductWallet) {
       const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
       if (walletErr || !wallet) return json({
@@ -315,9 +317,9 @@ Deno.serve(async (req)=>{
       await supabase.from("wallets").update({
         balance: newBalance
       }).eq("id", wallet.id);
-      // Create transaction record
+      // Create transaction record (capture id to use as stable usage idempotency key)
       const cleanAccountId = account.account_id.replace(/^act_/, '');
-      await supabase.from("transactions").insert({
+      const { data: txnRow } = await supabase.from("transactions").insert({
         user_id: walletUserId,
         amount: -amount,
         balance_after: newBalance,
@@ -325,7 +327,9 @@ Deno.serve(async (req)=>{
         description: `${account.account_name}\n${cleanAccountId}`,
         reference_id: ad_account_id,
         processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`
-      });
+      }).select("id").maybeSingle();
+      walletTxnId = (txnRow as any)?.id ?? null;
+      if (walletTxnId) usageIdempotencyKey = `wallet_txn:${walletTxnId}`;
     }
     // ============================================
     // STEP 2: Call Meta API
