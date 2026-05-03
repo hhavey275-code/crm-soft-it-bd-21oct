@@ -272,7 +272,8 @@ export function AdminTopUp() {
       r.status === "approved" &&
       r.proof_url &&
       r.bankAccount?.telegram_group_id &&
-      r.telegram_forwarded !== true
+      r.telegram_forwarded !== true &&
+      !r.forward_dismissed_at
     );
   }, [requests]);
 
