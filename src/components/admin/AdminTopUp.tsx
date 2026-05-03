@@ -1135,6 +1135,57 @@ export function AdminTopUp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={forwardMissingOpen} onOpenChange={(o) => { if (!forwardingMissing) setForwardMissingOpen(o); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Forward Missing Top-Ups</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {missingForwards.length} approved top-up(s) have a bank with Telegram group assigned but were never forwarded.
+              Clicking <b>Forward All</b> will send each to its Telegram group and (if missing) create the matching seller ledger entry.
+            </p>
+            <div className="max-h-80 overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Result</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {missingForwards.map((r: any) => {
+                    const res = forwardResults.find((x) => x.id === r.id);
+                    const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs">{format(new Date(r.created_at), "MMM d, HH:mm")}</TableCell>
+                        <TableCell className="text-sm">{name}</TableCell>
+                        <TableCell className="text-sm font-medium">${Number(r.amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">
+                          {!res ? <span className="text-muted-foreground">—</span> :
+                            res.status === "ok" ? <span className="text-emerald-600">✅ Forwarded</span> :
+                            res.status === "skipped" ? <span className="text-yellow-600">⚠️ {res.reason || "skipped"}</span> :
+                            <span className="text-destructive">❌ {res.reason || "error"}</span>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForwardMissingOpen(false)} disabled={forwardingMissing}>Close</Button>
+            <Button onClick={runForwardMissing} disabled={forwardingMissing || missingForwards.length === 0}>
+              {forwardingMissing ? `Forwarding... (${forwardResults.length}/${missingForwards.length})` : `Forward All (${missingForwards.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
