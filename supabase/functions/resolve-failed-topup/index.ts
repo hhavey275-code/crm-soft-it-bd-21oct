@@ -107,7 +107,10 @@ Deno.serve(async (req)=>{
           },
           body: JSON.stringify({
             action: "refund-usage",
-            amount: Number(failedTopup.amount)
+            amount: Number(failedTopup.amount),
+            idempotency_key: `refund:${failed_topup_id}`,
+            source: "resolve-failed-topup",
+            meta: { failed_topup_id, ad_account_id: failedTopup.ad_account_id, user_id: failedTopup.user_id }
           })
         });
         const refundData = await refundRes.json();
