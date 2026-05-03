@@ -64,7 +64,7 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
       const mirrorSet = new Set((mirrors || []).map((m: any) => m.top_up_request_id));
 
       // 4) Fetch client names
-      const userIds = [...new Set(candidates.map((r: any) => r.user_id))];
+      const userIds = [...new Set(candidates.map((r: any) => r.user_id as string))] as string[];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, full_name, email")
