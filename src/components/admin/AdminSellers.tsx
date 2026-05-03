@@ -780,7 +780,9 @@ export function AdminSellers() {
   const uncalculatedTxns = useMemo(
     () => (sellerTxns || [])
       .map((t: any) => ({ txn: t, reason: getSellerTransactionSkipReason(t) }))
-      .filter((item) => item.reason),
+      .filter((item) => item.reason)
+      // Hide entries where both BDT and USDT amounts are zero (no real value to show)
+      .filter(({ txn }: any) => Number(txn.bdt_amount || 0) !== 0 || Number(txn.usdt_amount || 0) !== 0),
     [sellerTxns]
   );
 
