@@ -931,7 +931,7 @@ export function AdminTopUp() {
                         {getProcessedByLabel(r)}
                       </TableCell>
                       <TableCell className="py-2 px-2">
-                        {r.status === "approved" && r._source !== "tenant" ? (
+                        {r.status === "approved" && r._source !== "tenant" && r.bankAccount?.telegram_group_id ? (
                           <div className="flex items-center gap-1">
                             <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
                               <Send className="h-2.5 w-2.5" />
