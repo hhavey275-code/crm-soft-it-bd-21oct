@@ -234,7 +234,7 @@ export function AdminTopUp() {
 
       const [{ data: profiles }, { data: banks }] = await Promise.all([
         allIds.length > 0 ? supabase.from("profiles").select("user_id, full_name, email").in("user_id", allIds) : Promise.resolve({ data: [] }),
-        bankIds.length > 0 ? supabase.from("bank_accounts").select("id, bank_name, account_number").in("id", bankIds) : Promise.resolve({ data: [] }),
+        bankIds.length > 0 ? supabase.from("bank_accounts").select("id, bank_name, account_number, telegram_group_id").in("id", bankIds) : Promise.resolve({ data: [] }),
       ]);
 
       const profileMap: Record<string, any> = {};
@@ -777,13 +777,13 @@ export function AdminTopUp() {
                   <span className="text-muted-foreground">Processed By</span>
                   <span className="font-medium text-foreground">{getProcessedByLabel(r)}</span>
                 </div>
-                {r.status === "approved" && r._source !== "tenant" && (
+                {r.status === "approved" && r._source !== "tenant" && r.bankAccount?.telegram_group_id && (
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Telegram</span>
                     <span className={cn("font-medium flex items-center gap-1", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
                       <Send className="h-3 w-3" />
                       {r.telegram_forwarded === true ? "Forwarded" : r.telegram_forwarded === false ? "Not Forwarded" : "—"}
-                      {r.telegram_forwarded === false && (
+                      {r.telegram_forwarded !== true && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -931,7 +931,7 @@ export function AdminTopUp() {
                         {getProcessedByLabel(r)}
                       </TableCell>
                       <TableCell className="py-2 px-2">
-                        {r.status === "approved" && r._source !== "tenant" ? (
+                        {r.status === "approved" && r._source !== "tenant" && r.bankAccount?.telegram_group_id ? (
                           <div className="flex items-center gap-1">
                             <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
                               <Send className="h-2.5 w-2.5" />
