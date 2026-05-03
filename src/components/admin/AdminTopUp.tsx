@@ -722,6 +722,12 @@ export function AdminTopUp() {
               />
             </PopoverContent>
           </Popover>
+          {missingForwards.length > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => setForwardMissingOpen(true)} className="gap-1.5">
+              <Send className="h-3.5 w-3.5" />
+              Forward Missing ({missingForwards.length})
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
