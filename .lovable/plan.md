@@ -1,67 +1,44 @@
-আমি কোড/ডাটাবেস দেখে যেটা পেলাম:
+## Goal
 
-- `scale up` tenant-এর master row এখন:
-  - `system_limit = $6,788.13`
-  - `total_used = $6,473.68`
-- আপনার screenshot অনুযায়ী tenant-side actual log:
-  - `total_used = $5,639.00`
-  - তাই master বেশি দেখাচ্ছে `6473.68 - 5639 = $834.68`।
-- আগে একবার master `total_used` manually align করা হয়েছিল `$4,898.50` এ, কিন্তু এরপর আবার drift হয়েছে।
-- সবচেয়ে বড় সমস্যা: tenant usage update হচ্ছে `tenant-webhook` এর `report-usage` action দিয়ে, কিন্তু master-side audit/dedup table `tenant_usage_report_keys` খালি। মানে usage বাড়ার হিসাবের stable audit trail নেই / deployed function পুরোনো logic চালাতে পারে / logging insert fail করছে। তাই কোন top-up master-used বাড়ালো সেটা পরিষ্কার দেখা যাচ্ছে না।
-- আরেকটা ঝুঁকি আছে: tenant-side `spend-cap-update` idempotency key এখন minute-based:
-  `topup:{ad_account_id}:{amount}:{minute}`
-  এটা retry কিছুটা আটকায়, কিন্তু production accounting-এর জন্য যথেষ্ট শক্ত না। একই logical request-এর permanent id থাকা দরকার।
+Top Up page-এর "Forward Missing" dialog (currently 7 entries) এখন শুধু Date / Client / USD Amount / Result দেখায়। User চাচ্ছে প্রতিটা row-এ দেখা যাক — কোন bank-এ এসেছে, BDT কত, কোন Telegram group-এ forward হবে, এবং seller sheet-এ already আছে কিনা (অর্থাৎ forward + ledger create হবে নাকি শুধু forward)।
 
-Plan to fix:
+## Changes — `src/components/admin/AdminTopUp.tsx`
 
-1. Correct current bad value for Scale Up
-   - Master `tenants.total_used` for `scale up` tenant set করব `$5,639.00`।
-   - একই সঙ্গে tenant-এর local `site_settings.license_total_used` heartbeat/response থেকে sync হবে, যাতে UI-তে master/tenant এক থাকে।
+### 1. `missingForwards` enrich (around line 268)
 
-2. Add proper audit table for every system usage movement
-   - `tenant_usage_report_keys` শুধু dedupe key না রেখে useful audit বানাব:
-     - tenant_id
-     - action: `report-usage` / `refund-usage` / adjustment
-     - amount
-     - idempotency_key
-     - source/ad_account/payment/failed_topup reference if available
-     - before_total_used
-     - after_total_used
-     - created_at
-   - এতে ভবিষ্যতে exact দেখা যাবে master used কেন বাড়ল/কমল।
+`useMemo`-তে candidates filter করার পর extra query দিয়ে enrich করব:
 
-3. Make master usage updates atomic and idempotent
-   - `tenant-webhook` এর `report-usage` / `refund-usage` logic update করব যেন:
-     - duplicate key হলে আর count না করে current total return করে।
-     - concurrent request এ double count না হয়।
-     - usage row + tenant total update এক reliable flow-তে হয়।
-   - Current edge function redeploy করব, কারণ deployed side-এ audit key লিখছে না বলে মনে হচ্ছে।
+- Collect `req.id` array → query `seller_transactions` `select("top_up_request_id").in("top_up_request_id", ids)` → `mirrorSet`.
+- Already `r.bankAccount` আছে (bank_name, telegram_group_id) — সেটাই ব্যবহার করব।
+- প্রতিটা row-এ যোগ হবে: `bank_name`, `telegram_group_id`, `bdt_amount` (already on row), `mirror_present` (boolean)।
 
-4. Fix tenant-side usage reporting key
-   - `spend-cap-update` থেকে minute-based key বাদ দিয়ে stable key ব্যবহার করব।
-   - Best source:
-     - wallet transaction id / request id / failed_topup id / ad_account + exact created transaction id
-   - Retry করলে same key যাবে; new top-up হলে new key যাবে।
+যেহেতু `useMemo` async হতে পারে না, সরিয়ে আলাদা `useQuery(["missing-forward-mirrors", ids])` করব যা শুধু mirror set return করে। তারপর derived `missingForwards` array সেটার সাথে merge করবে।
 
-5. Fix retry/refund edge cases
-   - `retry-failed-topup` already reports usage on successful retry, কিন্তু key/audit আরও clear করব।
-   - `resolve-failed-topup` refund currently no idempotency key পাঠায়; এটাও fix করব, না হলে repeated refund/report drift করতে পারে।
+### 2. Dialog table columns (line ~1150-1178)
 
-6. Add master-side reconciliation button/report
-   - Tenant detail page-এ একটি small “Reconcile Used” action/report যোগ করব:
-     - master total_used
-     - tenant reported/current total_used
-     - difference
-     - last N usage audit rows
-   - ভবিষ্যতে mismatch হলে manually guess না করে এক ক্লিকে align করা যাবে।
+নতুন columns:
 
-7. Deploy and verify
-   - `tenant-webhook`, `spend-cap-update`, `retry-failed-topup`, `resolve-failed-topup` deploy করব।
-   - DB migration দিয়ে current Scale Up value `$5,639.00` করব এবং audit baseline row রাখব: “manual correction from $6,473.68 to $5,639.00”.
+```
+Date | Client | Bank | USD | BDT | Telegram | In Sheet | Action | Result
+```
 
-Expected result:
+- **Bank**: `r.bankAccount?.bank_name || "—"`
+- **USD**: `$<amount>`
+- **BDT**: `৳<bdt_amount>`
+- **Telegram**: group id badge (truncated, tooltip full id)
+- **In Sheet**: ✅ if mirror_present, ❌ "Will create" if not
+- **Action**: small text — "Forward only" (mirror_present=true) বা "Forward + Add to sheet" (mirror_present=false)
+- **Result**: same as before
 
-- Scale Up master used immediately `$5,639.00` দেখাবে।
-- Future client top-up করলে master used ঠিক amount-ই বাড়বে।
-- Failed top-up retry/refund double count করবে না।
-- কোন tenant কত used হওয়ার কথা, কত হয়েছে—এটার audit trail থাকবে।
+### 3. Dialog description copy update
+
+Replace static line দিয়ে summary count: "X-টি forward হবে · Y-টি seller sheet-এও যোগ হবে।"
+
+### 4. Mobile responsive
+
+Dialog already `max-w-2xl` — table will be wide. Wrap in existing `overflow-y-auto` div, also add `overflow-x-auto`. Keep font-size `text-xs` for new cells.
+
+## Out of scope
+
+- Forwarding logic itself unchanged (`forward-proof` edge function already creates seller mirror when missing).
+- No DB migration needed — RLS already allows admin to read `seller_transactions` and `bank_accounts`.
