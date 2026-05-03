@@ -3,9 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Send, AlertTriangle, Loader2, CheckCircle2, XCircle, ImageIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Send, AlertTriangle, Loader2, CheckCircle2, XCircle, ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 
 type Props = { sellerId: string; sellerName: string };
 
