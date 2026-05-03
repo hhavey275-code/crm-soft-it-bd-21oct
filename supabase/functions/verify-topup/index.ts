@@ -541,20 +541,26 @@ Deno.serve(async (req) => {
     }
 
     // Seller ledger sync + Telegram forward are handled atomically by the
-    // database trigger `sync_seller_transaction_for_approved_topup_trigger`
-    // on `top_up_requests`. We only need to mark telegram_forwarded as a UI
-    // hint when the receiving bank has a Telegram group configured.
-    let telegramForwarded = false;
-    if (bank_account_id && proof_url) {
+    // database trigger `sync_seller_transaction_for_approved_topup_trigger`.
+    // We only INITIALIZE telegram_forwarded to false when the receiving bank
+    // has a Telegram group configured — the forward-proof edge function will
+    // flip it to true once Telegram actually accepts the message. This way
+    // the field is a truthful "did the message land?" indicator instead of
+    // an optimistic "we tried" flag.
+    if (bank_account_id) {
       const { data: bankRow } = await supabase
         .from('bank_accounts')
         .select('telegram_group_id')
         .eq('id', bank_account_id)
         .single();
-      if (bankRow?.telegram_group_id) telegramForwarded = true;
+      if (bankRow?.telegram_group_id) {
+        await supabase
+          .from('top_up_requests')
+          .update({ telegram_forwarded: false })
+          .eq('id', request_id)
+          .is('telegram_forwarded', null);
+      }
     }
-
-    await supabase.from('top_up_requests').update({ telegram_forwarded: telegramForwarded }).eq('id', request_id);
 
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

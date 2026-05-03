@@ -556,11 +556,10 @@ export function AdminTopUp() {
 
       // Seller ledger sync + Telegram forward are now handled atomically by the
       // database trigger `sync_seller_transaction_for_approved_topup_trigger` on
-      // `top_up_requests` (fires whenever status becomes 'approved'). This avoids
-      // race conditions between admin approve and verify-topup auto-approve, and
-      // guarantees both happen exactly once. We still mark forwarded=true here as
-      // a UI hint when the bank has a Telegram group; the trigger fires the
-      // forward-proof edge function asynchronously.
+      // `top_up_requests`. We mark telegram_forwarded=false up-front when the
+      // bank has a Telegram group — the forward-proof edge function flips it to
+      // true ONLY when Telegram actually accepts the message. This gives a
+      // truthful Forwarded / Not-Forwarded / "—" signal in the UI.
       if (action === "approved") {
         try {
           const reqForSeller = requests?.find((r: any) => r.id === id);
@@ -571,14 +570,17 @@ export function AdminTopUp() {
               .eq("id", reqForSeller.bank_account_id)
               .single();
             if (bankRow?.telegram_group_id) {
+              // Only initialize to false if it's still null — never overwrite a
+              // true that forward-proof may already have set (race-safe).
               await (supabase as any)
                 .from("top_up_requests")
-                .update({ telegram_forwarded: true })
-                .eq("id", id);
+                .update({ telegram_forwarded: false })
+                .eq("id", id)
+                .is("telegram_forwarded", null);
             }
           }
         } catch (e) {
-          console.error("Mark telegram_forwarded failed (non-blocking):", e);
+          console.error("Init telegram_forwarded=false failed (non-blocking):", e);
         }
       }
     },
@@ -591,6 +593,23 @@ export function AdminTopUp() {
       setActionDialog(null); setAdminNote("");
     },
     onError: (err: any) => toast.error(err.message),
+  });
+
+  // Manual resend for top-up rows where forward-proof never landed in Telegram.
+  // Server-side claim_forward_slot guarantees idempotency — clicking twice
+  // does NOT produce duplicate Telegram messages.
+  const resendTopupForwardMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: requestId } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data?.skipped) toast.info(`Skipped: ${data.reason || "already forwarded"}`);
+      else toast.success("Resent to Telegram!");
+      queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+    },
+    onError: (e: any) => toast.error(`Resend failed: ${e.message}`),
   });
 
   const openAction = (r: any, action: ActionType) => {
@@ -758,12 +777,23 @@ export function AdminTopUp() {
                   <span className="text-muted-foreground">Processed By</span>
                   <span className="font-medium text-foreground">{getProcessedByLabel(r)}</span>
                 </div>
-                {r.status === "approved" && (
+                {r.status === "approved" && r._source !== "tenant" && (
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Telegram</span>
                     <span className={cn("font-medium flex items-center gap-1", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
                       <Send className="h-3 w-3" />
                       {r.telegram_forwarded === true ? "Forwarded" : r.telegram_forwarded === false ? "Not Forwarded" : "—"}
+                      {r.telegram_forwarded === false && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1.5 text-[10px] ml-1"
+                          disabled={resendTopupForwardMutation.isPending}
+                          onClick={() => resendTopupForwardMutation.mutate(r.id)}
+                        >
+                          Resend
+                        </Button>
+                      )}
                     </span>
                   </div>
                 )}
@@ -901,11 +931,25 @@ export function AdminTopUp() {
                         {getProcessedByLabel(r)}
                       </TableCell>
                       <TableCell className="py-2 px-2">
-                        {r.status === "approved" ? (
-                          <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
-                            <Send className="h-2.5 w-2.5" />
-                            {r.telegram_forwarded === true ? "Yes" : r.telegram_forwarded === false ? "No" : "—"}
-                          </span>
+                        {r.status === "approved" && r._source !== "tenant" ? (
+                          <div className="flex items-center gap-1">
+                            <span className={cn("text-[10px] font-medium flex items-center gap-0.5", r.telegram_forwarded === true ? "text-green-600 dark:text-green-400" : r.telegram_forwarded === false ? "text-destructive" : "text-muted-foreground")}>
+                              <Send className="h-2.5 w-2.5" />
+                              {r.telegram_forwarded === true ? "Yes" : r.telegram_forwarded === false ? "No" : "—"}
+                            </span>
+                            {r.telegram_forwarded === false && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 px-1 text-[9px]"
+                                title="Resend to Telegram"
+                                disabled={resendTopupForwardMutation.isPending}
+                                onClick={() => resendTopupForwardMutation.mutate(r.id)}
+                              >
+                                ↻
+                              </Button>
+                            )}
+                          </div>
                         ) : <span className="text-muted-foreground text-[10px]">—</span>}
                       </TableCell>
                       <TableCell className="py-2 px-2">
