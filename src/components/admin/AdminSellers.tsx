@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle, Send } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload, Trash2, Plus, CalendarIcon, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, TrendingUp, Clock, CheckCircle2, XCircle, Download, AlertCircle, Send, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
