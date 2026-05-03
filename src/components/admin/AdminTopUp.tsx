@@ -252,10 +252,56 @@ export function AdminTopUp() {
   });
 
   const filtered = requests?.filter((r: any) => {
+    // Date range filter (applies to all tabs except bank_sms which has its own data)
+    if (statusFilter !== "bank_sms" && dateRange?.from) {
+      const from = startOfDay(dateRange.from);
+      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      const ts = new Date(r.created_at).getTime();
+      if (ts < from.getTime() || ts > to.getTime()) return false;
+    }
     if (statusFilter === "all" || statusFilter === "bank_sms") return true;
     if (statusFilter === "tenant") return r._source === "tenant";
     return r.status === statusFilter;
   });
+
+  // Approved top-ups whose bank has a Telegram group but were never forwarded
+  const missingForwards = useMemo(() => {
+    if (!requests) return [];
+    return requests.filter((r: any) =>
+      r._source === "client" &&
+      r.status === "approved" &&
+      r.proof_url &&
+      r.bankAccount?.telegram_group_id &&
+      r.telegram_forwarded !== true
+    );
+  }, [requests]);
+
+  const [forwardingMissing, setForwardingMissing] = useState(false);
+  const [forwardMissingOpen, setForwardMissingOpen] = useState(false);
+  const [forwardResults, setForwardResults] = useState<Array<{ id: string; name: string; amount: number; status: "ok" | "skipped" | "error"; reason?: string }>>([]);
+
+  const runForwardMissing = async () => {
+    if (!missingForwards.length) { toast.info("Nothing to forward."); return; }
+    setForwardingMissing(true);
+    setForwardResults([]);
+    const results: typeof forwardResults = [];
+    for (const r of missingForwards) {
+      const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+      try {
+        const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: r.id } });
+        if (error) throw error;
+        if (data?.skipped) results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "skipped", reason: data.reason });
+        else results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "ok" });
+      } catch (e: any) {
+        results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "error", reason: e.message });
+      }
+      setForwardResults([...results]);
+    }
+    setForwardingMissing(false);
+    const okCount = results.filter(r => r.status === "ok").length;
+    toast.success(`Forwarded ${okCount} of ${results.length}`);
+    queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+  };
 
   const summaryMetrics = useMemo(() => {
     if (!requests) return { totalUsd: 0, totalBdt: 0, autoApproved: 0, manualApproved: 0 };
