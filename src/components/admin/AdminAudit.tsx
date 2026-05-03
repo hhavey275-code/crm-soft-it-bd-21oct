@@ -177,8 +177,9 @@ export function AdminAudit() {
         </Card>
       )}
 
-      <Tabs defaultValue="orphans">
+      <Tabs defaultValue="forwards">
         <TabsList>
+          <TabsTrigger value="forwards">Telegram Forwards</TabsTrigger>
           <TabsTrigger value="orphans">
             Orphan Top-ups ({report.orphans.length})
           </TabsTrigger>
@@ -189,6 +190,10 @@ export function AdminAudit() {
             Per-seller Balance ({report.balances.length})
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="forwards">
+          <ForwardAudit />
+        </TabsContent>
 
         {/* Orphans */}
         <TabsContent value="orphans">
