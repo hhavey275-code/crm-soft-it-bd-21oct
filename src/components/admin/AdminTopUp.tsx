@@ -1164,33 +1164,47 @@ export function AdminTopUp() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {missingForwards.length} approved top-up(s) have a bank with Telegram group assigned but were never forwarded.
-              Clicking <b>Forward All</b> will send each to its Telegram group and (if missing) create the matching seller ledger entry.
+              <b>{missingForwards.length}</b> approved top-up(s) Telegram-এ forward হয়নি · এর মধ্যে <b>{willCreateSheetCount}</b>-টি seller sheet-এও যোগ হবে, বাকি <b>{missingForwards.length - willCreateSheetCount}</b>-টি শুধু Telegram-এ forward হবে।
             </p>
-            <div className="max-h-80 overflow-y-auto border rounded-md">
+            <div className="max-h-80 overflow-auto border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Result</TableHead>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Client</TableHead>
+                    <TableHead className="text-xs">Bank</TableHead>
+                    <TableHead className="text-xs">USD</TableHead>
+                    <TableHead className="text-xs">BDT</TableHead>
+                    <TableHead className="text-xs">Telegram</TableHead>
+                    <TableHead className="text-xs">In Sheet</TableHead>
+                    <TableHead className="text-xs">Action</TableHead>
+                    <TableHead className="text-xs">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {missingForwards.map((r: any) => {
                     const res = forwardResults.find((x) => x.id === r.id);
                     const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
+                    const tg = r.bankAccount?.telegram_group_id || "";
                     return (
                       <TableRow key={r.id}>
-                        <TableCell className="text-xs">{format(new Date(r.created_at), "MMM d, HH:mm")}</TableCell>
-                        <TableCell className="text-sm">{name}</TableCell>
-                        <TableCell className="text-sm font-medium">${Number(r.amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{format(new Date(r.created_at), "MMM d, HH:mm")}</TableCell>
+                        <TableCell className="text-xs">{name}</TableCell>
+                        <TableCell className="text-xs">{r.bankAccount?.bank_name || "—"}</TableCell>
+                        <TableCell className="text-xs font-medium">${Number(r.amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">৳{Number(r.bdt_amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-[10px] font-mono" title={tg}>{tg ? (tg.length > 10 ? tg.slice(0, 10) + "…" : tg) : "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          {r.mirror_present ? <span className="text-emerald-600">✅ Yes</span> : <span className="text-rose-600">❌ No</span>}
+                        </TableCell>
+                        <TableCell className="text-[11px]">
+                          {r.mirror_present ? <span className="text-muted-foreground">Forward only</span> : <span className="text-amber-600 font-medium">Forward + Add to sheet</span>}
+                        </TableCell>
                         <TableCell className="text-xs">
                           {!res ? <span className="text-muted-foreground">—</span> :
-                            res.status === "ok" ? <span className="text-emerald-600">✅ Forwarded</span> :
-                            res.status === "skipped" ? <span className="text-yellow-600">⚠️ {res.reason || "skipped"}</span> :
-                            <span className="text-destructive">❌ {res.reason || "error"}</span>}
+                            res.status === "ok" ? <span className="text-emerald-600">✅</span> :
+                            res.status === "skipped" ? <span className="text-yellow-600" title={res.reason}>⚠️</span> :
+                            <span className="text-destructive" title={res.reason}>❌</span>}
                         </TableCell>
                       </TableRow>
                     );
