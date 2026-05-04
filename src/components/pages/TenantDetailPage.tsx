@@ -152,6 +152,23 @@ export default function TenantDetailPage() {
     refetchInterval: 60 * 1000,
   });
 
+  // Unified ledger — every limit/used movement with before/after for both fields.
+  const { data: ledger = [], refetch: refetchLedger, isFetching: ledgerFetching } = useQuery({
+    queryKey: ["tenant-ledger", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_limit_ledger")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60 * 1000,
+  });
+
   // On-demand refresh: invokes tenant-pull-stats edge function which calls the
   // tenant's webhook (NO Meta API call — tenant returns aggregated data from
   // its own DB, fed by the tenant's existing "Update from Meta" runs).
