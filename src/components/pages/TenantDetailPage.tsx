@@ -295,7 +295,29 @@ export default function TenantDetailPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const copyApiKey = (key: string) => {
+  // Reconcile master total_used to tenant's actual value
+  const reconcileMutation = useMutation({
+    mutationFn: async () => {
+      const v = Number(reconcileValue);
+      if (Number.isNaN(v) || v < 0) throw new Error("Enter a valid total used value (>= 0)");
+      const { data, error } = await (supabase as any).rpc("reconcile_tenant_total_used", {
+        p_tenant_id: tenantId,
+        p_new_total_used: v,
+        p_reason: reconcileReason.trim() || "manual reconcile",
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-usage-log", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      setReconcileOpen(false);
+      setReconcileValue("");
+      toast.success(`Reconciled: ${Number(data?.before_total_used ?? 0).toFixed(2)} → ${Number(data?.after_total_used ?? 0).toFixed(2)}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
     navigator.clipboard.writeText(key);
     toast.success("API key copied");
   };
