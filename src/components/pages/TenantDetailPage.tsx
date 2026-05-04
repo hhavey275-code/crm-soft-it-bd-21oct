@@ -257,31 +257,30 @@ export default function TenantDetailPage() {
       if (!tenant) throw new Error("Tenant not loaded");
       if (!adjustReason.trim()) throw new Error("Reason is required");
       const amt = Number(adjustAmount);
-      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
-      const currentLimit = Number(tenant.system_limit || 0);
-      let newLimit = currentLimit;
-      let delta = 0;
-      if (adjustMode === "increase") { newLimit = currentLimit + amt; delta = amt; }
-      else if (adjustMode === "decrease") { newLimit = Math.max(0, currentLimit - amt); delta = -(currentLimit - newLimit); }
-      else { newLimit = amt; delta = amt - currentLimit; }
+      if (!amt || amt < 0) throw new Error("Enter a valid amount");
 
-      // Update tenant
-      const { error: upErr } = await (supabase as any).from("tenants").update({
-        system_limit: newLimit,
-        subscription_type: "subscription_with_limit",
-      }).eq("id", tenantId);
-      if (upErr) throw upErr;
+      if (adjustMode === "refund_used") {
+        if (amt <= 0) throw new Error("Enter a valid amount");
+        const { data: authData } = await supabase.auth.getUser();
+        const { error } = await (supabase as any).rpc("refund_tenant_usage", {
+          p_tenant_id: tenantId,
+          p_amount: amt,
+          p_reason: adjustReason.trim(),
+          p_admin: authData?.user?.id ?? null,
+        });
+        if (error) throw error;
+        return;
+      }
 
-      // Log as a tenant_payment row so it shows in tenant's limit log
-      const { error: logErr } = await (supabase as any).from("tenant_payments").insert({
-        tenant_id: tenantId,
-        amount: 0,
-        limit_amount: delta,
-        payment_type: "manual_adjustment",
-        status: "approved",
-        adjustment_reason: adjustReason.trim(),
+      const { data: authData } = await supabase.auth.getUser();
+      const { error } = await (supabase as any).rpc("adjust_tenant_system_limit", {
+        p_tenant_id: tenantId,
+        p_mode: adjustMode,
+        p_amount: amt,
+        p_reason: adjustReason.trim(),
+        p_admin: authData?.user?.id ?? null,
       });
-      if (logErr) throw logErr;
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
