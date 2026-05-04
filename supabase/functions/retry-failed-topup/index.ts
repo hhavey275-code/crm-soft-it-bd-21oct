@@ -271,24 +271,57 @@ Deno.serve(async (req)=>{
       const { data: licenseRows } = await supabase
         .from("site_settings")
         .select("key,value")
-        .in("key", ["master_url", "tenant_api_key"]);
+        .in("key", ["master_url", "tenant_api_key", "license_total_used"]);
       const licenseMap: Record<string, string> = {};
       (licenseRows || []).forEach((r: any) => { licenseMap[r.key] = r.value; });
+      const localBefore = licenseMap["license_total_used"] !== undefined ? Number(licenseMap["license_total_used"]) : null;
       if (licenseMap["master_url"] && licenseMap["tenant_api_key"]) {
-        await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Tenant-Key": licenseMap["tenant_api_key"],
-          },
-          body: JSON.stringify({
+        const idemKey = `retry:${failed_topup_id}`;
+        const payload = {
+          action: "report-usage",
+          amount: Number(failedTopup.amount),
+          idempotency_key: idemKey,
+          source: "retry-failed-topup",
+          meta: { failed_topup_id, ad_account_id: failedTopup.ad_account_id, account_name: account.account_name, wallet_user_id: failedTopup.user_id },
+        };
+        let responseStatus: number | null = null;
+        let responseBody: any = null;
+        let errorMessage: string | null = null;
+        try {
+          const res = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Tenant-Key": licenseMap["tenant_api_key"] },
+            body: JSON.stringify(payload),
+          });
+          responseStatus = res.status;
+          responseBody = await res.json().catch(() => ({}));
+          if (responseBody?.total_used !== undefined) {
+            await supabase.from("site_settings").update({ value: String(responseBody.total_used) }).eq("key", "license_total_used");
+          }
+        } catch (e) {
+          errorMessage = e instanceof Error ? e.message : String(e);
+        }
+        try {
+          await supabase.from("tenant_usage_audit").insert({
+            source: "retry-failed-topup",
             action: "report-usage",
             amount: Number(failedTopup.amount),
-            idempotency_key: `retry:${failed_topup_id}`,
-            source: "retry-failed-topup",
-            meta: { failed_topup_id, ad_account_id: failedTopup.ad_account_id, account_name: account.account_name },
-          }),
-        });
+            idempotency_key: idemKey,
+            ad_account_id: failedTopup.ad_account_id ?? null,
+            failed_topup_id,
+            user_id: failedTopup.user_id ?? null,
+            request_payload: payload,
+            response_status: responseStatus,
+            response_body: responseBody,
+            local_total_used_before: localBefore,
+            local_total_used_after: responseBody?.total_used ?? localBefore,
+            master_total_used_after: responseBody?.total_used ?? null,
+            master_duplicate: responseBody?.duplicate ?? null,
+            error_message: errorMessage,
+          });
+        } catch (auditErr) {
+          console.warn("tenant_usage_audit insert failed:", auditErr);
+        }
       }
     } catch (reportErr) {
       console.warn("retry-failed-topup: report-usage failed", reportErr);
