@@ -41,7 +41,7 @@ export default function TenantDetailPage() {
   const [extendMode, setExtendMode] = useState<"extend" | "reduce" | "set">("extend");
   const [manualDate, setManualDate] = useState("");
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set">("increase");
+  const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set" | "refund_used">("increase");
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
