@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Plus, Copy, Ban, CheckCircle, Landmark, Trash2, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export function AdminTenants() {
   const queryClient = useQueryClient();
@@ -159,106 +160,104 @@ export function AdminTenants() {
         </Card>
       )}
 
-      {/* Tenant Cards - Mobile Optimized */}
-      <div className="space-y-3">
+      {/* Tenant Cards - Cleaner layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {isLoading ? (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">Loading...</CardContent></Card>
+          <Card className="lg:col-span-2"><CardContent className="py-8 text-center text-muted-foreground">Loading...</CardContent></Card>
         ) : tenants.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">No tenants yet</CardContent></Card>
-        ) : tenants.map((t: any) => (
-          <Card
-            key={t.id}
-            className="overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all"
-            onClick={() => openTenantDetail(t.id)}
-          >
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{t.name}</h3>
-                    <Badge variant={statusColor(t.status)} className="text-[10px]">{t.status}</Badge>
+          <Card className="lg:col-span-2"><CardContent className="py-8 text-center text-muted-foreground">No tenants yet</CardContent></Card>
+        ) : tenants.map((t: any) => {
+          const tenantPending = payments.filter((p: any) => p.status === "pending" && p.tenant_id === t.id).length;
+          const hasLimit = t.subscription_type === "subscription_with_limit";
+          const used = Number(t.total_used || 0);
+          const limit = Number(t.system_limit || 0);
+          const usagePct = hasLimit && limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+          const expired = t.subscription_paid_until ? new Date(t.subscription_paid_until) < new Date() : false;
+          return (
+            <Card
+              key={t.id}
+              className="overflow-hidden cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
+              onClick={() => openTenantDetail(t.id)}
+            >
+              <CardContent className="p-4">
+                {/* Header: name + status + actions */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-sm sm:text-base truncate">{t.name}</h3>
+                      <Badge variant={statusColor(t.status)} className="text-[10px]">{t.status}</Badge>
+                      {expired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
+                      {tenantPending > 0 && (
+                        <Badge variant="outline" className="text-[10px] border-orange-500/60 text-orange-600">
+                          {tenantPending} pending
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      {t.domain}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{t.domain}</p>
+                  <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyApiKey(t.api_key)} title="Copy API Key">
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleStatus(t)} title={t.status === "active" ? "Freeze" : "Activate"}>
+                      {t.status === "active" ? <Ban className="h-3 w-3 text-destructive" /> : <CheckCircle className="h-3 w-3 text-green-500" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setDeleteTenant(t); setDeleteOpen(true); }} title="Delete">
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTenantDetail(t.id)} title="View Details">
-                    <Eye className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyApiKey(t.api_key)} title="Copy API Key">
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleStatus(t)}>
-                    {t.status === "active" ? <Ban className="h-3 w-3 text-destructive" /> : <CheckCircle className="h-3 w-3 text-green-500" />}
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setDeleteTenant(t); setDeleteOpen(true); }}>
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
-                </div>
-              </div>
 
-              {/* Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                <div className="bg-muted/50 rounded-lg p-2">
-                  <p className="text-[10px] text-muted-foreground">Type</p>
-                  <p className="text-xs font-medium">{t.subscription_type === "subscription_with_limit" ? "Sub + Limit" : "Sub Only"}</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2">
-                  <p className="text-[10px] text-muted-foreground">Fee</p>
-                  <p className="text-xs font-medium">৳{Number(t.subscription_fee || 0).toLocaleString()}/mo</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2">
-                  <p className="text-[10px] text-muted-foreground">USD Rate</p>
-                  <p className="text-xs font-medium">৳{Number(t.usd_rate || 0)}</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2">
-                  <p className="text-[10px] text-muted-foreground">
-                    {t.subscription_type === "subscription_with_limit" ? "Used / Limit" : "Used"}
-                  </p>
-                  <p className="text-xs font-medium">
-                    ${Number(t.total_used || 0).toLocaleString()}
-                    {t.subscription_type === "subscription_with_limit" ? ` / $${Number(t.system_limit || 0).toLocaleString()}` : ""}
-                  </p>
-                </div>
-              </div>
+                {/* Limit usage bar (only for limit-type) */}
+                {hasLimit && (
+                  <div className="mt-3 space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">System Limit</span>
+                      <span className="font-medium">
+                        ${used.toLocaleString()} <span className="text-muted-foreground">/ ${limit.toLocaleString()}</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full transition-all",
+                          usagePct >= 90 ? "bg-destructive" : usagePct >= 70 ? "bg-orange-500" : "bg-primary"
+                        )}
+                        style={{ width: `${usagePct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
-              {/* Subscription date */}
-              {t.subscription_paid_until && (
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  Paid until: {format(new Date(t.subscription_paid_until), "dd MMM yyyy")}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                {/* Info row: type / fee / rate / paid-until */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                  <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Type</p>
+                    <p className="text-xs font-medium truncate">{hasLimit ? "Sub + Limit" : "Sub Only"}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Fee / mo</p>
+                    <p className="text-xs font-medium">৳{Number(t.subscription_fee || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                    <p className="text-[10px] text-muted-foreground">USD Rate</p>
+                    <p className="text-xs font-medium">৳{Number(t.usd_rate || 0)}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Paid Until</p>
+                    <p className={cn("text-xs font-medium", expired && "text-destructive")}>
+                      {t.subscription_paid_until ? format(new Date(t.subscription_paid_until), "dd MMM yy") : "—"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
-
-      {/* Payment History */}
-      {payments.length > 0 && (
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <h3 className="font-semibold text-sm mb-3">Recent Payments ({payments.length})</h3>
-            <div className="space-y-2">
-              {payments.slice(0, 20).map((p: any) => (
-                <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 rounded-lg bg-muted/30 text-sm">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-xs">{p.tenants?.name || "—"}</span>
-                    <Badge variant="outline" className="text-[10px]">{p.payment_type}</Badge>
-                    <Badge variant={p.status === "approved" ? "default" : p.status === "rejected" ? "destructive" : "secondary"} className="text-[10px]">{p.status}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>৳{Number(p.amount).toLocaleString()}</span>
-                    {p.limit_amount && <span>(${Number(p.limit_amount).toLocaleString()})</span>}
-                    <span>{format(new Date(p.created_at), "dd MMM")}</span>
-                    {p.proof_url && (
-                      <a href={p.proof_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">Proof</a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Delete Confirmation */}
       <Dialog open={deleteOpen} onOpenChange={(o) => { setDeleteOpen(o); if (!o) setDeleteConfirm(""); }}>
