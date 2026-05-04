@@ -369,24 +369,18 @@ export function AdminTopUp() {
 
       if (isTenantPayment) {
         // --- Tenant payment approval logic ---
-        const updateData: any = { status: action, reviewed_by: user!.id };
-        if ((action === "rejected" || action === "hold") && adminNote) updateData.admin_note = adminNote;
-        // Atomic guard: only update if still pending (prevents double-approval race with auto-verify)
-        const { data: updatedRows, error: updateError } = await (supabase as any)
-          .from("tenant_payments")
-          .update(updateData)
-          .eq("id", id)
-          .eq("status", "pending")
-          .select("id");
-        if (updateError) throw updateError;
-        if (!updatedRows?.length) {
-          throw new Error("This payment was already processed (auto-verified or by another admin). Please refresh.");
-        }
-
         if (action === "approved") {
-          const tenant = requestRow._tenant;
-          const tenantId = requestRow._tenant_id;
+          // Use atomic RPC: marks pending->approved, increases limit once, writes ledger.
+          const { error: rpcErr } = await (supabase as any).rpc("approve_tenant_limit_payment", {
+            p_payment_id: id,
+            p_admin: user!.id,
+          });
+          if (rpcErr) throw rpcErr;
+
+          // For subscription payments we still need to extend paid_until.
           if (requestRow._payment_type === "subscription") {
+            const tenant = requestRow._tenant;
+            const tenantId = requestRow._tenant_id;
             const months = requestRow._duration_months || 1;
             const baseDate = tenant?.subscription_paid_until && new Date(tenant.subscription_paid_until) > new Date()
               ? new Date(tenant.subscription_paid_until) : new Date();
@@ -395,15 +389,26 @@ export function AdminTopUp() {
               subscription_paid_until: baseDate.toISOString(),
               status: "active",
             }).eq("id", tenantId);
-          } else if (requestRow._payment_type === "limit_purchase") {
-            const tenantRate = Number(tenant?.usd_rate) || 120;
-            const usdAmount = requestRow._limit_amount ? Number(requestRow._limit_amount) : (Number(requestRow._original_amount) / tenantRate);
-            const newLimit = Number(tenant?.system_limit || 0) + usdAmount;
-            await (supabase as any).from("tenants").update({
-              system_limit: newLimit,
-              subscription_type: "subscription_with_limit",
-            }).eq("id", tenantId);
           }
+        } else {
+          // reject / hold — just update status with admin note (atomic guard)
+          const updateData: any = { status: action, reviewed_by: user!.id };
+          if (adminNote) updateData.admin_note = adminNote;
+          const { data: updatedRows, error: updateError } = await (supabase as any)
+            .from("tenant_payments")
+            .update(updateData)
+            .eq("id", id)
+            .eq("status", "pending")
+            .select("id");
+          if (updateError) throw updateError;
+          if (!updatedRows?.length) {
+            throw new Error("This payment was already processed (auto-verified or by another admin). Please refresh.");
+          }
+        }
+
+        if (action === "approved") {
+          const tenant = requestRow._tenant;
+          const tenantId = requestRow._tenant_id;
 
           // Auto-sync to seller ledger if the receiving bank has a seller assigned.
           // Mirrors client top-up flow so tenant payments show up in the seller's

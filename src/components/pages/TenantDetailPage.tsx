@@ -41,7 +41,7 @@ export default function TenantDetailPage() {
   const [extendMode, setExtendMode] = useState<"extend" | "reduce" | "set">("extend");
   const [manualDate, setManualDate] = useState("");
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set">("increase");
+  const [adjustMode, setAdjustMode] = useState<"increase" | "decrease" | "set" | "refund_used">("increase");
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
@@ -142,6 +142,23 @@ export default function TenantDetailPage() {
       const { data, error } = await (supabase as any)
         .from("tenant_usage_report_keys")
         .select("id, idempotency_key, action, amount, source, meta, created_at, before_total_used, after_total_used")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60 * 1000,
+  });
+
+  // Unified ledger — every limit/used movement with before/after for both fields.
+  const { data: ledger = [], refetch: refetchLedger, isFetching: ledgerFetching } = useQuery({
+    queryKey: ["tenant-ledger", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_limit_ledger")
+        .select("*")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -257,40 +274,41 @@ export default function TenantDetailPage() {
       if (!tenant) throw new Error("Tenant not loaded");
       if (!adjustReason.trim()) throw new Error("Reason is required");
       const amt = Number(adjustAmount);
-      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
-      const currentLimit = Number(tenant.system_limit || 0);
-      let newLimit = currentLimit;
-      let delta = 0;
-      if (adjustMode === "increase") { newLimit = currentLimit + amt; delta = amt; }
-      else if (adjustMode === "decrease") { newLimit = Math.max(0, currentLimit - amt); delta = -(currentLimit - newLimit); }
-      else { newLimit = amt; delta = amt - currentLimit; }
+      if (!amt || amt < 0) throw new Error("Enter a valid amount");
 
-      // Update tenant
-      const { error: upErr } = await (supabase as any).from("tenants").update({
-        system_limit: newLimit,
-        subscription_type: "subscription_with_limit",
-      }).eq("id", tenantId);
-      if (upErr) throw upErr;
+      if (adjustMode === "refund_used") {
+        if (amt <= 0) throw new Error("Enter a valid amount");
+        const { data: authData } = await supabase.auth.getUser();
+        const { error } = await (supabase as any).rpc("refund_tenant_usage", {
+          p_tenant_id: tenantId,
+          p_amount: amt,
+          p_reason: adjustReason.trim(),
+          p_admin: authData?.user?.id ?? null,
+        });
+        if (error) throw error;
+        return;
+      }
 
-      // Log as a tenant_payment row so it shows in tenant's limit log
-      const { error: logErr } = await (supabase as any).from("tenant_payments").insert({
-        tenant_id: tenantId,
-        amount: 0,
-        limit_amount: delta,
-        payment_type: "manual_adjustment",
-        status: "approved",
-        adjustment_reason: adjustReason.trim(),
+      const { data: authData } = await supabase.auth.getUser();
+      const { error } = await (supabase as any).rpc("adjust_tenant_system_limit", {
+        p_tenant_id: tenantId,
+        p_mode: adjustMode,
+        p_amount: amt,
+        p_reason: adjustReason.trim(),
+        p_admin: authData?.user?.id ?? null,
       });
-      if (logErr) throw logErr;
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenant-payments-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-usage-log", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       setAdjustOpen(false);
       setAdjustAmount("");
       setAdjustReason("");
-      toast.success("Limit adjusted and logged");
+      toast.success("Saved and logged in ledger");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -598,8 +616,9 @@ export default function TenantDetailPage() {
         )}
 
         {/* Tabs - like ClientDetailPage */}
-        <Tabs defaultValue="payments">
+        <Tabs defaultValue="ledger">
           <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
+            <TabsTrigger value="ledger" className={cn(isMobile && "text-xs flex-1")}>Ledger</TabsTrigger>
             <TabsTrigger value="payments" className={cn(isMobile && "text-xs flex-1")}>Payments</TabsTrigger>
             <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
             <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
@@ -607,6 +626,90 @@ export default function TenantDetailPage() {
             <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
             <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
           </TabsList>
+
+          {/* Ledger Tab — unified, step-by-step, before/after for limit & used */}
+          <TabsContent value="ledger" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+                    Limit Ledger ({ledger.length})
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
+                    <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className="rounded-lg p-2.5 bg-blue-500/10 border border-blue-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Total Limit</p>
+                    <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">${Number(tenant.system_limit || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-lg p-2.5 bg-orange-500/10 border border-orange-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Used</p>
+                    <p className="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400">${Number(tenant.total_used || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-lg p-2.5 bg-green-500/10 border border-green-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Remaining</p>
+                    <p className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">${Math.max(0, Number(tenant.system_limit || 0) - Number(tenant.total_used || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                {ledger.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-6 border rounded-lg">
+                    Kono entry nei akhono. Payment approve / Adjust / Top-up hole ekhane step by step dekhabe.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {ledger.map((row: any) => {
+                      const isLimit = String(row.movement_type).startsWith("limit");
+                      const isUsage = String(row.movement_type).startsWith("usage");
+                      const delta = Number(row.amount_delta || 0);
+                      const lb = row.system_limit_before; const la = row.system_limit_after;
+                      const ub = row.total_used_before; const ua = row.total_used_after;
+                      const rb = row.remaining_before; const ra = row.remaining_after;
+                      const fmt = (v: any) => v == null ? "—" : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+                      return (
+                        <div key={row.id} className="border rounded-lg p-2.5 text-xs">
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant={isLimit ? "default" : "secondary"} className="text-[9px]">{row.movement_type}</Badge>
+                                {row.source && <Badge variant="outline" className="text-[9px]">{row.source}</Badge>}
+                              </div>
+                              {row.reason && <p className="text-[11px] text-muted-foreground mt-1 italic">{row.reason}</p>}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className={cn("font-bold text-sm", delta >= 0 ? (isLimit ? "text-blue-600" : "text-orange-600") : "text-green-600")}>
+                                {delta >= 0 ? "+" : ""}{fmt(Math.abs(delta) === 0 ? 0 : delta)}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 pt-2 border-t">
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Limit</p>
+                              <p className="font-semibold text-[11px]">{fmt(lb)} → <span className="text-blue-600">{fmt(la)}</span></p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Used</p>
+                              <p className="font-semibold text-[11px]">{fmt(ub)} → <span className="text-orange-600">{fmt(ua)}</span></p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Remaining</p>
+                              <p className="font-semibold text-[11px]">{fmt(rb)} → <span className="text-green-600">{fmt(ra)}</span></p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-3">
@@ -1073,17 +1176,23 @@ export default function TenantDetailPage() {
                   <div><Label>USD Rate (৳)</Label><Input type="number" value={editData.usd_rate || 0} onChange={e => setEditData((p: any) => ({ ...p, usd_rate: Number(e.target.value) }))} /></div>
                 </div>
                 {editData.subscription_type === "subscription_with_limit" && (
-                  <div><Label>System Limit ($)</Label><Input type="number" value={editData.system_limit || ""} onChange={e => setEditData((p: any) => ({ ...p, system_limit: Number(e.target.value) }))} /></div>
+                  <div>
+                    <Label>System Limit ($)</Label>
+                    <Input type="number" value={editData.system_limit || ""} disabled readOnly />
+                    <p className="text-[11px] text-muted-foreground mt-1">এই field শুধু "Adjust Limit" বা tenant payment approve থেকে পাল্টাবে — direct edit বন্ধ।</p>
+                  </div>
                 )}
-                <div><Label>Total Used ($)</Label><Input type="number" value={editData.total_used || 0} onChange={e => setEditData((p: any) => ({ ...p, total_used: Number(e.target.value) }))} /></div>
+                <div>
+                  <Label>Total Used ($)</Label>
+                  <Input type="number" value={editData.total_used || 0} disabled readOnly />
+                  <p className="text-[11px] text-muted-foreground mt-1">Used শুধু ad-account top-up বা "Refund Used" থেকে পাল্টাবে — direct edit বন্ধ।</p>
+                </div>
                 <Button className="w-full" onClick={() => updateMutation.mutate({
                   name: editData.name,
                   domain: editData.domain,
                   subscription_type: editData.subscription_type,
                   subscription_fee: editData.subscription_fee,
                   usd_rate: editData.usd_rate,
-                  system_limit: editData.subscription_type === "subscription_with_limit" ? editData.system_limit : null,
-                  total_used: editData.total_used,
                 })} disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
@@ -1193,35 +1302,36 @@ export default function TenantDetailPage() {
         {/* Adjust Limit Dialog */}
         <Dialog open={adjustOpen} onOpenChange={(o) => { setAdjustOpen(o); if (!o) { setAdjustAmount(""); setAdjustReason(""); } }}>
           <DialogContent className="max-w-[95vw] sm:max-w-sm">
-            <DialogHeader><DialogTitle>Manually Adjust System Limit</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Adjust System Limit / Used</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                বর্তমান limit: <strong>${Number(tenant.system_limit || 0).toLocaleString()}</strong>
+                Limit: <strong>${Number(tenant.system_limit || 0).toLocaleString()}</strong> · Used: <strong>${Number(tenant.total_used || 0).toLocaleString()}</strong>
               </p>
               <div>
                 <Label>Action</Label>
                 <Select value={adjustMode} onValueChange={(v: any) => setAdjustMode(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="increase">➕ Increase ($)</SelectItem>
-                    <SelectItem value="decrease">➖ Decrease ($)</SelectItem>
-                    <SelectItem value="set">🎯 Set Exact Limit ($)</SelectItem>
+                    <SelectItem value="increase">➕ Increase System Limit ($)</SelectItem>
+                    <SelectItem value="decrease">➖ Decrease System Limit ($)</SelectItem>
+                    <SelectItem value="set">🎯 Set Exact System Limit ($)</SelectItem>
+                    <SelectItem value="refund_used">↩️ Refund Used (decreases Used)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Amount (USD)</Label>
-                <Input type="number" min="0" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder={adjustMode === "set" ? "New total limit" : "Amount to add/subtract"} />
+                <Input type="number" min="0" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder={adjustMode === "set" ? "New total limit" : "Amount"} />
               </div>
               <div>
                 <Label>Reason <span className="text-destructive">*</span></Label>
                 <Textarea
                   value={adjustReason}
                   onChange={e => setAdjustReason(e.target.value)}
-                  placeholder="যেমনঃ Promotional bonus / Refund adjustment / Compensation for downtime..."
+                  placeholder="যেমনঃ Promotional bonus / Refund adjustment / Account refund..."
                   rows={3}
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">এই reason টা tenant-এর limit log-এ দেখাবে।</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Reason টা ledger-এ before/after সহ save হবে।</p>
               </div>
               <Button
                 className="w-full"
@@ -1229,7 +1339,7 @@ export default function TenantDetailPage() {
                 onClick={() => adjustMutation.mutate()}
                 disabled={adjustMutation.isPending || !adjustAmount || !adjustReason.trim()}
               >
-                {adjustMutation.isPending ? "Saving..." : adjustMode === "increase" ? "Increase Limit" : adjustMode === "decrease" ? "Decrease Limit" : "Set New Limit"}
+                {adjustMutation.isPending ? "Saving..." : adjustMode === "increase" ? "Increase Limit" : adjustMode === "decrease" ? "Decrease Limit" : adjustMode === "set" ? "Set New Limit" : "Refund Used"}
               </Button>
             </div>
           </DialogContent>
