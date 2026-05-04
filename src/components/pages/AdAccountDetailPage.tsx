@@ -360,8 +360,11 @@ export default function AdAccountDetailPage() {
           });
           if (error) throw error;
           if (data?.error) throw new Error(data.error);
-          await queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
-          await queryClient.invalidateQueries({ queryKey: ["tiktok-account-insights-detail", id] });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] }),
+            queryClient.invalidateQueries({ queryKey: ["tiktok-account-insights-detail", id] }),
+            queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] }),
+          ]);
           toast.success("Data updated from TikTok BC");
         } else {
           toast.error("No Business Center linked to this account");
