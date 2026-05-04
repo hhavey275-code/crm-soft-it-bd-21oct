@@ -360,8 +360,11 @@ export default function AdAccountDetailPage() {
           });
           if (error) throw error;
           if (data?.error) throw new Error(data.error);
-          await queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
-          await queryClient.invalidateQueries({ queryKey: ["tiktok-account-insights-detail", id] });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] }),
+            queryClient.invalidateQueries({ queryKey: ["tiktok-account-insights-detail", id] }),
+            queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] }),
+          ]);
           toast.success("Data updated from TikTok BC");
         } else {
           toast.error("No Business Center linked to this account");
@@ -371,7 +374,12 @@ export default function AdAccountDetailPage() {
           body: { ad_account_ids: [id], source: "meta" },
         });
         if (error) throw error;
-        await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] }),
+          queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] }),
+          queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] }),
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] }),
+        ]);
         if (!isAdmin) setLastMetaUpdate(Date.now());
         toast.success("Data updated from Meta");
       }
