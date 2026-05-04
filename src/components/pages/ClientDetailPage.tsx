@@ -87,6 +87,7 @@ import { fetchPeriodSpendFromMeta } from "@/lib/fetchPeriodSpend";
 import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
+import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
 
 export default function ClientDetailPage() {
   const params = useParams<{ userId?: string; id?: string }>();
@@ -883,6 +884,18 @@ export default function ClientDetailPage() {
                 <ArrowUpCircle className="h-3 w-3 mr-1" />
                 Top Up
               </Button>
+              {(isAdmin || isSuperAdmin) && userId && (
+                <StripeLinkDialog
+                  targetUserId={userId}
+                  targetUserName={profile?.full_name || profile?.email}
+                  trigger={
+                    <Button size="sm" variant="outline" className="h-8 text-xs rounded-full">
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      Stripe Link
+                    </Button>
+                  }
+                />
+              )}
               <Button
                 size="sm"
                 variant="outline"
