@@ -128,6 +128,25 @@ export default function TenantDetailPage() {
     enabled: !!tenant?.name,
   });
 
+  // Per-tenant usage audit log — every report-usage / refund-usage call from
+  // tenant. Shows ad account, amount, before/after total_used, idempotency,
+  // and duplicates so admin can verify limit is calculating correctly.
+  const { data: usageLog = [], refetch: refetchUsageLog, isFetching: usageLogFetching } = useQuery({
+    queryKey: ["tenant-usage-log", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_usage_report_keys")
+        .select("id, idempotency_key, action, amount, source, meta, created_at, before_total_used, after_total_used")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60 * 1000,
+  });
+
   // On-demand refresh: invokes tenant-pull-stats edge function which calls the
   // tenant's webhook (NO Meta API call — tenant returns aggregated data from
   // its own DB, fed by the tenant's existing "Update from Meta" runs).
@@ -556,6 +575,7 @@ export default function TenantDetailPage() {
             <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
             <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
             <TabsTrigger value="banks" className={cn(isMobile && "text-xs flex-1")}>Banks</TabsTrigger>
+            <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
             <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
           </TabsList>
 
@@ -787,6 +807,162 @@ export default function TenantDetailPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Usage Log Tab — per-tenant detailed limit consumption audit */}
+          <TabsContent value="usage-log" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+                    Limit Usage Log
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => refetchUsageLog()} disabled={usageLogFetching}>
+                    <RefreshCw className={cn("h-3 w-3", usageLogFetching && "animate-spin")} />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                {/* Summary cards */}
+                {(() => {
+                  const reports = usageLog.filter((r: any) => r.action === "report-usage");
+                  const refunds = usageLog.filter((r: any) => r.action === "refund-usage");
+                  const duplicates = usageLog.filter((r: any) => {
+                    const before = Number(r.before_total_used ?? 0);
+                    const after = Number(r.after_total_used ?? 0);
+                    return Math.abs(after - before) < 0.001 && Number(r.amount) > 0;
+                  });
+                  const totalReported = reports.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+                  const totalRefunded = refunds.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+                  const netConsumed = totalReported - totalRefunded;
+                  const tenantTotalUsed = Number(tenant.total_used || 0);
+                  const drift = tenantTotalUsed - netConsumed;
+                  const driftOk = Math.abs(drift) < 0.5;
+
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                      <div className="border rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Total Reported</p>
+                        <p className="text-sm font-bold">${totalReported.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">{reports.length} events</p>
+                      </div>
+                      <div className="border rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Total Refunded</p>
+                        <p className="text-sm font-bold text-green-600">${totalRefunded.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">{refunds.length} events</p>
+                      </div>
+                      <div className="border rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Net (Reported − Refunded)</p>
+                        <p className="text-sm font-bold">${netConsumed.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">{duplicates.length} duplicates ignored</p>
+                      </div>
+                      <div className={cn("border rounded-lg p-2", !driftOk && "border-destructive")}>
+                        <p className="text-[10px] text-muted-foreground">Tenant total_used</p>
+                        <p className={cn("text-sm font-bold", !driftOk && "text-destructive")}>${tenantTotalUsed.toFixed(2)}</p>
+                        <p className={cn("text-[10px]", driftOk ? "text-green-600" : "text-destructive")}>
+                          {driftOk ? "✓ matches" : `Δ ${drift > 0 ? "+" : ""}${drift.toFixed(2)}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {usageLog.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-6">
+                    Kono usage report nei akhono. Tenant top-up korle ekhane dekhabe.
+                  </p>
+                ) : isMobile ? (
+                  <div className="space-y-2">
+                    {usageLog.map((row: any) => {
+                      const meta = row.meta || {};
+                      const accName = meta.account_name || meta.ad_account_name || meta.ad_account_id || "—";
+                      const before = Number(row.before_total_used ?? 0);
+                      const after = Number(row.after_total_used ?? 0);
+                      const isDup = Math.abs(after - before) < 0.001 && Number(row.amount) > 0;
+                      return (
+                        <div key={row.id} className="border rounded-lg p-2 text-xs space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</span>
+                            <div className="flex gap-1 flex-wrap justify-end">
+                              {isDup && <Badge variant="secondary" className="text-[9px]">DUP</Badge>}
+                              <Badge variant={row.action === "refund-usage" ? "secondary" : "outline"} className="text-[9px]">
+                                {row.action === "refund-usage" ? "refund" : "report"}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium truncate max-w-[60%]" title={accName}>{accName}</span>
+                            <span className={cn("font-bold", row.action === "refund-usage" && "text-green-600")}>
+                              {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{row.source || "—"}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            ${before.toFixed(0)} → ${after.toFixed(0)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b text-muted-foreground">
+                        <tr>
+                          <th className="text-left p-2">Time</th>
+                          <th className="text-left p-2">Action</th>
+                          <th className="text-left p-2">Ad Account</th>
+                          <th className="text-left p-2">Source</th>
+                          <th className="text-right p-2">Amount</th>
+                          <th className="text-right p-2">Before → After</th>
+                          <th className="text-left p-2">Idem Key</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usageLog.map((row: any) => {
+                          const meta = row.meta || {};
+                          const accName = meta.account_name || meta.ad_account_name || "—";
+                          const accId = meta.ad_account_id || meta.account_id || "";
+                          const before = Number(row.before_total_used ?? 0);
+                          const after = Number(row.after_total_used ?? 0);
+                          const delta = after - before;
+                          const isDup = Math.abs(delta) < 0.001 && Number(row.amount) > 0;
+                          return (
+                            <tr key={row.id} className={cn("border-b hover:bg-muted/30", isDup && "bg-muted/20")}>
+                              <td className="p-2 whitespace-nowrap">{format(new Date(row.created_at), "dd MMM HH:mm:ss")}</td>
+                              <td className="p-2">
+                                <div className="flex gap-1">
+                                  <Badge variant={row.action === "refund-usage" ? "secondary" : "outline"} className="text-[9px]">
+                                    {row.action === "refund-usage" ? "refund" : "report"}
+                                  </Badge>
+                                  {isDup && <Badge variant="secondary" className="text-[9px]">dup</Badge>}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                <div className="font-medium truncate max-w-[180px]" title={accName}>{accName}</div>
+                                {accId && <div className="text-[10px] text-muted-foreground">{accId}</div>}
+                              </td>
+                              <td className="p-2 text-muted-foreground">{row.source || "—"}</td>
+                              <td className={cn("p-2 text-right font-bold", row.action === "refund-usage" && "text-green-600")}>
+                                {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
+                              </td>
+                              <td className="p-2 text-right text-muted-foreground whitespace-nowrap">
+                                ${before.toFixed(0)} → ${after.toFixed(0)}
+                                <span className="ml-1 text-[10px]">({delta >= 0 ? "+" : ""}{delta.toFixed(2)})</span>
+                              </td>
+                              <td className="p-2 text-[10px] text-muted-foreground max-w-[140px] truncate" title={row.idempotency_key || ""}>
+                                {row.idempotency_key || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>
