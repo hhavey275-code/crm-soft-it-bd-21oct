@@ -371,7 +371,12 @@ export default function AdAccountDetailPage() {
           body: { ad_account_ids: [id], source: "meta" },
         });
         if (error) throw error;
-        await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] }),
+          queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] }),
+          queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] }),
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] }),
+        ]);
         if (!isAdmin) setLastMetaUpdate(Date.now());
         toast.success("Data updated from Meta");
       }
