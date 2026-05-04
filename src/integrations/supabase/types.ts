@@ -1779,6 +1779,7 @@ export type Database = {
           others_telegram_group_id: string | null
           phone: string | null
           status: string
+          stripe_customer_id: string | null
           updated_at: string
           usd_rate: number | null
           user_id: string
@@ -1802,6 +1803,7 @@ export type Database = {
           others_telegram_group_id?: string | null
           phone?: string | null
           status?: string
+          stripe_customer_id?: string | null
           updated_at?: string
           usd_rate?: number | null
           user_id: string
@@ -1825,6 +1827,7 @@ export type Database = {
           others_telegram_group_id?: string | null
           phone?: string | null
           status?: string
+          stripe_customer_id?: string | null
           updated_at?: string
           usd_rate?: number | null
           user_id?: string
@@ -2359,6 +2362,60 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      stripe_payment_links: {
+        Row: {
+          amount_usd: number
+          checkout_url: string
+          created_at: string
+          created_by: string
+          expires_at: string
+          failure_code: string | null
+          failure_message: string | null
+          id: string
+          paid_at: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          target_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_usd: number
+          checkout_url: string
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          paid_at?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          target_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_usd?: number
+          checkout_url?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          paid_at?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          target_user_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
