@@ -575,6 +575,7 @@ export default function TenantDetailPage() {
             <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
             <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
             <TabsTrigger value="banks" className={cn(isMobile && "text-xs flex-1")}>Banks</TabsTrigger>
+            <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
             <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
           </TabsList>
 
