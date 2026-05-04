@@ -128,6 +128,25 @@ export default function TenantDetailPage() {
     enabled: !!tenant?.name,
   });
 
+  // Per-tenant usage audit log — every report-usage / refund-usage call from
+  // tenant. Shows ad account, amount, before/after total_used, idempotency,
+  // and duplicates so admin can verify limit is calculating correctly.
+  const { data: usageLog = [], refetch: refetchUsageLog, isFetching: usageLogFetching } = useQuery({
+    queryKey: ["tenant-usage-log", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tenant_usage_report_keys")
+        .select("id, idempotency_key, action, amount, source, meta, created_at, before_total_used, after_total_used")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    enabled: !!tenantId,
+    refetchInterval: 60 * 1000,
+  });
+
   // On-demand refresh: invokes tenant-pull-stats edge function which calls the
   // tenant's webhook (NO Meta API call — tenant returns aggregated data from
   // its own DB, fed by the tenant's existing "Update from Meta" runs).
