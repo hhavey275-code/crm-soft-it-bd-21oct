@@ -1198,35 +1198,36 @@ export default function TenantDetailPage() {
         {/* Adjust Limit Dialog */}
         <Dialog open={adjustOpen} onOpenChange={(o) => { setAdjustOpen(o); if (!o) { setAdjustAmount(""); setAdjustReason(""); } }}>
           <DialogContent className="max-w-[95vw] sm:max-w-sm">
-            <DialogHeader><DialogTitle>Manually Adjust System Limit</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Adjust System Limit / Used</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                বর্তমান limit: <strong>${Number(tenant.system_limit || 0).toLocaleString()}</strong>
+                Limit: <strong>${Number(tenant.system_limit || 0).toLocaleString()}</strong> · Used: <strong>${Number(tenant.total_used || 0).toLocaleString()}</strong>
               </p>
               <div>
                 <Label>Action</Label>
                 <Select value={adjustMode} onValueChange={(v: any) => setAdjustMode(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="increase">➕ Increase ($)</SelectItem>
-                    <SelectItem value="decrease">➖ Decrease ($)</SelectItem>
-                    <SelectItem value="set">🎯 Set Exact Limit ($)</SelectItem>
+                    <SelectItem value="increase">➕ Increase System Limit ($)</SelectItem>
+                    <SelectItem value="decrease">➖ Decrease System Limit ($)</SelectItem>
+                    <SelectItem value="set">🎯 Set Exact System Limit ($)</SelectItem>
+                    <SelectItem value="refund_used">↩️ Refund Used (decreases Used)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Amount (USD)</Label>
-                <Input type="number" min="0" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder={adjustMode === "set" ? "New total limit" : "Amount to add/subtract"} />
+                <Input type="number" min="0" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder={adjustMode === "set" ? "New total limit" : "Amount"} />
               </div>
               <div>
                 <Label>Reason <span className="text-destructive">*</span></Label>
                 <Textarea
                   value={adjustReason}
                   onChange={e => setAdjustReason(e.target.value)}
-                  placeholder="যেমনঃ Promotional bonus / Refund adjustment / Compensation for downtime..."
+                  placeholder="যেমনঃ Promotional bonus / Refund adjustment / Account refund..."
                   rows={3}
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">এই reason টা tenant-এর limit log-এ দেখাবে।</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Reason টা ledger-এ before/after সহ save হবে।</p>
               </div>
               <Button
                 className="w-full"
@@ -1234,7 +1235,7 @@ export default function TenantDetailPage() {
                 onClick={() => adjustMutation.mutate()}
                 disabled={adjustMutation.isPending || !adjustAmount || !adjustReason.trim()}
               >
-                {adjustMutation.isPending ? "Saving..." : adjustMode === "increase" ? "Increase Limit" : adjustMode === "decrease" ? "Decrease Limit" : "Set New Limit"}
+                {adjustMutation.isPending ? "Saving..." : adjustMode === "increase" ? "Increase Limit" : adjustMode === "decrease" ? "Decrease Limit" : adjustMode === "set" ? "Set New Limit" : "Refund Used"}
               </Button>
             </div>
           </DialogContent>
