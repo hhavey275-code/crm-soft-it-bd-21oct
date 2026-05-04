@@ -856,144 +856,150 @@ export default function TenantDetailPage() {
                   </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                {/* Summary cards */}
+              <CardContent className="p-3 sm:p-4 pt-0 space-y-3">
+                {/* Top summary: Limit / Used / Remaining */}
+                {(() => {
+                  const systemLimit = Number(tenant.system_limit || 0);
+                  const totalUsed = Number(tenant.total_used || 0);
+                  const remaining = Math.max(0, systemLimit - totalUsed);
+                  const pct = systemLimit > 0 ? Math.min(100, (totalUsed / systemLimit) * 100) : 0;
+                  const isUnlimited = tenant.subscription_type !== "subscription_with_limit";
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="rounded-lg p-3 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total Limit</p>
+                          <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">
+                            {isUnlimited ? "Unlimited" : `$${systemLimit.toLocaleString()}`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">System spend cap</p>
+                        </div>
+                        <div className="rounded-lg p-3 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Used</p>
+                          <p className="text-lg sm:text-xl font-bold text-orange-600 dark:text-orange-400">
+                            ${totalUsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{pct.toFixed(1)}% consumed</p>
+                        </div>
+                        <div className="rounded-lg p-3 bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Remaining</p>
+                          <p className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">
+                            {isUnlimited ? "∞" : `$${remaining.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Available to spend</p>
+                        </div>
+                      </div>
+                      {!isUnlimited && (
+                        <div className="space-y-1">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full transition-all",
+                                pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-orange-500" : "bg-primary"
+                              )}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Reconciliation note */}
                 {(() => {
                   const reports = usageLog.filter((r: any) => r.action === "report-usage");
                   const refunds = usageLog.filter((r: any) => r.action === "refund-usage");
-                  const duplicates = usageLog.filter((r: any) => {
-                    const before = Number(r.before_total_used ?? 0);
-                    const after = Number(r.after_total_used ?? 0);
-                    return Math.abs(after - before) < 0.001 && Number(r.amount) > 0;
-                  });
                   const totalReported = reports.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
                   const totalRefunded = refunds.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
                   const netConsumed = totalReported - totalRefunded;
                   const tenantTotalUsed = Number(tenant.total_used || 0);
                   const drift = tenantTotalUsed - netConsumed;
                   const driftOk = Math.abs(drift) < 0.5;
-
                   return (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                      <div className="border rounded-lg p-2">
-                        <p className="text-[10px] text-muted-foreground">Total Reported</p>
-                        <p className="text-sm font-bold">${totalReported.toFixed(2)}</p>
-                        <p className="text-[10px] text-muted-foreground">{reports.length} events</p>
-                      </div>
-                      <div className="border rounded-lg p-2">
-                        <p className="text-[10px] text-muted-foreground">Total Refunded</p>
-                        <p className="text-sm font-bold text-green-600">${totalRefunded.toFixed(2)}</p>
-                        <p className="text-[10px] text-muted-foreground">{refunds.length} events</p>
-                      </div>
-                      <div className="border rounded-lg p-2">
-                        <p className="text-[10px] text-muted-foreground">Net (Reported − Refunded)</p>
-                        <p className="text-sm font-bold">${netConsumed.toFixed(2)}</p>
-                        <p className="text-[10px] text-muted-foreground">{duplicates.length} duplicates ignored</p>
-                      </div>
-                      <div className={cn("border rounded-lg p-2", !driftOk && "border-destructive")}>
-                        <p className="text-[10px] text-muted-foreground">Tenant total_used</p>
-                        <p className={cn("text-sm font-bold", !driftOk && "text-destructive")}>${tenantTotalUsed.toFixed(2)}</p>
-                        <p className={cn("text-[10px]", driftOk ? "text-green-600" : "text-destructive")}>
-                          {driftOk ? "✓ matches" : `Δ ${drift > 0 ? "+" : ""}${drift.toFixed(2)}`}
-                        </p>
-                      </div>
+                    <div className={cn(
+                      "rounded-md border p-2 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1",
+                      driftOk ? "border-green-500/30 bg-green-500/5" : "border-destructive/40 bg-destructive/5"
+                    )}>
+                      <span className="text-muted-foreground">Reported: <strong className="text-foreground">${totalReported.toFixed(2)}</strong></span>
+                      <span className="text-muted-foreground">Refunded: <strong className="text-green-600">${totalRefunded.toFixed(2)}</strong></span>
+                      <span className="text-muted-foreground">Net: <strong className="text-foreground">${netConsumed.toFixed(2)}</strong></span>
+                      <span className={cn("ml-auto font-medium", driftOk ? "text-green-600" : "text-destructive")}>
+                        {driftOk ? "✓ Matches tenant total_used" : `Drift Δ ${drift > 0 ? "+" : ""}${drift.toFixed(2)}`}
+                      </span>
                     </div>
                   );
                 })()}
 
-                {usageLog.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    Kono usage report nei akhono. Tenant top-up korle ekhane dekhabe.
-                  </p>
-                ) : isMobile ? (
-                  <div className="space-y-2">
-                    {usageLog.map((row: any) => {
-                      const meta = row.meta || {};
-                      const accName = meta.account_name || meta.ad_account_name || meta.ad_account_id || "—";
-                      const before = Number(row.before_total_used ?? 0);
-                      const after = Number(row.after_total_used ?? 0);
-                      const isDup = Math.abs(after - before) < 0.001 && Number(row.amount) > 0;
-                      return (
-                        <div key={row.id} className="border rounded-lg p-2 text-xs space-y-1">
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</span>
-                            <div className="flex gap-1 flex-wrap justify-end">
-                              {isDup && <Badge variant="secondary" className="text-[9px]">DUP</Badge>}
-                              <Badge variant={row.action === "refund-usage" ? "secondary" : "outline"} className="text-[9px]">
-                                {row.action === "refund-usage" ? "refund" : "report"}
+                {/* Transactions */}
+                <div>
+                  <p className="text-xs font-semibold mb-2 text-muted-foreground">Transactions ({usageLog.length})</p>
+                  {usageLog.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6 border rounded-lg">
+                      Kono usage report nei akhono. Tenant top-up korle ekhane dekhabe.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {usageLog.map((row: any) => {
+                        const meta = row.meta || {};
+                        const accName = meta.account_name || meta.ad_account_name || meta.ad_account_id || "—";
+                        const accId = meta.ad_account_id || meta.account_id || "";
+                        const before = Number(row.before_total_used ?? 0);
+                        const after = Number(row.after_total_used ?? 0);
+                        const delta = after - before;
+                        const isDup = Math.abs(delta) < 0.001 && Number(row.amount) > 0;
+                        const systemLimit = Number(tenant.system_limit || 0);
+                        const remainingBefore = Math.max(0, systemLimit - before);
+                        const remainingAfter = Math.max(0, systemLimit - after);
+                        const isRefund = row.action === "refund-usage";
+                        return (
+                          <div key={row.id} className={cn(
+                            "border rounded-lg p-2.5 text-xs hover:bg-muted/30 transition-colors",
+                            isDup && "bg-muted/20 opacity-70"
+                          )}>
+                            <div className="flex justify-between items-start gap-2 mb-1.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium truncate" title={accName}>{accName}</div>
+                                {accId && <div className="text-[10px] text-muted-foreground truncate">{accId}</div>}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className={cn("font-bold text-sm", isRefund ? "text-green-600" : "text-orange-600")}>
+                                  {isRefund ? "-" : "+"}${Number(row.amount).toFixed(2)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t">
+                              <div>
+                                <p className="text-[9px] uppercase text-muted-foreground">Limit</p>
+                                <p className="font-semibold text-[11px]">${systemLimit.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-muted-foreground">Used</p>
+                                <p className="font-semibold text-[11px]">
+                                  ${before.toFixed(0)} → <span className="text-orange-600">${after.toFixed(0)}</span>
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-muted-foreground">Remaining</p>
+                                <p className="font-semibold text-[11px]">
+                                  ${remainingBefore.toFixed(0)} → <span className="text-green-600">${remainingAfter.toFixed(0)}</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              <Badge variant={isRefund ? "secondary" : "outline"} className="text-[9px]">
+                                {isRefund ? "refund" : "report"}
                               </Badge>
+                              {row.source && <Badge variant="outline" className="text-[9px]">{row.source}</Badge>}
+                              {isDup && <Badge variant="secondary" className="text-[9px]">duplicate</Badge>}
                             </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium truncate max-w-[60%]" title={accName}>{accName}</span>
-                            <span className={cn("font-bold", row.action === "refund-usage" && "text-green-600")}>
-                              {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">{row.source || "—"}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            ${before.toFixed(0)} → ${after.toFixed(0)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="border-b text-muted-foreground">
-                        <tr>
-                          <th className="text-left p-2">Time</th>
-                          <th className="text-left p-2">Action</th>
-                          <th className="text-left p-2">Ad Account</th>
-                          <th className="text-left p-2">Source</th>
-                          <th className="text-right p-2">Amount</th>
-                          <th className="text-right p-2">Before → After</th>
-                          <th className="text-left p-2">Idem Key</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {usageLog.map((row: any) => {
-                          const meta = row.meta || {};
-                          const accName = meta.account_name || meta.ad_account_name || "—";
-                          const accId = meta.ad_account_id || meta.account_id || "";
-                          const before = Number(row.before_total_used ?? 0);
-                          const after = Number(row.after_total_used ?? 0);
-                          const delta = after - before;
-                          const isDup = Math.abs(delta) < 0.001 && Number(row.amount) > 0;
-                          return (
-                            <tr key={row.id} className={cn("border-b hover:bg-muted/30", isDup && "bg-muted/20")}>
-                              <td className="p-2 whitespace-nowrap">{format(new Date(row.created_at), "dd MMM HH:mm:ss")}</td>
-                              <td className="p-2">
-                                <div className="flex gap-1">
-                                  <Badge variant={row.action === "refund-usage" ? "secondary" : "outline"} className="text-[9px]">
-                                    {row.action === "refund-usage" ? "refund" : "report"}
-                                  </Badge>
-                                  {isDup && <Badge variant="secondary" className="text-[9px]">dup</Badge>}
-                                </div>
-                              </td>
-                              <td className="p-2">
-                                <div className="font-medium truncate max-w-[180px]" title={accName}>{accName}</div>
-                                {accId && <div className="text-[10px] text-muted-foreground">{accId}</div>}
-                              </td>
-                              <td className="p-2 text-muted-foreground">{row.source || "—"}</td>
-                              <td className={cn("p-2 text-right font-bold", row.action === "refund-usage" && "text-green-600")}>
-                                {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
-                              </td>
-                              <td className="p-2 text-right text-muted-foreground whitespace-nowrap">
-                                ${before.toFixed(0)} → ${after.toFixed(0)}
-                                <span className="ml-1 text-[10px]">({delta >= 0 ? "+" : ""}{delta.toFixed(2)})</span>
-                              </td>
-                              <td className="p-2 text-[10px] text-muted-foreground max-w-[140px] truncate" title={row.idempotency_key || ""}>
-                                {row.idempotency_key || "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
