@@ -616,8 +616,9 @@ export default function TenantDetailPage() {
         )}
 
         {/* Tabs - like ClientDetailPage */}
-        <Tabs defaultValue="payments">
+        <Tabs defaultValue="ledger">
           <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
+            <TabsTrigger value="ledger" className={cn(isMobile && "text-xs flex-1")}>Ledger</TabsTrigger>
             <TabsTrigger value="payments" className={cn(isMobile && "text-xs flex-1")}>Payments</TabsTrigger>
             <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
             <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
@@ -625,6 +626,90 @@ export default function TenantDetailPage() {
             <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
             <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
           </TabsList>
+
+          {/* Ledger Tab — unified, step-by-step, before/after for limit & used */}
+          <TabsContent value="ledger" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+                    Limit Ledger ({ledger.length})
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
+                    <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className="rounded-lg p-2.5 bg-blue-500/10 border border-blue-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Total Limit</p>
+                    <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">${Number(tenant.system_limit || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-lg p-2.5 bg-orange-500/10 border border-orange-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Used</p>
+                    <p className="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400">${Number(tenant.total_used || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-lg p-2.5 bg-green-500/10 border border-green-500/20">
+                    <p className="text-[10px] uppercase text-muted-foreground">Remaining</p>
+                    <p className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">${Math.max(0, Number(tenant.system_limit || 0) - Number(tenant.total_used || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                {ledger.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-6 border rounded-lg">
+                    Kono entry nei akhono. Payment approve / Adjust / Top-up hole ekhane step by step dekhabe.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {ledger.map((row: any) => {
+                      const isLimit = String(row.movement_type).startsWith("limit");
+                      const isUsage = String(row.movement_type).startsWith("usage");
+                      const delta = Number(row.amount_delta || 0);
+                      const lb = row.system_limit_before; const la = row.system_limit_after;
+                      const ub = row.total_used_before; const ua = row.total_used_after;
+                      const rb = row.remaining_before; const ra = row.remaining_after;
+                      const fmt = (v: any) => v == null ? "—" : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+                      return (
+                        <div key={row.id} className="border rounded-lg p-2.5 text-xs">
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant={isLimit ? "default" : "secondary"} className="text-[9px]">{row.movement_type}</Badge>
+                                {row.source && <Badge variant="outline" className="text-[9px]">{row.source}</Badge>}
+                              </div>
+                              {row.reason && <p className="text-[11px] text-muted-foreground mt-1 italic">{row.reason}</p>}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className={cn("font-bold text-sm", delta >= 0 ? (isLimit ? "text-blue-600" : "text-orange-600") : "text-green-600")}>
+                                {delta >= 0 ? "+" : ""}{fmt(Math.abs(delta) === 0 ? 0 : delta)}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 pt-2 border-t">
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Limit</p>
+                              <p className="font-semibold text-[11px]">{fmt(lb)} → <span className="text-blue-600">{fmt(la)}</span></p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Used</p>
+                              <p className="font-semibold text-[11px]">{fmt(ub)} → <span className="text-orange-600">{fmt(ua)}</span></p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase text-muted-foreground">Remaining</p>
+                              <p className="font-semibold text-[11px]">{fmt(rb)} → <span className="text-green-600">{fmt(ra)}</span></p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-3">
