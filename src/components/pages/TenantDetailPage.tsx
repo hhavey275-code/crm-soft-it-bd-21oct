@@ -1072,9 +1072,17 @@ export default function TenantDetailPage() {
                   <div><Label>USD Rate (৳)</Label><Input type="number" value={editData.usd_rate || 0} onChange={e => setEditData((p: any) => ({ ...p, usd_rate: Number(e.target.value) }))} /></div>
                 </div>
                 {editData.subscription_type === "subscription_with_limit" && (
-                  <div><Label>System Limit ($)</Label><Input type="number" value={editData.system_limit || ""} onChange={e => setEditData((p: any) => ({ ...p, system_limit: Number(e.target.value) }))} /></div>
+                  <div>
+                    <Label>System Limit ($)</Label>
+                    <Input type="number" value={editData.system_limit || ""} disabled readOnly />
+                    <p className="text-[11px] text-muted-foreground mt-1">এই field শুধু "Adjust Limit" বা tenant payment approve থেকে পাল্টাবে — direct edit বন্ধ।</p>
+                  </div>
                 )}
-                <div><Label>Total Used ($)</Label><Input type="number" value={editData.total_used || 0} onChange={e => setEditData((p: any) => ({ ...p, total_used: Number(e.target.value) }))} /></div>
+                <div>
+                  <Label>Total Used ($)</Label>
+                  <Input type="number" value={editData.total_used || 0} disabled readOnly />
+                  <p className="text-[11px] text-muted-foreground mt-1">Used শুধু ad-account top-up বা "Refund Used" থেকে পাল্টাবে — direct edit বন্ধ।</p>
+                </div>
                 <Button className="w-full" onClick={() => updateMutation.mutate({
                   name: editData.name,
                   domain: editData.domain,
