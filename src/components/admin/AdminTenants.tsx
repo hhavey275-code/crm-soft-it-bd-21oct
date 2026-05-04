@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Plus, Copy, Ban, CheckCircle, Landmark, Trash2, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export function AdminTenants() {
   const queryClient = useQueryClient();
