@@ -3414,6 +3414,14 @@ export type Database = {
       }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      reconcile_tenant_total_used: {
+        Args: {
+          p_new_total_used: number
+          p_reason?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       release_forward_slot: {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
