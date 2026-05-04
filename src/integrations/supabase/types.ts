@@ -2683,6 +2683,74 @@ export type Database = {
           },
         ]
       }
+      tenant_limit_ledger: {
+        Row: {
+          actor_user_id: string | null
+          amount_delta: number
+          created_at: string
+          id: string
+          idempotency_key: string | null
+          meta: Json | null
+          movement_type: string
+          reason: string | null
+          remaining_after: number | null
+          remaining_before: number | null
+          source: string | null
+          source_id: string | null
+          system_limit_after: number | null
+          system_limit_before: number | null
+          tenant_id: string
+          total_used_after: number | null
+          total_used_before: number | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          amount_delta: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          meta?: Json | null
+          movement_type: string
+          reason?: string | null
+          remaining_after?: number | null
+          remaining_before?: number | null
+          source?: string | null
+          source_id?: string | null
+          system_limit_after?: number | null
+          system_limit_before?: number | null
+          tenant_id: string
+          total_used_after?: number | null
+          total_used_before?: number | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          amount_delta?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          meta?: Json | null
+          movement_type?: string
+          reason?: string | null
+          remaining_after?: number | null
+          remaining_before?: number | null
+          source?: string | null
+          source_id?: string | null
+          system_limit_after?: number | null
+          system_limit_before?: number | null
+          tenant_id?: string
+          total_used_after?: number | null
+          total_used_before?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_limit_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_payments: {
         Row: {
           adjustment_reason: string | null
@@ -3378,6 +3446,34 @@ export type Database = {
       }
     }
     Functions: {
+      _tll_insert: {
+        Args: {
+          p_actor: string
+          p_delta: number
+          p_idempotency_key: string
+          p_limit_after: number
+          p_limit_before: number
+          p_meta: Json
+          p_movement_type: string
+          p_reason: string
+          p_source: string
+          p_source_id: string
+          p_tenant_id: string
+          p_used_after: number
+          p_used_before: number
+        }
+        Returns: string
+      }
+      adjust_tenant_system_limit: {
+        Args: {
+          p_admin: string
+          p_amount: number
+          p_mode: string
+          p_reason: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       apply_tenant_usage: {
         Args: {
           p_action: string
@@ -3387,6 +3483,10 @@ export type Database = {
           p_source?: string
           p_tenant_id: string
         }
+        Returns: Json
+      }
+      approve_tenant_limit_payment: {
+        Args: { p_admin: string; p_payment_id: string }
         Returns: Json
       }
       claim_forward_slot: {
@@ -3418,6 +3518,15 @@ export type Database = {
         Args: {
           p_new_total_used: number
           p_reason?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      refund_tenant_usage: {
+        Args: {
+          p_admin: string
+          p_amount: number
+          p_reason: string
           p_tenant_id: string
         }
         Returns: Json
