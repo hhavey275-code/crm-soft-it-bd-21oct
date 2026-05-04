@@ -1089,8 +1089,6 @@ export default function TenantDetailPage() {
                   subscription_type: editData.subscription_type,
                   subscription_fee: editData.subscription_fee,
                   usd_rate: editData.usd_rate,
-                  system_limit: editData.subscription_type === "subscription_with_limit" ? editData.system_limit : null,
-                  total_used: editData.total_used,
                 })} disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
