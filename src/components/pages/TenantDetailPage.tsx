@@ -45,6 +45,11 @@ export default function TenantDetailPage() {
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
+  const [logSearch, setLogSearch] = useState("");
+  const [logActionFilter, setLogActionFilter] = useState<"all" | "report-usage" | "refund-usage">("all");
+  const [reconcileOpen, setReconcileOpen] = useState(false);
+  const [reconcileValue, setReconcileValue] = useState("");
+  const [reconcileReason, setReconcileReason] = useState("Synced to tenant DB value");
 
   // Tenant
   const { data: tenant, isLoading, error: tenantError } = useQuery({
