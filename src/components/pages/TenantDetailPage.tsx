@@ -285,11 +285,13 @@ export default function TenantDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenant-payments-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-usage-log", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       setAdjustOpen(false);
       setAdjustAmount("");
       setAdjustReason("");
-      toast.success("Limit adjusted and logged");
+      toast.success("Saved and logged in ledger");
     },
     onError: (e: any) => toast.error(e.message),
   });
