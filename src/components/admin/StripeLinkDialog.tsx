@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,12 +83,14 @@ export function StripeLinkDialog({ targetUserId, targetUserName, trigger }: Prop
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      {trigger || (
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          <CreditCard className="h-4 w-4 mr-2" />
-          Generate Stripe Link
-        </Button>
-      )}
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button variant="outline" size="sm">
+            <CreditCard className="h-4 w-4 mr-2" />
+            Generate Stripe Link
+          </Button>
+        )}
+      </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Stripe Payment Link {targetUserName ? `— ${targetUserName}` : ""}</DialogTitle>
