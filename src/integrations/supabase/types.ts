@@ -2838,6 +2838,69 @@ export type Database = {
           },
         ]
       }
+      tenant_usage_audit: {
+        Row: {
+          action: string
+          ad_account_id: string | null
+          amount: number
+          created_at: string
+          error_message: string | null
+          failed_topup_id: string | null
+          id: string
+          idempotency_key: string | null
+          local_total_used_after: number | null
+          local_total_used_before: number | null
+          master_duplicate: boolean | null
+          master_total_used_after: number | null
+          request_payload: Json | null
+          response_body: Json | null
+          response_status: number | null
+          source: string
+          user_id: string | null
+          wallet_txn_id: string | null
+        }
+        Insert: {
+          action: string
+          ad_account_id?: string | null
+          amount: number
+          created_at?: string
+          error_message?: string | null
+          failed_topup_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          local_total_used_after?: number | null
+          local_total_used_before?: number | null
+          master_duplicate?: boolean | null
+          master_total_used_after?: number | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          source: string
+          user_id?: string | null
+          wallet_txn_id?: string | null
+        }
+        Update: {
+          action?: string
+          ad_account_id?: string | null
+          amount?: number
+          created_at?: string
+          error_message?: string | null
+          failed_topup_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          local_total_used_after?: number | null
+          local_total_used_before?: number | null
+          master_duplicate?: boolean | null
+          master_total_used_after?: number | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          source?: string
+          user_id?: string | null
+          wallet_txn_id?: string | null
+        }
+        Relationships: []
+      }
       tenant_usage_report_keys: {
         Row: {
           action: string
