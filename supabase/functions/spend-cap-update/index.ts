@@ -52,6 +52,26 @@ const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
 // same logical top-up — including network-error / POST-error recovery paths —
 // so master never double-counts. Master dedupes by (tenant_id, idempotency_key).
 async function reportUsageToMaster(licenseMap: Record<string, string>, amount: number, idempotencyKey: string, supabase: any, source?: string, meta?: Record<string, unknown>) {
+  // Read local total_used BEFORE the call so we can record drift
+  let localBefore: number | null = null;
+  try {
+    const { data: beforeRow } = await supabase.from("site_settings").select("value").eq("key", "license_total_used").maybeSingle();
+    if (beforeRow?.value !== undefined && beforeRow?.value !== null) localBefore = Number(beforeRow.value);
+  } catch {}
+
+  const payload = {
+    action: "report-usage",
+    amount,
+    idempotency_key: idempotencyKey,
+    source: source ?? "spend-cap-update",
+    meta: meta ?? null,
+  };
+
+  let responseStatus: number | null = null;
+  let responseBody: any = null;
+  let errorMessage: string | null = null;
+  let localAfter: number | null = localBefore;
+
   try {
     const reportRes = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
       method: "POST",
@@ -59,22 +79,44 @@ async function reportUsageToMaster(licenseMap: Record<string, string>, amount: n
         "Content-Type": "application/json",
         "X-Tenant-Key": licenseMap["tenant_api_key"],
       },
-      body: JSON.stringify({
-        action: "report-usage",
-        amount,
-        idempotency_key: idempotencyKey,
-        source: source ?? "spend-cap-update",
-        meta: meta ?? null,
-      }),
+      body: JSON.stringify(payload),
     });
-    const reportData = await reportRes.json().catch(() => ({}));
-    if (reportData?.total_used !== undefined) {
+    responseStatus = reportRes.status;
+    responseBody = await reportRes.json().catch(() => ({}));
+    if (responseBody?.total_used !== undefined) {
+      localAfter = Number(responseBody.total_used);
       await supabase.from("site_settings").update({
-        value: String(reportData.total_used),
+        value: String(responseBody.total_used),
       }).eq("key", "license_total_used");
     }
   } catch (reportErr) {
+    errorMessage = reportErr instanceof Error ? reportErr.message : String(reportErr);
     console.warn("Failed to report usage to master:", reportErr);
+  }
+
+  // Audit log — fire-and-forget, never block the caller
+  try {
+    const m: any = meta ?? {};
+    await supabase.from("tenant_usage_audit").insert({
+      source: source ?? "spend-cap-update",
+      action: "report-usage",
+      amount,
+      idempotency_key: idempotencyKey,
+      ad_account_id: m.ad_account_id ?? null,
+      wallet_txn_id: m.wallet_txn_id ?? null,
+      failed_topup_id: m.failed_topup_id ?? null,
+      user_id: m.wallet_user_id ?? m.user_id ?? null,
+      request_payload: payload,
+      response_status: responseStatus,
+      response_body: responseBody,
+      local_total_used_before: localBefore,
+      local_total_used_after: localAfter,
+      master_total_used_after: responseBody?.total_used ?? null,
+      master_duplicate: responseBody?.duplicate ?? null,
+      error_message: errorMessage,
+    });
+  } catch (auditErr) {
+    console.warn("tenant_usage_audit insert failed:", auditErr);
   }
 }
 // Tolerance for "verified == expected" comparisons. Meta sometimes stores
