@@ -2,9 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gauge, Loader2 } from "lucide-react";
+import { Gauge, Loader2, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ExtensionSyncButton } from "@/components/ExtensionSyncButton";
+import { ClientRequestSyncButton } from "@/components/ClientRequestSyncButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   adAccountId: string;
@@ -18,6 +20,7 @@ function fmt(v?: number | null, currency = "USD") {
 
 export function LiveBillingData({ adAccountId, metaAccountId }: Props) {
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["live-billing-data", adAccountId],
     queryFn: async () => {
@@ -40,7 +43,9 @@ export function LiveBillingData({ adAccountId, metaAccountId }: Props) {
     );
   }
   const cur = data?.daily_spend_limit_currency || "USD";
-  const synced = data?.daily_spend_limit_synced_at ? formatDistanceToNow(new Date(data.daily_spend_limit_synced_at), { addSuffix: true }) : "never";
+  const syncedAt = data?.daily_spend_limit_synced_at ? new Date(data.daily_spend_limit_synced_at) : null;
+  const synced = syncedAt ? formatDistanceToNow(syncedAt, { addSuffix: true }) : "never";
+  const isStale = syncedAt ? Date.now() - syncedAt.getTime() > 60 * 60 * 1000 : true;
   const status = data?.billing_raw_snapshot?.account_status;
 
   return (
@@ -50,13 +55,13 @@ export function LiveBillingData({ adAccountId, metaAccountId }: Props) {
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-emerald-500/10 p-2"><Gauge className="h-5 w-5 text-emerald-600" /></div>
             <div>
-              <div className="text-sm font-semibold">Live Billing Data (from extension)</div>
+              <div className="text-sm font-semibold">Live Billing Data</div>
               <div className="text-[11px] text-muted-foreground">Synced {synced}{status ? ` · ${status}` : ""}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {data?.account_type && <Badge variant="secondary" className="text-xs">{data.account_type}</Badge>}
-            {metaAccountId && (
+            {isAdmin && metaAccountId && (
               <ExtensionSyncButton
                 accountId={metaAccountId}
                 size="sm"
@@ -65,8 +70,22 @@ export function LiveBillingData({ adAccountId, metaAccountId }: Props) {
                 }}
               />
             )}
+            {!isAdmin && (
+              <ClientRequestSyncButton
+                adAccountInternalId={adAccountId}
+                onRequested={() => {
+                  queryClient.invalidateQueries({ queryKey: ["live-billing-data", adAccountId] });
+                }}
+              />
+            )}
           </div>
         </div>
+        {isStale && data && (
+          <div className="mb-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>Data may be outdated. Click {isAdmin ? "Sync from Meta" : "Request sync"} to refresh.</span>
+          </div>
+        )}
         {data ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
             <Field label="Hidden Limit" value={fmt(data.hidden_daily_limit, cur)} accent />
@@ -79,8 +98,8 @@ export function LiveBillingData({ adAccountId, metaAccountId }: Props) {
           </div>
         ) : (
           <div className="text-xs text-muted-foreground">
-            No live data yet. Click <span className="font-medium text-foreground">Sync from Meta</span> above to fetch the
-            hidden daily limit, threshold, balance and cards via the extension.
+            No live data yet. Click <span className="font-medium text-foreground">{isAdmin ? "Sync from Meta" : "Request sync"}</span> above to fetch the
+            hidden daily limit, threshold, balance and cards.
           </div>
         )}
       </CardContent>
