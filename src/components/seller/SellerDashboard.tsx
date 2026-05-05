@@ -259,14 +259,69 @@ export function SellerDashboard() {
             <p className="text-xs text-muted-foreground">Financial overview & transaction ledger</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={exportToExcel}>
             <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Excel</span>
+          </Button>
+          <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
+            <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Monthly Excel</span><span className="md:hidden">Monthly</span>
           </Button>
           <Button size={isMobile ? "sm" : "default"} onClick={() => setShowSubmit(true)}>
             <Plus className="h-4 w-4 mr-1" /> {isMobile ? "USDT" : "Submit USDT"}
           </Button>
         </div>
+      </div>
+
+      {/* Month View Toolbar */}
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant={monthView ? "default" : "outline"}
+            onClick={() => setMonthView(v => !v)}
+          >
+            {monthView ? "Month View: ON" : "Month View: OFF"}
+          </Button>
+          <Select
+            value={`${activeBucket.year}-${activeBucket.month}`}
+            onValueChange={(v) => {
+              const [y, m] = v.split("-").map(Number);
+              setActiveBucket({ year: y, month: m });
+            }}
+          >
+            <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {availableMonths.map(b => (
+                <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                  {monthLabel(b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {monthView && (
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <span className={cn(
+                "text-xs px-2.5 py-1 rounded-full border font-medium",
+                monthOpening >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
+                                  : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900"
+              )}>
+                Opening: {monthOpening >= 0 ? "+" : "−"}৳{Math.abs(monthOpening).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+              <span className={cn(
+                "text-xs px-2.5 py-1 rounded-full border font-semibold",
+                monthDueAdvance >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+                                      : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
+              )}>
+                Current: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+        {monthView && (
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Showing only {monthLabel(activeBucket)} transactions. Running balance carries forward from previous month.
+          </p>
+        )}
       </div>
 
       {/* Summary Cards */}
