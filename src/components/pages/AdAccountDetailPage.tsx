@@ -761,6 +761,18 @@ export default function AdAccountDetailPage() {
                         Old Billing
                       </a>
                     )}
+                    {!isTikTok && account.business_managers?.bm_id && (
+                      <a
+                        href={`https://business.facebook.com/business-support-home/${account.business_managers.bm_id}/${account.account_id.replace(/^act_/, '')}/?business_id=${account.business_managers.bm_id}&global_scope_id=${account.business_managers.bm_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        title="Open Facebook Business Support / Request Review"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Request Review
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
