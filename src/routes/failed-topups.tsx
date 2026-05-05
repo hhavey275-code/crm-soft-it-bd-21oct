@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import FailedTopUpsPage from "@/components/pages/FailedTopUpsPage";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
+
+const FailedTopUpsPage = lazy(() => import("@/components/pages/FailedTopUpsPage"));
 
 export const Route = createFileRoute("/failed-topups")({
-  component: FailedTopUpsPage,
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><FailedTopUpsPage /></Suspense>
+  ),
 });
