@@ -6,17 +6,26 @@ import { Button } from "@/components/ui/button";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { ImageIcon, CalendarIcon, X, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, Landmark, TrendingUp, Plus, Clock, CheckCircle2, XCircle, Download } from "lucide-react";
 import { useState, useMemo } from "react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { SellerSubmitUsdtDialog } from "./SellerSubmitUsdtDialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
-import { MonthlyDueAdvanceCard } from "./MonthlyDueAdvanceCard";
+import {
+  getMonthBucket,
+  isSameMonth,
+  monthLabel,
+  aggregateMonth,
+  computeLedgerBalanceBefore,
+  type MonthBucket,
+} from "@/lib/sellerMonthlyClose";
+import { exportAllColumnsTotal, exportColorfulMonthly, buildAvailableMonths, slugifySeller } from "@/lib/sellerExcelExports";
 import { SellerNotInSheetCard } from "./SellerNotInSheetCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
