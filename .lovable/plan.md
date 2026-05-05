@@ -1,86 +1,51 @@
-# Plan: Make all pages load faster (target: instant nav)
+## Goals
 
-## Diagnosis (kothay slow hocche)
+1. **Seller Dashboard** (`/dashboard` — seller role): replace the current "Month-by-Month Due / Advance" list card with the admin-style **Month View toggle + month picker** (matches 2nd screenshot).
+2. **Excel exports**: split into two separate buttons everywhere — **Monthly Excel** (colorful styled, per-month sheets) and **Excel / Total** (all columns, full ledger). Apply on both seller dashboard and admin seller view.
 
-Ami sob route + boro page file inspect korechi. Main bottlenecks:
+---
 
-1. **Code-splitting nei** — sob route file directly `import` korche giant page components:
-   - `ClientDetailPage` = **3,181 lines**
-   - `TenantDetailPage` = **1,350 lines**
-   - `AdAccountDetailPage` = **1,154 lines**
-   - `AgencyDetailPage` = **1,011 lines**
-   - `BillingsPage` = **444 lines**
-   
-   Eta sob ekta main JS bundle e dhuke jay. Initial load e browser ke ~10k+ lines parse korte hoy — tai first paint slow.
+## Changes
 
-2. **Dashboard route eager-loads 4 dashboards** — `AdminDashboard`, `ClientDashboard`, `SellerDashboard`, `AgencyDashboard` — kintu user matro 1ta dekhe. 75% code waste.
+### 1. `src/components/seller/SellerDashboard.tsx`
 
-3. **TechBackground canvas** ekhon lazy holeo prottek page e animation 60fps e cholche (requestAnimationFrame loop with 35 particles + hex grid). Background tab eo CPU khay → page interaction laggy mone hoy.
+- Remove `<MonthlyDueAdvanceCard />` (line 371) and its import.
+- Add state: `monthView: boolean`, `activeBucket: {year, month}`.
+- Build `availableMonths` from `transactions` (newest first, like admin).
+- Add a toolbar above the summary cards:
+  - `Button` "Month View: ON/OFF" (toggles `monthView`).
+  - `Select` listing `availableMonths` (uses `monthLabel`).
+  - When ON, show small "Opening" + "Current Due/Adv" pills (read-only — no Close Month for sellers).
+- Apply month filter to `filtered` when `monthView` is ON (`isSameMonth(getMonthBucket(t.created_at), activeBucket)`).
+- Compute `displayDueAdvance`:
+  - All-time: existing `dueAdvance` from full ledger.
+  - Month view: opening (carry-forward via `computeLedgerBalanceBefore`) + month delta (via `aggregateMonth`).
+- Replace single Excel button with two buttons in the header action group:
+  - **Excel** → existing `exportToExcel` extended to include ALL columns (Date, Month, Type, Status, Transaction ID, BDT, USDT, Rate, Converted BDT, Bank, Account Name, Change BDT, Due/Advance BDT, Description, Proof URL, Not Calculated Reason).
+  - **Monthly Excel** → opens dialog (reuse the column-picker pattern), produces per-month sheets using the colorful styled layout currently in `AdminSellers.exportToExcel` (yellow opening row, red totals, blue header, final balance cell).
 
-4. **Router preload disabled** — `defaultPreloadStaleTime: 0` ar kothao `<Link preload="intent">` use hocche na. Mouse hover korle next page prefetch hoy na.
+### 2. `src/components/admin/AdminSellers.tsx`
 
-5. **Kichu query er staleTime kom / 0** — ClientTopUp, ClientDashboard er ekta query, etc. — page e dhukle bar bar refetch.
+- **Excel button** (`exportToExcel`, line 956–1150): keep colorful design, but move that colorful design into `exportMonthlyToExcel` (per-month sheets). Replace the `Excel` button handler with a "all columns, all months in one sheet" exporter (same column set as the dialog's `ALL_EXPORT_COLS`, no column picker — just dump everything).
+- **Monthly Excel button** (`exportMonthlyToExcel`, line 870–947): rewrite so each month sheet uses the **colorful styled layout** (header row with blue + yellow Final cell, yellow opening row, red totals, running Due/Adv column) — one sheet per month. Keep the existing dialog (month picker + "all months" checkbox) but drop the column-selection grid (colorful layout has fixed columns). Optionally keep "all months" checkbox.
+- Remove the `MonthlyDueAdvanceCard` from seller dashboard only — admin already uses month view toolbar, no change needed there.
 
-## Plan
+### 3. `src/components/seller/MonthlyDueAdvanceCard.tsx`
 
-### 1. Lazy-load all heavy page components (biggest win)
+- File becomes unused after step 1. Leave file in place (no deletion needed) or remove if confirmed safe.
 
-`src/routes/*.tsx` er moddhe ja directly boro page import korche, segulo `React.lazy` + `Suspense` diye convert korbo. Affected routes:
-- `clients.$id.tsx` → ClientDetailPage
-- `tenants.$id.tsx` → TenantDetailPage
-- `ad-accounts.$id.tsx` → AdAccountDetailPage
-- `agencies.$id.tsx` → AgencyDetailPage
-- `billings.tsx`, `system-logs.tsx`, `card-vault.tsx`, `invoice.$requestId.tsx`, `client-spend-report.tsx`, `admin.performance.tsx`, `admin.stripe-links.tsx`, `my-unused.tsx`, `wallet-balances.tsx`, `ads-manager.$accountId.tsx`, `meta-oauth-callback.tsx`, `agency-*`, `tenants.index.tsx`, `clients.index.tsx`, etc.
+---
 
-Pattern:
-```tsx
-const ClientDetailPage = lazy(() => import("@/components/pages/ClientDetailPage"));
-// in route component:
-<Suspense fallback={<PageSkeleton />}> <ClientDetailPage /> </Suspense>
-```
+## Technical notes
 
-Ekta shared `PageSkeleton` component banabo (simple shimmer) jate fallback e blank na dekhay.
+- Reuse helpers from `src/lib/sellerMonthlyClose.ts` (`getMonthBucket`, `monthLabel`, `filterMonth`, `aggregateMonth`, `computeLedgerBalanceBefore`, `computeRunningWithOpening`, `sortSellerTxnsAsc`) — already used by `AdminSellers`.
+- Use `xlsx-js-style` (`XLSXStyle`) for the colorful Monthly export — same import already present in `AdminSellers.tsx`.
+- Seller does NOT get Close/Reopen/Recalc buttons — Month View is read-only for them.
+- Both Excel buttons respect existing filters (type/bank/date) only on the **Total** export; Monthly export iterates raw transactions per bucket regardless of filters (consistent with current admin behavior).
 
-### 2. Lazy-load role dashboards
+## What the user will see
 
-`src/routes/dashboard.tsx` e Admin/Client/Seller/Agency dashboard lazy korbo, role detect korar por only relevant ta load hobe.
-
-### 3. Tame TechBackground
-
-- Render only after `requestIdleCallback` (mount er por 1s deri).
-- Pause animation jokhon `document.hidden` (tab background e gele).
-- Mobile (`< 768px`) e disable kore dibo — choto screen e ei effect dekhao jay na, sudhu battery khay.
-
-### 4. Enable router prefetching
-
-`src/router.tsx` e `defaultPreload: "intent"` + `defaultPreloadStaleTime: 30_000` set korbo. Sidebar er link e hover korle next page prefetch hobe → click korle instant.
-
-### 5. Tighten cache for common queries
-
-- `ClientTopUp.tsx`: `staleTime: 0` → `60_000`.
-- `ClientDashboard.tsx` er last query (staleTime 0) → `30_000`.
-- `useSiteSettings` (header logo/announcement) — `staleTime: Infinity` (page e bar bar refetch korar dorkar nei).
-
-### 6. Vite manual chunks (optional polish)
-
-`vite.config.ts` e manualChunks diye `react`, `@tanstack`, `recharts`, `lucide-react` alada vendor chunk e bhag korbo — initial parse choto hobe ar long-term browser cache better hobe.
-
-## Expected impact
-
-- Initial JS bundle ~40-60% choto hobe (ClientDetailPage etc. nijer chunk e jabe).
-- Dashboard route load: 4x → 1x (sudhu nijer role).
-- Subsequent navigation: hover prefetch er karone almost instant.
-- TechBackground CPU usage mobile e 0%, desktop e idle tab e 0%.
-
-## Files to change
-
-- `src/router.tsx` (preload config)
-- `src/routes/dashboard.tsx`, `clients.$id.tsx`, `tenants.$id.tsx`, `ad-accounts.$id.tsx`, `agencies.$id.tsx`, ar onnano detail/heavy route file
-- `src/components/DashboardLayout.tsx` (TechBackground gating)
-- `src/components/TechBackground.tsx` (visibility pause)
-- `src/components/PageSkeleton.tsx` (new)
-- `src/hooks/useSiteSettings.ts` (staleTime)
-- `src/components/client/ClientTopUp.tsx`, `ClientDashboard.tsx` (staleTime tweak)
-- `vite.config.ts` (manualChunks)
-
-Approve korle implement kore dibo — kono backend / DB change nei, sudhu frontend perf.
+- **Seller Dashboard** (mobile, matches screenshot 2): toolbar `[ Month View: OFF ] [ May 2026 ▾ ]` directly above the Due hero card. Old "Month-by-Month" stacked card is gone.
+- **Header buttons**: `[Excel]` `[Monthly Excel]` `[Submit USDT]`.
+- **Excel** → one workbook, every column, full ledger.
+- **Monthly Excel** → colorful sheet per month with the design from the user's screenshot (header blue, Final balance yellow cell, totals red, opening yellow row).

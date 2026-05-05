@@ -29,6 +29,7 @@ import { SellerNotForwardedCard } from "@/components/admin/SellerNotForwardedCar
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, getSellerTransactionSkipReason, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import * as XLSX from "xlsx";
 import XLSXStyle from "xlsx-js-style";
+import { exportAllColumnsTotal, exportColorfulMonthly } from "@/lib/sellerExcelExports";
 import {
   getMonthBucket,
   isSameMonth,
@@ -869,81 +870,15 @@ export function AdminSellers() {
 
   const exportMonthlyToExcel = () => {
     if (!selectedSeller) return;
-    const months = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
-    const wb = XLSX.utils.book_new();
-    let totalRows = 0;
-    let skippedRows = 0;
-
-    const buildRow = (t: any, running: Map<string, number>, bucket: MonthBucket): Record<string, any> => {
-      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-      const skipReason = getSellerTransactionSkipReason(t) || "";
-      if (skipReason) skippedRows += 1;
-      const full: Record<ExportCol, any> = {
-        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
-        "Month": monthLabel(bucket),
-        "Type": getTypeLabel(t.type),
-        "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
-        "BDT Amount": Number(t.bdt_amount || 0),
-        "USDT Amount": Number(t.usdt_amount || 0),
-        "Rate": Number(t.rate || 0),
-        "Converted (BDT)": Number(convBdt.toFixed(2)),
-        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
-        "Account Name": t.bank_accounts?.account_name || "",
-        "Change (BDT)": Number(computeTransactionDelta(t).toFixed(2)),
-        "Due/Advance (BDT)": Number((running.get(t.id) || 0).toFixed(2)),
-        "Description": t.description || "",
-        "Proof URL": t.proof_url || "",
-        "Not Calculated Reason": skipReason,
-      };
-      const picked: Record<string, any> = {};
-      for (const c of exportCols) picked[c] = full[c];
-      return picked;
-    };
-
-    for (const bucket of months) {
-      const monthTxns = filterMonth(sellerTxns || [], bucket);
-      const opening = openingFor(bucket);
-      const running = computeRunningWithOpening(monthTxns, opening);
-      const sorted = sortSellerTxnsAsc(monthTxns);
-      const rows: any[] = [];
-      const openingRow: Record<string, any> = {};
-      exportCols.forEach(c => { openingRow[c] = ""; });
-      if (exportCols.includes("Date")) openingRow["Date"] = "OPENING";
-      if (exportCols.includes("Month")) openingRow["Month"] = monthLabel(bucket);
-      if (exportCols.includes("Description")) openingRow["Description"] = `Opening Balance (ledger before month)`;
-      if (exportCols.includes("Due/Advance (BDT)")) openingRow["Due/Advance (BDT)"] = Number(opening.toFixed(2));
-      rows.push(openingRow);
-      sorted.forEach(t => rows.push(buildRow(t, running, bucket)));
-      const agg = aggregateMonth(sellerTxns || [], bucket);
-      const closing = opening + agg.delta;
-      const closingRow: Record<string, any> = {};
-      exportCols.forEach(c => { closingRow[c] = ""; });
-      if (exportCols.includes("Date")) closingRow["Date"] = "CLOSING";
-      if (exportCols.includes("Month")) closingRow["Month"] = monthLabel(bucket);
-      if (exportCols.includes("BDT Amount")) closingRow["BDT Amount"] = Number((agg.bdtIn + agg.clientBdt).toFixed(2));
-      if (exportCols.includes("USDT Amount")) closingRow["USDT Amount"] = Number(agg.usdtGiven.toFixed(2));
-      if (exportCols.includes("Converted (BDT)")) closingRow["Converted (BDT)"] = Number(agg.convertedBdt.toFixed(2));
-      if (exportCols.includes("Change (BDT)")) closingRow["Change (BDT)"] = Number(agg.delta.toFixed(2));
-      if (exportCols.includes("Description")) closingRow["Description"] = closing >= 0 ? `Advance: BDT ${closing.toFixed(2)}` : `Due: BDT ${Math.abs(closing).toFixed(2)}`;
-      if (exportCols.includes("Due/Advance (BDT)")) closingRow["Due/Advance (BDT)"] = Number(closing.toFixed(2));
-      rows.push(closingRow);
-      totalRows += rows.length;
-
-      const ws = XLSX.utils.json_to_sheet(rows, { header: exportCols as unknown as string[] });
-      ws["!cols"] = exportCols.map((c) => ({ wch: c.includes("Description") || c.includes("Reason") || c.includes("Proof") ? 34 : 16 }));
-      XLSX.utils.book_append_sheet(wb, ws, `${bucket.year}-${String(bucket.month).padStart(2, "0")}`);
+    try {
+      const buckets = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
+      const slug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      exportColorfulMonthly(sellerTxns || [], slug, buckets);
+      toast.success(exportAllMonths ? `Exported ${buckets.length} months` : `Exported ${monthLabel(exportBucket)}`);
+      setShowMonthlyExport(false);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
     }
-
-    if (!totalRows) {
-      toast.error("No data to export");
-      return;
-    }
-    const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    const suffix = exportAllMonths ? "month-by-month" : `${exportBucket.year}-${String(exportBucket.month).padStart(2, "0")}`;
-    XLSX.writeFile(wb, `${sellerSlug}-${suffix}-ledger.xlsx`);
-    toast.success(`Exported ${exportAllMonths ? "all months" : monthLabel(exportBucket)}${skippedRows ? ` — ${skippedRows} not calculated listed` : ""}`);
-    setShowMonthlyExport(false);
   };
 
   const hasActiveFilter = typeFilter !== "all" || bankFilter || datePreset !== "all";
@@ -954,199 +889,14 @@ export function AdminSellers() {
     type === "usdt_received" ? "USDT Given" : type === "bdt_payment" ? "BDT Payment" : type === "withdraw" ? "Withdraw" : "Client Top-Up";
 
   const exportToExcel = () => {
-    if (!filteredTxns.length) {
-      toast.error("No transactions to export");
-      return;
+    if (!selectedSeller) return;
+    try {
+      const slug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      exportAllColumnsTotal(sellerTxns || [], slug);
+      toast.success("Exported full ledger");
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
     }
-    // ── Build styled ledger sheet matching the user's design ──
-    // Columns: Date & time | Payment | USDT | Rate | Converted BDT | Total Due/Adv
-    // Sort transactions ascending by date so the ledger reads top-to-bottom
-    const sorted = [...filteredTxns].sort((a, b) => {
-      const ta = new Date(a.created_at).getTime();
-      const tb = new Date(b.created_at).getTime();
-      if (ta !== tb) return ta - tb;
-      return String(a.id).localeCompare(String(b.id));
-    });
-
-    // Identify the carry-forward / opening row (the first txn whose description mentions carry forward)
-    const openingTxn = sorted.find((t: any) =>
-      typeof t.description === "string" && /carry forward|opening balance/i.test(t.description)
-    );
-    const dataRows = openingTxn ? sorted.filter((t: any) => t.id !== openingTxn.id) : sorted;
-    const openingBalance = openingTxn ? computeTransactionDelta(openingTxn) : 0;
-
-    // Aggregate totals from non-opening rows only
-    let totalPayment = 0;
-    let totalUsdt = 0;
-    let totalConvertedBdt = 0;
-    for (const t of dataRows) {
-      if ((t.status || "approved").toLowerCase() !== "approved") continue;
-      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-        totalPayment += Number(t.bdt_amount || 0);
-      } else if (t.type === "usdt_received") {
-        totalUsdt += Math.abs(Number(t.usdt_amount || 0));
-        totalConvertedBdt += Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-      }
-    }
-    const finalBalance = openingBalance + totalPayment - totalConvertedBdt;
-
-    // Style helpers
-    const border = {
-      top: { style: "thin", color: { rgb: "999999" } },
-      bottom: { style: "thin", color: { rgb: "999999" } },
-      left: { style: "thin", color: { rgb: "999999" } },
-      right: { style: "thin", color: { rgb: "999999" } },
-    };
-    const headerStyle = {
-      font: { bold: true, sz: 12, color: { rgb: "000000" } },
-      fill: { fgColor: { rgb: "D9E1F2" } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border,
-    };
-    const headerYellow = {
-      ...headerStyle,
-      font: { bold: true, sz: 12, color: { rgb: "1F4E78" } },
-      fill: { fgColor: { rgb: "FFFF00" } },
-    };
-    const subLabelStyle = {
-      font: { italic: true, sz: 10, color: { rgb: "555555" } },
-      alignment: { horizontal: "center" },
-    };
-    const totalRedStyle = {
-      font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "C00000" } },
-      alignment: { horizontal: "right", vertical: "center" },
-      numFmt: '#,##0.00',
-      border,
-    };
-    const finalBalanceStyle = {
-      font: { bold: true, sz: 14, color: { rgb: "000000" } },
-      alignment: { horizontal: "right", vertical: "center" },
-      numFmt: '#,##0.00',
-    };
-    const openingYellowStyle = {
-      font: { bold: true, sz: 11, color: { rgb: "000000" } },
-      fill: { fgColor: { rgb: "FFFF00" } },
-      alignment: { horizontal: "right", vertical: "center" },
-      numFmt: '#,##0.00',
-      border,
-    };
-    const openingLabelStyle = {
-      font: { bold: true, sz: 11, color: { rgb: "000000" } },
-      alignment: { horizontal: "left", vertical: "center" },
-      border,
-    };
-    const dataNumStyle = {
-      alignment: { horizontal: "right", vertical: "center" },
-      numFmt: '#,##0.00',
-      border,
-    };
-    const dataTextStyle = {
-      alignment: { horizontal: "left", vertical: "center" },
-      border,
-    };
-
-    // Build sheet rows (AOA)
-    // Row 1: Headers
-    // Row 2: blank | blank | blank | blank | blank | finalBalance value
-    // Row 3: blank | blank | "Total usdt" | blank | "total Taka" | blank
-    // Row 4: blank | totalPayment | totalUsdt | blank | totalConvertedBdt | blank   (red)
-    // Row 5: "previous month closing balance" | openingBalance | blank | blank | blank | blank   (yellow)
-    // Row 6+: transactions
-    const aoa: any[][] = [];
-
-    aoa.push([
-      "date and time", "payment", "usdt", "Rate", "Conveted BDT", "total due/adv",
-    ]);
-    aoa.push(["", "", "", "", "", finalBalance]);
-    aoa.push(["", "", "Total usdt", "", "total Taka", ""]);
-    aoa.push(["", totalPayment, totalUsdt, "", totalConvertedBdt, ""]);
-    aoa.push(["previous month closing balance", openingBalance, "", "", "", ""]);
-
-    // Transaction rows + running balance
-    let running = openingBalance;
-    for (const t of dataRows) {
-      const isApproved = (t.status || "approved").toLowerCase() === "approved";
-      const dt = format(new Date(t.created_at), "dd MMM hh:mm a").toLowerCase();
-      let payment: any = "";
-      let usdt: any = "";
-      let rate: any = "";
-      let convBdt: any = "";
-      if (t.type === "bdt_payment" || t.type === "client_topup" || t.type === "tenant_payment") {
-        payment = Number(t.bdt_amount || 0);
-        if (isApproved) running += Number(t.bdt_amount || 0);
-      } else if (t.type === "usdt_received") {
-        usdt = Number(t.usdt_amount || 0);
-        rate = Number(t.rate || 0);
-        convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-        if (isApproved) running -= convBdt;
-      } else if (t.type === "withdraw") {
-        payment = -Math.abs(Number(t.bdt_amount || 0));
-        if (isApproved) running -= Math.abs(Number(t.bdt_amount || 0));
-      }
-      aoa.push([dt, payment, usdt, rate, convBdt, running]);
-    }
-
-    const ws: any = XLSXStyle.utils.aoa_to_sheet(aoa);
-
-    // Column widths
-    ws["!cols"] = [
-      { wch: 28 }, // date and time / opening label
-      { wch: 18 }, // payment
-      { wch: 14 }, // usdt
-      { wch: 8 },  // rate
-      { wch: 16 }, // converted bdt
-      { wch: 18 }, // total due/adv
-    ];
-    ws["!rows"] = [
-      { hpt: 28 }, // headers
-      { hpt: 24 }, // final balance
-      { hpt: 18 }, // sub-labels
-      { hpt: 24 }, // red totals
-      { hpt: 22 }, // opening row
-    ];
-
-    // Apply styles
-    const setStyle = (addr: string, style: any) => {
-      if (!ws[addr]) ws[addr] = { t: "s", v: "" };
-      ws[addr].s = style;
-    };
-
-    // Row 1: headers (col F yellow)
-    ["A1", "B1", "C1", "D1", "E1"].forEach((a) => setStyle(a, headerStyle));
-    setStyle("F1", headerYellow);
-
-    // Row 2: final balance in F2
-    setStyle("F2", finalBalanceStyle);
-
-    // Row 3: sub-labels
-    setStyle("C3", subLabelStyle);
-    setStyle("E3", subLabelStyle);
-
-    // Row 4: red totals
-    ["B4", "C4", "E4"].forEach((a) => setStyle(a, totalRedStyle));
-
-    // Row 5: opening (yellow background)
-    setStyle("A5", openingLabelStyle);
-    setStyle("B5", openingYellowStyle);
-    ["C5", "D5", "E5", "F5"].forEach((a) => setStyle(a, { fill: { fgColor: { rgb: "FFFF00" } }, border }));
-
-    // Data rows: rows 6 .. 6 + dataRows.length - 1
-    for (let i = 0; i < dataRows.length; i++) {
-      const r = 6 + i;
-      setStyle(`A${r}`, dataTextStyle);
-      ["B", "C", "D", "E", "F"].forEach((col) => setStyle(`${col}${r}`, dataNumStyle));
-    }
-
-    // Update sheet range to cover all styled cells
-    const lastRow = 5 + dataRows.length;
-    ws["!ref"] = `A1:F${Math.max(lastRow, 5)}`;
-
-    const wb = XLSXStyle.utils.book_new();
-    XLSXStyle.utils.book_append_sheet(wb, ws, "Ledger");
-    const sellerSlug = (selectedSeller?.full_name || selectedSeller?.email || "seller").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    XLSXStyle.writeFile(wb, `${sellerSlug}-ledger-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`);
-    toast.success("Exported to Excel");
   };
 
   // Convert client to seller
@@ -2625,47 +2375,13 @@ export function AdminSellers() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs">Columns to include</Label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={() => setExportCols([...ALL_EXPORT_COLS])}
-                  >Select all</button>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:underline"
-                    onClick={() => setExportCols([])}
-                  >Clear</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto border rounded-md p-2">
-                {ALL_EXPORT_COLS.map(col => {
-                  const checked = exportCols.includes(col);
-                  return (
-                    <label key={col} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(v) => {
-                          if (v) setExportCols(prev => ALL_EXPORT_COLS.filter(c => prev.includes(c) || c === col) as ExportCol[]);
-                          else setExportCols(prev => prev.filter(c => c !== col));
-                        }}
-                      />
-                      <span>{col}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Opening Balance row + transactions + Closing Balance row will be included.
-              </p>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Colorful styled sheet — opening balance, totals, and running due/advance per month.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
-            <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
+            <Button onClick={exportMonthlyToExcel}>
               <Download className="h-4 w-4 mr-1" /> Download
             </Button>
             </DialogFooter>

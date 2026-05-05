@@ -6,17 +6,26 @@ import { Button } from "@/components/ui/button";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { ImageIcon, CalendarIcon, X, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw, Landmark, TrendingUp, Plus, Clock, CheckCircle2, XCircle, Download } from "lucide-react";
 import { useState, useMemo } from "react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { SellerSubmitUsdtDialog } from "./SellerSubmitUsdtDialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
 import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
-import { MonthlyDueAdvanceCard } from "./MonthlyDueAdvanceCard";
+import {
+  getMonthBucket,
+  isSameMonth,
+  monthLabel,
+  aggregateMonth,
+  computeLedgerBalanceBefore,
+  type MonthBucket,
+} from "@/lib/sellerMonthlyClose";
+import { exportAllColumnsTotal, exportColorfulMonthly, buildAvailableMonths, slugifySeller } from "@/lib/sellerExcelExports";
 import { SellerNotInSheetCard } from "./SellerNotInSheetCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
@@ -56,6 +65,12 @@ export function SellerDashboard() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [bankFilter, setBankFilter] = useState<string | null>(null);
   const [showSubmit, setShowSubmit] = useState(false);
+  const today = new Date();
+  const [monthView, setMonthView] = useState<boolean>(false);
+  const [activeBucket, setActiveBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [showMonthlyExport, setShowMonthlyExport] = useState(false);
+  const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [exportAllMonths, setExportAllMonths] = useState(true);
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["seller-transactions", user?.id],
@@ -125,8 +140,27 @@ export function SellerDashboard() {
         return isWithinInterval(d, { start: range!.from, end: range!.to });
       });
     }
+    if (monthView) {
+      result = result.filter((t: any) => isSameMonth(getMonthBucket(t.created_at), activeBucket));
+    }
     return result;
-  }, [transactions, typeFilter, bankFilter, datePreset, customFrom, customTo]);
+  }, [transactions, typeFilter, bankFilter, datePreset, customFrom, customTo, monthView, activeBucket]);
+
+  const availableMonths = useMemo(() => buildAvailableMonths(transactions || []), [transactions]);
+  const lifetimeDueAdvance = useMemo(() => {
+    let r = 0;
+    for (const t of (transactions || [])) r += computeTransactionDelta(t);
+    return r;
+  }, [transactions]);
+  const monthOpening = useMemo(
+    () => computeLedgerBalanceBefore(transactions || [], activeBucket),
+    [transactions, activeBucket]
+  );
+  const monthAgg = useMemo(
+    () => aggregateMonth(transactions || [], activeBucket),
+    [transactions, activeBucket]
+  );
+  const monthDueAdvance = monthOpening + monthAgg.delta;
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -147,7 +181,8 @@ export function SellerDashboard() {
     );
   }, [filtered]);
 
-  const dueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
+  const filteredDueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
+  const dueAdvance = monthView ? monthDueAdvance : (typeFilter === "all" && !bankFilter && datePreset === "all" ? lifetimeDueAdvance : filteredDueAdvance);
 
   // Running Due/Advance balance per row — computed from ALL transactions (not just filtered),
   // so each filtered row still shows its true historical balance up to that point.
@@ -170,55 +205,29 @@ export function SellerDashboard() {
 
   const fmt = (v: number, prefix: string) => v > 0 ? `${prefix}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "0";
 
+  const sellerSlug = useMemo(
+    () => slugifySeller((user as any)?.user_metadata?.full_name || user?.email),
+    [user]
+  );
+
   const exportToExcel = () => {
-    if (!filtered.length) {
-      toast.error("No transactions to export");
-      return;
+    try {
+      exportAllColumnsTotal(transactions || [], sellerSlug);
+      toast.success("Exported full ledger");
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
     }
-    const extractTrxId = (desc: string | null | undefined): string => {
-      if (!desc) return "";
-      const m1 = desc.match(/Tr[xn]\s*ID\s*[:\-]?\s*([A-Za-z0-9]+)/i);
-      if (m1) return m1[1];
-      const m2 = desc.match(/\b(\d{8,})\b/);
-      if (m2) return m2[1];
-      return desc.trim();
-    };
-    const rows = filtered.map((t: any) => {
-      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-      return {
-        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
-        "Type": getTypeLabel(t.type),
-        "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
-        "BDT Amount": Number(t.bdt_amount || 0),
-        "USDT Amount": Number(t.usdt_amount || 0),
-        "Rate": Number(t.rate || 0),
-        "Converted (BDT)": Number(convBdt.toFixed(2)),
-        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
-        "Due/Advance (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
-        "Description": t.description || "",
-        "Proof URL": t.proof_url || "",
-      };
-    });
-    rows.push({
-      "Date": "", "Type": "TOTALS", "Status": "",
-      "Transaction ID": "",
-      "BDT Amount": totals.totalBdtPaid + totals.totalClientBdt,
-      "USDT Amount": totals.totalUsdt,
-      "Rate": 0,
-      "Converted (BDT)": Number(totals.totalConvertedBdt.toFixed(2)),
-      "Bank": `Withdrawn: BDT ${totals.totalWithdrawn.toLocaleString()}`,
-      "Due/Advance (BDT)": "",
-      "Description": dueAdvance >= 0 ? `Advance: BDT ${dueAdvance.toFixed(2)}` : `Due: BDT ${Math.abs(dueAdvance).toFixed(2)}`,
-      "Proof URL": "",
-    } as any);
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    const filename = `seller-ledger-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    toast.success("Exported to Excel");
+  };
+
+  const handleMonthlyExport = () => {
+    try {
+      const buckets = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
+      const total = exportColorfulMonthly(transactions || [], sellerSlug, buckets);
+      toast.success(exportAllMonths ? `Exported ${buckets.length} months` : `Exported ${monthLabel(exportBucket)}`);
+      setShowMonthlyExport(false);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    }
   };
 
   const StatusBadge = ({ status }: { status?: string | null }) => {
@@ -250,14 +259,69 @@ export function SellerDashboard() {
             <p className="text-xs text-muted-foreground">Financial overview & transaction ledger</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={exportToExcel}>
             <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Excel</span>
+          </Button>
+          <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
+            <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Monthly Excel</span><span className="md:hidden">Monthly</span>
           </Button>
           <Button size={isMobile ? "sm" : "default"} onClick={() => setShowSubmit(true)}>
             <Plus className="h-4 w-4 mr-1" /> {isMobile ? "USDT" : "Submit USDT"}
           </Button>
         </div>
+      </div>
+
+      {/* Month View Toolbar */}
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant={monthView ? "default" : "outline"}
+            onClick={() => setMonthView(v => !v)}
+          >
+            {monthView ? "Month View: ON" : "Month View: OFF"}
+          </Button>
+          <Select
+            value={`${activeBucket.year}-${activeBucket.month}`}
+            onValueChange={(v) => {
+              const [y, m] = v.split("-").map(Number);
+              setActiveBucket({ year: y, month: m });
+            }}
+          >
+            <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {availableMonths.map(b => (
+                <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                  {monthLabel(b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {monthView && (
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <span className={cn(
+                "text-xs px-2.5 py-1 rounded-full border font-medium",
+                monthOpening >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
+                                  : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900"
+              )}>
+                Opening: {monthOpening >= 0 ? "+" : "−"}৳{Math.abs(monthOpening).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+              <span className={cn(
+                "text-xs px-2.5 py-1 rounded-full border font-semibold",
+                monthDueAdvance >= 0 ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+                                      : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800"
+              )}>
+                Current: {monthDueAdvance >= 0 ? "+" : "−"}৳{Math.abs(monthDueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+        {monthView && (
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Showing only {monthLabel(activeBucket)} transactions. Running balance carries forward from previous month.
+          </p>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -367,8 +431,6 @@ export function SellerDashboard() {
       {/* Not in Seller Sheet — visibility for seller */}
       {user && <SellerNotInSheetCard sellerId={user.id} />}
 
-      {/* Month-by-Month Due/Advance */}
-      <MonthlyDueAdvanceCard transactions={transactions as any} />
 
       {/* Filters & Banks — collapsible on mobile, always visible on desktop */}
       <Collapsible defaultOpen={!isMobile}>
@@ -807,6 +869,50 @@ export function SellerDashboard() {
       </Dialog>
 
       <SellerSubmitUsdtDialog open={showSubmit} onOpenChange={setShowSubmit} />
+
+      {/* Monthly Excel Export */}
+      <Dialog open={showMonthlyExport} onOpenChange={setShowMonthlyExport}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Excel Export</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm cursor-pointer">
+              <Checkbox checked={exportAllMonths} onCheckedChange={(v) => setExportAllMonths(Boolean(v))} />
+              <span className="font-medium">Export all months (one sheet per month)</span>
+            </label>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Month</p>
+              <Select
+                value={`${exportBucket.year}-${exportBucket.month}`}
+                disabled={exportAllMonths}
+                onValueChange={(v) => {
+                  const [y, m] = v.split("-").map(Number);
+                  setExportBucket({ year: y, month: m });
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map(b => (
+                    <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                      {monthLabel(b)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Colorful styled sheet with opening balance, totals, and running due/advance.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
+            <Button onClick={handleMonthlyExport}>
+              <Download className="h-4 w-4 mr-1" /> Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
