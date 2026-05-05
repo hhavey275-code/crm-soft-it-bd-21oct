@@ -216,11 +216,43 @@ Deno.serve(async (req) => {
     if (seller_transaction_id) {
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
       if (!claimed) {
-        console.log(`forward-seller-proof: slot already claimed for ${seller_transaction_id}, skipping`);
-        return new Response(
-          JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
+        // Self-heal: if the slot already has a message_id, the Telegram send
+        // really happened — only the seller_transactions flag was missed.
+        const { data: slot } = await supabase
+          .from('telegram_forward_log')
+          .select('telegram_message_id')
+          .eq('source_type', sourceType)
+          .eq('source_id', seller_transaction_id)
+          .maybeSingle();
+        if (slot?.telegram_message_id) {
+          try {
+            await supabase
+              .from('seller_transactions')
+              .update({
+                telegram_forwarded: true,
+                telegram_message_id: slot.telegram_message_id,
+                telegram_forwarded_at: new Date().toISOString(),
+              })
+              .eq('id', seller_transaction_id)
+              .or('telegram_forwarded.is.null,telegram_forwarded.eq.false');
+          } catch (e) {
+            console.warn('self-heal flag update failed:', (e as any)?.message);
+          }
+          return new Response(
+            JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: slot.telegram_message_id, healed: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+        // Slot reserved but never sent — release and retry once.
+        await releaseForwardSlot(supabase, sourceType, seller_transaction_id);
+        const reclaimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
+        if (!reclaimed) {
+          console.log(`forward-seller-proof: slot already claimed for ${seller_transaction_id}, skipping`);
+          return new Response(
+            JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
       }
     }
 
