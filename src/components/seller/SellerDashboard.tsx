@@ -181,7 +181,8 @@ export function SellerDashboard() {
     );
   }, [filtered]);
 
-  const dueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
+  const filteredDueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
+  const dueAdvance = monthView ? monthDueAdvance : (typeFilter === "all" && !bankFilter && datePreset === "all" ? lifetimeDueAdvance : filteredDueAdvance);
 
   // Running Due/Advance balance per row — computed from ALL transactions (not just filtered),
   // so each filtered row still shows its true historical balance up to that point.
