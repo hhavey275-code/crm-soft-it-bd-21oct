@@ -205,55 +205,29 @@ export function SellerDashboard() {
 
   const fmt = (v: number, prefix: string) => v > 0 ? `${prefix}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "0";
 
+  const sellerSlug = useMemo(
+    () => slugifySeller((user as any)?.user_metadata?.full_name || user?.email),
+    [user]
+  );
+
   const exportToExcel = () => {
-    if (!filtered.length) {
-      toast.error("No transactions to export");
-      return;
+    try {
+      exportAllColumnsTotal(transactions || [], sellerSlug);
+      toast.success("Exported full ledger");
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
     }
-    const extractTrxId = (desc: string | null | undefined): string => {
-      if (!desc) return "";
-      const m1 = desc.match(/Tr[xn]\s*ID\s*[:\-]?\s*([A-Za-z0-9]+)/i);
-      if (m1) return m1[1];
-      const m2 = desc.match(/\b(\d{8,})\b/);
-      if (m2) return m2[1];
-      return desc.trim();
-    };
-    const rows = filtered.map((t: any) => {
-      const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
-      return {
-        "Date": format(new Date(t.created_at), "yyyy-MM-dd HH:mm"),
-        "Type": getTypeLabel(t.type),
-        "Status": (t.status || "approved").toUpperCase(),
-        "Transaction ID": (t.top_up_requests?.payment_reference || extractTrxId(t.description)),
-        "BDT Amount": Number(t.bdt_amount || 0),
-        "USDT Amount": Number(t.usdt_amount || 0),
-        "Rate": Number(t.rate || 0),
-        "Converted (BDT)": Number(convBdt.toFixed(2)),
-        "Bank": t.bank_accounts ? `${t.bank_accounts.bank_name} ****${(t.bank_accounts.account_number || "").slice(-4)}` : "—",
-        "Due/Advance (BDT)": Number((runningTotals.get(t.id) || 0).toFixed(2)),
-        "Description": t.description || "",
-        "Proof URL": t.proof_url || "",
-      };
-    });
-    rows.push({
-      "Date": "", "Type": "TOTALS", "Status": "",
-      "Transaction ID": "",
-      "BDT Amount": totals.totalBdtPaid + totals.totalClientBdt,
-      "USDT Amount": totals.totalUsdt,
-      "Rate": 0,
-      "Converted (BDT)": Number(totals.totalConvertedBdt.toFixed(2)),
-      "Bank": `Withdrawn: BDT ${totals.totalWithdrawn.toLocaleString()}`,
-      "Due/Advance (BDT)": "",
-      "Description": dueAdvance >= 0 ? `Advance: BDT ${dueAdvance.toFixed(2)}` : `Due: BDT ${Math.abs(dueAdvance).toFixed(2)}`,
-      "Proof URL": "",
-    } as any);
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 32 }, { wch: 40 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    const filename = `seller-ledger-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    toast.success("Exported to Excel");
+  };
+
+  const handleMonthlyExport = () => {
+    try {
+      const buckets = exportAllMonths ? [...availableMonths].reverse() : [exportBucket];
+      const total = exportColorfulMonthly(transactions || [], sellerSlug, buckets);
+      toast.success(exportAllMonths ? `Exported ${buckets.length} months` : `Exported ${monthLabel(exportBucket)}`);
+      setShowMonthlyExport(false);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    }
   };
 
   const StatusBadge = ({ status }: { status?: string | null }) => {
