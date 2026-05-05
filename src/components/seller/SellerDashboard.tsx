@@ -65,6 +65,12 @@ export function SellerDashboard() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [bankFilter, setBankFilter] = useState<string | null>(null);
   const [showSubmit, setShowSubmit] = useState(false);
+  const today = new Date();
+  const [monthView, setMonthView] = useState<boolean>(false);
+  const [activeBucket, setActiveBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [showMonthlyExport, setShowMonthlyExport] = useState(false);
+  const [exportBucket, setExportBucket] = useState<MonthBucket>({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const [exportAllMonths, setExportAllMonths] = useState(true);
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["seller-transactions", user?.id],
