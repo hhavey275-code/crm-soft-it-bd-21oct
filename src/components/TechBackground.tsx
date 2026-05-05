@@ -109,6 +109,14 @@ export default function TechBackground() {
       animationId = requestAnimationFrame(draw);
     };
 
+    const onVis = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationId);
+      } else {
+        animationId = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
     init();
     draw();
 
