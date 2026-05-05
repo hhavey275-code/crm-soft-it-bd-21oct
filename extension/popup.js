@@ -481,6 +481,41 @@ if (autoSyncToggleEl) {
   if (lbl) lbl.textContent = "Per-account sync (use CRM Sync button)";
 }
 
+// ---------- Process pending client sync requests ----------
+async function refreshPendingCount() {
+  const el = $("pending-count");
+  if (!el) return;
+  const stored = await getStored(["apiUrl", "anonKey", "jwt"]);
+  if (!stored.jwt) { el.textContent = ""; return; }
+  try {
+    const url = `${stored.apiUrl.replace(/\/$/, "")}/functions/v1/list-pending-sync-requests`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${stored.jwt}`, apikey: stored.anonKey },
+      body: "{}",
+    });
+    const body = await res.json().catch(() => ({}));
+    const n = body?.count || 0;
+    el.textContent = n ? `${n} pending client sync request(s)` : "No pending client sync requests";
+  } catch { el.textContent = ""; }
+}
+refreshPendingCount();
+setInterval(refreshPendingCount, 30000);
+
+const processBtn = $("process-pending-btn");
+if (processBtn) {
+  processBtn.addEventListener("click", async () => {
+    processBtn.disabled = true;
+    setStatus("Processing pending requests…", "info");
+    try {
+      const r = await chrome.runtime.sendMessage({ type: "process-pending-sync-requests" });
+      if (r?.ok) setStatus(`Done — synced ${r.done || 0}, failed ${r.failed || 0}`, "success");
+      else setStatus(r?.error || "Failed", "error");
+      refreshPendingCount();
+    } finally { processBtn.disabled = false; }
+  });
+}
+
 setInterval(() => { refreshAutoSyncUi().catch(() => {}); }, 5000);
 
 init();
