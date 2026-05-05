@@ -60,20 +60,43 @@ async function openFbTab() {
   });
 }
 
-async function openBillingTab(accountId) {
+// Open billing page in a *minimized window* so Meta's SPA actually
+// renders (Chrome throttles invisible background tabs and Meta won't
+// fire its GraphQL calls — that's why background sync was failing).
+// We close the window when done. Returns { tab, windowId }.
+async function openBillingWindow(accountId) {
   const actId = String(accountId).replace(/^act_/, "");
-  return new Promise((resolve) => {
-    chrome.tabs.create(
-      { url: `https://business.facebook.com/billing_hub/accounts/details?asset_id=${actId}`, active: false },
-      (tab) => {
+  const url = `https://business.facebook.com/billing_hub/accounts/details?asset_id=${actId}`;
+  return new Promise((resolve, reject) => {
+    chrome.windows.create(
+      {
+        url,
+        focused: false,
+        state: "minimized",
+        type: "normal",
+        width: 1280,
+        height: 900,
+      },
+      (win) => {
+        if (!win || !win.tabs || !win.tabs[0]) {
+          reject(new Error("Could not open background window"));
+          return;
+        }
+        const tab = win.tabs[0];
+        let resolved = false;
+        const finish = () => {
+          if (resolved) return;
+          resolved = true;
+          chrome.tabs.onUpdated.removeListener(listener);
+          // Generous wait so React/Relay can hydrate and fire GraphQL.
+          setTimeout(() => resolve({ tab, windowId: win.id }), 6000);
+        };
         const listener = (tabId, info) => {
-          if (tabId === tab.id && info.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(listener);
-            // Give the SPA / GraphQL traffic time to populate.
-            setTimeout(() => resolve(tab), 2500);
-          }
+          if (tabId === tab.id && info.status === "complete") finish();
         };
         chrome.tabs.onUpdated.addListener(listener);
+        // Hard timeout fallback in case 'complete' never fires
+        setTimeout(finish, 20000);
       },
     );
   });
