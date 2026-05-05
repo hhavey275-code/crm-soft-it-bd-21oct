@@ -2375,47 +2375,13 @@ export function AdminSellers() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs">Columns to include</Label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={() => setExportCols([...ALL_EXPORT_COLS])}
-                  >Select all</button>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:underline"
-                    onClick={() => setExportCols([])}
-                  >Clear</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto border rounded-md p-2">
-                {ALL_EXPORT_COLS.map(col => {
-                  const checked = exportCols.includes(col);
-                  return (
-                    <label key={col} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(v) => {
-                          if (v) setExportCols(prev => ALL_EXPORT_COLS.filter(c => prev.includes(c) || c === col) as ExportCol[]);
-                          else setExportCols(prev => prev.filter(c => c !== col));
-                        }}
-                      />
-                      <span>{col}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Opening Balance row + transactions + Closing Balance row will be included.
-              </p>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Colorful styled sheet — opening balance, totals, and running due/advance per month.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
-            <Button onClick={exportMonthlyToExcel} disabled={exportCols.length === 0}>
+            <Button onClick={exportMonthlyToExcel}>
               <Download className="h-4 w-4 mr-1" /> Download
             </Button>
             </DialogFooter>
