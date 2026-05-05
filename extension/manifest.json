@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Live Meta billing sync: page-world hook + DOM parser captures cards, hidden DSL, threshold and balance; remove cards via captured Meta mutation replay or visible UI flow; one-click sync to CRM.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [
