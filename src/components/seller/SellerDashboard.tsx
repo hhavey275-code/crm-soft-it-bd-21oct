@@ -249,25 +249,30 @@ export function SellerDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
-            <Wallet className="h-5 w-5 text-primary-foreground" />
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center justify-between gap-3 md:justify-start">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
+              <Wallet className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate">Seller Dashboard</h1>
+              <p className="text-xs text-muted-foreground truncate">Financial overview & transaction ledger</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">Seller Dashboard</h1>
-            <p className="text-xs text-muted-foreground">Financial overview & transaction ledger</p>
-          </div>
+          <Button className="md:hidden" size="sm" onClick={() => setShowSubmit(true)}>
+            <Plus className="h-4 w-4 mr-1" /> USDT
+          </Button>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={exportToExcel}>
-            <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Excel</span>
+        <div className="flex items-center gap-2 md:shrink-0 md:justify-end">
+          <Button className="flex-1 md:flex-none" size={isMobile ? "sm" : "default"} variant="outline" onClick={exportToExcel}>
+            <Download className="h-4 w-4 mr-1" /> <span>Excel</span>
           </Button>
-          <Button size={isMobile ? "sm" : "default"} variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
-            <Download className="h-4 w-4 md:mr-1" /> <span className="hidden md:inline">Monthly Excel</span><span className="md:hidden">Monthly</span>
+          <Button className="flex-1 md:flex-none" size={isMobile ? "sm" : "default"} variant="outline" onClick={() => { setExportBucket(activeBucket); setShowMonthlyExport(true); }}>
+            <Download className="h-4 w-4 mr-1" /> <span>Monthly</span><span className="hidden md:inline">&nbsp;Excel</span>
           </Button>
-          <Button size={isMobile ? "sm" : "default"} onClick={() => setShowSubmit(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {isMobile ? "USDT" : "Submit USDT"}
+          <Button className="hidden md:inline-flex" size="default" onClick={() => setShowSubmit(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Submit USDT
           </Button>
         </div>
       </div>
