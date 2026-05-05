@@ -140,8 +140,27 @@ export function SellerDashboard() {
         return isWithinInterval(d, { start: range!.from, end: range!.to });
       });
     }
+    if (monthView) {
+      result = result.filter((t: any) => isSameMonth(getMonthBucket(t.created_at), activeBucket));
+    }
     return result;
-  }, [transactions, typeFilter, bankFilter, datePreset, customFrom, customTo]);
+  }, [transactions, typeFilter, bankFilter, datePreset, customFrom, customTo, monthView, activeBucket]);
+
+  const availableMonths = useMemo(() => buildAvailableMonths(transactions || []), [transactions]);
+  const lifetimeDueAdvance = useMemo(() => {
+    let r = 0;
+    for (const t of (transactions || [])) r += computeTransactionDelta(t);
+    return r;
+  }, [transactions]);
+  const monthOpening = useMemo(
+    () => computeLedgerBalanceBefore(transactions || [], activeBucket),
+    [transactions, activeBucket]
+  );
+  const monthAgg = useMemo(
+    () => aggregateMonth(transactions || [], activeBucket),
+    [transactions, activeBucket]
+  );
+  const monthDueAdvance = monthOpening + monthAgg.delta;
 
   const totals = useMemo(() => {
     return filtered.reduce(
