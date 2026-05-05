@@ -431,8 +431,6 @@ export function SellerDashboard() {
       {/* Not in Seller Sheet — visibility for seller */}
       {user && <SellerNotInSheetCard sellerId={user.id} />}
 
-      {/* Month-by-Month Due/Advance */}
-      <MonthlyDueAdvanceCard transactions={transactions as any} />
 
       {/* Filters & Banks — collapsible on mobile, always visible on desktop */}
       <Collapsible defaultOpen={!isMobile}>
