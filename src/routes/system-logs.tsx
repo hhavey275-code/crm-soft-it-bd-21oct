@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import SystemLogsPage from "@/components/pages/SystemLogsPage";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export const Route = createFileRoute("/system-logs")({ component: SystemLogsPage });
+const SystemLogsPage = lazy(() => import("@/components/pages/SystemLogsPage"));
+
+export const Route = createFileRoute("/system-logs")({
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><SystemLogsPage /></Suspense>
+  ),
+});

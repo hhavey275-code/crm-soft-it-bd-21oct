@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import TenantsPage from "@/components/pages/TenantsPage";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export const Route = createFileRoute("/tenants/")({ component: TenantsPage });
+const TenantsPage = lazy(() => import("@/components/pages/TenantsPage"));
+
+export const Route = createFileRoute("/tenants/")({
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><TenantsPage /></Suspense>
+  ),
+});

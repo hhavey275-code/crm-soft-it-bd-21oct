@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import MetaOAuthCallback from "@/components/pages/MetaOAuthCallback";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export const Route = createFileRoute("/meta-oauth-callback")({ component: MetaOAuthCallback });
+const MetaOAuthCallback = lazy(() => import("@/components/pages/MetaOAuthCallback"));
+
+export const Route = createFileRoute("/meta-oauth-callback")({
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><MetaOAuthCallback /></Suspense>
+  ),
+});
