@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import PrivacyPage from "@/components/pages/PrivacyPage";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export const Route = createFileRoute("/privacy")({ component: PrivacyPage });
+const PrivacyPage = lazy(() => import("@/components/pages/PrivacyPage"));
+
+export const Route = createFileRoute("/privacy")({
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><PrivacyPage /></Suspense>
+  ),
+});

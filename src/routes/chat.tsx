@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import ChatPage from "@/components/pages/ChatPage";
+import { lazy, Suspense } from "react";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export const Route = createFileRoute("/chat")({ component: ChatPage });
+const ChatPage = lazy(() => import("@/components/pages/ChatPage"));
+
+export const Route = createFileRoute("/chat")({
+  component: () => (
+    <Suspense fallback={<PageSkeleton />}><ChatPage /></Suspense>
+  ),
+});

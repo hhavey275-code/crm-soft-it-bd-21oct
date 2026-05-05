@@ -201,7 +201,7 @@ export function ClientDashboard() {
       return (data ?? []).reduce((s: number, r: any) => s + Number(r.total_spend ?? 0), 0);
     },
     enabled: !!user && totalSpendPeriod !== "alltime",
-    staleTime: 0,
+    staleTime: 60_000,
   });
 
   const totalSpent = adAccounts?.reduce((s: number, a: any) => s + Number(a.amount_spent), 0) ?? 0;
