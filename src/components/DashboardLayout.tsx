@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -12,18 +12,37 @@ import { Zap } from "lucide-react";
 
 const TechBackground = lazy(() => import("@/components/TechBackground"));
 
+function useShouldRenderTechBg() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Skip on small screens — pure decoration, wastes battery
+    if (window.matchMedia("(max-width: 767px)").matches) return;
+    const ric: any = (window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 1000));
+    const id = ric(() => setShow(true));
+    return () => {
+      const cic: any = (window as any).cancelIdleCallback;
+      if (cic && typeof id === "number") cic(id);
+    };
+  }, []);
+  return show;
+}
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
   const { isAdmin } = useAuth();
+  const showTechBg = useShouldRenderTechBg();
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full relative">
-        <div className="fixed inset-0 w-screen h-screen opacity-60 pointer-events-none" style={{ zIndex: 0 }}>
-          <Suspense fallback={null}>
-            <TechBackground />
-          </Suspense>
-        </div>
+        {showTechBg ? (
+          <div className="fixed inset-0 w-screen h-screen opacity-60 pointer-events-none" style={{ zIndex: 0 }}>
+            <Suspense fallback={null}>
+              <TechBackground />
+            </Suspense>
+          </div>
+        ) : null}
 
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 relative z-10">
