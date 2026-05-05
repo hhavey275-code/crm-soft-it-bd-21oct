@@ -57,8 +57,9 @@ export function useSiteSettings() {
     queryKey: ["site-settings"],
     queryFn: fetchSettings,
     initialData: undefined,
-    staleTime: cached?.logoUrl ? 5 * 60 * 1000 : 0,
+    staleTime: cached?.logoUrl ? 30 * 60 * 1000 : 0,
     refetchOnMount: !cached?.logoUrl ? "always" : false,
+    refetchOnWindowFocus: false,
   });
 
   return {
