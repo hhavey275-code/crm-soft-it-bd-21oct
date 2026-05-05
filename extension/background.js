@@ -672,6 +672,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     syncSingleAccount(msg.accountId).then(sendResponse);
     return true;
   }
+  if (msg?.type === "process-pending-sync-requests") {
+    processPendingSyncRequests().then(sendResponse);
+    return true;
+  }
   if (msg?.type === "remove-card") {
     // Legacy path
     removeCardFromAccount({ ...(msg.payload || {}), tabId: sender?.tab?.id })
