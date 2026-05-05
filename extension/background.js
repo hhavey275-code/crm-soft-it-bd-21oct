@@ -342,11 +342,29 @@ async function syncSingleAccount(accountId) {
   }
   recentSyncs.set(id, Date.now());
 
+  let windowId = null;
   let tab = null;
   try {
-    tab = await openBillingTab(id);
-    const res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot", timeoutMs: 25000 }, 6);
-    if (!res?.ok) throw new Error(res?.error || "Could not parse billing page");
+    const opened = await openBillingWindow(id);
+    tab = opened.tab;
+    windowId = opened.windowId;
+
+    // Retry the snapshot collection — Meta sometimes needs an extra moment
+    // for the page to populate after hydration.
+    let res = null;
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await sendTabMessage(tab.id, { type: "collect-billing-snapshot", timeoutMs: 25000 }, 6);
+        if (res?.ok) break;
+        lastErr = res?.error || "empty snapshot";
+      } catch (e) {
+        lastErr = e?.message || String(e);
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    if (!res?.ok) throw new Error(lastErr || "Could not parse billing page");
+
     await setStored({ lastSyncStatus: "success", lastSyncAt: Date.now(), lastSyncSaved: 1, lastSyncError: null });
     return { ok: true, accountId: id };
   } catch (err) {
@@ -354,7 +372,61 @@ async function syncSingleAccount(accountId) {
     await setStored({ lastSyncStatus: "error", lastSyncAt: Date.now(), lastSyncError: message });
     return { ok: false, error: message };
   } finally {
-    if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
+    if (windowId) { try { await chrome.windows.remove(windowId); } catch {} }
+    else if (tab?.id) { try { await chrome.tabs.remove(tab.id); } catch {} }
+  }
+}
+
+// ---------- Pending sync requests from CRM (clients asking admin to sync) ----------
+let pendingPollerRunning = false;
+async function processPendingSyncRequests() {
+  if (pendingPollerRunning) return { ok: false, error: "already-running" };
+  pendingPollerRunning = true;
+  try {
+    const stored = await getStored(["apiUrl", "anonKey", "jwt", "refreshToken"]);
+    if (!stored.apiUrl || !stored.anonKey || !stored.jwt) {
+      return { ok: false, error: "not-logged-in" };
+    }
+    const list = await callBackend(
+      stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken,
+      "list-pending-sync-requests", {},
+    );
+    const requests = list.requests || [];
+    if (!requests.length) return { ok: true, processed: 0 };
+
+    let done = 0; let failed = 0;
+    for (const r of requests) {
+      const sync = await syncSingleAccount(r.meta_account_id);
+      try {
+        await callBackend(
+          stored.apiUrl, stored.anonKey, stored.jwt, stored.refreshToken,
+          "complete-sync-request",
+          {
+            request_id: r.id,
+            status: sync.ok ? "done" : "failed",
+            error: sync.ok ? null : sync.error,
+          },
+        );
+      } catch (e) { console.warn("complete-sync-request failed", e); }
+      if (sync.ok) done++; else failed++;
+      // Throttle so Meta doesn't see rapid window churn
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+
+    try {
+      chrome.notifications?.create({
+        type: "basic",
+        iconUrl: "icon.png",
+        title: "DSL Sync — pending requests processed",
+        message: `Synced ${done} account(s)${failed ? `, ${failed} failed` : ""}.`,
+      });
+    } catch {}
+
+    return { ok: true, processed: requests.length, done, failed };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  } finally {
+    pendingPollerRunning = false;
   }
 }
 
