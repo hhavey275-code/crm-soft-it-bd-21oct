@@ -388,6 +388,50 @@ export type Database = {
           },
         ]
       }
+      ad_account_sync_requests: {
+        Row: {
+          ad_account_id: string
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          requested_at: string
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_account_id: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          requested_at?: string
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ad_account_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          requested_at?: string
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_account_sync_requests_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_accounts: {
         Row: {
           account_id: string
