@@ -11,13 +11,19 @@ interface SiteSettings {
   announcementSize: string | null;
 }
 
-const CACHE_KEY = "site_settings_cache";
+const CACHE_KEY = "site_settings_cache_v2";
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — cache used only as instant placeholder
+
+interface CacheEntry { ts: number; data: SiteSettings }
 
 function getCachedSettings(): SiteSettings | undefined {
   if (typeof window === "undefined") return undefined;
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as CacheEntry;
+    if (!parsed?.ts || Date.now() - parsed.ts > CACHE_TTL_MS) return undefined;
+    return parsed.data;
   } catch {}
   return undefined;
 }
@@ -45,7 +51,9 @@ async function fetchSettings(): Promise<SiteSettings> {
     }
   }
 
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(settings)); } catch {}
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: settings }));
+  } catch {}
   return settings;
 }
 
@@ -56,9 +64,10 @@ export function useSiteSettings() {
   const { data, isLoading } = useQuery({
     queryKey: ["site-settings"],
     queryFn: fetchSettings,
-    initialData: undefined,
-    staleTime: cached?.logoUrl ? 30 * 60 * 1000 : 0,
-    refetchOnMount: !cached?.logoUrl ? "always" : false,
+    initialData: cached,
+    // Always refetch in background so admin updates show up — cache only avoids the blank flash.
+    staleTime: 60_000,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 
