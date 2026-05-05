@@ -245,7 +245,7 @@ export function ClientTopUp() {
       return Number(data?.value ?? 120);
     },
     enabled: !!user,
-    staleTime: 0,
+    staleTime: 60_000,
     refetchOnMount: "always",
   });
 
