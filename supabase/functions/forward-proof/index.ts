@@ -151,11 +151,41 @@ Deno.serve(async (req) => {
     // ATOMIC CLAIM — race-safe: only the first concurrent caller wins this slot.
     const claimed = await claimForwardSlot(supabase, 'client_topup', request_id, targetGroupId);
     if (!claimed) {
-      console.log(`forward-proof: slot already claimed for ${request_id}, skipping`);
-      return new Response(
-        JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      // Self-heal: if slot was claimed AND a Telegram message_id was recorded,
+      // the message really did go out — just the top_up_requests flag never got
+      // flipped. Repair it so the UI stops showing "Not Forwarded" forever.
+      const { data: slot } = await supabase
+        .from('telegram_forward_log')
+        .select('telegram_message_id')
+        .eq('source_type', 'client_topup')
+        .eq('source_id', request_id)
+        .maybeSingle();
+      if (slot?.telegram_message_id) {
+        try {
+          await supabase
+            .from('top_up_requests')
+            .update({ telegram_forwarded: true })
+            .eq('id', request_id);
+        } catch (e) {
+          console.warn('self-heal flag update failed:', (e as any)?.message);
+        }
+        console.log(`forward-proof: already forwarded (msg ${slot.telegram_message_id}), flag healed for ${request_id}`);
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded', message_id: slot.telegram_message_id, healed: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      // Slot exists but no message_id — a previous attempt died mid-flight.
+      // Release it so this call (or a future Resend) can actually send.
+      await releaseForwardSlot(supabase, 'client_topup', request_id);
+      const reclaimed = await claimForwardSlot(supabase, 'client_topup', request_id, targetGroupId);
+      if (!reclaimed) {
+        console.log(`forward-proof: slot already claimed for ${request_id}, skipping`);
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
     const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
