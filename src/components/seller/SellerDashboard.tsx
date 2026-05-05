@@ -869,6 +869,50 @@ export function SellerDashboard() {
       </Dialog>
 
       <SellerSubmitUsdtDialog open={showSubmit} onOpenChange={setShowSubmit} />
+
+      {/* Monthly Excel Export */}
+      <Dialog open={showMonthlyExport} onOpenChange={setShowMonthlyExport}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Excel Export</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm cursor-pointer">
+              <Checkbox checked={exportAllMonths} onCheckedChange={(v) => setExportAllMonths(Boolean(v))} />
+              <span className="font-medium">Export all months (one sheet per month)</span>
+            </label>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Month</p>
+              <Select
+                value={`${exportBucket.year}-${exportBucket.month}`}
+                disabled={exportAllMonths}
+                onValueChange={(v) => {
+                  const [y, m] = v.split("-").map(Number);
+                  setExportBucket({ year: y, month: m });
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map(b => (
+                    <SelectItem key={`${b.year}-${b.month}`} value={`${b.year}-${b.month}`}>
+                      {monthLabel(b)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Colorful styled sheet with opening balance, totals, and running due/advance.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMonthlyExport(false)}>Cancel</Button>
+            <Button onClick={handleMonthlyExport}>
+              <Download className="h-4 w-4 mr-1" /> Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
