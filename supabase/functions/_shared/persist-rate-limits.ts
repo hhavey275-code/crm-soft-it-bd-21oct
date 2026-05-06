@@ -68,11 +68,14 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
         bucRegain = firstEntry.estimated_time_to_regain_access;
       }
     }
+    const tier = snap.account?.ads_api_access_tier ?? null;
+    const estLimit = estimateCallLimit(tier, 0);
     const rows = opts.ad_account_db_ids.map((id) => ({
       ad_account_id: id,
       acc_util_pct: snap.account?.acc_id_util_pct ?? null,
       reset_seconds: snap.account?.reset_time_duration ?? null,
-      access_tier: snap.account?.ads_api_access_tier ?? null,
+      access_tier: tier,
+      estimated_call_limit: estLimit,
       buc_call_count: bucCall ?? null,
       buc_cputime: bucCpu ?? null,
       buc_total_time: bucTime ?? null,
