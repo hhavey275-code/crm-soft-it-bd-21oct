@@ -260,4 +260,3 @@ export async function metaFetch(
   try { captureRateLimitHeaders(directRes.headers); } catch { /* ignore */ }
   return directRes;
 }
-}
