@@ -332,6 +332,53 @@ export type Database = {
           },
         ]
       }
+      ad_account_rate_limits: {
+        Row: {
+          acc_util_pct: number | null
+          access_tier: string | null
+          ad_account_id: string
+          buc_call_count: number | null
+          buc_cputime: number | null
+          buc_total_time: number | null
+          estimated_regain_sec: number | null
+          id: string
+          reset_seconds: number | null
+          updated_at: string
+        }
+        Insert: {
+          acc_util_pct?: number | null
+          access_tier?: string | null
+          ad_account_id: string
+          buc_call_count?: number | null
+          buc_cputime?: number | null
+          buc_total_time?: number | null
+          estimated_regain_sec?: number | null
+          id?: string
+          reset_seconds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          acc_util_pct?: number | null
+          access_tier?: string | null
+          ad_account_id?: string
+          buc_call_count?: number | null
+          buc_cputime?: number | null
+          buc_total_time?: number | null
+          estimated_regain_sec?: number | null
+          id?: string
+          reset_seconds?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_account_rate_limits_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: true
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_account_requests: {
         Row: {
           account_name: string
@@ -961,6 +1008,36 @@ export type Database = {
           },
         ]
       }
+      app_rate_limits: {
+        Row: {
+          app_id: string
+          app_label: string | null
+          call_count: number | null
+          id: string
+          total_cputime: number | null
+          total_time: number | null
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          app_label?: string | null
+          call_count?: number | null
+          id?: string
+          total_cputime?: number | null
+          total_time?: number | null
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          app_label?: string | null
+          call_count?: number | null
+          id?: string
+          total_cputime?: number | null
+          total_time?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       auto_topup_rules: {
         Row: {
           ad_account_id: string
@@ -1161,6 +1238,54 @@ export type Database = {
             foreignKeyName: "bm_invitations_business_manager_id_fkey"
             columns: ["business_manager_id"]
             isOneToOne: false
+            referencedRelation: "business_managers_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bm_rate_limits: {
+        Row: {
+          buc_call_count: number | null
+          buc_cputime: number | null
+          buc_total_time: number | null
+          business_manager_id: string
+          business_use_case: string | null
+          estimated_regain_sec: number | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          buc_call_count?: number | null
+          buc_cputime?: number | null
+          buc_total_time?: number | null
+          business_manager_id: string
+          business_use_case?: string | null
+          estimated_regain_sec?: number | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          buc_call_count?: number | null
+          buc_cputime?: number | null
+          buc_total_time?: number | null
+          business_manager_id?: string
+          business_use_case?: string | null
+          estimated_regain_sec?: number | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bm_rate_limits_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: true
+            referencedRelation: "business_managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bm_rate_limits_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: true
             referencedRelation: "business_managers_safe"
             referencedColumns: ["id"]
           },
