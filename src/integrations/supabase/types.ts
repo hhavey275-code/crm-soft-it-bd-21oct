@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_account_call_log: {
+        Row: {
+          account_id: string | null
+          ad_account_id: string | null
+          called_at: string
+          endpoint: string | null
+          error_code: number | null
+          error_message: string | null
+          error_subcode: number | null
+          id: number
+          status_code: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          ad_account_id?: string | null
+          called_at?: string
+          endpoint?: string | null
+          error_code?: number | null
+          error_message?: string | null
+          error_subcode?: number | null
+          id?: number
+          status_code?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          ad_account_id?: string | null
+          called_at?: string
+          endpoint?: string | null
+          error_code?: number | null
+          error_message?: string | null
+          error_subcode?: number | null
+          id?: number
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_account_call_log_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_account_card_assignments: {
         Row: {
           ad_account_id: string
@@ -336,10 +380,12 @@ export type Database = {
         Row: {
           acc_util_pct: number | null
           access_tier: string | null
+          active_ads_count: number | null
           ad_account_id: string
           buc_call_count: number | null
           buc_cputime: number | null
           buc_total_time: number | null
+          estimated_call_limit: number | null
           estimated_regain_sec: number | null
           id: string
           reset_seconds: number | null
@@ -348,10 +394,12 @@ export type Database = {
         Insert: {
           acc_util_pct?: number | null
           access_tier?: string | null
+          active_ads_count?: number | null
           ad_account_id: string
           buc_call_count?: number | null
           buc_cputime?: number | null
           buc_total_time?: number | null
+          estimated_call_limit?: number | null
           estimated_regain_sec?: number | null
           id?: string
           reset_seconds?: number | null
@@ -360,10 +408,12 @@ export type Database = {
         Update: {
           acc_util_pct?: number | null
           access_tier?: string | null
+          active_ads_count?: number | null
           ad_account_id?: string
           buc_call_count?: number | null
           buc_cputime?: number | null
           buc_total_time?: number | null
+          estimated_call_limit?: number | null
           estimated_regain_sec?: number | null
           id?: string
           reset_seconds?: number | null
