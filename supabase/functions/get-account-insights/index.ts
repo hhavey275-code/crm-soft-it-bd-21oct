@@ -1405,6 +1405,37 @@ Deno.serve(async (req)=>{
       } catch (eventErr) {
         console.error("meta_account_events insert error:", eventErr);
       }
+
+      // --- Persist hold/health flags on ad_accounts so the UI can show why an account is held ---
+      try {
+        const HOLD_STATUSES = new Set([2, 3, 7, 8, 9, 100, 101]);
+        const holdReasonFor = (s: number | null, dr: number | null): string | null => {
+          if (s === 2) return `Disabled by Meta${dr ? ` (reason ${dr})` : ""}`;
+          if (s === 3) return "Unsettled balance";
+          if (s === 7) return "Pending risk review";
+          if (s === 8) return "Pending settlement";
+          if (s === 9) return "In grace period (billing failed)";
+          if (s === 100) return "Pending closure";
+          if (s === 101) return "Closed";
+          if (dr) return `Disable reason ${dr}`;
+          return null;
+        };
+        const nowIso = new Date().toISOString();
+        for (const [adAccountId, data] of Object.entries(insights as Record<string, any>)) {
+          const status = data?.account_status ?? null;
+          const dReason = data?.disable_reason ?? null;
+          const isHold = status !== null && HOLD_STATUSES.has(Number(status));
+          await supabase.from("ad_accounts").update({
+            meta_account_status: status,
+            meta_disable_reason: dReason,
+            meta_hold_detected: isHold,
+            meta_hold_reason: isHold ? holdReasonFor(Number(status), dReason) : null,
+            meta_health_checked_at: nowIso,
+          }).eq("id", adAccountId);
+        }
+      } catch (flagErr) {
+        console.warn("hold flag update failed (insights):", flagErr);
+      }
     }
     // Log API calls per BM
     if (source === "meta") {

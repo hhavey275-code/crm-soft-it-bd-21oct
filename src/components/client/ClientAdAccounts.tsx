@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RateLimitBadge } from "@/components/RateLimitBadge";
+import { HoldBadge } from "@/components/HoldBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -774,6 +775,7 @@ export function ClientAdAccounts() {
                         <div className="flex flex-col items-end gap-1">
                           <StatusBadge status={a.status} />
                           <InactiveBadge lastSpendDate={(ins as any)?.last_spend_date} fallbackDate={a.created_at} />
+                          <HoldBadge accountId={a.id} compact />
                           <RateLimitBadge accountId={a.id} compact />
                         </div>
                       </div>
@@ -949,7 +951,7 @@ export function ClientAdAccounts() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
-                      <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><RateLimitBadge accountId={a.id} compact /></div></TableCell>
+                      <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /><RateLimitBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
                           {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}

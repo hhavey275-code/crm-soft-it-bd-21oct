@@ -707,17 +707,58 @@ Deno.serve(async (req)=>{
         account_status: metaStatus,
         disable_reason: disableReason
       });
+      // Detect "hold" — account ostensibly active but Meta refuses to charge / disabled.
+      // Meta status codes: 1=ACTIVE, 2=DISABLED, 3=UNSETTLED, 7=PENDING_RISK_REVIEW,
+      // 8=PENDING_SETTLEMENT, 9=IN_GRACE_PERIOD, 100=PENDING_CLOSURE, 101=CLOSED, 201=ANY_ACTIVE, 202=ANY_CLOSED.
+      const HOLD_STATUSES = new Set([2, 3, 7, 8, 9, 100, 101]);
+      const fundDetails = healthData?.funding_source_details || null;
+      const failedAttempts = Number(fundDetails?.failed_attempts ?? 0);
+      const isHold =
+        (metaStatus !== null && HOLD_STATUSES.has(Number(metaStatus))) ||
+        failedAttempts > 0 ||
+        !!disableReason;
+      let holdReason: string | null = null;
+      if (metaStatus === 2) holdReason = `Disabled by Meta (reason ${disableReason ?? "?"})`;
+      else if (metaStatus === 3) holdReason = "Unsettled balance";
+      else if (metaStatus === 7) holdReason = "Pending risk review";
+      else if (metaStatus === 8) holdReason = "Pending settlement";
+      else if (metaStatus === 9) holdReason = "In grace period (billing failed)";
+      else if (failedAttempts > 0) holdReason = `Card failed ${failedAttempts}× — temporary hold not placed`;
+      else if (disableReason) holdReason = `Disable reason ${disableReason}`;
+
+      try {
+        await supabase.from("ad_accounts").update({
+          meta_account_status: metaStatus,
+          meta_disable_reason: disableReason,
+          meta_hold_detected: isHold,
+          meta_hold_reason: holdReason,
+          meta_health_checked_at: new Date().toISOString(),
+        }).eq("id", ad_account_id);
+      } catch (e) { console.warn("hold flag update failed:", e); }
+
       if (metaStatus && metaStatus !== 1) {
         billingWarning = {
           account_status: metaStatus,
           disable_reason: disableReason,
-          message: `Account status is ${metaStatus} after top-up. Disable reason: ${disableReason || "unknown"}`
+          hold: isHold,
+          hold_reason: holdReason,
+          message: holdReason || `Account status is ${metaStatus} after top-up.`,
         };
         console.warn("Post-topup health warning:", billingWarning);
       }
     } catch (healthErr) {
       console.warn("Post-topup health check failed:", healthErr);
     }
+
+    // Persist rate-limit headers + per-call log captured during this invocation
+    try {
+      const { persistMetaRateLimits } = await import("../_shared/persist-rate-limits.ts");
+      await persistMetaRateLimits(supabase, {
+        ad_account_db_ids: [ad_account_id],
+        business_manager_db_id: (account as any).business_manager_id ?? null,
+        account_id_map: { [actId]: ad_account_id },
+      });
+    } catch (e) { console.warn("rate-limit persist failed (spend-cap-update):", e); }
     // ============================================
     // STEP 5: Report usage to master (Tenant mode)
     // ============================================
