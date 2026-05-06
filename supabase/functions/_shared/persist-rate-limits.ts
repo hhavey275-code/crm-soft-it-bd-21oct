@@ -13,11 +13,12 @@ interface PersistOptions {
 // Standard tier: 9000 + 100 * active_ads, Dev tier: 60 + 300 * active_ads (cap ~9000).
 function estimateCallLimit(tier: string | null | undefined, activeAds: number): number {
   const ads = Math.max(0, activeAds || 0);
-  if ((tier ?? "").toLowerCase().includes("standard")) {
-    return 9000 + 100 * ads;
-  }
-  // default to development tier (more conservative)
-  return Math.min(9000, 60 + 300 * ads);
+  const t = (tier ?? "").toLowerCase();
+  if (t.includes("standard")) return 9000 + 100 * ads;
+  if (t.includes("dev") || t.includes("development")) return Math.min(9000, 60 + 300 * ads);
+  // Tier unknown — default to a generous Standard-tier baseline so the UI
+  // shows a meaningful "X / 9000" rather than "X / 60".
+  return 9000 + 100 * ads;
 }
 
 export async function persistMetaRateLimits(supabase: any, opts: PersistOptions) {
