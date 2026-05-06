@@ -127,6 +127,7 @@ export function resetMetaCounters() {
   metaDirectCount = 0;
   metaProxyFailReasons.length = 0;
   lastRateLimit = {};
+  callLog.length = 0;
 }
 
 export function getLastMetaVia() {
