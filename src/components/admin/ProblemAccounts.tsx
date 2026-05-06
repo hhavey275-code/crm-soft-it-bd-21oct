@@ -69,7 +69,7 @@ export default function ProblemAccounts() {
 
     const { data: accounts } = await (supabase as any)
       .from("ad_accounts")
-      .select("id, account_id, account_name, status, business_managers(name)")
+      .select("id, account_id, account_name, status, meta_hold_detected, meta_hold_reason, meta_account_status, meta_health_checked_at, business_managers(name)")
       .limit(2000);
 
     const { data: rl } = await (supabase as any)
@@ -135,6 +135,10 @@ export default function ProblemAccounts() {
         last_error_at: err?.called_at ?? null,
         failed_topups_24h: ftCount.get(a.id) ?? 0,
         last_failed_topup_at: ftLast.get(a.id) ?? null,
+        meta_hold_detected: !!a.meta_hold_detected,
+        meta_hold_reason: a.meta_hold_reason ?? null,
+        meta_account_status: a.meta_account_status ?? null,
+        meta_health_checked_at: a.meta_health_checked_at ?? null,
       };
     });
 
@@ -142,6 +146,7 @@ export default function ProblemAccounts() {
       r.calls_1h > 0 ||
       r.last_error_code !== null ||
       r.failed_topups_24h > 0 ||
+      r.meta_hold_detected ||
       (r.acc_util_pct ?? 0) > 50
     );
 
@@ -163,7 +168,7 @@ export default function ProblemAccounts() {
     } else if (filter === "failed_billing") {
       r = r.filter((x) => x.failed_topups_24h > 0);
     } else if (filter === "suspected_hold") {
-      r = r.filter((x) => x.failed_topups_24h > 0 && x.status === "active");
+      r = r.filter((x) => x.meta_hold_detected || (x.failed_topups_24h > 0 && x.status === "active"));
     }
     if (search.trim()) {
       const q = search.toLowerCase();
