@@ -928,7 +928,7 @@ export function AdminAdAccounts() {
                         )}
                       </div>
                     </div>
-                    <StatusBadge status={a.status} />
+                    <div className="flex flex-col items-end gap-1"><StatusBadge status={a.status} /><RateLimitBadge accountId={a.id} compact /></div>
                   </div>
 
                   {/* Remaining + Progress */}
