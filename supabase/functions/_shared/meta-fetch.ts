@@ -256,5 +256,8 @@ export async function metaFetch(
 
   lastMetaVia = "direct";
   metaDirectCount += 1;
-  return fetch(url, fetchOptions);
+  const directRes = await fetch(url, fetchOptions);
+  try { captureRateLimitHeaders(directRes.headers); } catch { /* ignore */ }
+  return directRes;
+}
 }
