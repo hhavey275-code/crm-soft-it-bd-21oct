@@ -25,20 +25,26 @@ interface Row {
   last_error_at: string | null;
   failed_topups_24h: number;
   last_failed_topup_at: string | null;
+  meta_hold_detected: boolean;
+  meta_hold_reason: string | null;
+  meta_account_status: number | null;
+  meta_health_checked_at: string | null;
 }
 
 type Filter = "all" | "high_calls" | "errors" | "failed_billing" | "suspected_hold";
 
-const HOLD_ERROR_CODES = new Set([17, 368]);
+// Meta error codes that indicate Meta-side flagging / restriction
+const HOLD_ERROR_CODES = new Set([17, 368, 1487742, 1885010, 1487390]);
 
 function likelyCause(r: Row): { label: string; color: string } {
   const utilPct = r.estimated_call_limit && r.estimated_call_limit > 0
     ? (r.calls_1h / r.estimated_call_limit) * 100
     : (r.acc_util_pct ?? 0);
 
+  if (r.meta_hold_detected) return { label: `🔒 ${r.meta_hold_reason || "Meta hold"}`, color: "bg-destructive text-destructive-foreground" };
   if (utilPct >= 80) return { label: "🟠 Rate limit", color: "bg-orange-500 text-white" };
   if (r.last_error_code && HOLD_ERROR_CODES.has(r.last_error_code)) {
-    return { label: "🔴 Meta flag", color: "bg-destructive text-destructive-foreground" };
+    return { label: `🔴 Meta flag #${r.last_error_code}`, color: "bg-destructive text-destructive-foreground" };
   }
   if (r.failed_topups_24h > 0 && !r.last_error_code) {
     return { label: "💳 Card / issuer", color: "bg-yellow-500 text-black" };
