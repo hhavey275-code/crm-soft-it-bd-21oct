@@ -398,7 +398,7 @@ export function AdminTopUp() {
             .from("tenant_payments")
             .update(updateData)
             .eq("id", id)
-            .eq("status", "pending")
+            .in("status", ["pending", "hold"])
             .select("id");
           if (updateError) throw updateError;
           if (!updatedRows?.length) {
