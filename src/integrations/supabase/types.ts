@@ -543,6 +543,11 @@ export type Database = {
           external_topup_url: string | null
           fraud_flag: boolean
           id: string
+          meta_account_status: number | null
+          meta_disable_reason: number | null
+          meta_health_checked_at: string | null
+          meta_hold_detected: boolean | null
+          meta_hold_reason: string | null
           platform: string
           reclaim_alerted_at: string | null
           spend_cap: number
@@ -563,6 +568,11 @@ export type Database = {
           external_topup_url?: string | null
           fraud_flag?: boolean
           id?: string
+          meta_account_status?: number | null
+          meta_disable_reason?: number | null
+          meta_health_checked_at?: string | null
+          meta_hold_detected?: boolean | null
+          meta_hold_reason?: string | null
           platform?: string
           reclaim_alerted_at?: string | null
           spend_cap?: number
@@ -583,6 +593,11 @@ export type Database = {
           external_topup_url?: string | null
           fraud_flag?: boolean
           id?: string
+          meta_account_status?: number | null
+          meta_disable_reason?: number | null
+          meta_health_checked_at?: string | null
+          meta_hold_detected?: boolean | null
+          meta_hold_reason?: string | null
           platform?: string
           reclaim_alerted_at?: string | null
           spend_cap?: number
