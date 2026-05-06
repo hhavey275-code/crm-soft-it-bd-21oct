@@ -63,7 +63,7 @@ export default function ProblemAccounts() {
 
     const { data: accounts } = await (supabase as any)
       .from("ad_accounts")
-      .select("id, account_id, account_name, status, business_managers(bm_name)")
+      .select("id, account_id, account_name, status, business_managers(name)")
       .limit(2000);
 
     const { data: rl } = await (supabase as any)
@@ -119,7 +119,7 @@ export default function ProblemAccounts() {
         account_id: a.account_id,
         account_name: a.account_name || a.account_id,
         status: a.status || "unknown",
-        business_manager_name: bm?.bm_name ?? null,
+        business_manager_name: bm?.name ?? null,
         client_name: null,
         calls_1h: callCount.get(a.id) ?? 0,
         estimated_call_limit: rlRow?.estimated_call_limit ?? null,
