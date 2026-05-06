@@ -51,6 +51,7 @@ const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
+  { title: "Problem Accounts", url: "/admin/problem-accounts", icon: AlertTriangle, key: "problem-accounts" },
   { title: "Requests", url: "/requests", icon: FileText, key: "requests" },
   { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
   { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },

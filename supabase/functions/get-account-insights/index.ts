@@ -1001,13 +1001,18 @@ Deno.serve(async (req)=>{
         if (i >= tasks.length) return;
         const task = tasks[i];
         const results = await processAccountsBatched(task.accs, task.token, date, date_from, date_to);
-        // Persist rate-limit headers from this batch (per-account + per-BM)
+        // Persist rate-limit headers + per-call log from this batch
         try {
           const accountDbIds = task.accs.map((a: any) => a.id);
           const bmId = task.accs[0]?.business_manager_id ?? null;
+          const accountIdMap: Record<string, string> = {};
+          for (const a of task.accs) {
+            if (a?.account_id && a?.id) accountIdMap[a.account_id] = a.id;
+          }
           await persistMetaRateLimits(supabase, {
             ad_account_db_ids: accountDbIds,
             business_manager_db_id: bmId,
+            account_id_map: accountIdMap,
           });
         } catch (e) {
           console.warn("rate-limit persist failed:", e);

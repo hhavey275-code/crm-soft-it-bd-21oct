@@ -1,17 +1,54 @@
-// Persist Meta rate-limit headers captured by meta-fetch into DB tables.
+// Persist Meta rate-limit headers + per-call log captured by meta-fetch.
 // Called by edge functions after each Meta batch call.
-import { getLastRateLimitHeaders } from "./meta-fetch.ts";
+import { getLastRateLimitHeaders, getMetaCallLog, clearMetaCallLog } from "./meta-fetch.ts";
 
 interface PersistOptions {
   ad_account_db_ids?: string[]; // ad_accounts.id (uuid) — applies same account snapshot to all
   business_manager_db_id?: string | null;
+  // Optional mapping: act_xxx -> ad_accounts.id (uuid) for call log resolution.
+  account_id_map?: Record<string, string>;
+}
+
+// Estimate hourly call limit per ad account based on Meta's documented rules.
+// Standard tier: 9000 + 100 * active_ads, Dev tier: 60 + 300 * active_ads (cap ~9000).
+function estimateCallLimit(tier: string | null | undefined, activeAds: number): number {
+  const ads = Math.max(0, activeAds || 0);
+  if ((tier ?? "").toLowerCase().includes("standard")) {
+    return 9000 + 100 * ads;
+  }
+  // default to development tier (more conservative)
+  return Math.min(9000, 60 + 300 * ads);
 }
 
 export async function persistMetaRateLimits(supabase: any, opts: PersistOptions) {
   const snap = getLastRateLimitHeaders();
-  if (!snap || (!snap.app && !snap.account && !snap.buc)) return;
-
+  const log = getMetaCallLog();
   const now = new Date().toISOString();
+
+  // Flush call log
+  if (log.length > 0) {
+    try {
+      const map = opts.account_id_map || {};
+      const rows = log.map((e) => ({
+        ad_account_id: (e.account_id && map[e.account_id]) || null,
+        account_id: e.account_id ?? null,
+        called_at: e.called_at,
+        endpoint: e.endpoint,
+        status_code: e.status_code,
+        error_code: e.error_code,
+        error_subcode: e.error_subcode,
+        error_message: e.error_message,
+      }));
+      for (let i = 0; i < rows.length; i += 100) {
+        await supabase.from("ad_account_call_log").insert(rows.slice(i, i + 100));
+      }
+    } catch (e) {
+      console.warn("persist call log failed:", e);
+    }
+    clearMetaCallLog();
+  }
+
+  if (!snap || (!snap.app && !snap.account && !snap.buc)) return;
 
   // 1) Per-account snapshot (X-Ad-Account-Usage). Same value applied to every
   //    account in this batch since Meta returns one header for the whole call.
@@ -31,11 +68,14 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
         bucRegain = firstEntry.estimated_time_to_regain_access;
       }
     }
+    const tier = snap.account?.ads_api_access_tier ?? null;
+    const estLimit = estimateCallLimit(tier, 0);
     const rows = opts.ad_account_db_ids.map((id) => ({
       ad_account_id: id,
       acc_util_pct: snap.account?.acc_id_util_pct ?? null,
       reset_seconds: snap.account?.reset_time_duration ?? null,
-      access_tier: snap.account?.ads_api_access_tier ?? null,
+      access_tier: tier,
+      estimated_call_limit: estLimit,
       buc_call_count: bucCall ?? null,
       buc_cputime: bucCpu ?? null,
       buc_total_time: bucTime ?? null,

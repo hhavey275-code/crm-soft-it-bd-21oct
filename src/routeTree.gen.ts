@@ -56,6 +56,7 @@ import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
+import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
@@ -295,6 +296,11 @@ const AdminStripeLinksRoute = AdminStripeLinksRouteImport.update({
   path: '/admin/stripe-links',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminProblemAccountsRoute = AdminProblemAccountsRouteImport.update({
+  id: '/admin/problem-accounts',
+  path: '/admin/problem-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminPerformanceRoute = AdminPerformanceRouteImport.update({
   id: '/admin/performance',
   path: '/admin/performance',
@@ -352,6 +358,7 @@ export interface FileRoutesByFullPath {
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
+  '/admin/problem-accounts': typeof AdminProblemAccountsRoute
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
@@ -403,6 +410,7 @@ export interface FileRoutesByTo {
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
+  '/admin/problem-accounts': typeof AdminProblemAccountsRoute
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
@@ -456,6 +464,7 @@ export interface FileRoutesById {
   '/wallet-balances': typeof WalletBalancesRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
+  '/admin/problem-accounts': typeof AdminProblemAccountsRoute
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
@@ -510,6 +519,7 @@ export interface FileRouteTypes {
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
+    | '/admin/problem-accounts'
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
@@ -561,6 +571,7 @@ export interface FileRouteTypes {
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
+    | '/admin/problem-accounts'
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
@@ -613,6 +624,7 @@ export interface FileRouteTypes {
     | '/wallet-balances'
     | '/ad-accounts/$id'
     | '/admin/performance'
+    | '/admin/problem-accounts'
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
@@ -665,6 +677,7 @@ export interface RootRouteChildren {
   WalletRoute: typeof WalletRoute
   WalletBalancesRoute: typeof WalletBalancesRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
+  AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
   ApiMetaProxyRoute: typeof ApiMetaProxyRoute
@@ -1005,6 +1018,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminStripeLinksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/problem-accounts': {
+      id: '/admin/problem-accounts'
+      path: '/admin/problem-accounts'
+      fullPath: '/admin/problem-accounts'
+      preLoaderRoute: typeof AdminProblemAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/performance': {
       id: '/admin/performance'
       path: '/admin/performance'
@@ -1106,6 +1126,7 @@ const rootRouteChildren: RootRouteChildren = {
   WalletRoute: WalletRoute,
   WalletBalancesRoute: WalletBalancesRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
+  AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
   ApiMetaProxyRoute: ApiMetaProxyRoute,

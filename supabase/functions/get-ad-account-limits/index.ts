@@ -124,6 +124,18 @@ Deno.serve(async (req: Request) => {
     const res = await metaFetch(url, { method: "GET" });
     const body = await res.json().catch(() => ({}));
 
+    // Persist call log for this single-account call
+    try {
+      const { persistMetaRateLimits } = await import("../_shared/persist-rate-limits.ts");
+      await persistMetaRateLimits(supabase, {
+        ad_account_db_ids: [ad_account_id],
+        business_manager_db_id: null,
+        account_id_map: { [actId]: ad_account_id },
+      });
+    } catch (e) {
+      console.warn("rate-limit persist failed (limits):", e);
+    }
+
     const safeFieldsError = !res.ok || body?.error
       ? (body?.error?.message || `Meta returned ${res.status}`)
       : null;
