@@ -19,12 +19,53 @@ let metaProxyCount = 0;
 let metaDirectCount = 0;
 const metaProxyFailReasons: string[] = [];
 
+// Last captured rate-limit headers from any Meta response in this invocation
+export interface MetaRateLimitSnapshot {
+  app?: { call_count?: number; total_cputime?: number; total_time?: number };
+  account?: {
+    acc_id_util_pct?: number;
+    reset_time_duration?: number;
+    ads_api_access_tier?: string;
+  };
+  buc?: Record<string, Array<{
+    type?: string;
+    call_count?: number;
+    total_cputime?: number;
+    total_time?: number;
+    estimated_time_to_regain_access?: number;
+  }>>;
+}
+let lastRateLimit: MetaRateLimitSnapshot = {};
+
+export function getLastRateLimitHeaders(): MetaRateLimitSnapshot {
+  return lastRateLimit;
+}
+
+function safeParseJson(s: string | null): any {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+function captureRateLimitHeaders(headers: Headers) {
+  const app = safeParseJson(headers.get("x-app-usage") || headers.get("X-App-Usage"));
+  const account = safeParseJson(headers.get("x-ad-account-usage") || headers.get("X-Ad-Account-Usage"));
+  const buc = safeParseJson(headers.get("x-business-use-case-usage") || headers.get("X-Business-Use-Case-Usage"));
+  if (app || account || buc) {
+    lastRateLimit = {
+      ...(app ? { app } : {}),
+      ...(account ? { account } : {}),
+      ...(buc ? { buc } : {}),
+    };
+  }
+}
+
 export function resetMetaCounters() {
   lastMetaVia = "direct";
   lastMetaIp = null;
   metaProxyCount = 0;
   metaDirectCount = 0;
   metaProxyFailReasons.length = 0;
+  lastRateLimit = {};
 }
 
 export function getLastMetaVia() {
@@ -173,6 +214,7 @@ export async function metaFetch(
       if (!shouldFallback) {
         lastMetaVia = "proxy";
         metaProxyCount += 1;
+        captureRateLimitHeaders(proxyRes.headers);
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers,
@@ -214,5 +256,7 @@ export async function metaFetch(
 
   lastMetaVia = "direct";
   metaDirectCount += 1;
-  return fetch(url, fetchOptions);
+  const directRes = await fetch(url, fetchOptions);
+  try { captureRateLimitHeaders(directRes.headers); } catch { /* ignore */ }
+  return directRes;
 }

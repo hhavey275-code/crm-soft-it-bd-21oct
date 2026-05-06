@@ -8,6 +8,7 @@ import {
   getMetaDirectCount,
   getMetaProxyFailReasons,
 } from "../_shared/meta-fetch.ts";
+import { persistMetaRateLimits } from "../_shared/persist-rate-limits.ts";
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
   try {
@@ -1000,6 +1001,17 @@ Deno.serve(async (req)=>{
         if (i >= tasks.length) return;
         const task = tasks[i];
         const results = await processAccountsBatched(task.accs, task.token, date, date_from, date_to);
+        // Persist rate-limit headers from this batch (per-account + per-BM)
+        try {
+          const accountDbIds = task.accs.map((a: any) => a.id);
+          const bmId = task.accs[0]?.business_manager_id ?? null;
+          await persistMetaRateLimits(supabase, {
+            ad_account_db_ids: accountDbIds,
+            business_manager_db_id: bmId,
+          });
+        } catch (e) {
+          console.warn("rate-limit persist failed:", e);
+        }
         for (const result of results) {
           insights[result.id] = result.insight;
           if (result.rateLimit) { rateLimited.push(result.rateLimit); hitRateLimit = true; }
