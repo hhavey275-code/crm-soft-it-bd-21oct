@@ -775,6 +775,7 @@ export function ClientAdAccounts() {
                         <div className="flex flex-col items-end gap-1">
                           <StatusBadge status={a.status} />
                           <InactiveBadge lastSpendDate={(ins as any)?.last_spend_date} fallbackDate={a.created_at} />
+                          <HoldBadge accountId={a.id} compact />
                           <RateLimitBadge accountId={a.id} compact />
                         </div>
                       </div>
