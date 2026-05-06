@@ -277,10 +277,12 @@ export async function metaFetch(
         lastMetaVia = "proxy";
         metaProxyCount += 1;
         captureRateLimitHeaders(proxyRes.headers);
-        return new Response(text, {
+        const finalRes = new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers,
         });
+        try { await recordCall(url, finalRes.clone()); } catch { /* ignore */ }
+        return finalRes;
       }
 
       if (looksLikeHtml) recordProxyFail(`proxy_html(status=${proxyRes.status})`);
