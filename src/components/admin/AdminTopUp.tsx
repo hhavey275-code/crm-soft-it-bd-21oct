@@ -252,8 +252,8 @@ export function AdminTopUp() {
   });
 
   const filtered = requests?.filter((r: any) => {
-    // Date range filter (applies to all tabs except bank_sms which has its own data)
-    if (statusFilter !== "bank_sms" && dateRange?.from) {
+    // Date range filter — skip for actionable tabs (pending/hold) so old items remain visible
+    if (statusFilter !== "bank_sms" && statusFilter !== "hold" && statusFilter !== "pending" && dateRange?.from) {
       const from = startOfDay(dateRange.from);
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
       const ts = new Date(r.created_at).getTime();
