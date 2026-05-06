@@ -244,6 +244,16 @@ Deno.serve(async (req) => {
       details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? "Wallet credited" : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
     });
 
+    // Persist rate-limit headers + per-call log captured during this invocation
+    try {
+      const { persistMetaRateLimits } = await import("../_shared/persist-rate-limits.ts");
+      await persistMetaRateLimits(supabase, {
+        ad_account_db_ids: [ad_account_id],
+        business_manager_db_id: (account as any).business_manager_id ?? null,
+        account_id_map: { [actId]: ad_account_id },
+      });
+    } catch (e) { console.warn("rate-limit persist failed (spend-cap-withdraw):", e); }
+
     return json({
       success: true,
       old_spend_cap: currentSpendCap,
