@@ -1,51 +1,116 @@
-## Goals
+# Multi-App Rate Limit Strategy — Architecture Plan
 
-1. **Seller Dashboard** (`/dashboard` — seller role): replace the current "Month-by-Month Due / Advance" list card with the admin-style **Month View toggle + month picker** (matches 2nd screenshot).
-2. **Excel exports**: split into two separate buttons everywhere — **Monthly Excel** (colorful styled, per-month sheets) and **Excel / Total** (all columns, full ledger). Apply on both seller dashboard and admin seller view.
-
----
-
-## Changes
-
-### 1. `src/components/seller/SellerDashboard.tsx`
-
-- Remove `<MonthlyDueAdvanceCard />` (line 371) and its import.
-- Add state: `monthView: boolean`, `activeBucket: {year, month}`.
-- Build `availableMonths` from `transactions` (newest first, like admin).
-- Add a toolbar above the summary cards:
-  - `Button` "Month View: ON/OFF" (toggles `monthView`).
-  - `Select` listing `availableMonths` (uses `monthLabel`).
-  - When ON, show small "Opening" + "Current Due/Adv" pills (read-only — no Close Month for sellers).
-- Apply month filter to `filtered` when `monthView` is ON (`isSameMonth(getMonthBucket(t.created_at), activeBucket)`).
-- Compute `displayDueAdvance`:
-  - All-time: existing `dueAdvance` from full ledger.
-  - Month view: opening (carry-forward via `computeLedgerBalanceBefore`) + month delta (via `aggregateMonth`).
-- Replace single Excel button with two buttons in the header action group:
-  - **Excel** → existing `exportToExcel` extended to include ALL columns (Date, Month, Type, Status, Transaction ID, BDT, USDT, Rate, Converted BDT, Bank, Account Name, Change BDT, Due/Advance BDT, Description, Proof URL, Not Calculated Reason).
-  - **Monthly Excel** → opens dialog (reuse the column-picker pattern), produces per-month sheets using the colorful styled layout currently in `AdminSellers.exportToExcel` (yellow opening row, red totals, blue header, final balance cell).
-
-### 2. `src/components/admin/AdminSellers.tsx`
-
-- **Excel button** (`exportToExcel`, line 956–1150): keep colorful design, but move that colorful design into `exportMonthlyToExcel` (per-month sheets). Replace the `Excel` button handler with a "all columns, all months in one sheet" exporter (same column set as the dialog's `ALL_EXPORT_COLS`, no column picker — just dump everything).
-- **Monthly Excel button** (`exportMonthlyToExcel`, line 870–947): rewrite so each month sheet uses the **colorful styled layout** (header row with blue + yellow Final cell, yellow opening row, red totals, running Due/Adv column) — one sheet per month. Keep the existing dialog (month picker + "all months" checkbox) but drop the column-selection grid (colorful layout has fixed columns). Optionally keep "all months" checkbox.
-- Remove the `MonthlyDueAdvanceCard` from seller dashboard only — admin already uses month view toolbar, no change needed there.
-
-### 3. `src/components/seller/MonthlyDueAdvanceCard.tsx`
-
-- File becomes unused after step 1. Leave file in place (no deletion needed) or remove if confirmed safe.
+Eta ekhon **shudhu plan**, code change na. Future e jokhon rate limit problem hobe, tokhon implement korbo.
 
 ---
 
-## Technical notes
+## 1. Meta Rate Limit kivabe count hoy (summary)
 
-- Reuse helpers from `src/lib/sellerMonthlyClose.ts` (`getMonthBucket`, `monthLabel`, `filterMonth`, `aggregateMonth`, `computeLedgerBalanceBefore`, `computeRunningWithOpening`, `sortSellerTxnsAsc`) — already used by `AdminSellers`.
-- Use `xlsx-js-style` (`XLSXStyle`) for the colorful Monthly export — same import already present in `AdminSellers.tsx`.
-- Seller does NOT get Close/Reopen/Recalc buttons — Month View is read-only for them.
-- Both Excel buttons respect existing filters (type/bank/date) only on the **Total** export; Monthly export iterates raw transactions per bucket regardless of filters (consistent with current admin behavior).
+Meta'r BUC (Business Use Case) limit **3 layer** e count hoy:
 
-## What the user will see
+| Layer | Scope | Multi-app diye bypass hoy? |
+|---|---|---|
+| **App-level** | Per App ID per user | ✅ Haan — different app = different bucket |
+| **Ad Account-level** | Per ad account (call_count, cputime, total_time) | ❌ Na — same account same bucket |
+| **BM-level** | Puro Business Manager | ❌ Na — same BM same bucket |
 
-- **Seller Dashboard** (mobile, matches screenshot 2): toolbar `[ Month View: OFF ] [ May 2026 ▾ ]` directly above the Due hero card. Old "Month-by-Month" stacked card is gone.
-- **Header buttons**: `[Excel]` `[Monthly Excel]` `[Submit USDT]`.
-- **Excel** → one workbook, every column, full ledger.
-- **Monthly Excel** → colorful sheet per month with the design from the user's screenshot (header blue, Final balance yellow cell, totals red, opening yellow row).
+**Mul kotha:** Multi-app strategy **app-level throttling** solve kore, account/BM level e kichu kore na.
+
+---
+
+## 2. Tomar setup e ki hobe
+
+```text
+System User (1)
+   ├── App A (token A)  ─┐
+   ├── App B (token B)  ─┼── 100 ad accounts (same BM)
+   └── App C (token C)  ─┘
+```
+
+- **App A** diye account X call → A bucket ↑, X bucket ↑, BM bucket ↑
+- **App B** diye same account X call → B bucket ↑ (fresh!), X bucket ↑ (same), BM bucket ↑ (same)
+
+**Net effect:** App-level e 3x headroom, account-level e 0x gain.
+
+---
+
+## 3. Same BM e multiple system user na hole ki kora?
+
+Eta common problem. Solution:
+
+- **1 system user + multiple app token** — eta pura allowed
+- BM Settings → System Users → select user → **Add Assets → Apps** → multiple app assign
+- Protek app er jonno alada token generate kora jaay (different scope/expiry)
+- Mane: 1 system user identity, kintu 3-5 ta app token hand e
+
+---
+
+## 4. Proposed Architecture (jokhon implement korbo)
+
+### 4.1 Database changes
+
+`business_managers` table e ekhon `access_token` (single) ache. Notun structure:
+
+```text
+business_manager_app_tokens
+├── id
+├── business_manager_id  (FK)
+├── app_id               (Meta App ID)
+├── app_label            ("Primary", "Backup-1", etc.)
+├── access_token         (encrypted, like ekhon)
+├── is_active            (boolean)
+├── priority             (int — lower = preferred)
+├── last_used_at         (timestamptz)
+└── disabled_until       (timestamptz, null — set when 429 hit)
+```
+
+Backward compat: existing `business_managers.access_token` ke "default app token" hisebe migrate kora hobe.
+
+### 4.2 App selection logic (in `metaFetch` / `chunkedMetaSync`)
+
+```text
+function pickAppToken(bmId):
+  candidates = tokens where bm_id=bmId AND is_active
+                              AND (disabled_until IS NULL OR disabled_until < now())
+  if empty: fallback to legacy bm.access_token
+  sort by priority ASC, last_used_at ASC  (least-recently-used)
+  return first
+```
+
+### 4.3 429 / rate-limit handling
+
+Meta response headers parse korte hobe:
+- `X-Business-Use-Case-Usage` → JSON with `call_count`, `total_cputime`, `total_time`, `estimated_time_to_regain_access`
+- Jodi kono metric > 90% → oi token er `disabled_until = now() + estimated_time_to_regain_access`
+- Pore automatically next app token use hobe
+
+### 4.4 UI (Admin → Business Managers page)
+
+- Existing BM card e "Manage App Tokens" button
+- Dialog e: list of tokens, add new, mark active/inactive, see last_used_at + disabled_until
+- Health badge: 🟢 healthy, 🟡 throttled (X min remaining), 🔴 disabled
+
+---
+
+## 5. Limitations (clearly communicate)
+
+Multi-app **j gulo solve kore na**:
+
+1. **Account-level block** — ekta account e too many calls → oi account 1 hour block, kono app diyei call jabe na. Solution: caching, polling frequency reduce, batch calls.
+2. **BM-level throttle** — entire BM slow. Solution: BM split (different accounts → different BMs), but eta business decision.
+3. **Spend cap update / write operations** — eta sensitive, multi-app rotation FB suspicious dekhte pare. Write call gulo single "primary" app diye rakha better.
+
+---
+
+## 6. Recommended action priority (jokhon problem hobe)
+
+1. **First:** Reduce call frequency (already chunked sync ache, tar interval barano)
+2. **Second:** Implement multi-app rotation (ei plan)
+3. **Third:** Account-level caching/throttling (per-account cooldown after heavy fetch)
+4. **Last resort:** BM split
+
+---
+
+## 7. Akhon ki korte hobe?
+
+**Kichui na.** Ei plan reference er jonno — jokhon "User request limit reached" error dekha jabe regularly, tokhon ei plan theke implement korbo. Tokhon notun chat e bolba "multi-app rotation implement koro" — ei plan apply hobe.
