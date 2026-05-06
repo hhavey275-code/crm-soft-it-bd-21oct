@@ -216,8 +216,12 @@ Deno.serve(async (req) => {
     if (seller_transaction_id) {
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
       if (!claimed) {
-        // Self-heal: if the slot already has a message_id, the Telegram send
-        // really happened — only the seller_transactions flag was missed.
+        // Slot already exists. STRICT no-resend policy — never auto-release
+        // and re-claim, because that path produced duplicate Telegram sends
+        // when two invocations raced (the loser would release the winner's
+        // in-flight slot and resend). If the slot is stuck without a
+        // message_id, an admin must explicitly clear it via the manual
+        // "Resend" tool, which deletes the row first.
         const { data: slot } = await supabase
           .from('telegram_forward_log')
           .select('telegram_message_id')
@@ -243,16 +247,11 @@ Deno.serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-        // Slot reserved but never sent — release and retry once.
-        await releaseForwardSlot(supabase, sourceType, seller_transaction_id);
-        const reclaimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
-        if (!reclaimed) {
-          console.log(`forward-seller-proof: slot already claimed for ${seller_transaction_id}, skipping`);
-          return new Response(
-            JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-          );
-        }
+        console.log(`forward-seller-proof: slot already claimed for ${seller_transaction_id}, skipping (strict dedupe)`);
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, reason: 'already_claimed_strict' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
       }
     }
 
