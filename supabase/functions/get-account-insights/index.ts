@@ -7,6 +7,7 @@ import {
   getMetaProxyCount,
   getMetaDirectCount,
   getMetaProxyFailReasons,
+  pushBatchCallLog,
 } from "../_shared/meta-fetch.ts";
 import { persistMetaRateLimits } from "../_shared/persist-rate-limits.ts";
 async function decryptToken(stored, secret) {
@@ -339,12 +340,42 @@ async function processAccountsBatched(
     batchResults = await metaBatchGet(accessToken, allSubUrls);
   } catch (err: any) {
     // Whole batch failed (network/proxy). Return syncError per account.
+    try {
+      pushBatchCallLog(
+        accountsInBatch.map((a) => a.account_id),
+        0,
+        Object.fromEntries(accountsInBatch.map((a) => [a.account_id, { message: String(err?.message || err) }])),
+        "batch:insights",
+      );
+    } catch { /* ignore */ }
     return accountsInBatch.map((acc) => ({
       id: acc.id,
       insight: { ...EMPTY_INSIGHT },
       syncError: String(err?.message || err || "batch fetch failed")
     }));
   }
+  // Attribute one logical call per account in this batch (so per-account
+  // counters in the UI reflect work done against that act_xxx).
+  try {
+    const perAccountErr: Record<string, any> = {};
+    for (let i = 0; i < accountsInBatch.length; i++) {
+      const slice = batchResults.slice(offsets[i], offsets[i] + builds[i].subUrls.length);
+      const firstErr = slice.find((s: any) => s?.error || s?.__batch_error);
+      if (firstErr?.error) {
+        perAccountErr[accountsInBatch[i].account_id] = {
+          code: firstErr.error.code ?? null,
+          subcode: firstErr.error.error_subcode ?? null,
+          message: firstErr.error.message ?? null,
+        };
+      }
+    }
+    pushBatchCallLog(
+      accountsInBatch.map((a) => a.account_id),
+      200,
+      perAccountErr,
+      "batch:insights",
+    );
+  } catch { /* ignore */ }
   const out: any[] = [];
   for (let i = 0; i < accountsInBatch.length; i++) {
     try {

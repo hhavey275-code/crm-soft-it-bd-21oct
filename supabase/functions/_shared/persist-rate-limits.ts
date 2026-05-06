@@ -13,11 +13,12 @@ interface PersistOptions {
 // Standard tier: 9000 + 100 * active_ads, Dev tier: 60 + 300 * active_ads (cap ~9000).
 function estimateCallLimit(tier: string | null | undefined, activeAds: number): number {
   const ads = Math.max(0, activeAds || 0);
-  if ((tier ?? "").toLowerCase().includes("standard")) {
-    return 9000 + 100 * ads;
-  }
-  // default to development tier (more conservative)
-  return Math.min(9000, 60 + 300 * ads);
+  const t = (tier ?? "").toLowerCase();
+  if (t.includes("standard")) return 9000 + 100 * ads;
+  if (t.includes("dev") || t.includes("development")) return Math.min(9000, 60 + 300 * ads);
+  // Tier unknown — default to a generous Standard-tier baseline so the UI
+  // shows a meaningful "X / 9000" rather than "X / 60".
+  return 9000 + 100 * ads;
 }
 
 export async function persistMetaRateLimits(supabase: any, opts: PersistOptions) {
@@ -48,17 +49,18 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
     clearMetaCallLog();
   }
 
-  if (!snap || (!snap.app && !snap.account && !snap.buc)) return;
+// (We intentionally do NOT early-return when no headers were captured —
+  //  callers still want a per-account row so the UI shows current call counts.)
 
-  // 1) Per-account snapshot (X-Ad-Account-Usage). Same value applied to every
-  //    account in this batch since Meta returns one header for the whole call.
-  if (snap.account && Array.isArray(opts.ad_account_db_ids) && opts.ad_account_db_ids.length > 0) {
-    // Pick the first BUC entry for additional metrics if present
+  // 1) Per-account snapshot. We always upsert when caller provided
+  //    ad_account_db_ids (so the X/Limit badge has a row to read), even if
+  //    Meta didn't echo X-Ad-Account-Usage on this batch.
+  if (Array.isArray(opts.ad_account_db_ids) && opts.ad_account_db_ids.length > 0) {
     let bucCall: number | undefined;
     let bucCpu: number | undefined;
     let bucTime: number | undefined;
     let bucRegain: number | undefined;
-    if (snap.buc) {
+    if (snap?.buc) {
       const firstKey = Object.keys(snap.buc)[0];
       const firstEntry = firstKey ? snap.buc[firstKey]?.[0] : undefined;
       if (firstEntry) {
@@ -68,12 +70,12 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
         bucRegain = firstEntry.estimated_time_to_regain_access;
       }
     }
-    const tier = snap.account?.ads_api_access_tier ?? null;
+    const tier = snap?.account?.ads_api_access_tier ?? null;
     const estLimit = estimateCallLimit(tier, 0);
     const rows = opts.ad_account_db_ids.map((id) => ({
       ad_account_id: id,
-      acc_util_pct: snap.account?.acc_id_util_pct ?? null,
-      reset_seconds: snap.account?.reset_time_duration ?? null,
+      acc_util_pct: snap?.account?.acc_id_util_pct ?? null,
+      reset_seconds: snap?.account?.reset_time_duration ?? null,
       access_tier: tier,
       estimated_call_limit: estLimit,
       buc_call_count: bucCall ?? null,
@@ -83,7 +85,6 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
       updated_at: now,
     }));
     try {
-      // Upsert in chunks of 50
       for (let i = 0; i < rows.length; i += 50) {
         await supabase
           .from("ad_account_rate_limits")

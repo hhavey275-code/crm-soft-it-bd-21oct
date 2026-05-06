@@ -58,6 +58,32 @@ export function clearMetaCallLog() {
   callLog.length = 0;
 }
 
+/**
+ * Push synthetic per-account call entries — used for batched Meta calls
+ * (POST /v23.0/ batch) where the outer URL has no act_xxx, so recordCall()
+ * can't attribute the call to specific ad accounts.
+ */
+export function pushBatchCallLog(
+  accountActIds: string[],
+  statusCode: number,
+  perAccountError?: Record<string, { code?: number | null; subcode?: number | null; message?: string | null }>,
+  endpoint = "batch",
+) {
+  const now = new Date().toISOString();
+  for (const actId of accountActIds) {
+    const err = perAccountError?.[actId];
+    callLog.push({
+      account_id: actId,
+      endpoint,
+      status_code: statusCode,
+      error_code: err?.code ?? null,
+      error_subcode: err?.subcode ?? null,
+      error_message: err?.message ?? null,
+      called_at: now,
+    });
+  }
+}
+
 export function getLastRateLimitHeaders(): MetaRateLimitSnapshot {
   return lastRateLimit;
 }
