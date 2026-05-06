@@ -8,6 +8,7 @@ import {
   getMetaDirectCount,
   getMetaProxyFailReasons,
 } from "../_shared/meta-fetch.ts";
+import { persistMetaRateLimits } from "../_shared/persist-rate-limits.ts";
 async function decryptToken(stored, secret) {
   if (!stored.startsWith("enc:")) return stored;
   try {
