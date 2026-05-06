@@ -7,6 +7,7 @@ import {
   getMetaProxyCount,
   getMetaDirectCount,
   getMetaProxyFailReasons,
+  pushBatchCallLog,
 } from "../_shared/meta-fetch.ts";
 import { persistMetaRateLimits } from "../_shared/persist-rate-limits.ts";
 async function decryptToken(stored, secret) {
