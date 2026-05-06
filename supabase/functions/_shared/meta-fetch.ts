@@ -37,8 +37,69 @@ export interface MetaRateLimitSnapshot {
 }
 let lastRateLimit: MetaRateLimitSnapshot = {};
 
+// Per-invocation call log. Pushed by metaFetch on every call.
+export interface MetaCallLogEntry {
+  account_id?: string | null;     // raw act_xxx (from URL)
+  ad_account_db_id?: string | null; // ad_accounts.id (uuid) — set later via mapping
+  endpoint: string;
+  status_code: number;
+  error_code: number | null;
+  error_subcode: number | null;
+  error_message: string | null;
+  called_at: string;
+}
+const callLog: MetaCallLogEntry[] = [];
+
+export function getMetaCallLog(): MetaCallLogEntry[] {
+  return callLog;
+}
+
+export function clearMetaCallLog() {
+  callLog.length = 0;
+}
+
 export function getLastRateLimitHeaders(): MetaRateLimitSnapshot {
   return lastRateLimit;
+}
+
+// Extract act_xxx id from a Graph API URL
+function extractAccountId(url: string): string | null {
+  const m = url.match(/graph\.facebook\.com\/v[\d.]+\/(act_\d+)/);
+  return m ? m[1] : null;
+}
+
+// Extract logical endpoint (after the act_ id, or after version) for grouping
+function extractEndpoint(url: string): string {
+  // Strip query string and host
+  const path = url.split("?")[0].replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "");
+  // Replace numeric ids with placeholder for grouping
+  return path.replace(/act_\d+/, "act_*").replace(/\d{6,}/g, "*");
+}
+
+async function recordCall(url: string, res: Response): Promise<void> {
+  let errCode: number | null = null;
+  let errSub: number | null = null;
+  let errMsg: string | null = null;
+  if (!res.ok || res.status >= 400) {
+    try {
+      const cloned = res.clone();
+      const body = await cloned.json();
+      if (body?.error) {
+        errCode = body.error.code ?? null;
+        errSub = body.error.error_subcode ?? null;
+        errMsg = body.error.message ?? null;
+      }
+    } catch { /* ignore */ }
+  }
+  callLog.push({
+    account_id: extractAccountId(url),
+    endpoint: extractEndpoint(url),
+    status_code: res.status,
+    error_code: errCode,
+    error_subcode: errSub,
+    error_message: errMsg,
+    called_at: new Date().toISOString(),
+  });
 }
 
 function safeParseJson(s: string | null): any {
