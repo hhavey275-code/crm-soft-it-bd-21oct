@@ -49,7 +49,8 @@ export async function persistMetaRateLimits(supabase: any, opts: PersistOptions)
     clearMetaCallLog();
   }
 
-  if (!snap || (!snap.app && !snap.account && !snap.buc)) return;
+// (We intentionally do NOT early-return when no headers were captured —
+  //  callers still want a per-account row so the UI shows current call counts.)
 
   // 1) Per-account snapshot. We always upsert when caller provided
   //    ad_account_db_ids (so the X/Limit badge has a row to read), even if
