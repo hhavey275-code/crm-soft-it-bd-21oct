@@ -214,6 +214,7 @@ export async function metaFetch(
       if (!shouldFallback) {
         lastMetaVia = "proxy";
         metaProxyCount += 1;
+        captureRateLimitHeaders(proxyRes.headers);
         return new Response(text, {
           status: proxyRes.status,
           headers: proxyRes.headers,
