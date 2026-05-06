@@ -253,7 +253,7 @@ export function AdminTopUp() {
 
   const filtered = requests?.filter((r: any) => {
     // Date range filter — skip for actionable tabs (pending/hold) so old items remain visible
-    if (statusFilter !== "bank_sms" && statusFilter !== "hold" && statusFilter !== "pending" && dateRange?.from) {
+    if (statusFilter !== "bank_sms" && statusFilter !== "hold" && statusFilter !== "pending" && statusFilter !== "rejected" && dateRange?.from) {
       const from = startOfDay(dateRange.from);
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
       const ts = new Date(r.created_at).getTime();
@@ -398,7 +398,7 @@ export function AdminTopUp() {
             .from("tenant_payments")
             .update(updateData)
             .eq("id", id)
-            .eq("status", "pending")
+            .in("status", ["pending", "hold"])
             .select("id");
           if (updateError) throw updateError;
           if (!updatedRows?.length) {
@@ -525,7 +525,7 @@ export function AdminTopUp() {
         .from("top_up_requests")
         .update(updateData)
         .eq("id", id)
-        .eq("status", "pending")
+        .in("status", ["pending", "hold"])
         .select("id");
       if (updateError) throw updateError;
       if (!updatedRows?.length) {
