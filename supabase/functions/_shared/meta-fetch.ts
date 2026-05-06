@@ -322,5 +322,6 @@ export async function metaFetch(
   metaDirectCount += 1;
   const directRes = await fetch(url, fetchOptions);
   try { captureRateLimitHeaders(directRes.headers); } catch { /* ignore */ }
+  try { await recordCall(url, directRes.clone()); } catch { /* ignore */ }
   return directRes;
 }
