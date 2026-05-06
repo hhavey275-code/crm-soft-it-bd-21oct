@@ -525,7 +525,7 @@ export function AdminTopUp() {
         .from("top_up_requests")
         .update(updateData)
         .eq("id", id)
-        .eq("status", "pending")
+        .in("status", ["pending", "hold"])
         .select("id");
       if (updateError) throw updateError;
       if (!updatedRows?.length) {
