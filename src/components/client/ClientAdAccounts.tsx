@@ -949,7 +949,7 @@ export function ClientAdAccounts() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
-                      <TableCell><StatusBadge status={a.status} /></TableCell>
+                      <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><RateLimitBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
                           {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
