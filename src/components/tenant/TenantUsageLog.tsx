@@ -5,11 +5,57 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
-import { Activity, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type RowKind = {
+  label: string;
+  sign: 1 | -1 | 0;
+  badgeClass: string;
+  amountClass: string;
+  Icon?: typeof TrendingDown;
+};
+
+function classifyRow(action: string | null | undefined, source: string | null | undefined): RowKind {
+  const a = (action || "").toLowerCase();
+  const s = (source || "").toLowerCase();
+
+  if (a === "report-usage" || a === "usage_topup") {
+    return {
+      label: "Consumed",
+      sign: -1,
+      badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+      amountClass: "text-destructive",
+      Icon: TrendingDown,
+    };
+  }
+  if (a === "refund-usage" || a === "usage_refund") {
+    return {
+      label: "Refunded",
+      sign: 1,
+      badgeClass: "bg-green-500/10 text-green-600 border-green-500/20",
+      amountClass: "text-green-600",
+      Icon: TrendingUp,
+    };
+  }
+  if (s.includes("reconcile") || s.includes("master_sync") || s.includes("master:reconcile")) {
+    return {
+      label: "Master Sync",
+      sign: 0,
+      badgeClass: "bg-muted text-muted-foreground border-border",
+      amountClass: "text-muted-foreground",
+    };
+  }
+  // fallback
+  return {
+    label: action || source || "—",
+    sign: 0,
+    badgeClass: "bg-muted text-muted-foreground border-border",
+    amountClass: "text-muted-foreground",
+  };
+}
+
 export function TenantUsageLog() {
-  // License snapshot from site_settings (local cached values from heartbeat)
   const { data: licenseData, refetch: refetchLicense } = useQuery({
     queryKey: ["license-data-usage-log"],
     queryFn: async () => {
@@ -29,7 +75,6 @@ export function TenantUsageLog() {
   const masterUrl = licenseData?.master_url;
   const tenantApiKey = licenseData?.tenant_api_key;
 
-  // Live master snapshot
   const { data: masterSnapshot, refetch: refetchMaster, isFetching: masterFetching } = useQuery({
     queryKey: ["master-usage-snapshot"],
     queryFn: async () => {
@@ -50,7 +95,6 @@ export function TenantUsageLog() {
   const drift = masterTotalUsed - localTotalUsed;
   const hasDrift = Math.abs(drift) > 0.01;
 
-  // Audit rows
   const { data: auditRows, refetch: refetchAudit, isFetching: auditFetching } = useQuery({
     queryKey: ["tenant-usage-audit"],
     queryFn: async () => {
@@ -70,6 +114,9 @@ export function TenantUsageLog() {
     refetchMaster();
     refetchAudit();
   };
+
+  const fmt = (n: number) =>
+    `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -93,7 +140,7 @@ export function TenantUsageLog() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs">Local Total Used</CardDescription>
-            <CardTitle className="text-xl sm:text-2xl">${localTotalUsed.toLocaleString()}</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">{fmt(localTotalUsed)}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">Tenant DB cached value</p>
@@ -102,7 +149,7 @@ export function TenantUsageLog() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs">Master Total Used</CardDescription>
-            <CardTitle className="text-xl sm:text-2xl">${masterTotalUsed.toLocaleString()}</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">{fmt(masterTotalUsed)}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">Live from master heartbeat</p>
@@ -115,7 +162,7 @@ export function TenantUsageLog() {
               Drift (Master - Local)
             </CardDescription>
             <CardTitle className={`text-xl sm:text-2xl ${hasDrift ? "text-destructive" : "text-green-500"}`}>
-              {drift > 0 ? "+" : ""}${drift.toFixed(2)}
+              {drift > 0 ? "+" : ""}{fmt(drift)}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -133,13 +180,13 @@ export function TenantUsageLog() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2 justify-between text-xs sm:text-sm">
-            <span>Used: ${localTotalUsed.toLocaleString()}</span>
-            <span>Limit: ${systemLimit.toLocaleString()}</span>
+            <span>Used: {fmt(localTotalUsed)}</span>
+            <span>Limit: {fmt(systemLimit)}</span>
           </div>
           <Progress value={Math.min(usagePercent, 100)} className="h-3" />
           <div className="flex flex-wrap gap-2 justify-between">
             <Badge variant={remaining > 0 ? "default" : "destructive"}>
-              Remaining: ${remaining.toLocaleString()}
+              Remaining: {fmt(remaining)}
             </Badge>
             <span className="text-xs text-muted-foreground">{usagePercent.toFixed(1)}% used</span>
           </div>
@@ -151,42 +198,64 @@ export function TenantUsageLog() {
         <CardHeader>
           <CardTitle className="text-sm sm:text-base">Detailed Audit Log</CardTitle>
           <CardDescription className="text-xs">
-            Last 200 entries. Each row = ekta usage report Master ke pathano hoyeche.
+            Last 200 entries. Limit theke ki kombe / ferot eseche dekha jay.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
           {/* Mobile cards */}
-          <div className="sm:hidden space-y-2 px-3">
-            {(auditRows || []).map((row: any) => (
-              <div key={row.id} className="border rounded-lg p-3 text-xs space-y-1">
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</span>
-                  <div className="flex gap-1 flex-wrap justify-end">
-                    {row.master_duplicate && <Badge variant="secondary" className="text-[9px]">DUP</Badge>}
-                    {row.error_message && <Badge variant="destructive" className="text-[9px]">ERR</Badge>}
-                    {row.response_status && row.response_status >= 200 && row.response_status < 300 && !row.error_message && (
+          <div className="sm:hidden space-y-3 px-3">
+            {(auditRows || []).map((row: any) => {
+              const kind = classifyRow(row.action, row.source);
+              const amt = Number(row.amount || 0);
+              const localAfter = Number(row.local_total_used_after ?? 0);
+              const rowRemaining = systemLimit - localAfter;
+              const sign = kind.sign;
+              const signStr = sign === -1 ? "−" : sign === 1 ? "+" : "";
+              return (
+                <div key={row.id} className="border rounded-lg p-3 space-y-2 bg-card">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${kind.badgeClass} flex items-center gap-1`}>
+                      {kind.Icon && <kind.Icon className="h-3 w-3" />}
+                      {kind.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {format(new Date(row.created_at), "dd MMM HH:mm")}
+                    </span>
+                  </div>
+                  <div className={`text-lg font-bold ${kind.amountClass}`}>
+                    {signStr}{fmt(amt)}
+                  </div>
+                  <div className="border-t pt-2 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">System Limit</span>
+                      <span className="font-medium">{fmt(systemLimit)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Remaining</span>
+                      <span className={`font-medium ${rowRemaining < 0 ? "text-destructive" : rowRemaining < systemLimit * 0.2 ? "text-yellow-600" : "text-foreground"}`}>
+                        {fmt(rowRemaining)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {row.master_duplicate && <Badge variant="secondary" className="text-[9px]">duplicate</Badge>}
+                    {row.error_message ? (
+                      <Badge variant="destructive" className="text-[9px]" title={row.error_message}>error</Badge>
+                    ) : row.response_status ? (
                       <Badge variant="outline" className="text-[9px]">{row.response_status}</Badge>
-                    )}
+                    ) : null}
+                    <span className="text-[9px] text-muted-foreground ml-auto truncate max-w-[60%]" title={row.idempotency_key || ""}>
+                      {row.source}
+                    </span>
                   </div>
+                  {row.error_message && (
+                    <div className="text-[10px] text-destructive truncate" title={row.error_message}>
+                      {row.error_message}
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">{row.source}</span>
-                  <span className={row.action === "refund-usage" ? "text-green-500" : ""}>
-                    {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
-                  </span>
-                </div>
-                <div className="text-[10px] text-muted-foreground truncate">key: {row.idempotency_key || "—"}</div>
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>Local: ${Number(row.local_total_used_before ?? 0).toFixed(0)} → ${Number(row.local_total_used_after ?? 0).toFixed(0)}</span>
-                  <span>Master: ${Number(row.master_total_used_after ?? 0).toFixed(0)}</span>
-                </div>
-                {row.error_message && (
-                  <div className="text-[10px] text-destructive truncate" title={row.error_message}>
-                    {row.error_message}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {(!auditRows || auditRows.length === 0) && (
               <p className="text-xs text-muted-foreground text-center py-6">Kono audit entry nei akhono.</p>
             )}
@@ -198,45 +267,44 @@ export function TenantUsageLog() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Time</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Action</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Local Before → After</TableHead>
-                  <TableHead className="text-right">Master After</TableHead>
-                  <TableHead>Idem Key</TableHead>
+                  <TableHead className="text-right">System Limit</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(auditRows || []).map((row: any) => {
-                  const localDelta = Number(row.local_total_used_after ?? 0) - Number(row.local_total_used_before ?? 0);
-                  const masterAfter = row.master_total_used_after !== null ? Number(row.master_total_used_after) : null;
+                  const kind = classifyRow(row.action, row.source);
+                  const amt = Number(row.amount || 0);
                   const localAfter = Number(row.local_total_used_after ?? 0);
-                  const rowDrift = masterAfter !== null ? masterAfter - localAfter : 0;
+                  const rowRemaining = systemLimit - localAfter;
+                  const sign = kind.sign;
+                  const signStr = sign === -1 ? "−" : sign === 1 ? "+" : "";
                   return (
                     <TableRow key={row.id} className={row.error_message ? "bg-destructive/5" : ""}>
-                      <TableCell className="text-xs whitespace-nowrap">{format(new Date(row.created_at), "dd MMM HH:mm:ss")}</TableCell>
-                      <TableCell className="text-xs">{row.source}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {format(new Date(row.created_at), "dd MMM HH:mm:ss")}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={row.action === "refund-usage" ? "secondary" : "outline"} className="text-[10px]">
-                          {row.action}
-                        </Badge>
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${kind.badgeClass} inline-flex items-center gap-1`}>
+                          {kind.Icon && <kind.Icon className="h-3 w-3" />}
+                          {kind.label}
+                        </span>
                       </TableCell>
-                      <TableCell className={`text-right font-medium ${row.action === "refund-usage" ? "text-green-500" : ""}`}>
-                        {row.action === "refund-usage" ? "-" : "+"}${Number(row.amount).toFixed(2)}
+                      <TableCell className={`text-right font-semibold ${kind.amountClass}`}>
+                        {signStr}{fmt(amt)}
                       </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        ${Number(row.local_total_used_before ?? 0).toFixed(0)} → ${localAfter.toFixed(0)}
-                        <span className="ml-1 text-[10px]">({localDelta >= 0 ? "+" : ""}{localDelta.toFixed(2)})</span>
+                      <TableCell className="text-right text-xs font-medium">
+                        {fmt(systemLimit)}
                       </TableCell>
-                      <TableCell className={`text-right text-xs ${Math.abs(rowDrift) > 0.01 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                        {masterAfter !== null ? `$${masterAfter.toFixed(0)}` : "—"}
-                        {Math.abs(rowDrift) > 0.01 && (
-                          <span className="ml-1 text-[10px]">(Δ {rowDrift > 0 ? "+" : ""}{rowDrift.toFixed(2)})</span>
-                        )}
+                      <TableCell className={`text-right text-xs font-medium ${rowRemaining < 0 ? "text-destructive" : rowRemaining < systemLimit * 0.2 ? "text-yellow-600" : ""}`}>
+                        {fmt(rowRemaining)}
                       </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate" title={row.idempotency_key || ""}>
-                        {row.idempotency_key || "—"}
+                      <TableCell className="text-[10px] text-muted-foreground max-w-[160px] truncate" title={row.idempotency_key || row.source || ""}>
+                        {row.source || "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
@@ -253,8 +321,8 @@ export function TenantUsageLog() {
                 })}
                 {(!auditRows || auditRows.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground text-sm py-8">
-                      Kono audit entry nei akhono. Notun spend cap update / retry hole ekhane dekha jabe.
+                    <TableCell colSpan={7} className="text-center text-muted-foreground text-sm py-8">
+                      Kono audit entry nei akhono.
                     </TableCell>
                   </TableRow>
                 )}
