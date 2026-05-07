@@ -692,9 +692,15 @@ export default function TenantDetailPage() {
                     <Activity className="h-4 w-4 text-primary" />
                     Limit Ledger ({ledger.length})
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
-                    <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" onClick={() => recalcMutation.mutate()} disabled={recalcMutation.isPending} title="Sob entry chronologically recalculate kore correct values bashabe">
+                      <RefreshCw className={cn("h-3 w-3 mr-1", recalcMutation.isPending && "animate-spin")} />
+                      Recalc
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
+                      <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
