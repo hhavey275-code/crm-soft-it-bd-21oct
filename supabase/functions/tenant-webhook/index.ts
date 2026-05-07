@@ -420,6 +420,27 @@ Deno.serve(async (req) => {
         const source = String(field("source") ?? "") || null;
         const meta = (field("meta") as any) ?? null;
 
+        // Guard: only count usage if ad account name is present in meta.
+        // If missing, ignore the call (treat as a separate sync/identification issue)
+        // so we never silently deduct/top-up "nameless" amounts.
+        const acctName = meta && typeof meta === "object"
+          ? String((meta as any).account_name ?? "").trim()
+          : "";
+        if (!isRefund && !acctName) {
+          await logSystem("report_usage_skipped_no_account_name", {
+            amount,
+            idempotency_key: idempotencyKey || null,
+            source,
+            meta,
+          });
+          return json({
+            success: true,
+            ok: true,
+            skipped: true,
+            reason: "missing meta.account_name — usage ignored",
+          });
+        }
+
         const { data: rpcData, error: rpcErr } = await supabase.rpc("apply_tenant_usage" as any, {
           p_tenant_id: tenant.id,
           p_amount: amount,
