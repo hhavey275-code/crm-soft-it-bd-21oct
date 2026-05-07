@@ -22,7 +22,8 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Copy, Ban, CheckCircle, Trash2, Landmark, Edit, DollarSign,
   CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, TrendingDown, Wallet, SlidersHorizontal,
-  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink, Filter, Download
+  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink, Filter, Download,
+  LayoutDashboard, Receipt, Info, ListChecks
 } from "lucide-react";
 
 export default function TenantDetailPage() {
@@ -528,105 +529,7 @@ export default function TenantDetailPage() {
           />
         </div>
 
-        {/* Live Stats Section — from tenant heartbeat */}
-        <Card className="border-border/60">
-          <CardHeader className="p-3 sm:p-4 pb-2">
-            <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                Live Tenant Stats
-                {tenant.stats_updated_at ? (
-                  <Badge variant="outline" className="text-[10px] gap-1">
-                    <Circle className={cn(
-                      "h-1.5 w-1.5 fill-current",
-                      Date.now() - new Date(tenant.stats_updated_at).getTime() < 10 * 60_000
-                        ? "text-green-500" : "text-amber-500"
-                    )} />
-                    {formatDistanceToNow(new Date(tenant.stats_updated_at), { addSuffix: true })}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="text-[10px]">No data yet</Badge>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="default"
-                className="h-7"
-                disabled={refreshStatsMutation.isPending}
-                onClick={() => refreshStatsMutation.mutate()}
-              >
-                <RefreshCw className={cn("h-3 w-3 mr-1", refreshStatsMutation.isPending && "animate-spin")} />
-                {refreshStatsMutation.isPending ? "Pulling…" : "Refresh Stats from Tenant"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            {!tenant.stats_updated_at ? (
-              <p className="text-xs text-muted-foreground py-2">
-                এখনো stats pull হয়নি। উপরের <strong>"Refresh Stats from Tenant"</strong> button চাপুন। Tenant এর own database থেকে aggregate করে আনবে — Meta API কে কোনো call হবে না।
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-                <MetricCard
-                  title="Ad Accounts"
-                  value={Number(tenant.stats_accounts_total || 0)}
-                  subtitle={`${tenant.stats_accounts_active || 0} active · ${tenant.stats_accounts_disabled || 0} disabled`}
-                  icon={MonitorSmartphone}
-                  iconBg="bg-blue-500/10"
-                  iconColor="text-blue-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-                <MetricCard
-                  title="Today Spend"
-                  value={`$${Number(tenant.stats_spend_today || 0).toLocaleString()}`}
-                  subtitle={`Yesterday $${Number(tenant.stats_spend_yesterday || 0).toLocaleString()}`}
-                  icon={TrendingUp}
-                  iconBg="bg-orange-500/10"
-                  iconColor="text-orange-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-                <MetricCard
-                  title="This Month Spend"
-                  value={`$${Number(tenant.stats_spend_month || 0).toLocaleString()}`}
-                  subtitle={`Lifetime $${Number(tenant.stats_spend_lifetime || 0).toLocaleString()}`}
-                  icon={BarChart3}
-                  iconBg="bg-violet-500/10"
-                  iconColor="text-violet-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-                <MetricCard
-                  title="Wallet Balance"
-                  value={`$${Number(tenant.stats_total_wallet || 0).toLocaleString()}`}
-                  subtitle="all clients combined"
-                  icon={Wallet}
-                  iconBg="bg-emerald-500/10"
-                  iconColor="text-emerald-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-                <MetricCard
-                  title="Total Clients"
-                  value={Number(tenant.stats_total_clients || 0)}
-                  subtitle={`${tenant.stats_active_clients_today || 0} active today`}
-                  icon={Users}
-                  iconBg="bg-cyan-500/10"
-                  iconColor="text-cyan-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-                <MetricCard
-                  title="Today Top-Ups"
-                  value={`$${Number(tenant.stats_topups_today_amount || 0).toLocaleString()}`}
-                  subtitle={`${tenant.stats_topups_today_count || 0} done · ${tenant.stats_topups_pending || 0} pending`}
-                  icon={ShoppingCart}
-                  iconBg="bg-pink-500/10"
-                  iconColor="text-pink-600"
-                  size={isMobile ? "xs" : "sm"}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Usage Progress (if limit-based) */}
+        {/* Live Tenant Stats removed per request */}
         {tenant.subscription_type === "subscription_with_limit" && (
           <Card>
             <CardContent className="p-3 sm:p-4">
@@ -673,15 +576,31 @@ export default function TenantDetailPage() {
 
         {/* Tabs - like ClientDetailPage */}
         <Tabs defaultValue="ledger">
-          <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
-            <TabsTrigger value="ledger" className={cn(isMobile && "text-xs flex-1")}>Ledger</TabsTrigger>
-            <TabsTrigger value="payments" className={cn(isMobile && "text-xs flex-1")}>Payments</TabsTrigger>
-            <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
-            <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
-            <TabsTrigger value="banks" className={cn(isMobile && "text-xs flex-1")}>Banks</TabsTrigger>
-            <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
-            <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
-          </TabsList>
+          <div className={cn(isMobile && "w-full overflow-x-auto -mx-1 px-1 scrollbar-hide")}>
+            <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-max min-w-full")}>
+              <TabsTrigger value="ledger" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Activity className="h-3.5 w-3.5 text-primary" /> Ledger
+              </TabsTrigger>
+              <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Info className="h-3.5 w-3.5 text-blue-500" /> Info
+              </TabsTrigger>
+              <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Landmark className="h-3.5 w-3.5 text-emerald-500" /> Banks
+              </TabsTrigger>
+              <TabsTrigger value="payments" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Receipt className="h-3.5 w-3.5 text-violet-500" /> Payments
+              </TabsTrigger>
+              <TabsTrigger value="accounts" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <MonitorSmartphone className="h-3.5 w-3.5 text-cyan-500" /> Accounts
+              </TabsTrigger>
+              <TabsTrigger value="usage-log" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <ListChecks className="h-3.5 w-3.5 text-orange-500" /> Usage
+              </TabsTrigger>
+              <TabsTrigger value="activity" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <LayoutDashboard className="h-3.5 w-3.5 text-pink-500" /> Activity
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Ledger Tab — unified, step-by-step, before/after for limit & used */}
           <TabsContent value="ledger" className="space-y-3">
