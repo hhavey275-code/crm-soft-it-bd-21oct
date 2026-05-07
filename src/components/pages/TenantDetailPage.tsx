@@ -22,7 +22,8 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Copy, Ban, CheckCircle, Trash2, Landmark, Edit, DollarSign,
   CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, TrendingDown, Wallet, SlidersHorizontal,
-  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink, Filter, Download
+  Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink, Filter, Download,
+  LayoutDashboard, Receipt, Info, ListChecks
 } from "lucide-react";
 
 export default function TenantDetailPage() {
