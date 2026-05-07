@@ -1023,8 +1023,34 @@ export default function TenantDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Info Tab */}
+          {/* Info Tab — all key stats consolidated */}
           <TabsContent value="info" className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+              <MetricCard title="Subscription Fee" value={`৳${Number(tenant.subscription_fee || 0).toLocaleString()}/mo`} icon={CreditCard} iconBg="bg-primary/10" iconColor="text-primary" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="USD Rate" value={`৳${Number(tenant.usd_rate || 0)}`} icon={DollarSign} iconBg="bg-emerald-500/10" iconColor="text-emerald-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Paid Until" value={tenant.subscription_paid_until ? format(new Date(tenant.subscription_paid_until), "dd MMM yy") : "—"} icon={CalendarDays} iconBg={isExpired ? "bg-destructive/10" : "bg-blue-500/10"} iconColor={isExpired ? "text-destructive" : "text-blue-500"} size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Total Used" value={`$${Number(tenant.total_used || 0).toLocaleString()}`} icon={TrendingUp} iconBg="bg-orange-500/10" iconColor="text-orange-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title={tenant.subscription_type === "subscription_with_limit" ? "System Limit" : "Type"} value={tenant.subscription_type === "subscription_with_limit" ? `$${Number(tenant.system_limit || 0).toLocaleString()}` : "Unlimited"} icon={BarChart3} iconBg="bg-violet-500/10" iconColor="text-violet-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Total Paid" value={`৳${totalPayments.toLocaleString()}`} icon={Wallet} iconBg="bg-cyan-500/10" iconColor="text-cyan-500" size={isMobile ? "xs" : "sm"} />
+            </div>
+
+            {tenant.subscription_type === "subscription_with_limit" && (
+              <Card>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-muted-foreground">System Usage</span>
+                    <span className="text-xs font-medium">{usagePercent.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${usagePercent}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ${Number(tenant.total_used || 0).toLocaleString()} used of ${Number(tenant.system_limit || 0).toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader className="p-3 sm:p-4 pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -1034,39 +1060,69 @@ export default function TenantDetailPage() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Name</p>
-                    <p className="text-sm font-medium">{tenant.name}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Domain</p>
-                    <p className="text-sm font-medium">{tenant.domain}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Subscription Type</p>
-                    <p className="text-sm font-medium">{tenant.subscription_type === "subscription_with_limit" ? "Subscription + Limit" : "Subscription Only"}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Status</p>
-                    <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Created</p>
-                    <p className="text-sm font-medium">{format(new Date(tenant.created_at), "dd MMM yyyy")}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">API Key</p>
-                    <div className="flex items-center gap-1">
-                      <code className="text-xs truncate">{tenant.api_key.slice(0, 12)}...</code>
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyApiKey(tenant.api_key)}>
-                        <Copy className="h-2.5 w-2.5" />
-                      </Button>
-                    </div>
-                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Name</p><p className="text-sm font-medium">{tenant.name}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Domain</p><p className="text-sm font-medium break-all">{tenant.domain}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Subscription Type</p><p className="text-sm font-medium">{tenant.subscription_type === "subscription_with_limit" ? "Subscription + Limit" : "Subscription Only"}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Status</p><Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Created</p><p className="text-sm font-medium">{format(new Date(tenant.created_at), "dd MMM yyyy")}</p></div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Details Tab — actions */}
+          <TabsContent value="details" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-amber-500" />
+                  Tenant Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => { setEditData({ ...tenant }); setEditOpen(true); }}>
+                    <Edit className="h-4 w-4 mr-2 text-blue-500" /> Edit
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setExtendOpen(true)}>
+                    <CalendarDays className="h-4 w-4 mr-2 text-emerald-500" /> Extend
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => { setAdjustAmount(""); setAdjustReason(""); setAdjustMode("increase"); setAdjustOpen(true); }}>
+                    <SlidersHorizontal className="h-4 w-4 mr-2 text-amber-500" /> Adjust Limit
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={toggleStatus}>
+                    {tenant.status === "active" ? <Ban className="h-4 w-4 mr-2 text-destructive" /> : <CheckCircle className="h-4 w-4 mr-2 text-green-500" />}
+                    {tenant.status === "active" ? "Freeze" : "Activate"}
+                  </Button>
+                  <Button variant="destructive" className="justify-start h-auto py-3 col-span-2 sm:col-span-1" onClick={() => setDeleteOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* API Tab */}
+          <TabsContent value="api" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Key className="h-4 w-4 text-fuchsia-500" />
+                  API Key
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+                  <code className="text-xs sm:text-sm break-all flex-1">{tenant.api_key}</code>
+                  <Button variant="ghost" size="sm" onClick={() => copyApiKey(tenant.api_key)}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Tenant এই API Key দিয়ে master-এর webhook-এ heartbeat / report-usage call করে।</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
 
         {/* Edit Dialog */}
