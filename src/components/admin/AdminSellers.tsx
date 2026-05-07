@@ -353,19 +353,13 @@ export function AdminSellers() {
         ocrDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
         entry.created_at = ocrDate.toISOString();
       }
-      const { error } = await (supabase as any).from("seller_transactions").insert(entry);
-      if (error) throw error;
-
-      // Find the row we just inserted so we can pass its ID into the forward
-      // function for idempotency-locked Telegram delivery.
-      const { data: insertedRow } = await (supabase as any)
+      const { data: insertedRow, error } = await (supabase as any)
         .from("seller_transactions")
+        .insert(entry)
         .select("id")
-        .eq("seller_id", entry.seller_id)
-        .eq("type", "bdt_payment")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .single();
+      if (error) throw error;
+      if (!insertedRow?.id) throw new Error("Insert returned no id");
 
       // Forward to Telegram
       const shouldForward = ocrIsOthersBank

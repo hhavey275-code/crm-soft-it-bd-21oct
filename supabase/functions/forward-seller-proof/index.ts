@@ -61,10 +61,29 @@ Deno.serve(async (req) => {
     };
     const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
 
+    // STRICT: seller_transaction_id is REQUIRED. Without it the atomic
+    // claim_forward_slot dedupe below cannot run, and concurrent invocations
+    // produce duplicate Telegram messages (root cause of repeated double-forward
+    // bugs whenever a caller is refactored). Reject loudly so the caller is
+    // forced to pass the id — never silently send unguarded.
+    if (!seller_transaction_id) {
+      console.error('forward-seller-proof: REJECTED — missing seller_transaction_id', { payment_kind, seller_id, bdt_amount });
+      try {
+        await supabase.from('system_logs').insert({
+          action: 'Telegram Forward Rejected',
+          details: `forward-seller-proof called without seller_transaction_id (payment_kind=${payment_kind || 'unknown'}, seller=${seller_id || 'unknown'}, bdt=${bdt_amount || 0}). Caller must pass the row id so dedupe works.`,
+        });
+      } catch { /* best-effort */ }
+      return new Response(
+        JSON.stringify({ error: 'seller_transaction_id is required for dedupe', skipped: true }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Cheap early bail-out via the legacy mirror flag (saves work when we can
     // tell upfront the row was already forwarded). Authoritative dedupe is
     // still the atomic claim_forward_slot below.
-    if (seller_transaction_id) {
+    {
       const { data: existing } = await supabase
         .from('seller_transactions')
         .select('telegram_forwarded, telegram_message_id')
@@ -146,38 +165,30 @@ Deno.serve(async (req) => {
     let finalBalance: number | null = null;
     if (resolvedSellerId) {
       try {
-        const txns = await fetchAllSellerTxns(supabase, resolvedSellerId);
-        let balance = computeDueAdvance(txns);
-
-        const alreadyInLedger = seller_transaction_id
-          ? txns.some((t: any) => (t as any).id === seller_transaction_id)
-          : false;
+        // Source of truth = live seller_transactions (matches dashboard + sheet).
+        // Race window: row may not be visible yet. Retry briefly instead of
+        // manually adding bdt_amount (the old fallback double-counted when the
+        // row WAS already there but our `id` lookup raced).
+        let txns = await fetchAllSellerTxns(supabase, resolvedSellerId);
+        let alreadyInLedger = txns.some((t: any) => t.id === seller_transaction_id);
+        for (let i = 0; i < 3 && !alreadyInLedger; i++) {
+          await new Promise((r) => setTimeout(r, 300));
+          txns = await fetchAllSellerTxns(supabase, resolvedSellerId);
+          alreadyInLedger = txns.some((t: any) => t.id === seller_transaction_id);
+        }
         if (!alreadyInLedger) {
-          console.warn('forward-seller-proof balance mismatch: txn missing from dashboard ledger', {
-            seller_transaction_id,
-            resolvedSellerId,
-            payment_kind,
+          console.warn('forward-seller-proof: txn still missing from ledger after retries — using dashboard balance as-is (no manual add to avoid double-count)', {
+            seller_transaction_id, resolvedSellerId, payment_kind,
           });
           try {
             await supabase.from('system_logs').insert({
               action: 'Telegram Balance Mismatch',
-              details: `Seller txn ${seller_transaction_id || 'unknown'} was not found in live seller_transactions while forwarding. Telegram used dashboard live balance before fallback.`,
+              details: `Seller txn ${seller_transaction_id} not found in live seller_transactions while forwarding (after 3 retries). Caption Total uses dashboard balance.`,
             });
-          } catch { /* best-effort log */ }
-          if (payment_kind === 'usdt_received') {
-            balance -= Number(usdt_amount || 0) * Number(rate || 0);
-          } else if (payment_kind === 'withdraw') {
-            balance -= Number(bdt_amount || 0);
-          } else {
-            balance += Number(bdt_amount || 0);
-          }
+          } catch { /* best-effort */ }
         }
-        finalBalance = balance;
-        runningTotalLine = buildTotalLine(balance);
-        const mismatch = await fetchForwardedBalanceMismatches(supabase, resolvedSellerId);
-        if (mismatch.pendingTopupCount > 0) {
-          console.warn('forward-seller-proof balance probe: pending/unmirrored topups excluded to match dashboard', mismatch);
-        }
+        finalBalance = computeDueAdvance(txns);
+        runningTotalLine = buildTotalLine(finalBalance);
       } catch (e) {
         console.error('Due/Advance compute failed:', e);
       }
