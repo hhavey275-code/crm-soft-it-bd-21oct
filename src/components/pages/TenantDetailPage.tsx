@@ -436,132 +436,23 @@ export default function TenantDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
-        {/* Header - like ClientDetailPage */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/tenants")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-bold">{tenant.name}</h1>
-                <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
-                {isExpired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
-              </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Globe className="h-3 w-3" />
-                <span>{tenant.domain}</span>
-              </div>
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/tenants")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-bold truncate">{tenant.name}</h1>
+              <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
+              {isExpired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="truncate">{tenant.domain}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => { setEditData({ ...tenant }); setEditOpen(true); }}>
-              <Edit className="h-3 w-3 mr-1" /> Edit
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setExtendOpen(true)}>
-              <CalendarDays className="h-3 w-3 mr-1" /> Extend
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { setAdjustAmount(""); setAdjustReason(""); setAdjustMode("increase"); setAdjustOpen(true); }}>
-              <SlidersHorizontal className="h-3 w-3 mr-1" /> Adjust Limit
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setBankOpen(true)}>
-              <Landmark className="h-3 w-3 mr-1" /> Banks
-            </Button>
-            <Button size="sm" variant="outline" onClick={toggleStatus}>
-              {tenant.status === "active" ? <Ban className="h-3 w-3 mr-1 text-destructive" /> : <CheckCircle className="h-3 w-3 mr-1 text-green-500" />}
-              {tenant.status === "active" ? "Freeze" : "Activate"}
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="h-3 w-3 mr-1" /> Delete
-            </Button>
-          </div>
         </div>
-
-        {/* Metric Cards - like ClientDetailPage */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-          <MetricCard
-            title="Subscription Fee"
-            value={`৳${Number(tenant.subscription_fee || 0).toLocaleString()}/mo`}
-            icon={CreditCard}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="USD Rate"
-            value={`৳${Number(tenant.usd_rate || 0)}`}
-            icon={DollarSign}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Paid Until"
-            value={tenant.subscription_paid_until ? format(new Date(tenant.subscription_paid_until), "dd MMM yy") : "—"}
-            icon={CalendarDays}
-            iconBg={isExpired ? "bg-destructive/10" : "bg-primary/10"}
-            iconColor={isExpired ? "text-destructive" : "text-primary"}
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Total Used"
-            value={`$${Number(tenant.total_used || 0).toLocaleString()}`}
-            icon={TrendingUp}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title={tenant.subscription_type === "subscription_with_limit" ? "System Limit" : "Type"}
-            value={tenant.subscription_type === "subscription_with_limit" ? `$${Number(tenant.system_limit || 0).toLocaleString()}` : "Unlimited"}
-            icon={BarChart3}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Total Paid"
-            value={`৳${totalPayments.toLocaleString()}`}
-            icon={Wallet}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-        </div>
-
-        {/* Live Tenant Stats removed per request */}
-        {tenant.subscription_type === "subscription_with_limit" && (
-          <Card>
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">System Usage</span>
-                <span className="text-xs font-medium">{usagePercent.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${usagePercent}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                ${Number(tenant.total_used || 0).toLocaleString()} used of ${Number(tenant.system_limit || 0).toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* API Key */}
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Key className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground shrink-0">API Key:</span>
-                <code className="text-xs truncate">{tenant.api_key}</code>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => copyApiKey(tenant.api_key)}>
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Pending Alert */}
         {pendingPayments.length > 0 && (
@@ -584,20 +475,23 @@ export default function TenantDetailPage() {
               <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Info className="h-3.5 w-3.5 text-blue-500" /> Info
               </TabsTrigger>
+              <TabsTrigger value="details" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" /> Details
+              </TabsTrigger>
               <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Landmark className="h-3.5 w-3.5 text-emerald-500" /> Banks
               </TabsTrigger>
               <TabsTrigger value="payments" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Receipt className="h-3.5 w-3.5 text-violet-500" /> Payments
               </TabsTrigger>
+              <TabsTrigger value="api" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Key className="h-3.5 w-3.5 text-fuchsia-500" /> API
+              </TabsTrigger>
               <TabsTrigger value="accounts" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <MonitorSmartphone className="h-3.5 w-3.5 text-cyan-500" /> Accounts
               </TabsTrigger>
               <TabsTrigger value="usage-log" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <ListChecks className="h-3.5 w-3.5 text-orange-500" /> Usage
-              </TabsTrigger>
-              <TabsTrigger value="activity" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
-                <LayoutDashboard className="h-3.5 w-3.5 text-pink-500" /> Activity
               </TabsTrigger>
             </TabsList>
           </div>
@@ -967,42 +861,6 @@ export default function TenantDetailPage() {
             )}
           </TabsContent>
 
-          {/* Activity Tab — system_logs from tenant-webhook */}
-          <TabsContent value="activity" className="space-y-3">
-            <Card>
-              <CardHeader className="p-3 sm:p-4 pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Tenant Activity ({tenantActivity.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                {tenantActivity.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center">No activity logged yet.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
-                    {tenantActivity.map((log: any) => (
-                      <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/30 border-l-2 border-primary/40">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{log.action}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {format(new Date(log.created_at), "dd MMM yyyy, hh:mm:ss a")}
-                            {log.ip_address ? ` · ${log.ip_address}` : ""}
-                          </p>
-                          {log.details && Object.keys(log.details).length > 0 && (
-                            <pre className="text-[10px] text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap break-all">
-                              {JSON.stringify(log.details, null, 0).slice(0, 240)}
-                            </pre>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Usage Log Tab — per-tenant detailed limit consumption audit */}
           <TabsContent value="usage-log" className="space-y-3">
             <Card>
@@ -1165,8 +1023,34 @@ export default function TenantDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Info Tab */}
+          {/* Info Tab — all key stats consolidated */}
           <TabsContent value="info" className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+              <MetricCard title="Subscription Fee" value={`৳${Number(tenant.subscription_fee || 0).toLocaleString()}/mo`} icon={CreditCard} iconBg="bg-primary/10" iconColor="text-primary" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="USD Rate" value={`৳${Number(tenant.usd_rate || 0)}`} icon={DollarSign} iconBg="bg-emerald-500/10" iconColor="text-emerald-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Paid Until" value={tenant.subscription_paid_until ? format(new Date(tenant.subscription_paid_until), "dd MMM yy") : "—"} icon={CalendarDays} iconBg={isExpired ? "bg-destructive/10" : "bg-blue-500/10"} iconColor={isExpired ? "text-destructive" : "text-blue-500"} size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Total Used" value={`$${Number(tenant.total_used || 0).toLocaleString()}`} icon={TrendingUp} iconBg="bg-orange-500/10" iconColor="text-orange-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title={tenant.subscription_type === "subscription_with_limit" ? "System Limit" : "Type"} value={tenant.subscription_type === "subscription_with_limit" ? `$${Number(tenant.system_limit || 0).toLocaleString()}` : "Unlimited"} icon={BarChart3} iconBg="bg-violet-500/10" iconColor="text-violet-500" size={isMobile ? "xs" : "sm"} />
+              <MetricCard title="Total Paid" value={`৳${totalPayments.toLocaleString()}`} icon={Wallet} iconBg="bg-cyan-500/10" iconColor="text-cyan-500" size={isMobile ? "xs" : "sm"} />
+            </div>
+
+            {tenant.subscription_type === "subscription_with_limit" && (
+              <Card>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-muted-foreground">System Usage</span>
+                    <span className="text-xs font-medium">{usagePercent.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${usagePercent}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ${Number(tenant.total_used || 0).toLocaleString()} used of ${Number(tenant.system_limit || 0).toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader className="p-3 sm:p-4 pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -1176,39 +1060,69 @@ export default function TenantDetailPage() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Name</p>
-                    <p className="text-sm font-medium">{tenant.name}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Domain</p>
-                    <p className="text-sm font-medium">{tenant.domain}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Subscription Type</p>
-                    <p className="text-sm font-medium">{tenant.subscription_type === "subscription_with_limit" ? "Subscription + Limit" : "Subscription Only"}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Status</p>
-                    <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Created</p>
-                    <p className="text-sm font-medium">{format(new Date(tenant.created_at), "dd MMM yyyy")}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">API Key</p>
-                    <div className="flex items-center gap-1">
-                      <code className="text-xs truncate">{tenant.api_key.slice(0, 12)}...</code>
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyApiKey(tenant.api_key)}>
-                        <Copy className="h-2.5 w-2.5" />
-                      </Button>
-                    </div>
-                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Name</p><p className="text-sm font-medium">{tenant.name}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Domain</p><p className="text-sm font-medium break-all">{tenant.domain}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Subscription Type</p><p className="text-sm font-medium">{tenant.subscription_type === "subscription_with_limit" ? "Subscription + Limit" : "Subscription Only"}</p></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Status</p><Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge></div>
+                  <div className="p-3 rounded-lg bg-muted/50"><p className="text-[10px] text-muted-foreground mb-1">Created</p><p className="text-sm font-medium">{format(new Date(tenant.created_at), "dd MMM yyyy")}</p></div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Details Tab — actions */}
+          <TabsContent value="details" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-amber-500" />
+                  Tenant Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => { setEditData({ ...tenant }); setEditOpen(true); }}>
+                    <Edit className="h-4 w-4 mr-2 text-blue-500" /> Edit
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setExtendOpen(true)}>
+                    <CalendarDays className="h-4 w-4 mr-2 text-emerald-500" /> Extend
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={() => { setAdjustAmount(""); setAdjustReason(""); setAdjustMode("increase"); setAdjustOpen(true); }}>
+                    <SlidersHorizontal className="h-4 w-4 mr-2 text-amber-500" /> Adjust Limit
+                  </Button>
+                  <Button variant="outline" className="justify-start h-auto py-3" onClick={toggleStatus}>
+                    {tenant.status === "active" ? <Ban className="h-4 w-4 mr-2 text-destructive" /> : <CheckCircle className="h-4 w-4 mr-2 text-green-500" />}
+                    {tenant.status === "active" ? "Freeze" : "Activate"}
+                  </Button>
+                  <Button variant="destructive" className="justify-start h-auto py-3 col-span-2 sm:col-span-1" onClick={() => setDeleteOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* API Tab */}
+          <TabsContent value="api" className="space-y-3">
+            <Card>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Key className="h-4 w-4 text-fuchsia-500" />
+                  API Key
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+                  <code className="text-xs sm:text-sm break-all flex-1">{tenant.api_key}</code>
+                  <Button variant="ghost" size="sm" onClick={() => copyApiKey(tenant.api_key)}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Tenant এই API Key দিয়ে master-এর webhook-এ heartbeat / report-usage call করে।</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
 
         {/* Edit Dialog */}
