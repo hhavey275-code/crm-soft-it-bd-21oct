@@ -162,7 +162,7 @@ async function fetchAllSellerTransactions(sellerId: string) {
 
 export function AdminSellers() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const isMobile = useIsMobile();
   const [showConvert, setShowConvert] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
