@@ -1514,6 +1514,43 @@ export default function TenantDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Ledger Entry Dialog */}
+        <Dialog open={!!editLedgerRow} onOpenChange={(o) => { if (!o) setEditLedgerRow(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Edit Ledger Entry</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Movement Type</Label>
+                <Select value={editLedgerType} onValueChange={setEditLedgerType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usage_topup">Consumed (usage_topup)</SelectItem>
+                    <SelectItem value="usage_refund">Usage Refund (usage_refund)</SelectItem>
+                    <SelectItem value="limit_purchase">Limit Purchase</SelectItem>
+                    <SelectItem value="limit_manual_increase">Limit Manual Increase</SelectItem>
+                    <SelectItem value="limit_manual_decrease">Limit Manual Decrease</SelectItem>
+                    <SelectItem value="limit_set">Limit Set (absolute)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Amount Delta</Label>
+                <Input type="number" step="0.01" value={editLedgerAmount} onChange={e => setEditLedgerAmount(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Consumed = positive amount used. Refund = positive amount returned. Limit changes use signed delta (decrease usually negative).
+                </p>
+              </div>
+              <div>
+                <Label>Reason</Label>
+                <Textarea value={editLedgerReason} onChange={e => setEditLedgerReason(e.target.value)} rows={2} />
+              </div>
+              <Button className="w-full" onClick={() => editLedgerMutation.mutate()} disabled={editLedgerMutation.isPending}>
+                {editLedgerMutation.isPending ? "Saving..." : "Save & Recalculate"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
