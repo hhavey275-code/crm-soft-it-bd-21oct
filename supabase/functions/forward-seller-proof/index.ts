@@ -61,10 +61,29 @@ Deno.serve(async (req) => {
     };
     const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
 
+    // STRICT: seller_transaction_id is REQUIRED. Without it the atomic
+    // claim_forward_slot dedupe below cannot run, and concurrent invocations
+    // produce duplicate Telegram messages (root cause of repeated double-forward
+    // bugs whenever a caller is refactored). Reject loudly so the caller is
+    // forced to pass the id — never silently send unguarded.
+    if (!seller_transaction_id) {
+      console.error('forward-seller-proof: REJECTED — missing seller_transaction_id', { payment_kind, seller_id, bdt_amount });
+      try {
+        await supabase.from('system_logs').insert({
+          action: 'Telegram Forward Rejected',
+          details: `forward-seller-proof called without seller_transaction_id (payment_kind=${payment_kind || 'unknown'}, seller=${seller_id || 'unknown'}, bdt=${bdt_amount || 0}). Caller must pass the row id so dedupe works.`,
+        });
+      } catch { /* best-effort */ }
+      return new Response(
+        JSON.stringify({ error: 'seller_transaction_id is required for dedupe', skipped: true }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Cheap early bail-out via the legacy mirror flag (saves work when we can
     // tell upfront the row was already forwarded). Authoritative dedupe is
     // still the atomic claim_forward_slot below.
-    if (seller_transaction_id) {
+    {
       const { data: existing } = await supabase
         .from('seller_transactions')
         .select('telegram_forwarded, telegram_message_id')
