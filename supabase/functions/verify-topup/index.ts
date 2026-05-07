@@ -151,11 +151,12 @@ Deno.serve(async (req) => {
       .eq('id', request_id)
       .single();
     if (reqErr || !request) throw new Error('Request not found');
-    if (request.status !== 'pending') {
+    if (request.status !== 'pending' && request.status !== 'hold') {
       return new Response(JSON.stringify({ ok: true, message: 'Already processed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const isHold = request.status === 'hold';
 
     const { bdt_amount, bank_account_id, proof_url, user_id, amount, payment_method } = request;
     const payment_reference = (request.payment_reference || '').trim();
