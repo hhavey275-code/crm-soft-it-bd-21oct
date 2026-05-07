@@ -151,11 +151,12 @@ Deno.serve(async (req) => {
       .eq('id', request_id)
       .single();
     if (reqErr || !request) throw new Error('Request not found');
-    if (request.status !== 'pending') {
+    if (request.status !== 'pending' && request.status !== 'hold') {
       return new Response(JSON.stringify({ ok: true, message: 'Already processed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const isHold = request.status === 'hold';
 
     const { bdt_amount, bank_account_id, proof_url, user_id, amount, payment_method } = request;
     const payment_reference = (request.payment_reference || '').trim();
@@ -372,7 +373,17 @@ Deno.serve(async (req) => {
 
     const logText = `Auto-verification (${method}): ${verificationLog.join(' | ')}`;
     if (!allPassed) {
-      await supabase.from('top_up_requests').update({ admin_note: logText }).eq('id', request_id).eq('status', 'pending');
+      // Write match details for both pending AND hold so admins can see OCR/amount match status on held requests too.
+      // For hold rows, prepend the existing manual hold reason so it's not lost.
+      const { data: curRow } = await supabase.from('top_up_requests').select('status, admin_note').eq('id', request_id).maybeSingle();
+      if (curRow && (curRow.status === 'pending' || curRow.status === 'hold')) {
+        const prevNote = (curRow.admin_note || '').trim();
+        const isVerifyLog = prevNote.startsWith('Auto-verification');
+        const merged = curRow.status === 'hold' && prevNote && !isVerifyLog
+          ? `Hold reason: ${prevNote}\n\n${logText}`
+          : logText;
+        await supabase.from('top_up_requests').update({ admin_note: merged }).eq('id', request_id).in('status', ['pending', 'hold']);
+      }
       const failReasons: string[] = [];
       if (method === 'atm_deposit') {
         if (!ocrRefMatch) failReasons.push('OCR ref mismatch');
