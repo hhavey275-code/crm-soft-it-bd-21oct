@@ -576,15 +576,31 @@ export default function TenantDetailPage() {
 
         {/* Tabs - like ClientDetailPage */}
         <Tabs defaultValue="ledger">
-          <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
-            <TabsTrigger value="ledger" className={cn(isMobile && "text-xs flex-1")}>Ledger</TabsTrigger>
-            <TabsTrigger value="payments" className={cn(isMobile && "text-xs flex-1")}>Payments</TabsTrigger>
-            <TabsTrigger value="accounts" className={cn(isMobile && "text-xs flex-1")}>Ad Accounts</TabsTrigger>
-            <TabsTrigger value="activity" className={cn(isMobile && "text-xs flex-1")}>Activity</TabsTrigger>
-            <TabsTrigger value="banks" className={cn(isMobile && "text-xs flex-1")}>Banks</TabsTrigger>
-            <TabsTrigger value="usage-log" className={cn(isMobile && "text-xs flex-1")}>Usage Log</TabsTrigger>
-            <TabsTrigger value="info" className={cn(isMobile && "text-xs flex-1")}>Info</TabsTrigger>
-          </TabsList>
+          <div className={cn(isMobile && "w-full overflow-x-auto -mx-1 px-1 scrollbar-hide")}>
+            <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-max min-w-full")}>
+              <TabsTrigger value="ledger" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Activity className="h-3.5 w-3.5 text-primary" /> Ledger
+              </TabsTrigger>
+              <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Info className="h-3.5 w-3.5 text-blue-500" /> Info
+              </TabsTrigger>
+              <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Landmark className="h-3.5 w-3.5 text-emerald-500" /> Banks
+              </TabsTrigger>
+              <TabsTrigger value="payments" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Receipt className="h-3.5 w-3.5 text-violet-500" /> Payments
+              </TabsTrigger>
+              <TabsTrigger value="accounts" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <MonitorSmartphone className="h-3.5 w-3.5 text-cyan-500" /> Accounts
+              </TabsTrigger>
+              <TabsTrigger value="usage-log" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <ListChecks className="h-3.5 w-3.5 text-orange-500" /> Usage
+              </TabsTrigger>
+              <TabsTrigger value="activity" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <LayoutDashboard className="h-3.5 w-3.5 text-pink-500" /> Activity
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Ledger Tab — unified, step-by-step, before/after for limit & used */}
           <TabsContent value="ledger" className="space-y-3">
