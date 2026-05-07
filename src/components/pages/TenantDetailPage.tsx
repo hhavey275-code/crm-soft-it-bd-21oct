@@ -436,132 +436,23 @@ export default function TenantDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
-        {/* Header - like ClientDetailPage */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/tenants")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-bold">{tenant.name}</h1>
-                <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
-                {isExpired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
-              </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Globe className="h-3 w-3" />
-                <span>{tenant.domain}</span>
-              </div>
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/tenants")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-bold truncate">{tenant.name}</h1>
+              <Badge variant={statusColor(tenant.status)}>{tenant.status}</Badge>
+              {isExpired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="truncate">{tenant.domain}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => { setEditData({ ...tenant }); setEditOpen(true); }}>
-              <Edit className="h-3 w-3 mr-1" /> Edit
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setExtendOpen(true)}>
-              <CalendarDays className="h-3 w-3 mr-1" /> Extend
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { setAdjustAmount(""); setAdjustReason(""); setAdjustMode("increase"); setAdjustOpen(true); }}>
-              <SlidersHorizontal className="h-3 w-3 mr-1" /> Adjust Limit
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setBankOpen(true)}>
-              <Landmark className="h-3 w-3 mr-1" /> Banks
-            </Button>
-            <Button size="sm" variant="outline" onClick={toggleStatus}>
-              {tenant.status === "active" ? <Ban className="h-3 w-3 mr-1 text-destructive" /> : <CheckCircle className="h-3 w-3 mr-1 text-green-500" />}
-              {tenant.status === "active" ? "Freeze" : "Activate"}
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="h-3 w-3 mr-1" /> Delete
-            </Button>
-          </div>
         </div>
-
-        {/* Metric Cards - like ClientDetailPage */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-          <MetricCard
-            title="Subscription Fee"
-            value={`৳${Number(tenant.subscription_fee || 0).toLocaleString()}/mo`}
-            icon={CreditCard}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="USD Rate"
-            value={`৳${Number(tenant.usd_rate || 0)}`}
-            icon={DollarSign}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Paid Until"
-            value={tenant.subscription_paid_until ? format(new Date(tenant.subscription_paid_until), "dd MMM yy") : "—"}
-            icon={CalendarDays}
-            iconBg={isExpired ? "bg-destructive/10" : "bg-primary/10"}
-            iconColor={isExpired ? "text-destructive" : "text-primary"}
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Total Used"
-            value={`$${Number(tenant.total_used || 0).toLocaleString()}`}
-            icon={TrendingUp}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title={tenant.subscription_type === "subscription_with_limit" ? "System Limit" : "Type"}
-            value={tenant.subscription_type === "subscription_with_limit" ? `$${Number(tenant.system_limit || 0).toLocaleString()}` : "Unlimited"}
-            icon={BarChart3}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-          <MetricCard
-            title="Total Paid"
-            value={`৳${totalPayments.toLocaleString()}`}
-            icon={Wallet}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            size={isMobile ? "xs" : "sm"}
-          />
-        </div>
-
-        {/* Live Tenant Stats removed per request */}
-        {tenant.subscription_type === "subscription_with_limit" && (
-          <Card>
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">System Usage</span>
-                <span className="text-xs font-medium">{usagePercent.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${usagePercent}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                ${Number(tenant.total_used || 0).toLocaleString()} used of ${Number(tenant.system_limit || 0).toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* API Key */}
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Key className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground shrink-0">API Key:</span>
-                <code className="text-xs truncate">{tenant.api_key}</code>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => copyApiKey(tenant.api_key)}>
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Pending Alert */}
         {pendingPayments.length > 0 && (
