@@ -234,7 +234,7 @@ export function AdminSellers() {
     setOcrIsOthersBank(false);
   };
 
-  const adminDisplayName = (user as any)?.user_metadata?.full_name || user?.email || "Admin";
+  const adminDisplayName = profile?.full_name || (user as any)?.user_metadata?.full_name || user?.email || "Admin";
 
   const getApprovedAdminEntryMeta = () => ({
     status: "approved" as const,
