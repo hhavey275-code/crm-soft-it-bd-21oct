@@ -392,6 +392,8 @@ export default function TenantDetailPage() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const copyApiKey = (key: string) => {
     navigator.clipboard.writeText(key);
     toast.success("API key copied");
   };
