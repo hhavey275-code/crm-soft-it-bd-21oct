@@ -162,7 +162,7 @@ async function fetchAllSellerTransactions(sellerId: string) {
 
 export function AdminSellers() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const isMobile = useIsMobile();
   const [showConvert, setShowConvert] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -234,7 +234,7 @@ export function AdminSellers() {
     setOcrIsOthersBank(false);
   };
 
-  const adminDisplayName = (user as any)?.user_metadata?.full_name || user?.email || "Admin";
+  const adminDisplayName = profile?.full_name || (user as any)?.user_metadata?.full_name || user?.email || "Admin";
 
   const getApprovedAdminEntryMeta = () => ({
     status: "approved" as const,
@@ -1729,24 +1729,33 @@ export function AdminSellers() {
                           <span className="font-medium text-foreground">{t.entry_by_name}</span>
                         </p>
                       )}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
-                        <div className="text-center">
-                          <span className="text-muted-foreground text-xs">BDT</span>
-                          <p className="font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      {t.type === "bdt_payment" ? (
+                        <div className="flex items-center justify-center py-1">
+                          <div className="text-center">
+                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">BDT Paid</span>
+                            <p className="font-extrabold text-lg text-emerald-600 dark:text-emerald-400 tabular-nums">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <span className="text-muted-foreground text-xs">USDT</span>
-                          <p className="font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+                          <div className="text-center">
+                            <span className="text-muted-foreground text-xs">BDT</span>
+                            <p className="font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground text-xs">USDT</span>
+                            <p className="font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground text-xs">Rate</span>
+                            <p className="font-semibold">{Number(t.rate || 0).toFixed(1)}</p>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground text-xs">Conv. BDT</span>
+                            <p className="font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <span className="text-muted-foreground text-xs">Rate</span>
-                          <p className="font-semibold">{Number(t.rate || 0).toFixed(1)}</p>
-                        </div>
-                        <div className="text-center">
-                          <span className="text-muted-foreground text-xs">Conv. BDT</span>
-                          <p className="font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                        </div>
-                      </div>
+                      )}
                       {t.bank_accounts ? (
                         <p className="text-[10px] text-muted-foreground">
                           🏦 {t.bank_accounts.bank_name} — {t.bank_accounts.account_number}
