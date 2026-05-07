@@ -475,20 +475,23 @@ export default function TenantDetailPage() {
               <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Info className="h-3.5 w-3.5 text-blue-500" /> Info
               </TabsTrigger>
+              <TabsTrigger value="details" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" /> Details
+              </TabsTrigger>
               <TabsTrigger value="banks" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Landmark className="h-3.5 w-3.5 text-emerald-500" /> Banks
               </TabsTrigger>
               <TabsTrigger value="payments" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <Receipt className="h-3.5 w-3.5 text-violet-500" /> Payments
               </TabsTrigger>
+              <TabsTrigger value="api" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
+                <Key className="h-3.5 w-3.5 text-fuchsia-500" /> API
+              </TabsTrigger>
               <TabsTrigger value="accounts" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <MonitorSmartphone className="h-3.5 w-3.5 text-cyan-500" /> Accounts
               </TabsTrigger>
               <TabsTrigger value="usage-log" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
                 <ListChecks className="h-3.5 w-3.5 text-orange-500" /> Usage
-              </TabsTrigger>
-              <TabsTrigger value="activity" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "text-xs px-3 whitespace-nowrap")}>
-                <LayoutDashboard className="h-3.5 w-3.5 text-pink-500" /> Activity
               </TabsTrigger>
             </TabsList>
           </div>
