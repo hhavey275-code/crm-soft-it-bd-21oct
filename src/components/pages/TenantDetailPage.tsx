@@ -50,6 +50,10 @@ export default function TenantDetailPage() {
   const [reconcileOpen, setReconcileOpen] = useState(false);
   const [reconcileValue, setReconcileValue] = useState("");
   const [reconcileReason, setReconcileReason] = useState("Synced to tenant DB value");
+  const [editLedgerRow, setEditLedgerRow] = useState<any>(null);
+  const [editLedgerAmount, setEditLedgerAmount] = useState("");
+  const [editLedgerType, setEditLedgerType] = useState("");
+  const [editLedgerReason, setEditLedgerReason] = useState("");
 
   // Tenant
   const { data: tenant, isLoading, error: tenantError } = useQuery({
