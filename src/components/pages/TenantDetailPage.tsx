@@ -826,6 +826,21 @@ export default function TenantDetailPage() {
                           {row.source && (
                             <p className="text-[9px] text-muted-foreground mt-2 truncate">By: {row.source}</p>
                           )}
+                          <div className="flex gap-1 justify-end mt-2 pt-2 border-t">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => {
+                              setEditLedgerRow(row);
+                              setEditLedgerAmount(String(row.amount_delta ?? 0));
+                              setEditLedgerType(String(row.movement_type ?? ""));
+                              setEditLedgerReason(String(row.reason ?? ""));
+                            }}>
+                              <Edit className="h-3 w-3 mr-1" /> Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px] text-destructive" onClick={() => {
+                              if (confirm("Eta delete kore ledger recalculate korbo?")) deleteLedgerMutation.mutate(row.id);
+                            }}>
+                              <Trash2 className="h-3 w-3 mr-1" /> Delete
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
