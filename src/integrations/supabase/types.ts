@@ -3042,6 +3042,66 @@ export type Database = {
           },
         ]
       }
+      tenant_limit_ledger_backup_20260507: {
+        Row: {
+          actor_user_id: string | null
+          amount_delta: number | null
+          created_at: string | null
+          id: string | null
+          idempotency_key: string | null
+          meta: Json | null
+          movement_type: string | null
+          reason: string | null
+          remaining_after: number | null
+          remaining_before: number | null
+          source: string | null
+          source_id: string | null
+          system_limit_after: number | null
+          system_limit_before: number | null
+          tenant_id: string | null
+          total_used_after: number | null
+          total_used_before: number | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          amount_delta?: number | null
+          created_at?: string | null
+          id?: string | null
+          idempotency_key?: string | null
+          meta?: Json | null
+          movement_type?: string | null
+          reason?: string | null
+          remaining_after?: number | null
+          remaining_before?: number | null
+          source?: string | null
+          source_id?: string | null
+          system_limit_after?: number | null
+          system_limit_before?: number | null
+          tenant_id?: string | null
+          total_used_after?: number | null
+          total_used_before?: number | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          amount_delta?: number | null
+          created_at?: string | null
+          id?: string | null
+          idempotency_key?: string | null
+          meta?: Json | null
+          movement_type?: string | null
+          reason?: string | null
+          remaining_after?: number | null
+          remaining_before?: number | null
+          source?: string | null
+          source_id?: string | null
+          system_limit_after?: number | null
+          system_limit_before?: number | null
+          tenant_id?: string | null
+          total_used_after?: number | null
+          total_used_before?: number | null
+        }
+        Relationships: []
+      }
       tenant_payments: {
         Row: {
           adjustment_reason: string | null
