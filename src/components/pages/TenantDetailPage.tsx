@@ -738,6 +738,19 @@ export default function TenantDetailPage() {
                           {row.reason && (
                             <p className="text-[11px] text-muted-foreground mt-0.5 italic">{row.reason}</p>
                           )}
+                          {(row.meta?.account_name || row.meta?.account_external_id || row.meta?.ad_account_id) && (
+                            <div className="mt-1.5 text-[11px]">
+                              <span className="text-muted-foreground">Ad Account: </span>
+                              <span className="font-medium text-foreground">
+                                {row.meta?.account_name || row.meta?.ad_account_id}
+                              </span>
+                              {row.meta?.account_external_id && (
+                                <span className="text-muted-foreground ml-1">
+                                  ({row.meta.account_external_id})
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="border-t mt-2 pt-2 space-y-1 text-xs">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">System Limit</span>
