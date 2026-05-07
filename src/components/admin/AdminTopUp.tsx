@@ -510,6 +510,7 @@ export function AdminTopUp() {
         }
       }
 
+      let autoApprovedByVerify = false;
       if (action === "approved") {
         const { data: reqData } = await supabase.from("top_up_requests").select("payment_reference").eq("id", id).single();
         const ref = reqData?.payment_reference;
@@ -520,7 +521,8 @@ export function AdminTopUp() {
         // Run verify-topup once to populate admin_note (Match Details).
         // It writes admin_note whether auto-approval succeeds or not.
         try {
-          await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
+          const { data: vData } = await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
+          if (vData?.auto_approved) autoApprovedByVerify = true;
         } catch (e) {
           console.warn('Pre-approve verify-topup failed (non-blocking):', e);
         }
@@ -536,6 +538,7 @@ export function AdminTopUp() {
         .select("id");
       if (updateError) throw updateError;
       if (!updatedRows?.length) {
+        if (autoApprovedByVerify) return; // verify-topup already approved + credited; nothing more to do
         throw new Error("This request was already processed (auto-verified or by another admin). Please refresh the page.");
       }
 
