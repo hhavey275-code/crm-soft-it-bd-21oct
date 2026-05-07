@@ -341,7 +341,57 @@ export default function TenantDetailPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const copyApiKey = (key: string) => {
+  const recalcMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("recalculate_tenant_ledger", { p_tenant_id: tenantId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      toast.success(`Recalculated. Limit $${Number(data?.final_system_limit ?? 0).toFixed(2)}, Used $${Number(data?.final_total_used ?? 0).toFixed(2)}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const editLedgerMutation = useMutation({
+    mutationFn: async () => {
+      if (!editLedgerRow) throw new Error("No row");
+      const amt = Number(editLedgerAmount);
+      if (Number.isNaN(amt)) throw new Error("Invalid amount");
+      const { error } = await (supabase as any).rpc("update_ledger_entry", {
+        p_id: editLedgerRow.id,
+        p_amount_delta: amt,
+        p_movement_type: editLedgerType,
+        p_reason: editLedgerReason || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      setEditLedgerRow(null);
+      toast.success("Entry updated and ledger recalculated");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteLedgerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).rpc("delete_ledger_entry", { p_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      toast.success("Entry deleted and ledger recalculated");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
     navigator.clipboard.writeText(key);
     toast.success("API key copied");
   };
