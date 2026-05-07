@@ -3793,6 +3793,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_ledger_entry: { Args: { p_id: string }; Returns: Json }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
       get_user_agency_id: { Args: { _user_id: string }; Returns: string }
@@ -3805,6 +3806,10 @@ export type Database = {
       }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      recalculate_tenant_ledger: {
+        Args: { p_tenant_id: string }
+        Returns: Json
+      }
       reconcile_tenant_total_used: {
         Args: {
           p_new_total_used: number
@@ -3825,6 +3830,15 @@ export type Database = {
       release_forward_slot: {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
+      }
+      update_ledger_entry: {
+        Args: {
+          p_amount_delta: number
+          p_id: string
+          p_movement_type: string
+          p_reason: string
+        }
+        Returns: Json
       }
     }
     Enums: {

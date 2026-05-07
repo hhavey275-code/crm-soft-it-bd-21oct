@@ -50,6 +50,10 @@ export default function TenantDetailPage() {
   const [reconcileOpen, setReconcileOpen] = useState(false);
   const [reconcileValue, setReconcileValue] = useState("");
   const [reconcileReason, setReconcileReason] = useState("Synced to tenant DB value");
+  const [editLedgerRow, setEditLedgerRow] = useState<any>(null);
+  const [editLedgerAmount, setEditLedgerAmount] = useState("");
+  const [editLedgerType, setEditLedgerType] = useState("");
+  const [editLedgerReason, setEditLedgerReason] = useState("");
 
   // Tenant
   const { data: tenant, isLoading, error: tenantError } = useQuery({
@@ -333,6 +337,58 @@ export default function TenantDetailPage() {
       setReconcileOpen(false);
       setReconcileValue("");
       toast.success(`Reconciled: ${Number(data?.before_total_used ?? 0).toFixed(2)} → ${Number(data?.after_total_used ?? 0).toFixed(2)}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const recalcMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("recalculate_tenant_ledger", { p_tenant_id: tenantId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      toast.success(`Recalculated. Limit $${Number(data?.final_system_limit ?? 0).toFixed(2)}, Used $${Number(data?.final_total_used ?? 0).toFixed(2)}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const editLedgerMutation = useMutation({
+    mutationFn: async () => {
+      if (!editLedgerRow) throw new Error("No row");
+      const amt = Number(editLedgerAmount);
+      if (Number.isNaN(amt)) throw new Error("Invalid amount");
+      const { error } = await (supabase as any).rpc("update_ledger_entry", {
+        p_id: editLedgerRow.id,
+        p_amount_delta: amt,
+        p_movement_type: editLedgerType,
+        p_reason: editLedgerReason || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      setEditLedgerRow(null);
+      toast.success("Entry updated and ledger recalculated");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteLedgerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).rpc("delete_ledger_entry", { p_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      toast.success("Entry deleted and ledger recalculated");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -636,9 +692,15 @@ export default function TenantDetailPage() {
                     <Activity className="h-4 w-4 text-primary" />
                     Limit Ledger ({ledger.length})
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
-                    <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" onClick={() => recalcMutation.mutate()} disabled={recalcMutation.isPending} title="Sob entry chronologically recalculate kore correct values bashabe">
+                      <RefreshCw className={cn("h-3 w-3 mr-1", recalcMutation.isPending && "animate-spin")} />
+                      Recalc
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => refetchLedger()} disabled={ledgerFetching}>
+                      <RefreshCw className={cn("h-3 w-3", ledgerFetching && "animate-spin")} />
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0 space-y-2">
@@ -764,6 +826,21 @@ export default function TenantDetailPage() {
                           {row.source && (
                             <p className="text-[9px] text-muted-foreground mt-2 truncate">By: {row.source}</p>
                           )}
+                          <div className="flex gap-1 justify-end mt-2 pt-2 border-t">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => {
+                              setEditLedgerRow(row);
+                              setEditLedgerAmount(String(row.amount_delta ?? 0));
+                              setEditLedgerType(String(row.movement_type ?? ""));
+                              setEditLedgerReason(String(row.reason ?? ""));
+                            }}>
+                              <Edit className="h-3 w-3 mr-1" /> Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px] text-destructive" onClick={() => {
+                              if (confirm("Eta delete kore ledger recalculate korbo?")) deleteLedgerMutation.mutate(row.id);
+                            }}>
+                              <Trash2 className="h-3 w-3 mr-1" /> Delete
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1433,6 +1510,43 @@ export default function TenantDetailPage() {
                 disabled={adjustMutation.isPending || !adjustAmount || !adjustReason.trim()}
               >
                 {adjustMutation.isPending ? "Saving..." : adjustMode === "increase" ? "Increase Limit" : adjustMode === "decrease" ? "Decrease Limit" : adjustMode === "set" ? "Set New Limit" : "Refund Used"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Ledger Entry Dialog */}
+        <Dialog open={!!editLedgerRow} onOpenChange={(o) => { if (!o) setEditLedgerRow(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Edit Ledger Entry</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Movement Type</Label>
+                <Select value={editLedgerType} onValueChange={setEditLedgerType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usage_topup">Consumed (usage_topup)</SelectItem>
+                    <SelectItem value="usage_refund">Usage Refund (usage_refund)</SelectItem>
+                    <SelectItem value="limit_purchase">Limit Purchase</SelectItem>
+                    <SelectItem value="limit_manual_increase">Limit Manual Increase</SelectItem>
+                    <SelectItem value="limit_manual_decrease">Limit Manual Decrease</SelectItem>
+                    <SelectItem value="limit_set">Limit Set (absolute)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Amount Delta</Label>
+                <Input type="number" step="0.01" value={editLedgerAmount} onChange={e => setEditLedgerAmount(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Consumed = positive amount used. Refund = positive amount returned. Limit changes use signed delta (decrease usually negative).
+                </p>
+              </div>
+              <div>
+                <Label>Reason</Label>
+                <Textarea value={editLedgerReason} onChange={e => setEditLedgerReason(e.target.value)} rows={2} />
+              </div>
+              <Button className="w-full" onClick={() => editLedgerMutation.mutate()} disabled={editLedgerMutation.isPending}>
+                {editLedgerMutation.isPending ? "Saving..." : "Save & Recalculate"}
               </Button>
             </div>
           </DialogContent>
