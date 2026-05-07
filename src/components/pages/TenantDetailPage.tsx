@@ -861,42 +861,6 @@ export default function TenantDetailPage() {
             )}
           </TabsContent>
 
-          {/* Activity Tab — system_logs from tenant-webhook */}
-          <TabsContent value="activity" className="space-y-3">
-            <Card>
-              <CardHeader className="p-3 sm:p-4 pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Tenant Activity ({tenantActivity.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                {tenantActivity.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center">No activity logged yet.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
-                    {tenantActivity.map((log: any) => (
-                      <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/30 border-l-2 border-primary/40">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{log.action}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {format(new Date(log.created_at), "dd MMM yyyy, hh:mm:ss a")}
-                            {log.ip_address ? ` · ${log.ip_address}` : ""}
-                          </p>
-                          {log.details && Object.keys(log.details).length > 0 && (
-                            <pre className="text-[10px] text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap break-all">
-                              {JSON.stringify(log.details, null, 0).slice(0, 240)}
-                            </pre>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Usage Log Tab — per-tenant detailed limit consumption audit */}
           <TabsContent value="usage-log" className="space-y-3">
             <Card>
