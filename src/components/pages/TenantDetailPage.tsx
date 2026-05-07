@@ -1245,17 +1245,48 @@ export default function TenantDetailPage() {
                   </div>
                 )}
                 <div>
-                  <Label>Total Used ($)</Label>
-                  <Input type="number" value={editData.total_used || 0} disabled readOnly />
-                  <p className="text-[11px] text-muted-foreground mt-1">Used শুধু ad-account top-up বা "Refund Used" থেকে পাল্টাবে — direct edit বন্ধ।</p>
+                  <Label>Total Used ($) — Manual Baseline</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editData.total_used ?? 0}
+                    onChange={e => setEditData((p: any) => ({ ...p, total_used: e.target.value }))}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    এখানে exact used set করো। Save করলে current value k overwrite kore Usage Log e ekta reconcile entry tairi hobe. Erpor theke ad-account top-up gulo ei baseline er upor jog hobe — ar kono auto/antaze calculation hobe na.
+                  </p>
                 </div>
-                <Button className="w-full" onClick={() => updateMutation.mutate({
-                  name: editData.name,
-                  domain: editData.domain,
-                  subscription_type: editData.subscription_type,
-                  subscription_fee: editData.subscription_fee,
-                  usd_rate: editData.usd_rate,
-                })} disabled={updateMutation.isPending}>
+                <Button className="w-full" onClick={async () => {
+                  const newUsed = Number(editData.total_used);
+                  if (Number.isNaN(newUsed) || newUsed < 0) {
+                    toast.error("Total Used must be a non-negative number");
+                    return;
+                  }
+                  // 1) Save other tenant fields
+                  await updateMutation.mutateAsync({
+                    name: editData.name,
+                    domain: editData.domain,
+                    subscription_type: editData.subscription_type,
+                    subscription_fee: editData.subscription_fee,
+                    usd_rate: editData.usd_rate,
+                  });
+                  // 2) Reconcile total_used if changed
+                  if (Number(tenant.total_used ?? 0).toFixed(2) !== newUsed.toFixed(2)) {
+                    const { error: rpcErr } = await (supabase as any).rpc("reconcile_tenant_total_used", {
+                      p_tenant_id: tenantId,
+                      p_new_total_used: newUsed,
+                      p_reason: "Manual baseline set via Edit Tenant",
+                    });
+                    if (rpcErr) {
+                      toast.error("Used reconcile failed: " + rpcErr.message);
+                      return;
+                    }
+                    toast.success(`Total Used baseline set to $${newUsed.toFixed(2)}`);
+                    queryClient.invalidateQueries({ queryKey: ["tenant-detail", tenantId] });
+                    queryClient.invalidateQueries({ queryKey: ["tenant-ledger", tenantId] });
+                    queryClient.invalidateQueries({ queryKey: ["tenant-usage-audit", tenantId] });
+                  }
+                }} disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
