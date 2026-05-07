@@ -1729,19 +1729,15 @@ export function AdminSellers() {
                           <span className="font-medium text-foreground">{t.entry_by_name}</span>
                         </p>
                       )}
-                      {t.type === "bdt_payment" ? (
+                      {t.type === "bdt_payment" || t.type === "client_topup" ? (
                         <div className="flex items-center justify-center py-1">
                           <div className="text-center">
-                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">BDT Paid</span>
-                            <p className="font-extrabold text-lg text-emerald-600 dark:text-emerald-400 tabular-nums">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">{t.type === "client_topup" ? "Client Top-Up (BDT)" : "BDT Paid"}</span>
+                            <p className={cn("font-extrabold text-lg tabular-nums", t.type === "client_topup" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                           </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
-                          <div className="text-center">
-                            <span className="text-muted-foreground text-xs">BDT</span>
-                            <p className="font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                          </div>
+                        <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[13px]">
                           <div className="text-center">
                             <span className="text-muted-foreground text-xs">USDT</span>
                             <p className="font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
