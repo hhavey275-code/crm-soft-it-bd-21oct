@@ -517,6 +517,13 @@ export function AdminTopUp() {
           const { data: existing } = await supabase.from("top_up_requests").select("id").eq("payment_reference", ref).eq("status", "approved").neq("id", id);
           if (existing && existing.length > 0) throw new Error("This payment reference has already been used in an approved request!");
         }
+        // Run verify-topup once to populate admin_note (Match Details).
+        // It writes admin_note whether auto-approval succeeds or not.
+        try {
+          await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
+        } catch (e) {
+          console.warn('Pre-approve verify-topup failed (non-blocking):', e);
+        }
       }
       const updateData: any = { status: action, reviewed_by: user!.id };
       if ((action === "rejected" || action === "hold") && adminNote) updateData.admin_note = adminNote;
