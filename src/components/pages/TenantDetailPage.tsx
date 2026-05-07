@@ -664,44 +664,93 @@ export default function TenantDetailPage() {
                 ) : (
                   <div className="space-y-2">
                     {ledger.map((row: any) => {
-                      const isLimit = String(row.movement_type).startsWith("limit");
-                      const isUsage = String(row.movement_type).startsWith("usage");
+                      const mt = String(row.movement_type || "");
                       const delta = Number(row.amount_delta || 0);
-                      const lb = row.system_limit_before; const la = row.system_limit_after;
-                      const ub = row.total_used_before; const ua = row.total_used_after;
-                      const rb = row.remaining_before; const ra = row.remaining_after;
-                      const fmt = (v: any) => v == null ? "—" : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+                      const la = row.system_limit_after;
+                      const ra = row.remaining_after;
+                      const fmt = (v: any) => v == null ? "—" : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                      // Classify by movement_type → label, badge color, amount sign/color
+                      let label = mt;
+                      let badgeClass = "bg-muted text-muted-foreground border-border";
+                      let amountClass = "text-muted-foreground";
+                      let signStr = "";
+                      let IconEl: any = null;
+
+                      if (mt === "usage_topup" || mt === "report-usage") {
+                        label = "Consumed";
+                        badgeClass = "bg-destructive/10 text-destructive border-destructive/30";
+                        amountClass = "text-destructive";
+                        signStr = "−";
+                        IconEl = TrendingDown;
+                      } else if (mt === "usage_refund" || mt === "refund-usage") {
+                        label = "Usage Refund";
+                        badgeClass = "bg-green-500/10 text-green-600 border-green-500/30";
+                        amountClass = "text-green-600";
+                        signStr = "+";
+                        IconEl = TrendingUp;
+                      } else if (mt === "limit_purchase") {
+                        label = "Limit Purchase";
+                        badgeClass = "bg-green-500/10 text-green-600 border-green-500/30";
+                        amountClass = "text-green-600";
+                        signStr = "+";
+                        IconEl = TrendingUp;
+                      } else if (mt === "limit_manual_increase" || (mt === "limit_set" && delta > 0)) {
+                        label = "Limit Increase";
+                        badgeClass = "bg-blue-500/10 text-blue-600 border-blue-500/30";
+                        amountClass = "text-blue-600";
+                        signStr = "+";
+                        IconEl = TrendingUp;
+                      } else if (mt === "limit_manual_decrease" || (mt === "limit_set" && delta < 0)) {
+                        label = "Limit Decrease";
+                        badgeClass = "bg-destructive/10 text-destructive border-destructive/30";
+                        amountClass = "text-destructive";
+                        signStr = "−";
+                        IconEl = TrendingDown;
+                      } else if (mt === "limit_set") {
+                        label = "Limit Set";
+                        badgeClass = "bg-blue-500/10 text-blue-600 border-blue-500/30";
+                        amountClass = "text-foreground";
+                      }
+
+                      const remainingNum = ra != null ? Number(ra) : null;
+                      const limitNum = la != null ? Number(la) : null;
+                      const remainingClass = remainingNum != null && remainingNum < 0
+                        ? "text-destructive"
+                        : remainingNum != null && limitNum != null && remainingNum < limitNum * 0.2
+                          ? "text-yellow-600"
+                          : "text-foreground";
+
                       return (
-                        <div key={row.id} className="border rounded-lg p-2.5 text-xs">
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge variant={isLimit ? "default" : "secondary"} className="text-[9px]">{row.movement_type}</Badge>
-                                {row.source && <Badge variant="outline" className="text-[9px]">{row.source}</Badge>}
-                              </div>
-                              {row.reason && <p className="text-[11px] text-muted-foreground mt-1 italic">{row.reason}</p>}
+                        <div key={row.id} className="border rounded-lg p-3 bg-card">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border inline-flex items-center gap-1", badgeClass)}>
+                              {IconEl && <IconEl className="h-3 w-3" />}
+                              {label}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              {format(new Date(row.created_at), "dd MMM, hh:mm a")}
+                            </span>
+                          </div>
+                          <div className={cn("text-lg font-bold mt-1.5", amountClass)}>
+                            {signStr}{fmt(Math.abs(delta))}
+                          </div>
+                          {row.reason && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 italic">{row.reason}</p>
+                          )}
+                          <div className="border-t mt-2 pt-2 space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">System Limit</span>
+                              <span className="font-semibold">{fmt(la)}</span>
                             </div>
-                            <div className="text-right shrink-0">
-                              <div className={cn("font-bold text-sm", delta >= 0 ? (isLimit ? "text-blue-600" : "text-orange-600") : "text-green-600")}>
-                                {delta >= 0 ? "+" : ""}{fmt(Math.abs(delta) === 0 ? 0 : delta)}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Remaining</span>
+                              <span className={cn("font-semibold", remainingClass)}>{fmt(ra)}</span>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-1.5 pt-2 border-t">
-                            <div>
-                              <p className="text-[9px] uppercase text-muted-foreground">Limit</p>
-                              <p className="font-semibold text-[11px]">{fmt(lb)} → <span className="text-blue-600">{fmt(la)}</span></p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] uppercase text-muted-foreground">Used</p>
-                              <p className="font-semibold text-[11px]">{fmt(ub)} → <span className="text-orange-600">{fmt(ua)}</span></p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] uppercase text-muted-foreground">Remaining</p>
-                              <p className="font-semibold text-[11px]">{fmt(rb)} → <span className="text-green-600">{fmt(ra)}</span></p>
-                            </div>
-                          </div>
+                          {row.source && (
+                            <p className="text-[9px] text-muted-foreground mt-2 truncate">By: {row.source}</p>
+                          )}
                         </div>
                       );
                     })}
