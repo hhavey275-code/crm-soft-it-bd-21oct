@@ -967,7 +967,7 @@ export function ClientAdAccounts() {
                         <div className="flex items-center gap-1">
                           {a.client_topup_disabled ? (
                             <Button size="sm" variant="outline" disabled title="Admin top-up only">
-                              <Lock className="h-4 w-4 mr-1" />
+                              <LockIcon className="h-4 w-4 mr-1" />
                               Admin Only
                             </Button>
                           ) : (
