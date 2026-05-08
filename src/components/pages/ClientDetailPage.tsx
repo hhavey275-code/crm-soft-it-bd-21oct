@@ -703,7 +703,7 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
-                <div onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
@@ -716,6 +716,24 @@ export default function ClientDetailPage() {
                   >
                     <ArrowUpCircle className="h-3.5 w-3.5" />
                     Top Up
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={acc.client_topup_disabled ? "destructive" : "outline"}
+                    className="h-8 w-8 rounded-full"
+                    title={acc.client_topup_disabled ? "Client top-up disabled" : "Disable client top-up"}
+                    onClick={async () => {
+                      const next = !acc.client_topup_disabled;
+                      const { error } = await (supabase as any)
+                        .from("ad_accounts")
+                        .update({ client_topup_disabled: next })
+                        .eq("id", acc.id);
+                      if (error) { toast.error(error.message); return; }
+                      toast.success(next ? "Client top-up disabled" : "Client top-up enabled");
+                      refetchAdAccounts();
+                    }}
+                  >
+                    {acc.client_topup_disabled ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               </div>
