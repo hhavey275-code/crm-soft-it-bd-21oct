@@ -14,14 +14,16 @@ function verifyAccount(target: string, result: any): boolean | null {
   const t = String(target || "").replace(/\D/g, "");
   if (t.length < 6) return null;
   const first3 = t.slice(0, 3);
-  const last3 = t.slice(-3);
-  const ocrAcct = String(result?.account_number || "").replace(/\D/g, "");
+  const last4 = t.slice(-4);
+  const rawOcrAcct = String(result?.account_number || "");
+  const ocrAcct = rawOcrAcct.replace(/\D/g, "");
   if (ocrAcct) {
     if (ocrAcct === t) return true;
-    if (ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
+    const isMaskedOrPartial = /[*xX•●]/.test(rawOcrAcct) || ocrAcct.length <= 7;
+    if (isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) return true;
   }
-  // LOCKED: require both first3 and last3 in the OCR account number itself.
-  // Last4-only or unrelated text-field matches caused wrong-proof false passes.
+  // LOCKED: never accept first3+last3 only. It falsely verifies accounts like
+  // 150...6001 vs 150...1001 because both end with 001.
   return false;
 }
 
