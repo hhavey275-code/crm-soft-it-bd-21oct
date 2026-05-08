@@ -261,9 +261,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
+  // No hard requirement on LOVABLE_API_KEY — OCR uses fallback chain (Lovable → Gemini → OpenAI).
+  const hasAnyAiKey = !!(Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('USER_GEMINI_API_KEY') || Deno.env.get('GEMINI_API_KEY') || Deno.env.get('OPENAI_API_KEY'));
+  if (!hasAnyAiKey) {
+    return new Response(JSON.stringify({ error: 'No AI provider configured (LOVABLE_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY)' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
