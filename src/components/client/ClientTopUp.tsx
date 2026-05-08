@@ -149,11 +149,14 @@ export function ClientTopUp() {
       }
       if (data?.bdt_amount) {
         const finalAmount = Number(data.bdt_amount);
+        setOcrAmountRaw(finalAmount);
         // OCR now extracts the principal/base amount directly (charge already excluded by AI)
         if (selectedBankDetails && isMFS(selectedBankDetails.bank_name)) {
           toast.info(`প্রাপ্ত পরিমাণ (চার্জ বাদে): ৳${finalAmount.toLocaleString()}`);
         }
         setBdtAmount(String(finalAmount));
+      } else {
+        setOcrAmountRaw(0);
       }
       // Account verification result
       if (typeof data?.account_verified === 'boolean') {
