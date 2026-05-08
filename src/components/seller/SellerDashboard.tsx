@@ -622,22 +622,27 @@ export function SellerDashboard() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">BDT</span>
-                        <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">USDT</span>
-                        <span className="font-bold text-foreground">{fmt(Number(t.usdt_amount), "$")}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Rate</span>
-                        <span className="font-semibold text-foreground">{Number(t.rate) > 0 ? t.rate : "—"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Conv</span>
-                        <span className="font-bold text-foreground">{fmt(convertedBdt, "৳")}</span>
-                      </div>
+                      {t.type === "usdt_received" ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">USDT</span>
+                            <span className="font-bold text-foreground">{fmt(Number(t.usdt_amount), "$")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Rate</span>
+                            <span className="font-semibold text-foreground">{Number(t.rate) > 0 ? t.rate : "—"}</span>
+                          </div>
+                          <div className="flex justify-between col-span-2">
+                            <span className="text-muted-foreground">Conv</span>
+                            <span className="font-bold text-foreground">{fmt(convertedBdt, "৳")}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between col-span-2">
+                          <span className="text-muted-foreground">BDT</span>
+                          <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
+                        </div>
+                      )}
                     </div>
                     {t.bank_accounts && (
                       <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
