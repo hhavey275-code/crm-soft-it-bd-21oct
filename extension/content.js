@@ -698,6 +698,18 @@
       parseDom();
       rebuildSnapshot(state.accountId || getAccountIdFromUrl());
       renderPanel();
+      // Auto-push to CRM once per account per page session as soon as we have
+      // at least one real GraphQL-id card. Avoids relying on the unreliable
+      // background mass-sync — we capture passively while the user is on the
+      // billing page (Smit-style).
+      try {
+        const snap = state.snapshot;
+        const hasRealCard = !!snap?.cards?.some((c) => c?.id && !String(c.id).startsWith("dom:"));
+        if (hasRealCard && state.lastSyncedKey === "" && !state.__autoPushing) {
+          state.__autoPushing = true;
+          pushToCRM(false).finally(() => { state.__autoPushing = false; });
+        }
+      } catch {}
     }, 2000);
     // Detect SPA route changes
     let last = location.href;
