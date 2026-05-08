@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
       }
       if (ocrAccountNumber && fullBankAccount) {
         ocrAccountMatch = accountMatches(ocrAccountNumber, fullBankAccount);
-        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst4}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst4}...${bankLast3})`);
+        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast4})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast4})`);
       } else {
         verificationLog.push(`❌ OCR Account missing`);
       }
@@ -527,7 +527,7 @@ Deno.serve(async (req) => {
     } else {
       // LOCKED: bank_transfer / MFS — strict checks. OCR amount MUST be present
       // and match submitted amount; OCR ref MUST match submitted ref; OCR account
-      // MUST include selected account first3+last3. This prevents wrong-screenshot approvals.
+      // MUST include selected account first3+last4. This prevents wrong-screenshot approvals.
       // Do NOT loosen these conditions without owner approval.
       const refOk = ocrRef !== '' && ocrRefMatch;
       const amountOk = ocrAmount > 0 && ocrAmountMatch;
