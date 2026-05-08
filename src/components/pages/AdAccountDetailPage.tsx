@@ -574,7 +574,19 @@ export default function AdAccountDetailPage() {
           />
         </div>
 
-        {/* Meta Account Limits, Synced Payment Methods, and Live Billing Data sections removed — extension data was unreliable. */}
+        {/* === Cards on file (account-recovery view) ===
+            DSL / Live Billing removed (extension data unreliable for those).
+            We KEEP cards: extension passively captures default + backup card
+            last-4 when admin opens the Meta billing page, so if account access
+            is lost, last-4 is recoverable from CRM. */}
+        {!isTikTok && id && (
+          <div className="space-y-2">
+            <AdAccountSyncedCards adAccountId={id} />
+            <p className="text-[11px] text-muted-foreground px-1">
+              Cards on file are synced via the Chrome extension when an admin opens this account's Meta billing page. Used for account-recovery only — only brand + last-4 + expiry are stored, never full card numbers.
+            </p>
+          </div>
+        )}
 
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (
