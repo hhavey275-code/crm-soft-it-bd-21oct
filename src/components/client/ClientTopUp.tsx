@@ -607,7 +607,6 @@ export function ClientTopUp() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
-              { value: "online_transfer" as PaymentMethod, label: "Bank to Bank", desc: "Internet / Mobile Banking", IconComp: OnlineIcon },
               { value: "npsb" as PaymentMethod, label: "NPSB", desc: "Inter-bank NPSB transfer", IconComp: OnlineIcon },
               { value: "mfs_to_bank" as PaymentMethod, label: "bKash/Nagad → Bank", desc: "MFS to bank transfer", IconComp: MFSIcon },
             ]).map((m) => (
