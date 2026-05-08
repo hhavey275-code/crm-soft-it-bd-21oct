@@ -202,6 +202,7 @@ export function ClientTopUp() {
     setProofFile(null);
     setProofPreview(null);
     setAccountVerified(null);
+    setOcrAmountRaw(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
