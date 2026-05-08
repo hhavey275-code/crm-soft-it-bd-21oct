@@ -537,6 +537,7 @@ export type Database = {
           balance_after_topup: number | null
           business_manager_id: string | null
           business_name: string | null
+          client_topup_disabled: boolean
           created_at: string
           external_crm_name: string | null
           external_topup_required: boolean
@@ -562,6 +563,7 @@ export type Database = {
           balance_after_topup?: number | null
           business_manager_id?: string | null
           business_name?: string | null
+          client_topup_disabled?: boolean
           created_at?: string
           external_crm_name?: string | null
           external_topup_required?: boolean
@@ -587,6 +589,7 @@ export type Database = {
           balance_after_topup?: number | null
           business_manager_id?: string | null
           business_name?: string | null
+          client_topup_disabled?: boolean
           created_at?: string
           external_crm_name?: string | null
           external_topup_required?: boolean
