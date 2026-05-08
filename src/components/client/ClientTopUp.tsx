@@ -638,6 +638,7 @@ export function ClientTopUp() {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => {
               if (category === "mfs") { setStep(0); setCategory(null); setPaymentMethod(null); }
+              else if (paymentMethod === "mfs_to_bank" || paymentMethod === "npsb") { setStep(0.6 as any); }
               else { setStep(0.5 as any); }
             }} className="gap-1">
               <ChevronLeft className="h-4 w-4" /> Back
