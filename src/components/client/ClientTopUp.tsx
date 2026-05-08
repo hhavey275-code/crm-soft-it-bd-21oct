@@ -771,13 +771,6 @@ export function ClientTopUp() {
                 </p>
               </div>
             )}
-            {accountVerified === null && proofFile && selectedBankDetails && isMFS(selectedBankDetails.bank_name) && (
-              <div className="mt-1 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                  ℹ️ Account number verify হয়নি — TrxID দিয়ে auto-matching হবে।
-                </p>
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
