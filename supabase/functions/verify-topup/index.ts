@@ -380,11 +380,12 @@ Deno.serve(async (req) => {
           const hasLast3Only = bankLast3 && digitsInText.includes(bankLast3);
           const hasFirst3Last3 = bankFirst3 && bankLast3 && digitsInText.includes(bankFirst3) && digitsInText.includes(bankLast3);
           const hasAccountMatch = hasLast4 || hasFirst4Last3 || hasLast3Only || hasFirst3Last3;
-          const numberMatches = text.match(/[\d,]+/g) || [];
+          const creditAmounts = extractSmsCreditAmounts(text);
+          const numberMatches = creditAmounts.length > 0 ? creditAmounts.map(String) : (text.match(/[\d,]+/g) || []);
           let hasAmount = false;
           let matchedTelegramAmount = 0;
           for (const numStr of numberMatches) {
-            const num = Number(numStr.replace(/,/g, ''));
+            const num = typeof numStr === 'number' ? numStr : Number(String(numStr).replace(/,/g, ''));
             if (num > 0 && amountMatches(num, bdtNum)) {
               hasAmount = true;
               matchedTelegramAmount = num;
