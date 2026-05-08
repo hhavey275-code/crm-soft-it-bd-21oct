@@ -336,10 +336,10 @@ Deno.serve(async (req) => {
       const ocr = ocrAccNum.replace(/\D/g, '');
       const bank = bankAccNum.replace(/\D/g, '');
       if (ocr === bank) return true;
-      if (ocr.length >= 6 && bank.length >= 6) {
+      if (ocr.length >= 7 && bank.length >= 7) {
         const ocrFirst3 = ocr.slice(0, 3);
-        const ocrLast3 = ocr.slice(-3);
-        if (ocrFirst3 === bank.slice(0, 3) && ocrLast3 === bank.slice(-3)) return true;
+        const ocrLast4 = ocr.slice(-4);
+        if (ocrFirst3 === bank.slice(0, 3) && ocrLast4 === bank.slice(-4)) return true;
       }
       return false;
     }
@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
       }
       if (ocrAccountNumber && fullBankAccount) {
         ocrAccountMatch = accountMatches(ocrAccountNumber, fullBankAccount);
-        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst4}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst4}...${bankLast3})`);
+        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast4})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast4})`);
       } else {
         verificationLog.push(`❌ OCR Account missing`);
       }
@@ -475,11 +475,10 @@ Deno.serve(async (req) => {
           }
         } else {
           const digitsInText = text.replace(/[^\d]/g, '');
-          const hasLast4 = bankLast4 && digitsInText.includes(bankLast4);
-          const hasFirst4Last3 = bankFirst4 && bankLast3 && digitsInText.includes(bankFirst4) && digitsInText.includes(bankLast3);
-          const hasLast3Only = bankLast3 && digitsInText.includes(bankLast3);
-          const hasFirst3Last3 = bankFirst3 && bankLast3 && digitsInText.includes(bankFirst3) && digitsInText.includes(bankLast3);
-          const hasAccountMatch = hasLast4 || hasFirst4Last3 || hasLast3Only || hasFirst3Last3;
+          const hasFullAccount = fullBankAccount && digitsInText.includes(fullBankAccount);
+          const hasFirst3Last4 = bankFirst3 && bankLast4 && digitsInText.includes(bankFirst3) && digitsInText.includes(bankLast4);
+          const hasFirst4Last4 = bankFirst4 && bankLast4 && digitsInText.includes(bankFirst4) && digitsInText.includes(bankLast4);
+          const hasAccountMatch = hasFullAccount || hasFirst4Last4 || hasFirst3Last4;
           const creditAmounts = extractSmsCreditAmounts(text);
           const numberMatches = creditAmounts.length > 0 ? creditAmounts.map(String) : (text.match(/[\d,]+/g) || []);
           let hasAmount = false;
@@ -495,11 +494,11 @@ Deno.serve(async (req) => {
           if (hasAccountMatch && hasAmount) {
             telegramMatch = true;
             matchedMsg = msg;
-            const matchType = hasLast4 ? `last4: ${bankLast4}` : hasFirst4Last3 ? `first4+last3: ${bankFirst4}...${bankLast3}` : hasFirst3Last3 ? `first3+last3: ${bankFirst3}...${bankLast3}` : `last3: ${bankLast3}`;
+            const matchType = hasFullAccount ? `full: ${fullBankAccount}` : hasFirst4Last4 ? `first4+last4: ${bankFirst4}...${bankLast4}` : `first3+last4: ${bankFirst3}...${bankLast4}`;
             telegramMatchDetail = `${matchType}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
             break;
           } else if (perMsgReasons.length < 5) {
-            const acctTag = hasAccountMatch ? '✓acct' : `✗acct(need ${bankLast4||bankLast3})`;
+            const acctTag = hasAccountMatch ? '✓acct' : `✗acct(need ${bankFirst3}...${bankLast4})`;
             const amtTag = hasAmount ? '✓amt' : `✗amt(need ৳${bdtNum})`;
             perMsgReasons.push(`${acctTag} ${amtTag}: "${snippet}"`);
           }
@@ -528,7 +527,7 @@ Deno.serve(async (req) => {
     } else {
       // LOCKED: bank_transfer / MFS — strict checks. OCR amount MUST be present
       // and match submitted amount; OCR ref MUST match submitted ref; OCR account
-      // MUST include selected account first3+last3. This prevents wrong-screenshot approvals.
+      // MUST include selected account first3+last4. This prevents wrong-screenshot approvals.
       // Do NOT loosen these conditions without owner approval.
       const refOk = ocrRef !== '' && ocrRefMatch;
       const amountOk = ocrAmount > 0 && ocrAmountMatch;
