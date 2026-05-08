@@ -320,14 +320,36 @@ export function AppSidebar() {
           <RefreshCw className="mr-2 h-4 w-4" />
           {!collapsed && "Update System"}
         </Button>
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
-          onClick={signOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          {!collapsed && "Sign Out"}
-        </Button>
+        <SignOutButton signOut={signOut} collapsed={collapsed} />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+function SignOutButton({ signOut, collapsed }: { signOut: () => Promise<void>; collapsed: boolean }) {
+  const [loading, setLoading] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      disabled={loading}
+      className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
+      onClick={async () => {
+        if (loading) return;
+        setLoading(true);
+        const t = toast.loading("Signing out...");
+        try {
+          await signOut();
+          toast.success("Signed out", { id: t });
+        } catch (e: any) {
+          toast.error(e?.message || "Sign out failed", { id: t });
+          setLoading(false);
+        }
+      }}
+    >
+      <LogOut className="mr-2 h-4 w-4" />
+      {!collapsed && (loading ? "Signing out..." : "Sign Out")}
+    </Button>
+  );
       </SidebarFooter>
     </Sidebar>
   );
