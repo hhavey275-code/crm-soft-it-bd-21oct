@@ -26,6 +26,7 @@ import {
   Archive,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
