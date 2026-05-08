@@ -399,9 +399,8 @@ Deno.serve(async (req) => {
         if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
         if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
       } else {
-        const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-        if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
-        if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (ocrRef !== '' && !ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (ocrAmount > 0 && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
       }
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), {
