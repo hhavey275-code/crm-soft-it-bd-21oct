@@ -361,6 +361,12 @@ export function ClientTopUp() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // LOCKED: Transaction ID is required. Without it, SMS/Telegram cross-check
+      // is impossible and wrong-screenshot approvals slip through.
+      if (!paymentRef?.trim()) {
+        toast.error("Transaction ID আবশ্যক — Screenshot এ TrxID না পেলে ম্যানুয়ালি টাইপ করুন।");
+        throw new Error("Missing transaction ID");
+      }
       // Check for duplicate payment reference
       if (paymentRef?.trim()) {
         const isDuplicate = await checkDuplicateRef(paymentRef);
