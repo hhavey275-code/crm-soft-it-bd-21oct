@@ -291,6 +291,15 @@ Deno.serve(async (req) => {
 
     const { bdt_amount, bank_account_id, proof_url, user_id, amount, payment_method } = request;
     const payment_reference = (request.payment_reference || '').trim();
+
+    // LOCKED: Hard requirement — no TXN ID, no auto-approval. Ever.
+    if (!payment_reference) {
+      return new Response(JSON.stringify({
+        ok: true,
+        auto_approved: false,
+        reason: 'Missing transaction ID — manual review required',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
     const method = payment_method || 'bank_transfer';

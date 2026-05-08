@@ -361,6 +361,12 @@ export function ClientTopUp() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // LOCKED: Transaction ID is required. Without it, SMS/Telegram cross-check
+      // is impossible and wrong-screenshot approvals slip through.
+      if (!paymentRef?.trim()) {
+        toast.error("Transaction ID আবশ্যক — Screenshot এ TrxID না পেলে ম্যানুয়ালি টাইপ করুন।");
+        throw new Error("Missing transaction ID");
+      }
       // Check for duplicate payment reference
       if (paymentRef?.trim()) {
         const isDuplicate = await checkDuplicateRef(paymentRef);
@@ -852,6 +858,7 @@ export function ClientTopUp() {
             onClick={() => setStep(3)}
             disabled={
               !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
+              !paymentRef.trim() ||
               (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
               amountMismatch ||
               ocrAmountRaw === 0
@@ -967,7 +974,7 @@ export function ClientTopUp() {
             <Button
               className="flex-1"
               onClick={() => submitMutation.mutate()}
-              disabled={isInactive || !!agencyBlocked || !proofFile || submitMutation.isPending || amountMismatch || ocrAmountRaw === 0 || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name)))}
+              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || amountMismatch || ocrAmountRaw === 0 || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name)))}
             >
               {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
             </Button>
