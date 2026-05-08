@@ -11,6 +11,11 @@ function amountMatches(a: number, b: number) {
   return Math.abs(a - b) <= BDT_TOLERANCE;
 }
 
+function refsMatch(a: string, b: string) {
+  const clean = (value: string) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return !!clean(a) && clean(a) === clean(b);
+}
+
 function parseBdtAmount(value: string): number {
   return Number(value.replace(/,/g, ''));
 }
@@ -327,14 +332,13 @@ Deno.serve(async (req) => {
     }
 
     function accountMatches(ocrAccNum: string, bankAccNum: string) {
-      const ocr = ocrAccNum.replace(/\s+/g, '');
-      const bank = bankAccNum.replace(/\s+/g, '');
+      const ocr = ocrAccNum.replace(/\D/g, '');
+      const bank = bankAccNum.replace(/\D/g, '');
       if (ocr === bank) return true;
-      if (ocr.length >= 4 && bank.length >= 4 && ocr.slice(-4) === bank.slice(-4)) return true;
-      if (ocr.length >= 7 && bank.length >= 7) {
-        const ocrFirst4 = ocr.slice(0, 4);
+      if (ocr.length >= 6 && bank.length >= 6) {
+        const ocrFirst3 = ocr.slice(0, 3);
         const ocrLast3 = ocr.slice(-3);
-        if (ocrFirst4 === bank.slice(0, 4) && ocrLast3 === bank.slice(-3)) return true;
+        if (ocrFirst3 === bank.slice(0, 3) && ocrLast3 === bank.slice(-3)) return true;
       }
       return false;
     }
