@@ -856,6 +856,13 @@ export function ClientTopUp() {
               </p>
             </div>
           )}
+          {refMismatch && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot এর TrxID ({ocrReference || "পাওয়া যায়নি"}) এবং submitted TrxID ({paymentRef || "খালি"}) মিলছে না। সঠিক proof দিন।
+              </p>
+            </div>
+          )}
           {proofFile && ocrAmountRaw === 0 && !ocrLoading && (
             <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
               <p className="text-xs text-destructive font-medium">
@@ -869,9 +876,10 @@ export function ClientTopUp() {
             disabled={
               !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
               !paymentRef.trim() ||
-              (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
+              accountVerified !== true ||
+              refMismatch ||
               amountMismatch ||
-              ocrAmountRaw === 0
+              ocrAmountRaw === null || ocrAmountRaw <= 0
             }
           >
             Continue to Review <ChevronRight className="h-4 w-4 ml-1" />
@@ -984,7 +992,7 @@ export function ClientTopUp() {
             <Button
               className="flex-1"
               onClick={() => submitMutation.mutate()}
-              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || amountMismatch || ocrAmountRaw === 0 || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name)))}
+              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || ocrLoading || amountMismatch || refMismatch || ocrAmountRaw === null || ocrAmountRaw <= 0 || accountVerified !== true}
             >
               {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
             </Button>
