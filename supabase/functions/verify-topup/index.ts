@@ -43,6 +43,104 @@ function extractSmsCreditAmounts(text: string): number[] {
   return [...amounts];
 }
 
+// Multi-provider OCR fallback: Lovable AI -> Gemini direct -> OpenAI direct.
+// If Lovable credit/rate-limit fails, automatically falls back so verification keeps working.
+async function callOcrWithFallback(prompt: string, imageUrl: string): Promise<string> {
+  const providers: Array<{ name: string; fn: () => Promise<string> }> = [];
+
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+  if (lovableKey) {
+    providers.push({
+      name: 'lovable',
+      fn: async () => {
+        const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${lovableKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [{ role: 'user', content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ] }],
+          }),
+        });
+        if (!r.ok) throw new Error(`lovable ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        const d = await r.json();
+        return d?.choices?.[0]?.message?.content || '';
+      },
+    });
+  }
+
+  const geminiKey = Deno.env.get('USER_GEMINI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
+  if (geminiKey) {
+    providers.push({
+      name: 'gemini',
+      fn: async () => {
+        const imgResp = await fetch(imageUrl);
+        if (!imgResp.ok) throw new Error(`fetch image ${imgResp.status}`);
+        const mime = imgResp.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+        const buf = new Uint8Array(await imgResp.arrayBuffer());
+        let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        const b64 = btoa(bin);
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mime, data: b64 } },
+            ] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        });
+        if (!r.ok) throw new Error(`gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        const d = await r.json();
+        return d?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') || '';
+      },
+    });
+  }
+
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (openaiKey) {
+    providers.push({
+      name: 'openai',
+      fn: async () => {
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ] }],
+            response_format: { type: 'json_object' },
+          }),
+        });
+        if (!r.ok) throw new Error(`openai ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        const d = await r.json();
+        return d?.choices?.[0]?.message?.content || '';
+      },
+    });
+  }
+
+  let lastErr = '';
+  for (const p of providers) {
+    try {
+      const out = await p.fn();
+      if (out) {
+        console.log(`[verify-topup OCR] provider=${p.name} ok`);
+        return out;
+      }
+    } catch (e: any) {
+      lastErr = `${p.name}: ${e?.message || e}`;
+      console.warn(`[verify-topup OCR] ${lastErr}`);
+    }
+  }
+  console.error('[verify-topup OCR] all providers failed:', lastErr);
+  return '';
+}
+
 /**
  * Single global Due/Advance running balance for a seller.
  *  +bdt_amount on bdt_payment / client_topup
@@ -163,9 +261,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
+  // No hard requirement on LOVABLE_API_KEY — OCR uses fallback chain (Lovable → Gemini → OpenAI).
+  const hasAnyAiKey = !!(Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('USER_GEMINI_API_KEY') || Deno.env.get('GEMINI_API_KEY') || Deno.env.get('OPENAI_API_KEY'));
+  if (!hasAnyAiKey) {
+    return new Response(JSON.stringify({ error: 'No AI provider configured (LOVABLE_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY)' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -253,28 +352,8 @@ Deno.serve(async (req) => {
           ocrPrompt =
             'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.';
         }
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: ocrPrompt },
-                  { type: 'image_url', image_url: { url: proof_url } },
-                ],
-              },
-            ],
-          }),
-        });
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content || '';
+        const content = await callOcrWithFallback(ocrPrompt, proof_url);
+        if (content) {
           const jsonMatch = content.match(/\{[^}]+\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
