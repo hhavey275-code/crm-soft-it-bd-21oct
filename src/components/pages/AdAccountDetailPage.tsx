@@ -775,7 +775,7 @@ export default function AdAccountDetailPage() {
                     )}
                     {!isTikTok && (
                       <a
-                        href={`https://www.facebook.com/business-support-home/contact-support?source=business_help_center_support&selectedAsset=${account.account_id.replace(/^act_/, '')}`}
+                        href={`https://business.facebook.com/business-support-home/contact-support?source=business_help_center_support&selectedAsset=${account.account_id.replace(/^act_/, '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline flex items-center gap-1"
