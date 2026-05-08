@@ -357,13 +357,13 @@ Deno.serve(async (req) => {
         let ocrPrompt = '';
         if (method === 'atm_deposit') {
           ocrPrompt =
-            'Extract the following from this ATM deposit receipt screenshot: transaction reference number, deposit amount (in BDT), account number, date, and whether this is an "ATM Transfer Credit" transaction. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890", "date": "2025-01-15", "is_atm_credit": true}. If you cannot find a value, use empty string for strings, 0 for amount, and false for is_atm_credit. No explanation, just JSON.';
+            'Extract the following from this ATM deposit receipt screenshot: transaction reference number, deposit amount (in BDT), receiver/destination account number, date, and whether this is an "ATM Transfer Credit" transaction. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890", "date": "2025-01-15", "is_atm_credit": true}. If you cannot find a value, use empty string for strings, 0 for amount, and false for is_atm_credit. No explanation, just JSON.';
         } else if (method === 'cash_deposit') {
           ocrPrompt =
-            'Extract the following from this cash deposit receipt screenshot: deposit amount (in BDT), account number, and date. Return ONLY a JSON object like: {"amount": 1300, "account_number": "1234567890", "date": "2025-01-15"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
+            'Extract the following from this cash deposit receipt screenshot: deposit amount (in BDT), receiver/destination account number, and date. Return ONLY a JSON object like: {"amount": 1300, "account_number": "1234567890", "date": "2025-01-15"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
         } else {
           ocrPrompt =
-            'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.';
+            'Extract the transaction reference number, the BASE payment amount (in BDT), and the receiver/destination account number from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
         }
         const content = await callOcrWithFallback(ocrPrompt, proof_url);
         if (content) {
@@ -384,10 +384,10 @@ Deno.serve(async (req) => {
     if (method === 'atm_deposit' || method === 'cash_deposit') {
       if (method === 'atm_deposit') {
         if (ocrRef && payment_reference) {
-          ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
+          ocrRefMatch = refsMatch(ocrRef, payment_reference);
           verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (${ocrRef} vs ${payment_reference})`);
         } else {
-          verificationLog.push(`⚠️ OCR Ref skipped`);
+          verificationLog.push(`❌ OCR Ref missing`);
         }
         verificationLog.push(ocrAtmCredit ? `✅ ATM Transfer Credit confirmed` : `❌ ATM Transfer Credit NOT found`);
       }
@@ -395,26 +395,26 @@ Deno.serve(async (req) => {
         ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
         verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (${ocrAmount} vs ${bdtNum})` : `❌ OCR Amount mismatch (${ocrAmount} vs ${bdtNum})`);
       } else {
-        verificationLog.push(`⚠️ OCR Amount skipped`);
+        verificationLog.push(`❌ OCR Amount missing`);
       }
       if (ocrAccountNumber && fullBankAccount) {
         ocrAccountMatch = accountMatches(ocrAccountNumber, fullBankAccount);
         verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst4}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst4}...${bankLast3})`);
       } else {
-        verificationLog.push(`⚠️ OCR Account skipped`);
+        verificationLog.push(`❌ OCR Account missing`);
       }
     } else {
       if (ocrRef && payment_reference) {
-        ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
+        ocrRefMatch = refsMatch(ocrRef, payment_reference);
         verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
       } else {
-        verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
+        verificationLog.push(`❌ OCR Ref missing (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
       }
       if (ocrAmount > 0 && bdtNum > 0) {
         ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
         verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})` : `❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
       } else {
-        verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
+        verificationLog.push(`❌ OCR Amount missing (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
       }
     }
 
