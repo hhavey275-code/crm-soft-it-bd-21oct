@@ -833,7 +833,30 @@ export function ClientTopUp() {
           {!proofFile && (
             <p className="text-xs text-destructive font-medium text-center">⚠️ Payment screenshot আপলোড করা বাধ্যতামূলক</p>
           )}
-          <Button className="w-full" onClick={() => setStep(3)} disabled={!bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) || ocrLoading}>
+          {amountMismatch && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot এর amount (৳{ocrAmountRaw?.toLocaleString()}) আপনার দেওয়া amount (৳{Number(bdtAmount).toLocaleString()}) এর সাথে মিলছে না। সঠিক screenshot আপলোড করুন।
+              </p>
+            </div>
+          )}
+          {proofFile && ocrAmountRaw === 0 && !ocrLoading && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot থেকে amount পড়া যায়নি। স্পষ্ট receipt screenshot আপলোড করুন।
+              </p>
+            </div>
+          )}
+          <Button
+            className="w-full"
+            onClick={() => setStep(3)}
+            disabled={
+              !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
+              (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
+              amountMismatch ||
+              ocrAmountRaw === 0
+            }
+          >
             Continue to Review <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
