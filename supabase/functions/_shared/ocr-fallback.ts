@@ -28,7 +28,7 @@ Extract the following fields and return strictly valid JSON (no prose, no markdo
   "date": string (YYYY-MM-DD),
   "reference": string (transaction id / TrxID),
   "bank_name": string,
-  "account_number": string,
+  "account_number": string (receiver/destination account number only — the account that received the money, not sender/source),
   "account_holder_name": string
 }
 If a field is not visible, use empty string "".`;
