@@ -115,6 +115,16 @@ export function ClientTopUp() {
   const [ocrReference, setOcrReference] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: assignedBanks } = useQuery({
+    queryKey: ["client-assigned-banks", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(*)").eq("user_id", user!.id);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!user,
+  });
+  const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
+
   // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
   // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
   // (e.g. uploading a 5k receipt while requesting 30k). Do NOT remove without owner approval.
@@ -275,15 +285,6 @@ export function ClientTopUp() {
     enabled: !!user,
   });
 
-  const { data: assignedBanks } = useQuery({
-    queryKey: ["client-assigned-banks", user?.id],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(*)").eq("user_id", user!.id);
-      return (data as any[]) ?? [];
-    },
-    enabled: !!user,
-  });
-
   const { data: myRequests } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
@@ -328,7 +329,6 @@ export function ClientTopUp() {
   const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
   const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
   const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
-  const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
 
   // Filter banks by category
   const filteredBanks = assignedBanks?.filter((cb: any) => {
