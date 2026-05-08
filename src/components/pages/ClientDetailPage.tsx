@@ -78,6 +78,8 @@ import {
   Banknote,
   Eye,
   Trash2,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -701,7 +703,7 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
-                <div onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
@@ -714,6 +716,24 @@ export default function ClientDetailPage() {
                   >
                     <ArrowUpCircle className="h-3.5 w-3.5" />
                     Top Up
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={acc.client_topup_disabled ? "destructive" : "outline"}
+                    className="h-8 w-8 rounded-full"
+                    title={acc.client_topup_disabled ? "Client top-up disabled" : "Disable client top-up"}
+                    onClick={async () => {
+                      const next = !acc.client_topup_disabled;
+                      const { error } = await (supabase as any)
+                        .from("ad_accounts")
+                        .update({ client_topup_disabled: next })
+                        .eq("id", acc.id);
+                      if (error) { toast.error(error.message); return; }
+                      toast.success(next ? "Client top-up disabled" : "Client top-up enabled");
+                      refetchAdAccounts();
+                    }}
+                  >
+                    {acc.client_topup_disabled ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               </div>
@@ -2256,20 +2276,40 @@ export default function ClientDetailPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <Button
-                                      size="icon"
-                                      variant="default"
-                                      className="h-8 w-8"
-                                      onClick={() => {
-                                        setSelectedAccountId(acc.id);
-                                        setTopUpDialogOpen(true);
-                                        setTopUpAmount("");
-                                        setDialogTab("topup");
-                                      }}
-                                      title="Top Up"
-                                    >
-                                      <ArrowUpCircle className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        size="icon"
+                                        variant="default"
+                                        className="h-8 w-8"
+                                        onClick={() => {
+                                          setSelectedAccountId(acc.id);
+                                          setTopUpDialogOpen(true);
+                                          setTopUpAmount("");
+                                          setDialogTab("topup");
+                                        }}
+                                        title="Top Up"
+                                      >
+                                        <ArrowUpCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant={acc.client_topup_disabled ? "destructive" : "outline"}
+                                        className="h-8 w-8"
+                                        title={acc.client_topup_disabled ? "Client top-up is disabled — click to enable" : "Disable client top-up (admin only)"}
+                                        onClick={async () => {
+                                          const next = !acc.client_topup_disabled;
+                                          const { error } = await (supabase as any)
+                                            .from("ad_accounts")
+                                            .update({ client_topup_disabled: next })
+                                            .eq("id", acc.id);
+                                          if (error) { toast.error(error.message); return; }
+                                          toast.success(next ? "Client top-up disabled" : "Client top-up enabled");
+                                          refetchAdAccounts();
+                                        }}
+                                      >
+                                        {acc.client_topup_disabled ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               );
