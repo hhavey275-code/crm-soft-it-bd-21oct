@@ -519,18 +519,17 @@ Deno.serve(async (req) => {
       allPassed = ocrAmountMatch && ocrAccountMatch && telegramMatch;
     } else {
       // LOCKED: bank_transfer / MFS — strict checks. OCR amount MUST be present
-      // and match submitted amount; if OCR extracted an account number, it MUST
-      // match the selected bank account. This prevents wrong-screenshot approvals.
+      // and match submitted amount; OCR ref MUST match submitted ref; OCR account
+      // MUST include selected account first3+last3. This prevents wrong-screenshot approvals.
       // Do NOT loosen these conditions without owner approval.
-      const ocrRefAvailable = ocrRef !== '';
-      const refOk = !ocrRefAvailable || ocrRefMatch;
+      const refOk = ocrRef !== '' && ocrRefMatch;
       const amountOk = ocrAmount > 0 && ocrAmountMatch;
-      let acctOk = true;
+      let acctOk = false;
       if (ocrAccountNumber && fullBankAccount) {
         acctOk = accountMatches(ocrAccountNumber, fullBankAccount);
         verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast3})`);
-      } else if (!isMobileAgent) {
-        verificationLog.push(`⚠️ OCR Account skipped (OCR could not extract account number)`);
+      } else {
+        verificationLog.push(`❌ OCR Account missing (OCR could not extract account number)`);
       }
       allPassed = refOk && amountOk && acctOk && telegramMatch;
     }
@@ -558,8 +557,9 @@ Deno.serve(async (req) => {
         if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
         if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
       } else {
-        if (ocrRef !== '' && !ocrRefMatch) failReasons.push('OCR ref mismatch');
-        if (ocrAmount > 0 && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (ocrRef === '' || !ocrRefMatch) failReasons.push('OCR ref mismatch/missing');
+        if (ocrAmount <= 0 || !ocrAmountMatch) failReasons.push('OCR amount mismatch/missing');
+        if (!ocrAccountNumber || !ocrAccountMatch) failReasons.push('OCR account mismatch/missing');
       }
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), {
