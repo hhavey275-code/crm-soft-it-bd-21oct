@@ -539,9 +539,12 @@ Deno.serve(async (req) => {
       const amountOk = ocrAmount > 0 && ocrAmountMatch;
       let acctOk = false;
       if (ocrAccountNumber && fullBankAccount) {
-        acctOk = accountMatches(ocrAccountNumber, fullBankAccount);
+        acctOk = accountMatches(ocrAccountNumber, fullBankAccount, isMfsToBank);
         ocrAccountMatch = acctOk;
-        verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast3})`);
+        const tail = isMfsToBank && acctOk && !accountMatches(ocrAccountNumber, fullBankAccount, false)
+          ? `${bankFirst3}...${bankLast3} [mfs_to_bank first3+last3 fallback]`
+          : `${bankFirst3}...${bankLast4}`;
+        verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${tail})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast4})`);
       } else {
         verificationLog.push(`❌ OCR Account missing (OCR could not extract account number)`);
       }
