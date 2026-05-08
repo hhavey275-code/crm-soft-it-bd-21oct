@@ -367,8 +367,13 @@ Deno.serve(async (req) => {
     } else if (method === 'cash_deposit') {
       allPassed = ocrAmountMatch && ocrAccountMatch && telegramMatch;
     } else {
-      const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-      allPassed = ocrAvailable ? ocrRefMatch && ocrAmountMatch && telegramMatch : telegramMatch;
+      // Only enforce each OCR check when that specific field was actually extracted.
+      // Otherwise an SMS screenshot (no ref printed) blocks auto-approve forever.
+      const ocrRefAvailable = ocrRef !== '';
+      const ocrAmountAvailable = ocrAmount > 0;
+      const refOk = !ocrRefAvailable || ocrRefMatch;
+      const amountOk = !ocrAmountAvailable || ocrAmountMatch;
+      allPassed = refOk && amountOk && telegramMatch;
     }
 
     const logText = `Auto-verification (${method}): ${verificationLog.join(' | ')}`;
@@ -394,9 +399,8 @@ Deno.serve(async (req) => {
         if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
         if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
       } else {
-        const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-        if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
-        if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (ocrRef !== '' && !ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (ocrAmount > 0 && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
       }
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), {
