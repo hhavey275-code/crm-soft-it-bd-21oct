@@ -107,7 +107,12 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "ocr-edge-fallback",
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
@@ -135,8 +140,8 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
 }
 
 async function callGemini(imageUrl: string): Promise<OcrResult> {
-  const apiKey = Deno.env.get("USER_GEMINI_API_KEY");
-  if (!apiKey) throw new Error("USER_GEMINI_API_KEY not configured");
+  const apiKey = Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY not configured");
   // Fetch image and base64 it (Gemini accepts inline_data)
   const imgResp = await fetch(imageUrl);
   if (!imgResp.ok) throw new Error(`failed to fetch image: ${imgResp.status}`);
@@ -146,7 +151,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
   const b64 = btoa(bin);
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
