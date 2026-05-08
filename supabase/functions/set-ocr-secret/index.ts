@@ -43,6 +43,16 @@ serve(async (req) => {
     if (!api_key || typeof api_key !== "string" || api_key.length < 10) {
       return new Response(JSON.stringify({ error: "valid api_key required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const normalizedKey = api_key.trim();
+    if (/placeholder|replace|your[_-]?key|test[_-]?key/i.test(normalizedKey)) {
+      return new Response(JSON.stringify({ error: "Please paste a real API key, not a placeholder value" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (provider === "openai" && !normalizedKey.startsWith("sk-")) {
+      return new Response(JSON.stringify({ error: "OpenAI key should start with sk-" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (provider === "gemini" && !normalizedKey.startsWith("AIza")) {
+      return new Response(JSON.stringify({ error: "Gemini key should start with AIza" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const secretName = provider === "openai" ? "OPENAI_API_KEY" : "USER_GEMINI_API_KEY";
 
@@ -56,7 +66,7 @@ serve(async (req) => {
     let mgmtResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
       method: "POST",
       headers: { Authorization: `Bearer ${sbToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify([{ name: secretName, value: api_key }]),
+      body: JSON.stringify([{ name: secretName, value: normalizedKey }]),
     });
     let mgmtBody = await mgmtResp.text();
     console.log(`[set-ocr-secret] POST ${secretName} -> ${mgmtResp.status}: ${mgmtBody.slice(0, 300)}`);
@@ -72,7 +82,7 @@ serve(async (req) => {
       mgmtResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
         method: "POST",
         headers: { Authorization: `Bearer ${sbToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify([{ name: secretName, value: api_key }]),
+        body: JSON.stringify([{ name: secretName, value: normalizedKey }]),
       });
       mgmtBody = await mgmtResp.text();
       console.log(`[set-ocr-secret] POST retry ${secretName} -> ${mgmtResp.status}: ${mgmtBody.slice(0, 300)}`);
