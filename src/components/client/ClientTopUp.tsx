@@ -21,6 +21,7 @@ type PaymentMethod = "online_transfer" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
 
 const isMFS = (name: string) => /bkash|nagad/i.test(name);
+const normalizePaymentRef = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const STEPS = [
   { label: "Method", icon: CreditCard },
@@ -111,7 +112,18 @@ export function ClientTopUp() {
   const [duplicateRefError, setDuplicateRefError] = useState<string | null>(null);
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
   const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
+  const [ocrReference, setOcrReference] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: assignedBanks } = useQuery({
+    queryKey: ["client-assigned-banks", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(*)").eq("user_id", user!.id);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!user,
+  });
+  const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
 
   // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
   // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
@@ -119,6 +131,9 @@ export function ClientTopUp() {
   const amountMismatch =
     ocrAmountRaw !== null && ocrAmountRaw > 0 && !!bdtAmount &&
     Math.abs(parseFloat(bdtAmount) - ocrAmountRaw) > 15;
+  const refMismatch = !!proofFile && !ocrLoading && (
+    !ocrReference.trim() || !paymentRef.trim() || normalizePaymentRef(ocrReference) !== normalizePaymentRef(paymentRef)
+  );
 
   // MFS charge rates
   const getMFSChargeRate = (bankName: string): number => {
@@ -131,6 +146,7 @@ export function ClientTopUp() {
   const runOcrExtraction = async (file: File) => {
     setOcrLoading(true);
     setAccountVerified(null);
+    setOcrReference("");
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -143,8 +159,10 @@ export function ClientTopUp() {
         body: { image_url: dataUrl, verify_account_number: selectedBankDetails?.account_number || null },
       });
       if (error) throw error;
-      if (data?.reference) {
-        setPaymentRef(data.reference);
+      const extractedRef = String(data?.reference || "").trim();
+      setOcrReference(extractedRef);
+      if (extractedRef) {
+        setPaymentRef(extractedRef);
         toast.success("Transaction ID auto-filled from screenshot!");
       }
       if (data?.bdt_amount) {
@@ -160,16 +178,9 @@ export function ClientTopUp() {
       }
       // Account verification result
       if (typeof data?.account_verified === 'boolean') {
-        const isMFSPayment = selectedBankDetails && isMFS(selectedBankDetails.bank_name);
         if (!data.account_verified) {
-          if (isMFSPayment) {
-            // MFS: allow submit, just warn
-            setAccountVerified(null);
-            toast.warning("⚠️ Account number পাওয়া যায়নি। TrxID দিয়ে verify হবে।");
-          } else {
-            setAccountVerified(false);
-            toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
-          }
+          setAccountVerified(false);
+          toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
         } else {
           setAccountVerified(true);
           toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
@@ -177,6 +188,8 @@ export function ClientTopUp() {
       }
     } catch (err: any) {
       console.error("OCR extraction failed:", err);
+      setOcrAmountRaw(0);
+      setOcrReference("");
       const message = typeof err?.message === "string" ? err.message : "";
       if (message.includes("401") || message.toLowerCase().includes("unauthorized")) {
         toast.error("Session invalid. অনুগ্রহ করে আবার login করে চেষ্টা করুন।");
@@ -203,6 +216,7 @@ export function ClientTopUp() {
     setProofPreview(null);
     setAccountVerified(null);
     setOcrAmountRaw(null);
+    setOcrReference("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -271,15 +285,6 @@ export function ClientTopUp() {
     enabled: !!user,
   });
 
-  const { data: assignedBanks } = useQuery({
-    queryKey: ["client-assigned-banks", user?.id],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(*)").eq("user_id", user!.id);
-      return (data as any[]) ?? [];
-    },
-    enabled: !!user,
-  });
-
   const { data: myRequests } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
@@ -324,7 +329,6 @@ export function ClientTopUp() {
   const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
   const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
   const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
-  const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
 
   // Filter banks by category
   const filteredBanks = assignedBanks?.filter((cb: any) => {
@@ -367,6 +371,12 @@ export function ClientTopUp() {
         toast.error("Transaction ID আবশ্যক — Screenshot এ TrxID না পেলে ম্যানুয়ালি টাইপ করুন।");
         throw new Error("Missing transaction ID");
       }
+      if (!proofFile) throw new Error("Payment proof screenshot is required");
+      if (ocrLoading) throw new Error("OCR এখনো চলছে — একটু অপেক্ষা করুন");
+      if (ocrAmountRaw === null || ocrAmountRaw <= 0) throw new Error("Screenshot থেকে amount পড়া যায়নি। স্পষ্ট receipt screenshot আপলোড করুন।");
+      if (amountMismatch) throw new Error("Screenshot amount এবং submitted amount মিলছে না");
+      if (refMismatch) throw new Error("Screenshot TrxID এবং submitted TrxID মিলছে না");
+      if (accountVerified !== true) throw new Error("Screenshot এ selected account number verify হয়নি");
       // Check for duplicate payment reference
       if (paymentRef?.trim()) {
         const isDuplicate = await checkDuplicateRef(paymentRef);
@@ -761,13 +771,6 @@ export function ClientTopUp() {
                 </p>
               </div>
             )}
-            {accountVerified === null && proofFile && selectedBankDetails && isMFS(selectedBankDetails.bank_name) && (
-              <div className="mt-1 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                  ℹ️ Account number verify হয়নি — TrxID দিয়ে auto-matching হবে।
-                </p>
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -813,8 +816,7 @@ export function ClientTopUp() {
             </div>
 
             {/* Transaction Ref */}
-            {paymentMethod !== "cash_deposit" && (
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <Label>Transaction Reference / ID <span className="text-xs font-normal text-muted-foreground">(edit if needed)</span></Label>
                 <div className="relative">
                   <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" className={duplicateRefError ? "border-destructive" : ""} />
@@ -832,8 +834,7 @@ export function ClientTopUp() {
                     <Check className="h-3 w-3" /> Auto-filled — সঠিক না হলে edit করুন
                   </p>
                 )}
-              </div>
-            )}
+            </div>
           </div>
 
           {!proofFile && (
@@ -843,6 +844,13 @@ export function ClientTopUp() {
             <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
               <p className="text-xs text-destructive font-medium">
                 ⚠️ Screenshot এর amount (৳{ocrAmountRaw?.toLocaleString()}) আপনার দেওয়া amount (৳{Number(bdtAmount).toLocaleString()}) এর সাথে মিলছে না। সঠিক screenshot আপলোড করুন।
+              </p>
+            </div>
+          )}
+          {refMismatch && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot এর TrxID ({ocrReference || "পাওয়া যায়নি"}) এবং submitted TrxID ({paymentRef || "খালি"}) মিলছে না। সঠিক proof দিন।
               </p>
             </div>
           )}
@@ -859,9 +867,10 @@ export function ClientTopUp() {
             disabled={
               !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
               !paymentRef.trim() ||
-              (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
+              accountVerified !== true ||
+              refMismatch ||
               amountMismatch ||
-              ocrAmountRaw === 0
+              ocrAmountRaw === null || ocrAmountRaw <= 0
             }
           >
             Continue to Review <ChevronRight className="h-4 w-4 ml-1" />
@@ -974,7 +983,7 @@ export function ClientTopUp() {
             <Button
               className="flex-1"
               onClick={() => submitMutation.mutate()}
-              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || amountMismatch || ocrAmountRaw === 0 || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name)))}
+              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || ocrLoading || amountMismatch || refMismatch || ocrAmountRaw === null || ocrAmountRaw <= 0 || accountVerified !== true}
             >
               {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
             </Button>
