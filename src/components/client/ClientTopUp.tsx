@@ -110,7 +110,15 @@ export function ClientTopUp() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [duplicateRefError, setDuplicateRefError] = useState<string | null>(null);
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
+  const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
+  // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
+  // (e.g. uploading a 5k receipt while requesting 30k). Do NOT remove without owner approval.
+  const amountMismatch =
+    ocrAmountRaw !== null && ocrAmountRaw > 0 && !!bdtAmount &&
+    Math.abs(parseFloat(bdtAmount) - ocrAmountRaw) > 15;
 
   // MFS charge rates
   const getMFSChargeRate = (bankName: string): number => {
@@ -141,11 +149,14 @@ export function ClientTopUp() {
       }
       if (data?.bdt_amount) {
         const finalAmount = Number(data.bdt_amount);
+        setOcrAmountRaw(finalAmount);
         // OCR now extracts the principal/base amount directly (charge already excluded by AI)
         if (selectedBankDetails && isMFS(selectedBankDetails.bank_name)) {
           toast.info(`প্রাপ্ত পরিমাণ (চার্জ বাদে): ৳${finalAmount.toLocaleString()}`);
         }
         setBdtAmount(String(finalAmount));
+      } else {
+        setOcrAmountRaw(0);
       }
       // Account verification result
       if (typeof data?.account_verified === 'boolean') {
@@ -191,6 +202,7 @@ export function ClientTopUp() {
     setProofFile(null);
     setProofPreview(null);
     setAccountVerified(null);
+    setOcrAmountRaw(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -218,13 +230,14 @@ export function ClientTopUp() {
   }, [handlePaste]);
 
   // Duplicate reference check
+  // LOCKED: same TXN ID can never be reused — checks across ALL statuses
+  // (pending, approved, hold, rejected). Do NOT narrow this filter.
   const checkDuplicateRef = async (ref: string): Promise<boolean> => {
     if (!ref.trim()) return false;
     const { data } = await supabase
       .from("top_up_requests")
       .select("id, status")
       .eq("payment_reference", ref.trim())
-      .in("status", ["pending", "approved"])
       .limit(1);
     return (data?.length ?? 0) > 0;
   };
@@ -820,7 +833,30 @@ export function ClientTopUp() {
           {!proofFile && (
             <p className="text-xs text-destructive font-medium text-center">⚠️ Payment screenshot আপলোড করা বাধ্যতামূলক</p>
           )}
-          <Button className="w-full" onClick={() => setStep(3)} disabled={!bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) || ocrLoading}>
+          {amountMismatch && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot এর amount (৳{ocrAmountRaw?.toLocaleString()}) আপনার দেওয়া amount (৳{Number(bdtAmount).toLocaleString()}) এর সাথে মিলছে না। সঠিক screenshot আপলোড করুন।
+              </p>
+            </div>
+          )}
+          {proofFile && ocrAmountRaw === 0 && !ocrLoading && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot থেকে amount পড়া যায়নি। স্পষ্ট receipt screenshot আপলোড করুন।
+              </p>
+            </div>
+          )}
+          <Button
+            className="w-full"
+            onClick={() => setStep(3)}
+            disabled={
+              !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
+              (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
+              amountMismatch ||
+              ocrAmountRaw === 0
+            }
+          >
             Continue to Review <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
@@ -931,7 +967,7 @@ export function ClientTopUp() {
             <Button
               className="flex-1"
               onClick={() => submitMutation.mutate()}
-              disabled={isInactive || !!agencyBlocked || !proofFile || submitMutation.isPending}
+              disabled={isInactive || !!agencyBlocked || !proofFile || submitMutation.isPending || amountMismatch || ocrAmountRaw === 0 || (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name)))}
             >
               {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
             </Button>
