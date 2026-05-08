@@ -19,13 +19,10 @@ function verifyAccount(target: string, result: any): boolean | null {
   const ocrAcct = String(result?.account_number || "").replace(/\D/g, "");
   if (ocrAcct) {
     if (ocrAcct === t) return true;
-    if (ocrAcct.endsWith(last4)) return true;
     if (ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
   }
-  // Fallback: scan all OCR text fields for first3+last3 digits
-  const haystack = [result?.account_number, result?.reference, result?.account_holder_name, result?.bank_name]
-    .map((v) => String(v || "")).join(" ").replace(/\D/g, "");
-  if (haystack.includes(first3) && haystack.includes(last3)) return true;
+  // LOCKED: require both first3 and last3 in the OCR account number itself.
+  // Last4-only or unrelated text-field matches caused wrong-proof false passes.
   return false;
 }
 
