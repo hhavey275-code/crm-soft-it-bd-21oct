@@ -568,11 +568,48 @@ export function ClientTopUp() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
-              { value: "online_transfer" as PaymentMethod, label: "Online Transfer", desc: "Internet/Mobile Banking", IconComp: OnlineIcon },
-              { value: "mfs_to_bank" as PaymentMethod, label: "bKash/Nagad → Bank", desc: "MFS to bank transfer", IconComp: MFSIcon },
-              { value: "npsb" as PaymentMethod, label: "NPSB", desc: "Inter-bank NPSB transfer", IconComp: OnlineIcon },
+              { value: "online_transfer" as PaymentMethod, label: "Online Transfer", desc: "Internet / Mobile / NPSB / MFS→Bank", IconComp: OnlineIcon, isOnline: true },
               { value: "atm_deposit" as PaymentMethod, label: "ATM Deposit", desc: "Deposit via ATM", IconComp: ATMIcon },
               { value: "cash_deposit" as PaymentMethod, label: "Cash Deposit", desc: "Bank branch deposit", IconComp: CashIcon },
+            ]).map((m) => (
+              <Card
+                key={m.value}
+                className={cn(
+                  "cursor-pointer transition-all hover:shadow-lg active:scale-[0.97] border-2",
+                  (paymentMethod === m.value || (m.isOnline && (paymentMethod === "mfs_to_bank" || paymentMethod === "npsb"))) ? "border-primary bg-primary/5 shadow-lg" : "border-border hover:border-primary/40"
+                )}
+                onClick={() => {
+                  if (m.isOnline) { setPaymentMethod("online_transfer"); setStep(0.6 as any); }
+                  else { setPaymentMethod(m.value); setStep(1); }
+                }}
+              >
+                <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                  <m.IconComp />
+                  <div>
+                    <p className="font-bold text-sm">{m.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{m.desc}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Step 0.6: Online Transfer sub-method */}
+      {(step as number) === 0.6 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setStep(0.5 as any); setPaymentMethod(null); }} className="gap-1">
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+            <h2 className="text-lg font-semibold">Online Transfer Type</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {([
+              { value: "online_transfer" as PaymentMethod, label: "Bank to Bank", desc: "Internet / Mobile Banking", IconComp: OnlineIcon },
+              { value: "npsb" as PaymentMethod, label: "NPSB", desc: "Inter-bank NPSB transfer", IconComp: OnlineIcon },
+              { value: "mfs_to_bank" as PaymentMethod, label: "bKash/Nagad → Bank", desc: "MFS to bank transfer", IconComp: MFSIcon },
             ]).map((m) => (
               <Card
                 key={m.value}
