@@ -622,22 +622,27 @@ export function SellerDashboard() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">BDT</span>
-                        <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">USDT</span>
-                        <span className="font-bold text-foreground">{fmt(Number(t.usdt_amount), "$")}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Rate</span>
-                        <span className="font-semibold text-foreground">{Number(t.rate) > 0 ? t.rate : "—"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Conv</span>
-                        <span className="font-bold text-foreground">{fmt(convertedBdt, "৳")}</span>
-                      </div>
+                      {t.type === "usdt_received" ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">USDT</span>
+                            <span className="font-bold text-foreground">{fmt(Number(t.usdt_amount), "$")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Rate</span>
+                            <span className="font-semibold text-foreground">{Number(t.rate) > 0 ? t.rate : "—"}</span>
+                          </div>
+                          <div className="flex justify-between col-span-2">
+                            <span className="text-muted-foreground">Conv</span>
+                            <span className="font-bold text-foreground">{fmt(convertedBdt, "৳")}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between col-span-2">
+                          <span className="text-muted-foreground">BDT</span>
+                          <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
+                        </div>
+                      )}
                     </div>
                     {t.bank_accounts && (
                       <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
@@ -801,16 +806,16 @@ export function SellerDashboard() {
                           ) : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(Number(t.bdt_amount), "৳")}
+                          {t.type === "usdt_received" ? "—" : fmt(Number(t.bdt_amount), "৳")}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(Number(t.usdt_amount), "$")}
+                          {t.type === "usdt_received" ? fmt(Number(t.usdt_amount), "$") : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-semibold text-muted-foreground tabular-nums">
-                          {Number(t.rate) > 0 ? t.rate : "—"}
+                          {t.type === "usdt_received" && Number(t.rate) > 0 ? t.rate : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(convertedBdt, "৳")}
+                          {t.type === "usdt_received" ? fmt(convertedBdt, "৳") : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-xs text-muted-foreground">
                           <div className="whitespace-nowrap">{t.description || "—"}</div>
