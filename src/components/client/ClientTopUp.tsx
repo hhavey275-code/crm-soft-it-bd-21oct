@@ -371,6 +371,12 @@ export function ClientTopUp() {
         toast.error("Transaction ID আবশ্যক — Screenshot এ TrxID না পেলে ম্যানুয়ালি টাইপ করুন।");
         throw new Error("Missing transaction ID");
       }
+      if (!proofFile) throw new Error("Payment proof screenshot is required");
+      if (ocrLoading) throw new Error("OCR এখনো চলছে — একটু অপেক্ষা করুন");
+      if (ocrAmountRaw === null || ocrAmountRaw <= 0) throw new Error("Screenshot থেকে amount পড়া যায়নি। স্পষ্ট receipt screenshot আপলোড করুন।");
+      if (amountMismatch) throw new Error("Screenshot amount এবং submitted amount মিলছে না");
+      if (refMismatch) throw new Error("Screenshot TrxID এবং submitted TrxID মিলছে না");
+      if (accountVerified !== true) throw new Error("Screenshot এ selected account number verify হয়নি");
       // Check for duplicate payment reference
       if (paymentRef?.trim()) {
         const isDuplicate = await checkDuplicateRef(paymentRef);
