@@ -15,7 +15,6 @@ function verifyAccount(target: string, result: any): boolean | null {
   if (t.length < 6) return null;
   const first3 = t.slice(0, 3);
   const last3 = t.slice(-3);
-  const last4 = t.slice(-4);
   const ocrAcct = String(result?.account_number || "").replace(/\D/g, "");
   if (ocrAcct) {
     if (ocrAcct === t) return true;
