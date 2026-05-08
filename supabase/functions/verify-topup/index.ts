@@ -302,29 +302,44 @@ Deno.serve(async (req) => {
     const windowStart = new Date(requestTime.getTime() - windowMinsBack * 60 * 1000).toISOString();
     const windowEnd = new Date(requestTime.getTime() + windowMinsForward * 60 * 1000).toISOString();
 
+    // Fetch ALL messages in the window (do NOT pre-filter by matched_request_id)
+    // so the diagnostic log can show admins exactly which SMS arrived and why
+    // each one was skipped — instead of misleading "messages checked: 0".
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
       .select('text, raw_update, created_at, update_id, chat_id, matched_request_id')
       .gte('created_at', windowStart)
       .lte('created_at', windowEnd)
-      .or(`matched_request_id.is.null,matched_request_id.eq.${request_id}`)
       .order('created_at', { ascending: false })
       .limit(200);
 
     let telegramMatch = false;
     let telegramMatchDetail = '';
     let matchedMsg: any = null;
+    let alreadyMatchedSkipped = 0;
+    const perMsgReasons: string[] = [];
     if (telegramMsgs && bdtNum > 0) {
       for (const msg of telegramMsgs) {
         const raw = msg.raw_update || {};
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
         const text = msg.text || payload.text || payload.caption || '';
+        const snippet = text.replace(/\s+/g, ' ').slice(0, 80);
+        // Skip messages already consumed by another request (but log them for visibility)
+        if (msg.matched_request_id && msg.matched_request_id !== request_id) {
+          alreadyMatchedSkipped++;
+          if (perMsgReasons.length < 5) {
+            perMsgReasons.push(`⏭ already matched to other req: "${snippet}"`);
+          }
+          continue;
+        }
         if (useMobileAgentFlow && payment_reference) {
           if (text.toLowerCase().includes(payment_reference.toLowerCase())) {
             telegramMatch = true;
             matchedMsg = msg;
             telegramMatchDetail = `trnxID: ${payment_reference} found in SMS`;
             break;
+          } else if (perMsgReasons.length < 5) {
+            perMsgReasons.push(`✗ trnxID "${payment_reference}" not in: "${snippet}"`);
           }
         } else {
           const digitsInText = text.replace(/[^\d]/g, '');
@@ -350,6 +365,10 @@ Deno.serve(async (req) => {
             const matchType = hasLast4 ? `last4: ${bankLast4}` : hasFirst4Last3 ? `first4+last3: ${bankFirst4}...${bankLast3}` : hasFirst3Last3 ? `first3+last3: ${bankFirst3}...${bankLast3}` : `last3: ${bankLast3}`;
             telegramMatchDetail = `${matchType}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
             break;
+          } else if (perMsgReasons.length < 5) {
+            const acctTag = hasAccountMatch ? '✓acct' : `✗acct(need ${bankLast4||bankLast3})`;
+            const amtTag = hasAmount ? '✓amt' : `✗amt(need ৳${bdtNum})`;
+            perMsgReasons.push(`${acctTag} ${amtTag}: "${snippet}"`);
           }
         }
       }
@@ -357,8 +376,15 @@ Deno.serve(async (req) => {
     if (telegramMatch) {
       verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
     } else {
-      const matchInfo = useMobileAgentFlow ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
-      verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
+      const matchInfo = useMobileAgentFlow
+        ? `trnxID=${payment_reference}`
+        : `bankAcct=${fullBankAccount} (last4=${bankLast4}, first4=${bankFirst4}, last3=${bankLast3}), bdt=${bdtNum}`;
+      const total = telegramMsgs?.length ?? 0;
+      const checked = total - alreadyMatchedSkipped;
+      const detail = perMsgReasons.length > 0 ? ` | tried: ${perMsgReasons.join(' ; ')}` : '';
+      verificationLog.push(
+        `❌ Telegram SMS no match (${matchInfo}, total in window: ${total}, checked: ${checked}, already-matched skipped: ${alreadyMatchedSkipped}, window: ${windowStart} → ${windowEnd})${detail}`,
+      );
     }
 
     let allPassed = false;
