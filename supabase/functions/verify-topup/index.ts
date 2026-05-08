@@ -253,28 +253,8 @@ Deno.serve(async (req) => {
           ocrPrompt =
             'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.';
         }
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: ocrPrompt },
-                  { type: 'image_url', image_url: { url: proof_url } },
-                ],
-              },
-            ],
-          }),
-        });
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content || '';
+        const content = await callOcrWithFallback(ocrPrompt, proof_url);
+        if (content) {
           const jsonMatch = content.match(/\{[^}]+\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
