@@ -773,6 +773,18 @@ export default function AdAccountDetailPage() {
                         Request Review
                       </a>
                     )}
+                    {!isTikTok && (
+                      <a
+                        href={`https://www.facebook.com/business-support-home/contact-support?source=business_help_center_support&selectedAsset=${account.account_id.replace(/^act_/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        title="Open Facebook Support Chat for this account"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Contact Support
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
