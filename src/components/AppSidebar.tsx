@@ -350,7 +350,5 @@ function SignOutButton({ signOut, collapsed }: { signOut: () => Promise<void>; c
       {!collapsed && (loading ? "Signing out..." : "Sign Out")}
     </Button>
   );
-      </SidebarFooter>
-    </Sidebar>
-  );
 }
+
