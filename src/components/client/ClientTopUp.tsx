@@ -823,8 +823,7 @@ export function ClientTopUp() {
             </div>
 
             {/* Transaction Ref */}
-            {paymentMethod !== "cash_deposit" && (
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <Label>Transaction Reference / ID <span className="text-xs font-normal text-muted-foreground">(edit if needed)</span></Label>
                 <div className="relative">
                   <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" className={duplicateRefError ? "border-destructive" : ""} />
@@ -842,8 +841,7 @@ export function ClientTopUp() {
                     <Check className="h-3 w-3" /> Auto-filled — সঠিক না হলে edit করুন
                   </p>
                 )}
-              </div>
-            )}
+            </div>
           </div>
 
           {!proofFile && (
