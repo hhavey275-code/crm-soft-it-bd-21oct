@@ -813,15 +813,21 @@ export function ClientAdAccounts() {
 
                       {/* Top Up + Actions */}
                       <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground text-xs h-8 shadow-md shadow-primary/25"
-                          disabled={isInactive}
-                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        >
-                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                          Top Up
-                        </Button>
+                        {a.client_topup_disabled ? (
+                          <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
+                            Admin Top-Up Only
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground text-xs h-8 shadow-md shadow-primary/25"
+                            disabled={isInactive}
+                            onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                          >
+                            <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                            Top Up
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
