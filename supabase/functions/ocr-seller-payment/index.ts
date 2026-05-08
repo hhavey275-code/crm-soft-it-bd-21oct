@@ -10,20 +10,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function verifyAccount(target: string, result: any): boolean | null {
+function verifyAccount(target: string, result: any, allowFirst3Last3 = false): boolean | null {
   const t = String(target || "").replace(/\D/g, "");
   if (t.length < 6) return null;
   const first3 = t.slice(0, 3);
   const last4 = t.slice(-4);
+  const last3 = t.slice(-3);
   const rawOcrAcct = String(result?.account_number || "");
   const ocrAcct = rawOcrAcct.replace(/\D/g, "");
   if (ocrAcct) {
     if (ocrAcct === t) return true;
     const isMaskedOrPartial = /[*xX•●]/.test(rawOcrAcct) || ocrAcct.length <= 7;
     if (isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) return true;
+    // Narrow exception: bKash/Nagad → Bank receipts often hide the full last 4 digits.
+    // Allow first3+last3 ONLY when caller explicitly opts in for mfs_to_bank flow.
+    if (allowFirst3Last3 && isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
   }
-  // LOCKED: never accept first3+last3 only. It falsely verifies accounts like
-  // 150...6001 vs 150...1001 because both end with 001.
   return false;
 }
 
@@ -31,7 +33,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { image_url, verify_account_number } = await req.json();
+    const { image_url, verify_account_number, allow_first3_last3 } = await req.json();
     if (!image_url) {
       return new Response(JSON.stringify({ error: "image_url is required" }), {
         status: 400,
@@ -40,7 +42,9 @@ serve(async (req) => {
     }
 
     const { result, provider, attempts } = await runOcrWithFallback(image_url);
-    const account_verified = verify_account_number ? verifyAccount(verify_account_number, result) : null;
+    const account_verified = verify_account_number
+      ? verifyAccount(verify_account_number, result, !!allow_first3_last3)
+      : null;
 
     return new Response(JSON.stringify({ ...result, account_verified, _provider: provider, _attempts: attempts }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
