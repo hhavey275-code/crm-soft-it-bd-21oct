@@ -806,16 +806,16 @@ export function SellerDashboard() {
                           ) : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(Number(t.bdt_amount), "৳")}
+                          {t.type === "usdt_received" ? "—" : fmt(Number(t.bdt_amount), "৳")}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(Number(t.usdt_amount), "$")}
+                          {t.type === "usdt_received" ? fmt(Number(t.usdt_amount), "$") : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-semibold text-muted-foreground tabular-nums">
-                          {Number(t.rate) > 0 ? t.rate : "—"}
+                          {t.type === "usdt_received" && Number(t.rate) > 0 ? t.rate : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-right text-xs font-bold text-foreground tabular-nums">
-                          {fmt(convertedBdt, "৳")}
+                          {t.type === "usdt_received" ? fmt(convertedBdt, "৳") : "—"}
                         </td>
                         <td className="px-1.5 py-2 text-xs text-muted-foreground">
                           <div className="whitespace-nowrap">{t.description || "—"}</div>
