@@ -21,6 +21,7 @@ type PaymentMethod = "online_transfer" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
 
 const isMFS = (name: string) => /bkash|nagad/i.test(name);
+const normalizePaymentRef = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const STEPS = [
   { label: "Method", icon: CreditCard },
@@ -111,6 +112,7 @@ export function ClientTopUp() {
   const [duplicateRefError, setDuplicateRefError] = useState<string | null>(null);
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
   const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
+  const [ocrReference, setOcrReference] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
@@ -119,6 +121,9 @@ export function ClientTopUp() {
   const amountMismatch =
     ocrAmountRaw !== null && ocrAmountRaw > 0 && !!bdtAmount &&
     Math.abs(parseFloat(bdtAmount) - ocrAmountRaw) > 15;
+  const refMismatch = !!proofFile && !ocrLoading && (
+    !ocrReference.trim() || !paymentRef.trim() || normalizePaymentRef(ocrReference) !== normalizePaymentRef(paymentRef)
+  );
 
   // MFS charge rates
   const getMFSChargeRate = (bankName: string): number => {
@@ -131,6 +136,7 @@ export function ClientTopUp() {
   const runOcrExtraction = async (file: File) => {
     setOcrLoading(true);
     setAccountVerified(null);
+    setOcrReference("");
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -143,8 +149,10 @@ export function ClientTopUp() {
         body: { image_url: dataUrl, verify_account_number: selectedBankDetails?.account_number || null },
       });
       if (error) throw error;
-      if (data?.reference) {
-        setPaymentRef(data.reference);
+      const extractedRef = String(data?.reference || "").trim();
+      setOcrReference(extractedRef);
+      if (extractedRef) {
+        setPaymentRef(extractedRef);
         toast.success("Transaction ID auto-filled from screenshot!");
       }
       if (data?.bdt_amount) {
@@ -160,16 +168,9 @@ export function ClientTopUp() {
       }
       // Account verification result
       if (typeof data?.account_verified === 'boolean') {
-        const isMFSPayment = selectedBankDetails && isMFS(selectedBankDetails.bank_name);
         if (!data.account_verified) {
-          if (isMFSPayment) {
-            // MFS: allow submit, just warn
-            setAccountVerified(null);
-            toast.warning("⚠️ Account number পাওয়া যায়নি। TrxID দিয়ে verify হবে।");
-          } else {
-            setAccountVerified(false);
-            toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
-          }
+          setAccountVerified(false);
+          toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
         } else {
           setAccountVerified(true);
           toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
@@ -177,6 +178,8 @@ export function ClientTopUp() {
       }
     } catch (err: any) {
       console.error("OCR extraction failed:", err);
+      setOcrAmountRaw(0);
+      setOcrReference("");
       const message = typeof err?.message === "string" ? err.message : "";
       if (message.includes("401") || message.toLowerCase().includes("unauthorized")) {
         toast.error("Session invalid. অনুগ্রহ করে আবার login করে চেষ্টা করুন।");
@@ -203,6 +206,7 @@ export function ClientTopUp() {
     setProofPreview(null);
     setAccountVerified(null);
     setOcrAmountRaw(null);
+    setOcrReference("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
