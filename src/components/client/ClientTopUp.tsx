@@ -110,7 +110,15 @@ export function ClientTopUp() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [duplicateRefError, setDuplicateRefError] = useState<string | null>(null);
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
+  const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
+  // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
+  // (e.g. uploading a 5k receipt while requesting 30k). Do NOT remove without owner approval.
+  const amountMismatch =
+    ocrAmountRaw !== null && ocrAmountRaw > 0 && !!bdtAmount &&
+    Math.abs(parseFloat(bdtAmount) - ocrAmountRaw) > 15;
 
   // MFS charge rates
   const getMFSChargeRate = (bankName: string): number => {
