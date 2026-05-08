@@ -505,13 +505,21 @@ Deno.serve(async (req) => {
     } else if (method === 'cash_deposit') {
       allPassed = ocrAmountMatch && ocrAccountMatch && telegramMatch;
     } else {
-      // Only enforce each OCR check when that specific field was actually extracted.
-      // Otherwise an SMS screenshot (no ref printed) blocks auto-approve forever.
+      // LOCKED: bank_transfer / MFS — strict checks. OCR amount MUST be present
+      // and match submitted amount; if OCR extracted an account number, it MUST
+      // match the selected bank account. This prevents wrong-screenshot approvals.
+      // Do NOT loosen these conditions without owner approval.
       const ocrRefAvailable = ocrRef !== '';
-      const ocrAmountAvailable = ocrAmount > 0;
       const refOk = !ocrRefAvailable || ocrRefMatch;
-      const amountOk = !ocrAmountAvailable || ocrAmountMatch;
-      allPassed = refOk && amountOk && telegramMatch;
+      const amountOk = ocrAmount > 0 && ocrAmountMatch;
+      let acctOk = true;
+      if (ocrAccountNumber && fullBankAccount) {
+        acctOk = accountMatches(ocrAccountNumber, fullBankAccount);
+        verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast3})`);
+      } else if (!isMobileAgent) {
+        verificationLog.push(`⚠️ OCR Account skipped (OCR could not extract account number)`);
+      }
+      allPassed = refOk && amountOk && acctOk && telegramMatch;
     }
 
     const logText = `Auto-verification (${method}): ${verificationLog.join(' | ')}`;
