@@ -230,13 +230,14 @@ export function ClientTopUp() {
   }, [handlePaste]);
 
   // Duplicate reference check
+  // LOCKED: same TXN ID can never be reused — checks across ALL statuses
+  // (pending, approved, hold, rejected). Do NOT narrow this filter.
   const checkDuplicateRef = async (ref: string): Promise<boolean> => {
     if (!ref.trim()) return false;
     const { data } = await supabase
       .from("top_up_requests")
       .select("id, status")
       .eq("payment_reference", ref.trim())
-      .in("status", ["pending", "approved"])
       .limit(1);
     return (data?.length ?? 0) > 0;
   };
