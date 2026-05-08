@@ -11,6 +11,38 @@ function amountMatches(a: number, b: number) {
   return Math.abs(a - b) <= BDT_TOLERANCE;
 }
 
+function parseBdtAmount(value: string): number {
+  return Number(value.replace(/,/g, ''));
+}
+
+function extractSmsCreditAmounts(text: string): number[] {
+  const amounts = new Set<number>();
+  const currencyRegex = /(?:tk\.?|bdt|৳)\s*([\d,]+(?:\.\d+)?)/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = currencyRegex.exec(text)) !== null) {
+    const raw = match[1];
+    const amount = parseBdtAmount(raw);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    const start = match.index;
+    const end = start + match[0].length;
+    const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
+    const after = text.slice(end, end + 45).toLowerCase();
+    const near = `${before} ${after}`;
+    const immediateBefore = before.slice(-18);
+    const immediateAfter = after.slice(0, 24);
+
+    const looksLikeCredit = /(deposit|credited|credit|cash\s*out|received|transfer|successful)/i.test(near);
+    const looksLikeFeeOrBalance = /(fee\s*$|charge\s*$|vat\s*$|balance\s*$|bal\s*$|c\/b\s*$|available\s*$|a\/c\s*bal\s*$)/i.test(immediateBefore)
+      || /^(\s*(balance|bal|c\/b|available balance|a\/c bal|fee|charge|vat)\b)/i.test(immediateAfter);
+
+    if (looksLikeCredit && !looksLikeFeeOrBalance) amounts.add(amount);
+  }
+
+  return [...amounts];
+}
+
 /**
  * Single global Due/Advance running balance for a seller.
  *  +bdt_amount on bdt_payment / client_topup
@@ -348,11 +380,12 @@ Deno.serve(async (req) => {
           const hasLast3Only = bankLast3 && digitsInText.includes(bankLast3);
           const hasFirst3Last3 = bankFirst3 && bankLast3 && digitsInText.includes(bankFirst3) && digitsInText.includes(bankLast3);
           const hasAccountMatch = hasLast4 || hasFirst4Last3 || hasLast3Only || hasFirst3Last3;
-          const numberMatches = text.match(/[\d,]+/g) || [];
+          const creditAmounts = extractSmsCreditAmounts(text);
+          const numberMatches = creditAmounts.length > 0 ? creditAmounts.map(String) : (text.match(/[\d,]+/g) || []);
           let hasAmount = false;
           let matchedTelegramAmount = 0;
           for (const numStr of numberMatches) {
-            const num = Number(numStr.replace(/,/g, ''));
+            const num = typeof numStr === 'number' ? numStr : Number(String(numStr).replace(/,/g, ''));
             if (num > 0 && amountMatches(num, bdtNum)) {
               hasAmount = true;
               matchedTelegramAmount = num;
