@@ -133,7 +133,7 @@ export function ClientTopUp() {
   };
 
   // OCR extraction from screenshot
-  const runOcrExtraction = useCallback(async (file: File) => {
+  const runOcrExtraction = async (file: File) => {
     setOcrLoading(true);
     setAccountVerified(null);
     setOcrReference("");
@@ -189,7 +189,7 @@ export function ClientTopUp() {
     } finally {
       setOcrLoading(false);
     }
-  }, [selectedBankDetails]);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -226,7 +226,7 @@ export function ClientTopUp() {
         return;
       }
     }
-  }, [runOcrExtraction]);
+  }, []);
 
   useEffect(() => {
     document.addEventListener("paste", handlePaste);
