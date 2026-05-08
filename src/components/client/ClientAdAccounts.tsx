@@ -965,16 +965,23 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25"
-                            disabled={isInactive}
-                            onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                          >
-                            <ArrowUpCircle className="h-4 w-4" />
-                            Top Up
-                          </Button>
+                          {a.client_topup_disabled ? (
+                            <Button size="sm" variant="outline" disabled title="Admin top-up only">
+                              <Lock className="h-4 w-4 mr-1" />
+                              Admin Only
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25"
+                              disabled={isInactive}
+                              onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                            >
+                              <ArrowUpCircle className="h-4 w-4" />
+                              Top Up
+                            </Button>
+                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
