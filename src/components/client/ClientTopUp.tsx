@@ -852,6 +852,7 @@ export function ClientTopUp() {
             onClick={() => setStep(3)}
             disabled={
               !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
+              !paymentRef.trim() ||
               (accountVerified === false && !(selectedBankDetails && isMFS(selectedBankDetails.bank_name))) ||
               amountMismatch ||
               ocrAmountRaw === 0
