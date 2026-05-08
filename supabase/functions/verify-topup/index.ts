@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { runOcrWithFallback } from '../_shared/ocr-fallback.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -354,26 +355,33 @@ Deno.serve(async (req) => {
     let ocrAccountNumber = '';
     if (proof_url) {
       try {
-        let ocrPrompt = '';
-        if (method === 'atm_deposit') {
+        if (method === 'bank_transfer') {
+          const { result } = await runOcrWithFallback(proof_url);
+          ocrRef = String(result.reference || '').trim();
+          ocrAmount = Number(result.bdt_amount || 0);
+          ocrAccountNumber = String(result.account_number || '').trim();
+        } else {
+          let ocrPrompt = '';
+          if (method === 'atm_deposit') {
           ocrPrompt =
             'Extract the following from this ATM deposit receipt screenshot: transaction reference number, deposit amount (in BDT), receiver/destination account number, date, and whether this is an "ATM Transfer Credit" transaction. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890", "date": "2025-01-15", "is_atm_credit": true}. If you cannot find a value, use empty string for strings, 0 for amount, and false for is_atm_credit. No explanation, just JSON.';
-        } else if (method === 'cash_deposit') {
+          } else if (method === 'cash_deposit') {
           ocrPrompt =
             'Extract the following from this cash deposit receipt screenshot: deposit amount (in BDT), receiver/destination account number, and date. Return ONLY a JSON object like: {"amount": 1300, "account_number": "1234567890", "date": "2025-01-15"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
-        } else {
+          } else {
           ocrPrompt =
             'Extract the transaction reference number, the BASE payment amount (in BDT), and the receiver/destination account number from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
-        }
-        const content = await callOcrWithFallback(ocrPrompt, proof_url);
-        if (content) {
-          const jsonMatch = content.match(/\{[^}]+\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            ocrRef = String(parsed.ref || '').trim();
-            ocrAmount = Number(parsed.amount || 0);
-            ocrAccountNumber = String(parsed.account_number || '').trim();
-            ocrAtmCredit = Boolean(parsed.is_atm_credit);
+          }
+          const content = await callOcrWithFallback(ocrPrompt, proof_url);
+          if (content) {
+            const jsonMatch = content.match(/\{[^}]+\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              ocrRef = String(parsed.ref || parsed.reference || '').trim();
+              ocrAmount = Number(parsed.amount || parsed.bdt_amount || 0);
+              ocrAccountNumber = String(parsed.account_number || '').trim();
+              ocrAtmCredit = Boolean(parsed.is_atm_credit);
+            }
           }
         }
       } catch (e) {
