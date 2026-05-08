@@ -1,78 +1,43 @@
-## Goal
+## Plan
 
-Tenant Usage Log (`TenantUsageLog.tsx`) ke admin side er Limit Log er moto consistent banano — jate `usage_topup` (consumption) clearly **negative / "Consumed"** hisebe dekhay, ar prottek row e **System Limit + Remaining** dekha jay (2nd screenshot er moto).
+### 1) Fix login/signout lag and stale role issue
+- Refactor `AuthContext` so auth state restores with `getSession()` first, then listens to later auth events without awaiting database calls inside `onAuthStateChange`.
+- Remove/limit stale `cached_role` behavior so a previous client role cannot temporarily show client UI after switching to an admin account.
+- Make `signOut()` more forceful:
+  - clear Supabase auth storage keys, cached role, session storage, and relevant query cache
+  - reset auth state immediately even if Supabase signout is slow
+  - navigate to `/auth` after signout
+- Update the sidebar sign-out button to show a loading state and prevent double-clicks.
 
-## Current problem
+### 2) Add a new top-up method: `bKash/Nagad to Bank`
+- In client top-up flow, add a separate method under Bank Transfer choices:
+  - `Online Transfer`
+  - `bKash/Nagad to Bank`
+  - `NPSB`
+  - `ATM Deposit`
+  - `Cash Deposit`
+- Store the new methods distinctly in `top_up_requests.payment_method`, for example:
+  - `mfs_to_bank`
+  - `npsb`
+- Show the selected method in Review and history/admin logs where applicable.
 
-Ekhon row dekhay:
-- `usage_topup` badge + **+$20** (orange) → mone hocche limit barche, asole used barche
-- "Local Before → After" shows used jumping up — semantics correct kintu sign confusing
-- Limit / Remaining per row dekhano nai
+### 3) Verification rules for the new method
+- Keep normal bank transfer strict: full match or `first3 + last4` only.
+- Add a narrow exception only for `mfs_to_bank`:
+  - amount must match
+  - transaction/reference ID must match
+  - OCR must identify receiver bank account digits
+  - if last 4 digits are not visible, allow `first3 + last3`
+  - server log/admin note will clearly say `mfs_to_bank first3+last3 fallback`
+- This exception will not apply to normal bank transfer, NPSB, ATM deposit, or cash deposit.
 
-User-er expectation (limit 100, top-up 10):
-- Limit 100, Used 10, **Remaining 90 (−10 from full)**
-- Pore: Limit 100, Used 25, **Remaining 75 (−15 step)**
+### 4) Current verification behavior to keep/document
+- `MFS` currently means payment to a bKash/Nagad merchant/agent account. It uses MFS flow, reference/amount matching, and Telegram SMS matching by transaction ID.
+- `Cash Deposit` currently requires OCR amount + destination account match, then Telegram SMS account/amount match. It does not require a reference match.
+- `ATM Deposit` currently requires OCR reference match + amount match + account match + “ATM Transfer Credit” confirmation + Telegram SMS match.
+- Normal `bank_transfer` currently requires OCR reference + amount + selected account match, plus Telegram SMS account/amount match.
 
-## Changes (UI only — `src/components/tenant/TenantUsageLog.tsx`)
-
-### 1. Row presentation rework (mobile card + desktop table)
-
-Per row map `action` → display:
-
-| action | Badge | Amount color | Sign |
-|---|---|---|---|
-| `report-usage` / `usage_topup` | **Consumed** (red/destructive soft) | destructive | **−$X** |
-| `refund-usage` / `usage_refund` | **Refunded** (green soft) | green-500 | **+$X** |
-| `limit_purchase` | **Limit Purchase** (green) | green-500 | **+$X** |
-| `limit_manual_increase` / `limit_set` (delta>0) | **Limit ↑** | green | **+$X** |
-| `limit_manual_decrease` (or delta<0) | **Limit ↓** | destructive | **−$X** |
-| anything else (master_sync / reconcile) | source label fallback | muted | signed delta |
-
-Use `movement_type` if present, else fall back to `action`.
-
-### 2. Per-row "System Limit / Remaining" line (like 2nd SS)
-
-Each row shows below the amount:
-
-```
-System Limit       $X,XXX.XX
-Remaining          $YYY.YY     ← red if negative or low
-```
-
-Source of truth per row:
-- `system_limit_after` (from `tenant_limit_ledger`) if available
-- Remaining = `system_limit_after − total_used_after`
-
-Currently the query pulls from `tenant_usage_audit` which only has `local_total_used_*` and `master_total_used_after`. Need to also surface limit. Two options:
-
-**Option A (preferred, no schema change):** Switch the audit query to read from `tenant_limit_ledger` (already populated by `_tll_insert` with `system_limit_before/after`, `total_used_before/after`, `remaining_before/after`, `movement_type`). This table has everything needed.
-
-**Option B:** Keep `tenant_usage_audit` and join current `system_limit` from tenants (less accurate historically).
-
-Plan picks **Option A**. `tenant_usage_audit` view stays for backward compat but the Usage Log UI reads `tenant_limit_ledger` ordered by `created_at DESC LIMIT 200`.
-
-### 3. Drop the misleading "+/−" prefix on raw amount
-
-Compute sign from movement direction, not from string match on `"refund-usage"`.
-
-### 4. Keep top summary cards as-is
-
-Local Used / Master Used / Drift cards stay — they're correct.
-
-### 5. Keep idempotency key + status badges
-
-DUP / ERR / HTTP status badges stay (smaller, secondary placement).
-
-## Out of scope
-
-- No DB schema change.
-- No backend / edge function change.
-- Admin-side Limit Log component already matches 2nd screenshot — not touched.
-- Master sync / reconcile logic unchanged (separate question still pending from previous turn).
-
-## Acceptance
-
-- A `usage_topup +$20` row now renders: **Consumed  −$20.00**, with "System Limit $8,008.12 · Remaining $-475.61" line.
-- A `limit_purchase` row renders: **Limit Purchase  +$1,000.00**, remaining jumps up.
-- Refund renders green **Refunded +$X**.
-- Mobile + desktop both updated.
+### 5) Validation
+- Test auth flow manually: client login → sign out → admin login without reload.
+- Test verification logic with account examples like `...6001` vs `...1001` to confirm normal flow still fails.
+- Test `mfs_to_bank` with `first3 + last3` visible to confirm only that method can pass the fallback.

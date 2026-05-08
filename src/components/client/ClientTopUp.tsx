@@ -17,7 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 
-type PaymentMethod = "online_transfer" | "atm_deposit" | "cash_deposit";
+type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
 
 const isMFS = (name: string) => /bkash|nagad/i.test(name);
@@ -156,7 +156,11 @@ export function ClientTopUp() {
       });
 
       const { data, error } = await supabase.functions.invoke('ocr-seller-payment', {
-        body: { image_url: dataUrl, verify_account_number: selectedBankDetails?.account_number || null },
+        body: {
+          image_url: dataUrl,
+          verify_account_number: selectedBankDetails?.account_number || null,
+          allow_first3_last3: paymentMethod === "mfs_to_bank",
+        },
       });
       if (error) throw error;
       const extractedRef = String(data?.reference || "").trim();
@@ -433,6 +437,8 @@ export function ClientTopUp() {
 
   const methodLabel = (m: PaymentMethod | null) => {
     if (m === "online_transfer") return "Online Bank Transfer";
+    if (m === "mfs_to_bank") return "bKash/Nagad to Bank";
+    if (m === "npsb") return "NPSB";
     if (m === "atm_deposit") return "ATM Deposit";
     if (m === "cash_deposit") return "Cash Deposit";
     return "";
@@ -560,9 +566,11 @@ export function ClientTopUp() {
             </Button>
             <h2 className="text-lg font-semibold">Select Transfer Method</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
               { value: "online_transfer" as PaymentMethod, label: "Online Transfer", desc: "Internet/Mobile Banking", IconComp: OnlineIcon },
+              { value: "mfs_to_bank" as PaymentMethod, label: "bKash/Nagad → Bank", desc: "MFS to bank transfer", IconComp: MFSIcon },
+              { value: "npsb" as PaymentMethod, label: "NPSB", desc: "Inter-bank NPSB transfer", IconComp: OnlineIcon },
               { value: "atm_deposit" as PaymentMethod, label: "ATM Deposit", desc: "Deposit via ATM", IconComp: ATMIcon },
               { value: "cash_deposit" as PaymentMethod, label: "Cash Deposit", desc: "Bank branch deposit", IconComp: CashIcon },
             ]).map((m) => (

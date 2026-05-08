@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -36,95 +36,102 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const getCachedRole = (): AppRole | null => {
-    if (typeof window === "undefined") return null;
-    try { return localStorage.getItem("cached_role") as AppRole | null; } catch { return null; }
-  };
-  const cachedRole = useRef<AppRole | null>(getCachedRole());
-  const [role, setRole] = useState<AppRole | null>(cachedRole.current);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [profile, setProfile] = useState<Database["public"]["Tables"]["profiles"]["Row"] | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
+  const currentUserId = useRef<string | null>(null);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = useCallback(async (userId: string) => {
     try {
       const [{ data: roles }, { data: prof }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).limit(1),
         supabase.from("profiles").select("*").eq("user_id", userId).single(),
       ]);
-      const newRole = roles?.[0]?.role ?? null;
-      setRole(newRole);
-      try {
-        if (newRole) localStorage.setItem("cached_role", newRole);
-        else localStorage.removeItem("cached_role");
-      } catch {}
+      // Guard: if user changed mid-flight (logout/login), discard stale result
+      if (currentUserId.current !== userId) return;
+      setRole((roles?.[0]?.role as AppRole) ?? null);
       setProfile((prof as any) ?? null);
     } catch (err) {
       console.error("Failed to fetch user data:", err);
+      if (currentUserId.current === userId) {
+        setRole(null);
+        setProfile(null);
+      }
+    }
+  }, []);
+
+  const applySession = useCallback((newSession: Session | null) => {
+    const newUserId = newSession?.user?.id ?? null;
+    setSession(newSession);
+    setUser(newSession?.user ?? null);
+    if (newUserId !== currentUserId.current) {
+      // User changed → clear stale role/profile immediately to avoid wrong UI
+      currentUserId.current = newUserId;
       setRole(null);
       setProfile(null);
     }
-  };
+    if (newUserId) {
+      void fetchUserData(newUserId);
+    }
+    setLoading(false);
+  }, [fetchUserData]);
 
   useEffect(() => {
-    const safetyTimeout = setTimeout(() => {
-      setLoading((prev) => prev ? false : prev);
-    }, 5000);
+    let mounted = true;
 
-    const initializeAuth = async (currentSession: Session | null) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        await fetchUserData(currentSession.user.id);
-      } else {
-        setRole(null);
-        setProfile(null);
-        try { localStorage.removeItem("cached_role"); } catch {}
-      }
-      initialized.current = true;
-      setLoading(false);
-    };
+    const safety = setTimeout(() => {
+      if (mounted) setLoading((p) => (p ? false : p));
+    }, 4000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (!initialized.current && event === "INITIAL_SESSION") {
-        void initializeAuth(newSession);
-        return;
-      }
-      if (!initialized.current) return;
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        void fetchUserData(newSession.user.id);
-      } else {
-        setRole(null);
-        setProfile(null);
-        try { localStorage.removeItem("cached_role"); } catch {}
-      }
+    // Subscribe FIRST (synchronously), then restore session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      // Never await DB inside this callback (Supabase auth lock deadlock)
+      applySession(newSession);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      if (initialized.current) return;
-      await initializeAuth(initialSession);
+    supabase.auth.getSession().then(({ data: { session: initial } }) => {
+      if (!mounted) return;
+      applySession(initial);
     }).catch(() => {
-      if (initialized.current) return;
-      initialized.current = true;
-      setLoading(false);
+      if (mounted) setLoading(false);
     });
 
     return () => {
-      clearTimeout(safetyTimeout);
+      mounted = false;
+      clearTimeout(safety);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = useCallback(async () => {
+    // Reset state immediately so UI flips even if Supabase is slow
+    currentUserId.current = null;
     setUser(null);
     setSession(null);
     setRole(null);
     setProfile(null);
-    try { localStorage.removeItem("cached_role"); } catch {}
-  };
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("signOut error (ignored):", err);
+    }
+    // Hard-clean any leftover Supabase auth keys (legacy/cached tokens)
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("sb-") || k.includes("supabase.auth") || k === "cached_role")) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {}
+    // Force navigate to /auth
+    if (typeof window !== "undefined") {
+      window.location.replace("/auth");
+    }
+  }, []);
 
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin" || role === "superadmin";

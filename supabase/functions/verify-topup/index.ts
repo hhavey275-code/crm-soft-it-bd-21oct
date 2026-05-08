@@ -332,7 +332,7 @@ Deno.serve(async (req) => {
       if (bank?.bank_name) bankName = bank.bank_name.toLowerCase();
     }
 
-    function accountMatches(ocrAccNum: string, bankAccNum: string) {
+    function accountMatches(ocrAccNum: string, bankAccNum: string, allowFirst3Last3 = false) {
       const ocr = ocrAccNum.replace(/\D/g, '');
       const bank = bankAccNum.replace(/\D/g, '');
       if (ocr === bank) return true;
@@ -341,10 +341,16 @@ Deno.serve(async (req) => {
         const ocrLast4 = ocr.slice(-4);
         if (ocrFirst3 === bank.slice(0, 3) && ocrLast4 === bank.slice(-4)) return true;
       }
+      // Narrow exception: only for mfs_to_bank — bKash/Nagad → Bank receipts often
+      // hide last 4 digits but show last 3.
+      if (allowFirst3Last3 && ocr.length >= 6 && bank.length >= 6) {
+        if (ocr.slice(0, 3) === bank.slice(0, 3) && ocr.slice(-3) === bank.slice(-3)) return true;
+      }
       return false;
     }
 
     const isMobileAgent = bankName.includes('bkash') || bankName.includes('nagad');
+    const isMfsToBank = method === 'mfs_to_bank';
 
     let ocrRef = '';
     let ocrAmount = 0;
@@ -355,7 +361,7 @@ Deno.serve(async (req) => {
     let ocrAccountNumber = '';
     if (proof_url) {
       try {
-        if (method === 'bank_transfer') {
+        if (method === 'bank_transfer' || method === 'mfs_to_bank' || method === 'npsb') {
           const { result } = await runOcrWithFallback(proof_url);
           ocrRef = String(result.reference || '').trim();
           ocrAmount = Number(result.bdt_amount || 0);
@@ -533,9 +539,12 @@ Deno.serve(async (req) => {
       const amountOk = ocrAmount > 0 && ocrAmountMatch;
       let acctOk = false;
       if (ocrAccountNumber && fullBankAccount) {
-        acctOk = accountMatches(ocrAccountNumber, fullBankAccount);
+        acctOk = accountMatches(ocrAccountNumber, fullBankAccount, isMfsToBank);
         ocrAccountMatch = acctOk;
-        verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast3})`);
+        const tail = isMfsToBank && acctOk && !accountMatches(ocrAccountNumber, fullBankAccount, false)
+          ? `${bankFirst3}...${bankLast3} [mfs_to_bank first3+last3 fallback]`
+          : `${bankFirst3}...${bankLast4}`;
+        verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${tail})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast4})`);
       } else {
         verificationLog.push(`❌ OCR Account missing (OCR could not extract account number)`);
       }
