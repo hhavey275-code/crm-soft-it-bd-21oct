@@ -78,6 +78,8 @@ import {
   Banknote,
   Eye,
   Trash2,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
