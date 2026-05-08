@@ -527,6 +527,7 @@ Deno.serve(async (req) => {
       let acctOk = false;
       if (ocrAccountNumber && fullBankAccount) {
         acctOk = accountMatches(ocrAccountNumber, fullBankAccount);
+        ocrAccountMatch = acctOk;
         verificationLog.push(acctOk ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast3})` : `❌ OCR Account mismatch (OCR: ${ocrAccountNumber} vs Bank: ${bankFirst3}...${bankLast3})`);
       } else {
         verificationLog.push(`❌ OCR Account missing (OCR could not extract account number)`);
