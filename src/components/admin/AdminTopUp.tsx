@@ -25,6 +25,13 @@ import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
 
+const hasTopUpVerificationFailure = (note?: string | null) => {
+  if (!note) return true;
+  const text = note.toLowerCase();
+  if (!text.includes("auto-verification")) return true;
+  return text.includes("❌") || text.includes("⚠️") || !text.includes("✅ telegram sms matched");
+};
+
 const getTelegramDisplayText = (m: any) => {
   const raw = m?.raw_update || {};
   const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
@@ -523,8 +530,14 @@ export function AdminTopUp() {
         try {
           const { data: vData } = await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
           if (vData?.auto_approved) autoApprovedByVerify = true;
+          if (!vData?.auto_approved) {
+            const { data: checkedReq } = await supabase.from("top_up_requests").select("admin_note").eq("id", id).maybeSingle();
+            if (hasTopUpVerificationFailure(checkedReq?.admin_note)) {
+              throw new Error(`Verification failed: ${vData?.reason || "OCR/SMS mismatch"}. Manual approve is blocked until OCR ref, amount, account and SMS all match.`);
+            }
+          }
         } catch (e) {
-          console.warn('Pre-approve verify-topup failed (non-blocking):', e);
+          throw e instanceof Error ? e : new Error("Verification failed. Manual approve is blocked.");
         }
       }
       const updateData: any = { status: action, reviewed_by: user!.id };
