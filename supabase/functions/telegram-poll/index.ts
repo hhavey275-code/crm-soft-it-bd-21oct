@@ -49,29 +49,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Early-exit: skip Telegram API hit when nothing is pending verification.
-    // DB triggers (trigger_telegram_poll_on_topup / _on_tenant_payment) send {quick:true}
-    // and we still proceed for those — but they'll only proceed because a pending row exists.
-    // Pass {force:true} to bypass this guard.
-    if (!body?.force) {
-      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const [{ count: topupPending }, { count: tenantPending }] = await Promise.all([
-        supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
-          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
-        supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
-          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
-      ]);
-      if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
-        // Keep heartbeat fresh so UI doesn't show "polling stalled"
-        await supabase.from('telegram_bot_state').upsert({
-          id: 1,
-          updated_at: new Date().toISOString(),
-        });
-        console.log('[telegram-poll] skip: no pending top-ups or tenant payments');
-        return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    // Only poll when there is a pending top-up or tenant payment.
+    // No periodic cron — DB triggers fire on insert with {quick:true}, then
+    // this function self-loops every ~10s while pending rows still exist.
+    // Window: last 60 minutes (older requests are stale and shouldn't keep polling).
+    const PENDING_WINDOW_MIN = 60;
+    const sinceIso = new Date(Date.now() - PENDING_WINDOW_MIN * 60 * 1000).toISOString();
+    const [{ count: topupPending }, { count: tenantPending }] = await Promise.all([
+      supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+      supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+    ]);
+    if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
+      await supabase.from('telegram_bot_state').upsert({
+        id: 1,
+        updated_at: new Date().toISOString(),
+      });
+      console.log('[telegram-poll] stop: no pending in last 60 min');
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { data: state } = await supabase
@@ -190,9 +188,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[telegram-poll] ok updates=${updates.length} inserted=${inserted} skipped=${skippedNoText} topup_auto=${autoVerified} tenant_auto=${tenantAutoVerified} offset=${maxNextOffset}`);
+    // Self-loop: if pending still exists after this pass, schedule another run
+    // ~10s later (without blocking the response). Cap iterations to ~12 (~2 min)
+    // per chain via a hop counter. New pending rows fire fresh chains via DB trigger.
+    const hop = Number(body?.hop || 0);
+    const MAX_HOPS = 12;
+    const HOP_DELAY_MS = 10_000;
+    let scheduledNext = false;
+    try {
+      const [{ count: topupStill }, { count: tenantStill }] = await Promise.all([
+        supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+        supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+      ]);
+      if (((topupStill || 0) > 0 || (tenantStill || 0) > 0) && hop < MAX_HOPS) {
+        scheduledNext = true;
+        // Fire-and-forget after delay; don't await.
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+        setTimeout(() => {
+          fetch(`${supabaseUrl}/functions/v1/telegram-poll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonKey}` },
+            body: JSON.stringify({ hop: hop + 1 }),
+          }).catch((e) => console.error('[telegram-poll] reschedule failed:', e?.message || e));
+        }, HOP_DELAY_MS);
+      }
+    } catch (e: any) {
+      log.push(`reschedule check err: ${e?.message || e}`);
+    }
+
+    console.log(`[telegram-poll] ok hop=${hop} updates=${updates.length} inserted=${inserted} skipped=${skippedNoText} topup_auto=${autoVerified} tenant_auto=${tenantAutoVerified} next=${scheduledNext}`);
     return new Response(JSON.stringify({
       ok: true,
+      hop,
+      scheduled_next: scheduledNext,
       updates: updates.length,
       processed: inserted,
       inserted,
