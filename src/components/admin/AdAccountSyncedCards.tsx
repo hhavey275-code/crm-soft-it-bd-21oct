@@ -194,7 +194,7 @@ export function AdAccountSyncedCards({ adAccountId }: Props) {
                         {card.is_primary && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">Primary</Badge>}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
-                        {friendly ? card.display_string : "Unlabeled"} · {card.source === "cached" ? "last seen" : "synced"}{" "}
+                        {friendly ? card.display_string + " · " : ""}{card.source === "cached" ? "last seen" : "synced"}{" "}
                         {formatDistanceToNow(new Date(card.detected_at), { addSuffix: true })}
                       </div>
                     </div>
