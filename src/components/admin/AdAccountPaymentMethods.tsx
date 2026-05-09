@@ -135,11 +135,18 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Payment Methods
-            </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Payment Methods
+              </CardTitle>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {lastSyncedAt
+                  ? `Last synced ${formatDistanceToNow(new Date(lastSyncedAt), { addSuffix: true })} · cards are stored permanently for recovery`
+                  : "Cards are stored permanently for recovery — never auto-deleted"}
+              </p>
+            </div>
             {isAdmin && (
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowBmCards(true)}>
                 <Plus className="h-3.5 w-3.5" />
