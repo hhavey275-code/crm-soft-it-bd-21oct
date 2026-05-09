@@ -76,12 +76,27 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div>
-            <Label>Admin Label</Label>
-            <Input value={adminLabel} onChange={(e) => setAdminLabel(e.target.value)} placeholder="e.g. Sumon-er DBBL" />
+            <Label>Card Brand</Label>
+            <select
+              value={cardType}
+              onChange={(e) => setCardType(e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">— Select brand —</option>
+              <option value="visa">Visa</option>
+              <option value="mastercard">Mastercard</option>
+              <option value="amex">American Express</option>
+              <option value="discover">Discover</option>
+              <option value="other">Other</option>
+            </select>
           </div>
           <div>
             <Label>Bank Name</Label>
-            <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. DBBL, EBL" />
+            <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. DBBL, EBL, City Bank" />
+          </div>
+          <div>
+            <Label>Admin Label</Label>
+            <Input value={adminLabel} onChange={(e) => setAdminLabel(e.target.value)} placeholder="e.g. Sumon-er DBBL" />
           </div>
           <div>
             <Label>Holder Name</Label>
