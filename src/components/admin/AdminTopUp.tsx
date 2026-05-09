@@ -532,18 +532,14 @@ export function AdminTopUp() {
           if (existing && existing.length > 0) throw new Error("This payment reference has already been used in an approved request!");
         }
         // Run verify-topup once to populate admin_note (Match Details).
-        // It writes admin_note whether auto-approval succeeds or not.
+        // Auto-approval still requires strict matching (ref + amount + account + SMS).
+        // Manual admin approve is allowed even with mismatches — admin override.
         try {
           const { data: vData } = await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
           if (vData?.auto_approved) autoApprovedByVerify = true;
-          if (!vData?.auto_approved) {
-            const { data: checkedReq } = await supabase.from("top_up_requests").select("admin_note").eq("id", id).maybeSingle();
-            if (hasTopUpVerificationFailure(checkedReq?.admin_note)) {
-              throw new Error(`Verification failed: ${vData?.reason || "OCR mismatch"}. Manual approve is blocked while OCR ref / amount / account don't all match. (SMS-only mismatch is OK — but OCR proof must be valid.)`);
-            }
-          }
         } catch (e) {
-          throw e instanceof Error ? e : new Error("Verification failed. Manual approve is blocked.");
+          // Don't block manual approve on verify-topup errors — just log
+          console.warn('verify-topup call failed (non-blocking for manual approve):', e);
         }
       }
       const updateData: any = { status: action, reviewed_by: user!.id };
