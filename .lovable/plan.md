@@ -1,50 +1,46 @@
-## Goals
+## Goal
+Pending top-up section er nichey ekta choto Telegram polling status indicator dekhabo, jate bujha jay polling kokhon cholche / next kotokkhon por hobe.
 
-1. **Manual card details (brand/bank/label/holder/notes) must NOT be wiped** when the extension re-syncs an ad account. update 
-2. **Ad-account list table** should show only **one card per account** — the default (primary) card from the Meta API, exactly like before.
-3. **Default card always comes from the live API**. Synced/extra cards may optionally be listed under the default, but the default itself is API-driven.
+## Data source
+- `telegram_bot_state.updated_at` — telegram-poll cron (`* * * * *`, every 1 min) ei row ta proti run e update kore. So eta = "last poll time".
+- Cron schedule fixed: every 60s.
 
-## Root causes (found while exploring)
+## UI behavior
+Choto ekta line/badge (muted, text-xs), pending top-ups card er nichey:
 
-**Issue #1 — Manual card details disappear after sync:**
-`supabase/functions/ingest-dsl/index.ts` (line 107–116) upserts `ad_account_cards` with `card_type: card.type ?? null`. Extension rarely captures the brand from FB's API, so it sends `null`/`""` — the upsert overwrites the admin's manually-set brand back to `null`. Other manual fields (`admin_label`, `bank_name`, `holder_name`, `notes`) are not in the payload so they survive — only `card_type` is being clobbered.
+- Jodi `now - updated_at < 5s` → 🟢 **"Polling now…"** (pulse animation)
+- Else → 🔵 **"Last poll: {Xs} ago · Next in {Ys}"**
+  - Ys = max(0, 60 - Xs)
+  - Jokhon Ys = 0 hoye jabe → "Polling now…" e flip korbe (auto, refetch holey)
+- Jodi `updated_at > 3 min purono` → 🔴 **"Polling stalled ({Xm} ago)"** (warning color)
 
-**Issue #2/#3 — Multiple cards in list:**
-`src/components/admin/AdminAdAccounts.tsx` (line 1184–1190) maps over `ins.cards` and renders all of them. Previously it rendered only the first/default card.
+Tick: client side `setInterval` 1s (just for countdown display).
+Refetch `updated_at`: realtime subscription on `telegram_bot_state` (postgres_changes) + fallback poll every 15s.
 
-## Changes
+## Files
 
-### 1. `supabase/functions/ingest-dsl/index.ts` — preserve manual `card_type`
+1. **New**: `src/components/TelegramPollStatus.tsx`
+   - useQuery → `supabase.from('telegram_bot_state').select('updated_at').eq('id',1).single()`
+   - Realtime channel on `telegram_bot_state`
+   - 1s tick via `useEffect` + `useState` for `now`
+   - Compute label + color, render small inline status (icon + text, text-xs text-muted-foreground)
 
-Inside the `for (const card of cards)` upsert loop (around line 107):
+2. **Edit**: `src/components/FailedTopUps.tsx`
+   - Existing component already shows pending failed top-ups. Mount `<TelegramPollStatus />` at the top or bottom of the card content (also when list is empty).
 
-- Build the payload conditionally: only include `card_type` when `card.type` is truthy.
-- This way Postgres `ON CONFLICT DO UPDATE` won't touch the column when the extension has nothing better to offer, so the admin's saved brand stays intact.
-- Same defensive treatment for `exp_month` / `exp_year` (skip when null) so manually-corrected expiry isn't wiped either.
-
-No schema change needed.
-
-### 2. `src/components/admin/AdminAdAccounts.tsx` — show only the default card
-
-Replace the multi-card map (line 1184–1190) with single-card rendering:
-
-- Pick the default card: `const defaultCard = ins?.cards?.find((c: any) => c.is_primary) ?? ins?.cards?.[0];`
-- Render just that card's `CardBrandIcon` + `display_string`.
-- If `ins.cards.length > 1`, append a tiny muted `+N` chip (e.g. "+2 more") so the admin still knows extras exist — clicking through to the ad-account detail page reveals them in the existing Payment Methods card. (If you'd rather hide the chip entirely, say so and I'll drop it.)
-
-### 3. (Optional) `src/components/admin/AdAccountPaymentMethods.tsx` — order by default first
-
-Already shows multiple cards on the detail page. Make sure the default (primary, from API) is rendered first and labeled "Default", with synced extras listed below — this matches your point #3 ("default card always from API, synced cards under it"). Current ordering uses cached extension order; switch to: API-default first, then any other cached cards.
+3. **Edit**: `src/components/admin/AdminTopUp.tsx` and `src/components/client/ClientTopUp.tsx`
+   - Mount `<TelegramPollStatus />` near the pending-requests list header so user dekhte pay polling chalche kina.
 
 ## Out of scope
+- Polling schedule change. Cron already 1 min — touch korchi na.
+- Backend logic / verify flow — locked, untouched.
 
-- Edit dialog UI (already has Brand + Bank fields from the previous turn — keeping it as-is).
-- Extension code (no change needed; the server-side fix protects manual data regardless of what the extension sends).
-- Database migration (none required).
-
-## Verification
-
-- Edit a card → set brand to Visa + bank "DBBL" → save.
-- Trigger an extension sync.
-- Re-open the ad account → brand and bank still present.
-- Open the admin ad-account list → each row shows exactly one card (the API default), matching the pre-change look.
+## Visual sketch
+```
+Pending Top-Ups (3)
+... rows ...
+─────────────────────
+🟢 Polling now…
+   or
+🔵 Last poll 12s ago · Next in 48s
+```
