@@ -25,12 +25,18 @@ import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
 
+// Manual approve is blocked ONLY when an OCR check failed (ref / amount / account
+// mismatch or missing). Telegram SMS-only mismatch is allowed for manual approve
+// because bank SMS sometimes never arrives due to bank/server issues — the OCR
+// proof itself remains the source of truth and must still pass all 3 checks.
 const hasTopUpVerificationFailure = (note?: string | null) => {
   if (!note) return true;
   const text = note.toLowerCase();
   if (!text.includes("auto-verification")) return true;
-  return text.includes("❌") || text.includes("⚠️") || !text.includes("✅ telegram sms matched");
+  // Hard fail: any OCR ❌ marker (ref / amount / account / atm credit)
+  return /❌\s*(ocr|atm)/i.test(text) || text.includes("⚠️");
 };
+
 
 const getTelegramDisplayText = (m: any) => {
   const raw = m?.raw_update || {};
