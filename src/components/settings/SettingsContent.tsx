@@ -774,6 +774,9 @@ export default function SettingsPage() {
 
         {/* ─── Chrome Extension: Card Remover ─── */}
         <CardRemoverExtensionSection />
+
+        {/* ─── Chrome Extension: DSL & Cards Sync (admin) ─── */}
+        {isAdmin && <DslSyncExtensionSection />}
       </div>
     </DashboardLayout>
   );
