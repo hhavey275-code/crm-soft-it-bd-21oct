@@ -838,6 +838,7 @@ export function AdminTopUp() {
             size={isMobile ? "xs" : "sm"}
           />
       </div>
+      </div>
 
       <div className="flex justify-end">
         <TelegramPollStatus />
