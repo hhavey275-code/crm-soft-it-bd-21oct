@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
+import { TelegramPollStatus } from "@/components/TelegramPollStatus";
 
 type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
@@ -1039,7 +1040,10 @@ export function ClientTopUp() {
       {/* My Requests History */}
       <Card className="shadow-sm mt-6">
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">My Requests</CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">My Requests</CardTitle>
+            <TelegramPollStatus />
+          </div>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           {isMobile ? (

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { TelegramPollStatus } from "@/components/TelegramPollStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -837,7 +838,11 @@ export function AdminTopUp() {
             iconColor="text-muted-foreground"
             size={isMobile ? "xs" : "sm"}
           />
-        </div>
+      </div>
+      </div>
+
+      <div className="flex justify-end">
+        <TelegramPollStatus />
       </div>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>

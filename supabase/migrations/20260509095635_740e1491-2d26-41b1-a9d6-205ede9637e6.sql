@@ -1,0 +1,1 @@
+CREATE POLICY "Authenticated can read poll heartbeat" ON public.telegram_bot_state FOR SELECT TO authenticated USING (true);
