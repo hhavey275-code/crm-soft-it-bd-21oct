@@ -907,6 +907,20 @@ export function ClientTopUp() {
               </p>
             </div>
           )}
+          {proofFile && !ocrLoading && accountVerified === false && (
+            <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Screenshot এর destination account number ({selectedBankDetails?.account_number}) এর সাথে মিলছে না। সঠিক bank select করুন বা সঠিক receipt আপলোড করুন।
+              </p>
+            </div>
+          )}
+          {proofFile && !ocrLoading && accountVerified === null && selectedBankDetails?.account_number && (
+            <div className="p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                ⚠️ Account verification skipped — screenshot পুনরায় upload করুন।
+              </p>
+            </div>
+          )}
           <Button
             className="w-full"
             onClick={() => setStep(3)}
