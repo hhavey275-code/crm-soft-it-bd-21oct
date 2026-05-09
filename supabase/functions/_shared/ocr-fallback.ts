@@ -170,10 +170,7 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
     }),
   });
   if (!resp.ok) {
-    const body = await resp.text();
-    const err: any = new Error(`lovable ${resp.status}: ${body.slice(0, 200)}`);
-    err.status = resp.status;
-    throw err;
+    await throwProviderError("lovable", resp);
   }
   const data = await resp.json();
   const tc = data?.choices?.[0]?.message?.tool_calls?.[0];
@@ -225,10 +222,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
     }),
   });
   if (!resp.ok) {
-    const body = await resp.text();
-    const err: any = new Error(`gemini ${resp.status}: ${body.slice(0, 200)}`);
-    err.status = resp.status;
-    throw err;
+    await throwProviderError("gemini", resp);
   }
   const data = await resp.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join("") || "";
@@ -254,10 +248,7 @@ async function callOpenAI(imageUrl: string): Promise<OcrResult> {
     }),
   });
   if (!resp.ok) {
-    const body = await resp.text();
-    const err: any = new Error(`openai ${resp.status}: ${body.slice(0, 200)}`);
-    err.status = resp.status;
-    throw err;
+    await throwProviderError("openai", resp);
   }
   const data = await resp.json();
   const content = data?.choices?.[0]?.message?.content;
