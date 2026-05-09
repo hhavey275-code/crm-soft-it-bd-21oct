@@ -62,6 +62,11 @@ Deno.serve(async (req) => {
           .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
       ]);
       if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
+        // Keep heartbeat fresh so UI doesn't show "polling stalled"
+        await supabase.from('telegram_bot_state').upsert({
+          id: 1,
+          updated_at: new Date().toISOString(),
+        });
         console.log('[telegram-poll] skip: no pending top-ups or tenant payments');
         return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
