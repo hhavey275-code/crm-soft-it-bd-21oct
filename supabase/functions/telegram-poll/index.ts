@@ -49,29 +49,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Early-exit: skip Telegram API hit when nothing is pending verification.
-    // DB triggers (trigger_telegram_poll_on_topup / _on_tenant_payment) send {quick:true}
-    // and we still proceed for those — but they'll only proceed because a pending row exists.
-    // Pass {force:true} to bypass this guard.
-    if (!body?.force) {
-      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const [{ count: topupPending }, { count: tenantPending }] = await Promise.all([
-        supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
-          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
-        supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
-          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
-      ]);
-      if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
-        // Keep heartbeat fresh so UI doesn't show "polling stalled"
-        await supabase.from('telegram_bot_state').upsert({
-          id: 1,
-          updated_at: new Date().toISOString(),
-        });
-        console.log('[telegram-poll] skip: no pending top-ups or tenant payments');
-        return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    // Only poll when there is a pending top-up or tenant payment.
+    // No periodic cron — DB triggers fire on insert with {quick:true}, then
+    // this function self-loops every ~10s while pending rows still exist.
+    // Window: last 60 minutes (older requests are stale and shouldn't keep polling).
+    const PENDING_WINDOW_MIN = 60;
+    const sinceIso = new Date(Date.now() - PENDING_WINDOW_MIN * 60 * 1000).toISOString();
+    const [{ count: topupPending }, { count: tenantPending }] = await Promise.all([
+      supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+      supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+    ]);
+    if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
+      await supabase.from('telegram_bot_state').upsert({
+        id: 1,
+        updated_at: new Date().toISOString(),
+      });
+      console.log('[telegram-poll] stop: no pending in last 60 min');
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { data: state } = await supabase
