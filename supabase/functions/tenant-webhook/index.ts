@@ -1,5 +1,6 @@
 // Tenant → Master webhook. Receives heartbeat/chat/bm/withdraw from tenant projects.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { runOcrWithFallback } from "../_shared/ocr-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,46 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+const BDT_TOLERANCE = 15;
+const amountMatches = (a: number, b: number) => Math.abs(a - b) <= BDT_TOLERANCE;
+const refsMatch = (a: string, b: string) => {
+  const clean = (v: string) => String(v || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return !!clean(a) && clean(a) === clean(b);
+};
+
+function extractSmsCreditAmounts(text: string): number[] {
+  const amounts = new Set<number>();
+  const currencyRegex = /(?:tk\.?|bdt|৳)\s*([\d,]+(?:\.\d+)?)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = currencyRegex.exec(text)) !== null) {
+    const amount = Number(String(match[1]).replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const start = match.index;
+    const end = start + match[0].length;
+    const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
+    const after = text.slice(end, end + 45).toLowerCase();
+    const near = `${before} ${after}`;
+    const immediateBefore = before.slice(-18);
+    const immediateAfter = after.slice(0, 24);
+    const looksLikeCredit = /(deposit|credited|credit|cash\s*out|received|transfer|successful)/i.test(near);
+    const looksLikeFeeOrBalance = /(fee\s*$|charge\s*$|vat\s*$|balance\s*$|bal\s*$|c\/b\s*$|available\s*$|a\/c\s*bal\s*$)/i.test(immediateBefore)
+      || /^(\s*(balance|bal|c\/b|available balance|a\/c bal|fee|charge|vat)\b)/i.test(immediateAfter);
+    if (looksLikeCredit && !looksLikeFeeOrBalance) amounts.add(amount);
+  }
+  return [...amounts];
+}
+
+function accountMatches(ocrAccNum: string, bankAccNum: string) {
+  const ocr = String(ocrAccNum || "").replace(/\D/g, "");
+  const bank = String(bankAccNum || "").replace(/\D/g, "");
+  if (!ocr || !bank) return false;
+  if (ocr === bank) return true;
+  if (ocr.length >= 7 && bank.length >= 7) {
+    return ocr.slice(0, 3) === bank.slice(0, 3) && ocr.slice(-4) === bank.slice(-4);
+  }
+  return false;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -403,10 +444,179 @@ Deno.serve(async (req) => {
 
       case "verify-tenant-payment":
       case "verify_tenant_payment": {
-        // Lightweight stub: just return pending. Master admin reviews manually
-        // via AdminTenants UI; auto-approval pipeline is not yet wired.
         const payment_id = field<string>("payment_id");
-        return json({ ok: true, auto_approved: false, payment_id });
+        if (!payment_id) return json({ error: "payment_id required" }, 400);
+
+        const { data: payment, error: payErr } = await supabase
+          .from("tenant_payments")
+          .select("*, tenants(name, usd_rate)")
+          .eq("id", payment_id)
+          .eq("tenant_id", tenant.id)
+          .maybeSingle();
+        if (payErr) throw payErr;
+        if (!payment) return json({ error: "payment not found" }, 404);
+        if (payment.status !== "pending" && payment.status !== "hold") {
+          return json({ ok: true, auto_approved: false, reason: "already processed", payment_id });
+        }
+
+        const paymentReference = String(payment.payment_reference || "").trim();
+        if (!paymentReference) return json({ ok: true, auto_approved: false, reason: "Missing transaction ID" });
+
+        const bdtNum = Number(payment.amount || 0);
+        const verificationLog: string[] = [];
+        const { data: bank } = await supabase
+          .from("bank_accounts")
+          .select("account_number, bank_name, seller_id")
+          .eq("id", payment.bank_account_id)
+          .maybeSingle();
+        const fullBankAccount = String(bank?.account_number || "").replace(/\s+/g, "");
+        const bankFirst3 = fullBankAccount.slice(0, 3);
+        const bankFirst4 = fullBankAccount.slice(0, 4);
+        const bankLast4 = fullBankAccount.slice(-4);
+
+        let ocrRef = "";
+        let ocrAmount = 0;
+        let ocrAccountNumber = "";
+        if (payment.proof_url) {
+          try {
+            const { result } = await runOcrWithFallback(payment.proof_url);
+            ocrRef = String(result.reference || "").trim();
+            ocrAmount = Number(result.bdt_amount || 0);
+            ocrAccountNumber = String(result.account_number || "").trim();
+          } catch (e) {
+            console.error("tenant OCR failed:", e);
+          }
+        }
+
+        const ocrRefMatch = refsMatch(ocrRef, paymentReference);
+        const ocrAmountMatch = ocrAmount > 0 && amountMatches(ocrAmount, bdtNum);
+        const ocrAccountMatch = accountMatches(ocrAccountNumber, fullBankAccount);
+        verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch/missing (OCR: ${ocrRef}, Submitted: ${paymentReference})`);
+        verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum})` : `❌ OCR Amount mismatch/missing (OCR: ৳${ocrAmount}, Submitted: ৳${bdtNum})`);
+        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (${ocrAccountNumber} ~ ${bankFirst3}...${bankLast4})` : `❌ OCR Account mismatch/missing (OCR: ${ocrAccountNumber}, Bank: ${bankFirst3}...${bankLast4})`);
+
+        const requestTime = new Date(payment.created_at);
+        const windowStart = new Date(requestTime.getTime() - 120 * 60 * 1000).toISOString();
+        const windowEnd = new Date(requestTime.getTime() + 30 * 60 * 1000).toISOString();
+        const { data: telegramMsgs } = await supabase
+          .from("telegram_messages")
+          .select("text, raw_update, created_at, update_id, chat_id, matched_request_id")
+          .gte("created_at", windowStart)
+          .lte("created_at", windowEnd)
+          .order("created_at", { ascending: false })
+          .limit(200);
+
+        let telegramMatch = false;
+        let telegramMatchDetail = "";
+        let matchedMsg: any = null;
+        let alreadyMatchedSkipped = 0;
+        const perMsgReasons: string[] = [];
+        for (const msg of telegramMsgs || []) {
+          const raw = msg.raw_update || {};
+          const payloadMsg = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+          const text = msg.text || payloadMsg.text || payloadMsg.caption || "";
+          const snippet = text.replace(/\s+/g, " ").slice(0, 80);
+          if (msg.matched_request_id && msg.matched_request_id !== payment_id) {
+            alreadyMatchedSkipped++;
+            if (perMsgReasons.length < 5) perMsgReasons.push(`⏭ already matched to other req: "${snippet}"`);
+            continue;
+          }
+          const digitsInText = text.replace(/[^\d]/g, "");
+          const hasFullAccount = fullBankAccount && digitsInText.includes(fullBankAccount);
+          const hasFirst3Last4 = bankFirst3 && bankLast4 && digitsInText.includes(bankFirst3) && digitsInText.includes(bankLast4);
+          const hasFirst4Last4 = bankFirst4 && bankLast4 && digitsInText.includes(bankFirst4) && digitsInText.includes(bankLast4);
+          const hasAccountMatch = hasFullAccount || hasFirst4Last4 || hasFirst3Last4;
+          const numberMatches = extractSmsCreditAmounts(text);
+          const matchedAmount = numberMatches.find((n) => amountMatches(n, bdtNum)) || 0;
+          if (hasAccountMatch && matchedAmount) {
+            telegramMatch = true;
+            matchedMsg = msg;
+            const matchType = hasFullAccount ? `full: ${fullBankAccount}` : hasFirst4Last4 ? `first4+last4: ${bankFirst4}...${bankLast4}` : `first3+last4: ${bankFirst3}...${bankLast4}`;
+            telegramMatchDetail = `${matchType}, amount: ৳${matchedAmount}`;
+            break;
+          }
+          if (perMsgReasons.length < 5) perMsgReasons.push(`${hasAccountMatch ? "✓acct" : `✗acct(need ${bankFirst3}...${bankLast4})`} ${matchedAmount ? "✓amt" : `✗amt(need ৳${bdtNum})`}: "${snippet}"`);
+        }
+        verificationLog.push(telegramMatch ? `✅ Telegram SMS matched (${telegramMatchDetail})` : `❌ Telegram SMS no match (bankAcct=${fullBankAccount}, bdt=${bdtNum}, total in window: ${telegramMsgs?.length ?? 0}, checked: ${(telegramMsgs?.length ?? 0) - alreadyMatchedSkipped}, already-matched skipped: ${alreadyMatchedSkipped})${perMsgReasons.length ? ` | tried: ${perMsgReasons.join(" ; ")}` : ""}`);
+
+        const logText = `Tenant auto-verification: ${verificationLog.join(" | ")}`;
+        await supabase.from("tenant_payments").update({
+          verification_log: logText,
+          last_verify_at: new Date().toISOString(),
+          verify_attempts: Number(payment.verify_attempts || 0) + 1,
+        }).eq("id", payment_id).in("status", ["pending", "hold"]);
+
+        if (!(ocrRefMatch && ocrAmountMatch && ocrAccountMatch && telegramMatch)) {
+          return json({ ok: true, auto_approved: false, reason: logText, retry_suggested: !telegramMatch, payment_id });
+        }
+
+        const { data: duplicateRef } = await supabase
+          .from("tenant_payments")
+          .select("id")
+          .eq("payment_reference", paymentReference)
+          .eq("status", "approved")
+          .neq("id", payment_id)
+          .limit(1);
+        if (duplicateRef?.length) return json({ ok: true, auto_approved: false, reason: "Duplicate transaction ID", payment_id });
+
+        const { data: rpcData, error: rpcErr } = await supabase.rpc("approve_tenant_limit_payment" as any, {
+          p_payment_id: payment_id,
+          p_admin: null,
+        });
+        if (rpcErr) throw rpcErr;
+        await supabase.from("tenant_payments").update({ verification_log: logText }).eq("id", payment_id);
+        if (matchedMsg) await supabase.from("telegram_messages").update({ matched_request_id: payment_id }).eq("update_id", matchedMsg.update_id);
+        if (bank?.seller_id && bdtNum > 0) {
+          const { data: sellerTxn, error: sellerErr } = await supabase
+            .from("seller_transactions")
+            .insert({
+              seller_id: bank.seller_id,
+              type: "tenant_payment",
+              bdt_amount: bdtNum,
+              usdt_amount: 0,
+              rate: 0,
+              description: `Tenant payment auto-approved — ${tenant.name || "Tenant"} (${payment.payment_type || "payment"})`,
+              bank_account_id: payment.bank_account_id,
+              tenant_payment_id: payment_id,
+              proof_url: payment.proof_url,
+              status: "approved",
+              reviewed_by: null,
+              reviewed_at: new Date().toISOString(),
+              entry_by_name: `Tenant: ${tenant.name || "Unknown"}`,
+            })
+            .select("id")
+            .maybeSingle();
+          if (sellerErr && !String(sellerErr.message || "").toLowerCase().includes("duplicate")) {
+            console.error("Tenant auto-approve seller ledger insert failed:", sellerErr);
+          }
+          let sellerTxnId = sellerTxn?.id || null;
+          if (!sellerTxnId) {
+            const { data: existingSellerTxn } = await supabase
+              .from("seller_transactions")
+              .select("id")
+              .eq("tenant_payment_id", payment_id)
+              .maybeSingle();
+            sellerTxnId = existingSellerTxn?.id || null;
+          }
+          if (sellerTxnId && payment.proof_url) {
+            await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/forward-seller-proof`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                seller_transaction_id: sellerTxnId,
+                payment_kind: "bdt_payment",
+                proof_url: payment.proof_url,
+                seller_name: `Tenant: ${tenant.name || "Unknown"}`,
+                seller_id: bank.seller_id,
+                bdt_amount: bdtNum,
+                bank_account_id: payment.bank_account_id,
+                reference: paymentReference || `tenant:${payment_id.slice(0, 8)}`,
+              }),
+            }).catch((e) => console.error("Tenant auto-approve forward failed:", e));
+          }
+        }
+        await logSystem("tenant_payment_auto_approved", { payment_id, amount: bdtNum, limit_amount: payment.limit_amount, rpc: rpcData });
+        return json({ ok: true, auto_approved: true, payment_id, rpc: rpcData });
       }
 
       case "report-usage":

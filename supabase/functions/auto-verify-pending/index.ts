@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     log.push(`telegram-poll err: ${e?.message || e}`);
   }
 
-  // 2) Find pending requests submitted within last 24h (anything older is stale).
+  // 2) Find pending client requests submitted within last 24h (anything older is stale).
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: rows, error } = await supabase
     .from('top_up_requests')
@@ -65,11 +65,47 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 3) Tenant payments use tenant-webhook auth, so verify them separately.
+  const { data: tenantRows, error: tenantErr } = await supabase
+    .from('tenant_payments')
+    .select('id, status, created_at, tenants(api_key)')
+    .in('status', ['pending', 'hold'])
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(50);
+
+  let tenantApproved = 0;
+  let tenantChecked = 0;
+  if (tenantErr) {
+    log.push(`tenant query err: ${tenantErr.message}`);
+  } else {
+    for (const row of tenantRows || []) {
+      const tenantKey = (row as any)?.tenants?.api_key;
+      if (!tenantKey) {
+        log.push(`tenant verify ${row.id}: missing tenant api key`);
+        continue;
+      }
+      tenantChecked++;
+      try {
+        const res = await fetch(`${supabaseUrl}/functions/v1/tenant-webhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-Key': String(tenantKey) },
+          body: JSON.stringify({ action: 'verify-tenant-payment', payment_id: row.id }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (json?.auto_approved) tenantApproved++;
+        if (!res.ok) log.push(`tenant verify ${row.id}: ${res.status} ${json?.error || ''}`);
+      } catch (e: any) {
+        log.push(`tenant verify ${row.id}: ${e?.message || e}`);
+      }
+    }
+  }
+
   const ms = Date.now() - started;
-  console.log(`[auto-verify-pending] checked=${checked} approved=${approved} ms=${ms} ${log.join(' | ')}`);
+  console.log(`[auto-verify-pending] checked=${checked} approved=${approved} tenant_checked=${tenantChecked} tenant_approved=${tenantApproved} ms=${ms} ${log.join(' | ')}`);
 
   return new Response(
-    JSON.stringify({ ok: true, checked, approved, ms, log }),
+    JSON.stringify({ ok: true, checked, approved, tenant_checked: tenantChecked, tenant_approved: tenantApproved, ms, log }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   );
 });
