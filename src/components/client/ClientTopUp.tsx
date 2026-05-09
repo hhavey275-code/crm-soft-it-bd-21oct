@@ -1039,7 +1039,10 @@ export function ClientTopUp() {
       {/* My Requests History */}
       <Card className="shadow-sm mt-6">
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">My Requests</CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">My Requests</CardTitle>
+            <TelegramPollStatus />
+          </div>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           {isMobile ? (
