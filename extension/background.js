@@ -647,6 +647,7 @@ async function removeCardViaGraphql({ accountId, cardId, card, creds, pageUrl })
 
 // Fallback: use Graph API DELETE with EAA token if we managed to capture one
 async function removeCardViaGraphApi({ accountId, cardId, creds }) {
+  cardId = decodeFsId(cardId);
   if (!creds?.access_token) return { ok: false, error: "no_access_token" };
   const actId = String(accountId).replace(/^act_/, "");
   const url = `https://graph.facebook.com/v19.0/act_${actId}/payment_methods/${encodeURIComponent(cardId)}?access_token=${encodeURIComponent(creds.access_token)}`;
