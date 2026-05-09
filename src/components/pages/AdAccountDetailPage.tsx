@@ -581,9 +581,9 @@ export default function AdAccountDetailPage() {
             is lost, last-4 is recoverable from CRM. */}
         {!isTikTok && id && (
           <div className="space-y-2">
-            <AdAccountSyncedCards adAccountId={id} />
+            <LiveBillingData adAccountId={id} metaAccountId={account.account_id} />
             <p className="text-[11px] text-muted-foreground px-1">
-              Cards on file are synced via the Chrome extension when an admin opens this account's Meta billing page. Used for account-recovery only — only brand + last-4 + expiry are stored, never full card numbers.
+              Live billing (hidden daily limit, threshold, balance) is synced via the Chrome extension when an admin opens this account's Meta billing page.
             </p>
           </div>
         )}
