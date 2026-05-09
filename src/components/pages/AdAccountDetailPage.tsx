@@ -705,6 +705,35 @@ export default function AdAccountDetailPage() {
                 <InactiveBadge lastSpendDate={(insights as any)?.last_spend_date} fallbackDate={account.created_at} />
               </div>
             </div>
+
+            {/* Spend Cap / Spent / Remaining — refreshes after "Update from Meta" */}
+            <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[11px] text-muted-foreground">Spend Cap</div>
+                <div className="text-sm font-semibold">
+                  ${Number(account.spend_cap ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Amount Spent</div>
+                <div className="text-sm font-semibold">
+                  ${Number(account.amount_spent ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Remaining</div>
+                <div className="text-sm font-semibold">
+                  ${Math.max(Number(account.spend_cap ?? 0) - Number(account.amount_spent ?? 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2">
+              <SpendProgressBar
+                amountSpent={Number(account.amount_spent ?? 0)}
+                spendCap={Number(account.spend_cap ?? 0)}
+                platform={isTikTok ? "tiktok" : "meta"}
+              />
+            </div>
           </CardContent>
         </Card>
 
