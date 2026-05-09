@@ -91,7 +91,10 @@
     if (!text) return null;
     const lower = text.slice(0, 8000);
     return {
-      cards: /payment_method|funding_source|credit_card|paypal_account|display_string/i.test(lower),
+      // Only flag as "cards" if response actually contains a real last-4
+      // pattern. Prevents BM-wide / archived payment_method noise from
+      // being treated as attached cards on the current account.
+      cards: /last_four_digits"\s*:\s*"\d{4}"|•{2,}\s*\d{4}|\*{2,}\s*\d{4}|\.{2,}\s*\d{4}/i.test(lower),
       threshold: /threshold_amount|billing_threshold|next_bill_date|amount_due/i.test(lower),
       limit: /adtrust_dsl|min_daily_budget|spend_cap|daily_spend_limit/i.test(lower),
       account: /account_status|timezone_name|currency|amount_spent|balance/i.test(lower),

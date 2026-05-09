@@ -116,20 +116,23 @@
       obj.credit_card_last_four ||
       (obj.display_string && (obj.display_string.match(/(\d{4})\s*$/) || [])[1]) ||
       null;
+    // STRICT: must have a real 4-digit last4. Drops BM-wide / archived
+    // payment_method nodes whose only "id" is a base64 GraphQL node id
+    // (e.g. "...MzU=") — those were leaking into the panel as fake cards.
+    if (!last4 || !/^\d{4}$/.test(String(last4))) return null;
     const brand = (
       obj.credit_card_type || obj.type || obj.payment_method_type ||
       (obj.display_string && (obj.display_string.match(/^([A-Za-z ]+?)\s+/) || [])[1]) || ""
     ).toString().trim().toLowerCase().replace(/\s+/g, "");
-    // ONLY keep entries that actually have a real Meta id.
     const id = String(
       obj.id || obj.payment_method_id || obj.funding_source_id || obj.credit_card_id || "",
     ).trim();
-    if (!id || /^\d{1,4}$/.test(id)) return null; // ignore tiny sequential ids
+    if (!id || /^\d{1,4}$/.test(id)) return null;
     return {
       id,
-      display_string: obj.display_string || (last4 ? `${(brand || "card").toUpperCase()} *${last4}` : `Card ...${id.slice(-4)}`),
+      display_string: `${(brand || "card").toUpperCase()} *${last4}`,
       type: brand || "card",
-      last4: last4 || null,
+      last4,
       exp_month: obj.exp_month || obj.expiration_month || null,
       exp_year: obj.exp_year || obj.expiration_year || null,
       is_primary: !!(obj.is_primary || obj.is_default || obj.default_method),
