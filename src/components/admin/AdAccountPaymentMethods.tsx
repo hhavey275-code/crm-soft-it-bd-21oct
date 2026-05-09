@@ -127,9 +127,15 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
   });
 
   const assigningMethodId = assignMutation.isPending ? assignMutation.variables : null;
-  const displayCards = (cachedCards && cachedCards.length > 0)
+  const rawCards = (cachedCards && cachedCards.length > 0)
     ? cachedCards
     : (accountCards && accountCards.length > 0 ? accountCards : currentCards);
+  // Always render the API/primary default card first, then the rest.
+  const displayCards = [...rawCards].sort((a: any, b: any) => {
+    const ap = a?.is_primary ? 1 : 0;
+    const bp = b?.is_primary ? 1 : 0;
+    return bp - ap;
+  });
 
   return (
     <>
