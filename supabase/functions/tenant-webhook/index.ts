@@ -566,6 +566,55 @@ Deno.serve(async (req) => {
         if (rpcErr) throw rpcErr;
         await supabase.from("tenant_payments").update({ verification_log: logText }).eq("id", payment_id);
         if (matchedMsg) await supabase.from("telegram_messages").update({ matched_request_id: payment_id }).eq("update_id", matchedMsg.update_id);
+        if (bank?.seller_id && bdtNum > 0) {
+          const { data: sellerTxn, error: sellerErr } = await supabase
+            .from("seller_transactions")
+            .insert({
+              seller_id: bank.seller_id,
+              type: "tenant_payment",
+              bdt_amount: bdtNum,
+              usdt_amount: 0,
+              rate: 0,
+              description: `Tenant payment auto-approved — ${tenant.name || "Tenant"} (${payment.payment_type || "payment"})`,
+              bank_account_id: payment.bank_account_id,
+              tenant_payment_id: payment_id,
+              proof_url: payment.proof_url,
+              status: "approved",
+              reviewed_by: null,
+              reviewed_at: new Date().toISOString(),
+              entry_by_name: `Tenant: ${tenant.name || "Unknown"}`,
+            })
+            .select("id")
+            .maybeSingle();
+          if (sellerErr && !String(sellerErr.message || "").toLowerCase().includes("duplicate")) {
+            console.error("Tenant auto-approve seller ledger insert failed:", sellerErr);
+          }
+          let sellerTxnId = sellerTxn?.id || null;
+          if (!sellerTxnId) {
+            const { data: existingSellerTxn } = await supabase
+              .from("seller_transactions")
+              .select("id")
+              .eq("tenant_payment_id", payment_id)
+              .maybeSingle();
+            sellerTxnId = existingSellerTxn?.id || null;
+          }
+          if (sellerTxnId && payment.proof_url) {
+            await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/forward-seller-proof`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                seller_transaction_id: sellerTxnId,
+                payment_kind: "bdt_payment",
+                proof_url: payment.proof_url,
+                seller_name: `Tenant: ${tenant.name || "Unknown"}`,
+                seller_id: bank.seller_id,
+                bdt_amount: bdtNum,
+                bank_account_id: payment.bank_account_id,
+                reference: paymentReference || `tenant:${payment_id.slice(0, 8)}`,
+              }),
+            }).catch((e) => console.error("Tenant auto-approve forward failed:", e));
+          }
+        }
         await logSystem("tenant_payment_auto_approved", { payment_id, amount: bdtNum, limit_amount: payment.limit_amount, rpc: rpcData });
         return json({ ok: true, auto_approved: true, payment_id, rpc: rpcData });
       }
