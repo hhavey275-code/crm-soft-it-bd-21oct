@@ -49,6 +49,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Early-exit: skip Telegram API hit when nothing is pending verification.
+    // DB triggers (trigger_telegram_poll_on_topup / _on_tenant_payment) send {quick:true}
+    // and we still proceed for those — but they'll only proceed because a pending row exists.
+    // Pass {force:true} to bypass this guard.
+    if (!body?.force) {
+      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const [{ count: topupPending }, { count: tenantPending }] = await Promise.all([
+        supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+        supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+      ]);
+      if ((topupPending || 0) === 0 && (tenantPending || 0) === 0) {
+        console.log('[telegram-poll] skip: no pending top-ups or tenant payments');
+        return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_pending' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const { data: state } = await supabase
       .from('telegram_bot_state')
       .select('update_offset')
