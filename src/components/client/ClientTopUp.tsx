@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
+import { TelegramPollStatus } from "@/components/TelegramPollStatus";
 
 type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
