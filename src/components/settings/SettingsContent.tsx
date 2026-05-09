@@ -1424,3 +1424,60 @@ function CardRemoverExtensionSection() {
     </div>
   );
 }
+
+function DslSyncExtensionSection() {
+  const handleDownload = () => {
+    fetch("/dsl-sync-extension.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "dsl-sync-extension.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch((err) => alert(err.message));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Download className="h-4 w-4 text-primary" />
+        <h2 className="text-lg font-semibold">Chrome Extension — DSL &amp; Cards Sync (v2.3.0)</h2>
+      </div>
+      <Separator />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Default + Backup card auto-sync to CRM</CardTitle>
+          <CardDescription>
+            Admin Meta Ads Billing page open korlei extension passively default + backup card-er last-4 + brand
+            CRM-e push kore. Account access hariye gele card identify korar jonno useful (account-recovery only)।
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button onClick={handleDownload} className="w-full gap-2">
+            <Download className="h-4 w-4" />
+            Download Extension (.zip)
+          </Button>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <p className="font-semibold mb-1">Install করার নিয়ম:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+              <li>ZIP file unzip করুন</li>
+              <li>Chrome এ <code className="bg-background px-1 rounded">chrome://extensions</code> open করুন</li>
+              <li>উপরে ডানদিকে <strong>Developer mode</strong> ON করুন</li>
+              <li><strong>Load unpacked</strong> click করে unzip করা folder select করুন</li>
+              <li>Same browser-এ CRM + Facebook দুটোতেই login থাকতে হবে</li>
+              <li>Meta Ads Manager → Billing page open করলেই auto-sync হবে</li>
+            </ol>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            🔒 শুধু brand + last-4 + expiry store হয় — full card number / CVV কখনো store হয় না।
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
