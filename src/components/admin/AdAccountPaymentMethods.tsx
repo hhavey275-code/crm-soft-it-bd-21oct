@@ -164,23 +164,38 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
             <div className="space-y-2">
               {displayCards.map((card, idx) => {
                 const meta = cardMeta?.get((card.display_string || "").toLowerCase());
-                const friendly = meta?.admin_label || meta?.bank_name || meta?.holder_name;
+                const friendly = meta?.admin_label || meta?.holder_name;
+                const brand = meta?.card_type || (card as any).type;
+                const brandLabel = brand
+                  ? brand.toLowerCase() === "mastercard" ? "Mastercard"
+                    : brand.toLowerCase() === "visa" ? "Visa"
+                    : brand.toLowerCase() === "amex" ? "Amex"
+                    : brand.charAt(0).toUpperCase() + brand.slice(1)
+                  : null;
+                const bank = meta?.bank_name;
+                const last4 = (card.display_string || "").match(/(\d{4})\s*$/)?.[1];
                 return (
                   <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg gap-2">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <CardBrandIcon displayString={card.display_string} />
+                      <CardBrandIcon displayString={card.display_string} brand={brand} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium">{friendly || card.display_string}</span>
+                          <span className="text-sm font-medium">
+                            {brandLabel ? `${brandLabel} •••• ${last4 || ""}`.trim() : card.display_string}
+                          </span>
+                          {bank && <Badge variant="outline" className="text-xs">{bank}</Badge>}
                           {idx === 0 && displayCards.length > 1 && (
                             <Badge variant="outline" className="text-xs">Default</Badge>
                           )}
                           {idx > 0 && (
                             <Badge variant="secondary" className="text-xs">Backup</Badge>
                           )}
+                          {!brandLabel && (
+                            <Badge variant="destructive" className="text-[10px]">Brand unknown — click ✎ to set</Badge>
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {friendly ? card.display_string : (meta?.bank_name || "Unlabeled card")}
+                          {friendly || (brandLabel ? card.display_string : "Unlabeled card")}
                           {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
                             <span className="ml-2">· Exp {(card as any).exp_month}/{(card as any).exp_year}</span>
                           )}
