@@ -30,6 +30,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
   const [bankName, setBankName] = useState("");
   const [holderName, setHolderName] = useState("");
   const [notes, setNotes] = useState("");
+  const [cardType, setCardType] = useState("");
 
   useEffect(() => {
     if (card) {
@@ -37,6 +38,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
       setBankName(card.bank_name ?? "");
       setHolderName(card.holder_name ?? "");
       setNotes(card.notes ?? "");
+      setCardType(card.card_type ?? "");
     }
   }, [card]);
 
@@ -50,6 +52,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
           bank_name: bankName.trim() || null,
           holder_name: holderName.trim() || null,
           notes: notes.trim() || null,
+          card_type: cardType.trim() || null,
         })
         .eq("id", card.id);
       if (error) throw error;
