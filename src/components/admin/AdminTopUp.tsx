@@ -837,7 +837,10 @@ export function AdminTopUp() {
             iconColor="text-muted-foreground"
             size={isMobile ? "xs" : "sm"}
           />
-        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <TelegramPollStatus />
       </div>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
