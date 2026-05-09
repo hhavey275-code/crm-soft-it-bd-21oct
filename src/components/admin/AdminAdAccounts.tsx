@@ -1181,14 +1181,21 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm whitespace-nowrap">
-                          {ins?.cards && ins.cards.length > 0 ? (
-                            ins.cards.map((card: any, i: number) => (
-                              <div key={i} className="flex items-center gap-1.5">
-                                <CardBrandIcon displayString={card.display_string} size="xs" />
-                                <span>{card.display_string}</span>
+                          {(() => {
+                            const cards = ins?.cards ?? [];
+                            const def = cards.find((c: any) => c.is_primary) ?? cards[0];
+                            if (!def) return <span className="text-muted-foreground">—</span>;
+                            const extra = cards.length - 1;
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <CardBrandIcon displayString={def.display_string} size="xs" />
+                                <span>{def.display_string}</span>
+                                {extra > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">+{extra}</span>
+                                )}
                               </div>
-                            ))
-                          ) : <span className="text-muted-foreground">—</span>}
+                            );
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell>
