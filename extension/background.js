@@ -558,6 +558,7 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
 // ---------- SMIT-style: GraphQL remove via captured creds ----------
 // Tries multiple known Meta mutation names; the first one accepted wins.
 async function removeCardViaGraphql({ accountId, cardId, card, creds, pageUrl }) {
+  cardId = decodeFsId(cardId);
   if (!creds?.fb_dtsg) {
     return { ok: false, error: "fb_dtsg not captured yet — refresh the billing page once." };
   }
