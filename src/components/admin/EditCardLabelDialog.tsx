@@ -15,6 +15,7 @@ interface CardRow {
   bank_name?: string | null;
   holder_name?: string | null;
   notes?: string | null;
+  card_type?: string | null;
 }
 
 interface Props {
