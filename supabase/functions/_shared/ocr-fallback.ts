@@ -102,6 +102,49 @@ function safeJsonParse(text: string): any {
   throw new Error("could not parse JSON from response");
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function clamp(ms: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, ms));
+}
+
+function providerRetryAfterMs(provider: Provider, status: number, headers: Headers, body: string): number | undefined {
+  const retryAfter = headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) return clamp(seconds * 1000, 3_000, 70_000);
+    const dateMs = Date.parse(retryAfter);
+    if (Number.isFinite(dateMs)) return clamp(dateMs - Date.now(), 3_000, 70_000);
+  }
+
+  const retryDelay = body.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i) || body.match(/retryDelay[^0-9]+([0-9.]+)s/i);
+  if (retryDelay?.[1]) return clamp(Number(retryDelay[1]) * 1000, 3_000, 70_000);
+
+  if ([500, 502, 503, 504, 529].includes(status)) return 5_000;
+  if (status !== 429) return undefined;
+
+  // Gemini often omits RetryInfo on per-minute quota bursts; try again after the next minute once.
+  if (provider === "gemini") return 65_000;
+
+  // OpenAI 429 can be either temporary rate limit or exhausted billing quota. Don't wait for billing failures.
+  if (provider === "openai" && /insufficient_quota|billing details|check your plan/i.test(body)) return undefined;
+  if (provider === "openai") return 65_000;
+
+  return undefined;
+}
+
+async function throwProviderError(provider: Provider, resp: Response): Promise<never> {
+  const body = await resp.text();
+  const retryAfterMs = providerRetryAfterMs(provider, resp.status, resp.headers, body);
+  const err: any = new Error(`${provider} ${resp.status}: ${body.slice(0, 500)}`);
+  err.status = resp.status;
+  err.retryAfterMs = retryAfterMs;
+  err.retryable = typeof retryAfterMs === "number";
+  throw err;
+}
+
 async function callLovable(imageUrl: string): Promise<OcrResult> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
