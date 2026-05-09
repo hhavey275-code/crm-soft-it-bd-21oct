@@ -539,7 +539,7 @@ export function AdminTopUp() {
           if (!vData?.auto_approved) {
             const { data: checkedReq } = await supabase.from("top_up_requests").select("admin_note").eq("id", id).maybeSingle();
             if (hasTopUpVerificationFailure(checkedReq?.admin_note)) {
-              throw new Error(`Verification failed: ${vData?.reason || "OCR/SMS mismatch"}. Manual approve is blocked until OCR ref, amount, account and SMS all match.`);
+              throw new Error(`Verification failed: ${vData?.reason || "OCR mismatch"}. Manual approve is blocked while OCR ref / amount / account don't all match. (SMS-only mismatch is OK — but OCR proof must be valid.)`);
             }
           }
         } catch (e) {
