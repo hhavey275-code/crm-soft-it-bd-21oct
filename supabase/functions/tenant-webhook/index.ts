@@ -1,5 +1,6 @@
 // Tenant → Master webhook. Receives heartbeat/chat/bm/withdraw from tenant projects.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { runOcrWithFallback } from "../_shared/ocr-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,46 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+const BDT_TOLERANCE = 15;
+const amountMatches = (a: number, b: number) => Math.abs(a - b) <= BDT_TOLERANCE;
+const refsMatch = (a: string, b: string) => {
+  const clean = (v: string) => String(v || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return !!clean(a) && clean(a) === clean(b);
+};
+
+function extractSmsCreditAmounts(text: string): number[] {
+  const amounts = new Set<number>();
+  const currencyRegex = /(?:tk\.?|bdt|৳)\s*([\d,]+(?:\.\d+)?)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = currencyRegex.exec(text)) !== null) {
+    const amount = Number(String(match[1]).replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const start = match.index;
+    const end = start + match[0].length;
+    const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
+    const after = text.slice(end, end + 45).toLowerCase();
+    const near = `${before} ${after}`;
+    const immediateBefore = before.slice(-18);
+    const immediateAfter = after.slice(0, 24);
+    const looksLikeCredit = /(deposit|credited|credit|cash\s*out|received|transfer|successful)/i.test(near);
+    const looksLikeFeeOrBalance = /(fee\s*$|charge\s*$|vat\s*$|balance\s*$|bal\s*$|c\/b\s*$|available\s*$|a\/c\s*bal\s*$)/i.test(immediateBefore)
+      || /^(\s*(balance|bal|c\/b|available balance|a\/c bal|fee|charge|vat)\b)/i.test(immediateAfter);
+    if (looksLikeCredit && !looksLikeFeeOrBalance) amounts.add(amount);
+  }
+  return [...amounts];
+}
+
+function accountMatches(ocrAccNum: string, bankAccNum: string) {
+  const ocr = String(ocrAccNum || "").replace(/\D/g, "");
+  const bank = String(bankAccNum || "").replace(/\D/g, "");
+  if (!ocr || !bank) return false;
+  if (ocr === bank) return true;
+  if (ocr.length >= 7 && bank.length >= 7) {
+    return ocr.slice(0, 3) === bank.slice(0, 3) && ocr.slice(-4) === bank.slice(-4);
+  }
+  return false;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
