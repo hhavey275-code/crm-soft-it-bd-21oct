@@ -471,7 +471,20 @@ async function pushBillingSnapshot(snap) {
 }
 
 // ---------- Card removal ----------
+function decodeFsId(rawId) {
+  const s = String(rawId || "").trim();
+  if (!s) return s;
+  if (/^[A-Za-z0-9+/]+={0,2}$/.test(s) && s.length >= 8) {
+    try {
+      const decoded = atob(s);
+      const m = decoded.match(/(\d{8,})\s*$/);
+      if (m) return m[1];
+    } catch {}
+  }
+  return s;
+}
 async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }) {
+  fundingSourceId = decodeFsId(fundingSourceId);
   let tab = tabId ? await chrome.tabs.get(tabId).catch(() => null) : null;
   if (!tab) tab = await findFbTab();
   if (!tab) tab = await openFbTab();
@@ -545,6 +558,7 @@ async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }
 // ---------- SMIT-style: GraphQL remove via captured creds ----------
 // Tries multiple known Meta mutation names; the first one accepted wins.
 async function removeCardViaGraphql({ accountId, cardId, card, creds, pageUrl }) {
+  cardId = decodeFsId(cardId);
   if (!creds?.fb_dtsg) {
     return { ok: false, error: "fb_dtsg not captured yet — refresh the billing page once." };
   }
@@ -633,6 +647,7 @@ async function removeCardViaGraphql({ accountId, cardId, card, creds, pageUrl })
 
 // Fallback: use Graph API DELETE with EAA token if we managed to capture one
 async function removeCardViaGraphApi({ accountId, cardId, creds }) {
+  cardId = decodeFsId(cardId);
   if (!creds?.access_token) return { ok: false, error: "no_access_token" };
   const actId = String(accountId).replace(/^act_/, "");
   const url = `https://graph.facebook.com/v19.0/act_${actId}/payment_methods/${encodeURIComponent(cardId)}?access_token=${encodeURIComponent(creds.access_token)}`;

@@ -110,6 +110,21 @@
     }
   }
 
+  function decodeNodeId(rawId) {
+    const s = String(rawId || "").trim();
+    if (!s) return s;
+    // Base64-looking GraphQL node id: try to extract numeric tail like
+    // "credit_card_<digits>" / "fundingsource_<digits>" so it merges with
+    // the numeric id branch returns from other queries.
+    if (/^[A-Za-z0-9+/]+={0,2}$/.test(s) && s.length >= 8) {
+      try {
+        const decoded = atob(s);
+        const m = decoded.match(/(\d{8,})\s*$/);
+        if (m) return m[1];
+      } catch {}
+    }
+    return s;
+  }
   function normalizeCardNode(obj) {
     const last4 =
       obj.last_four_digits ||
@@ -124,9 +139,10 @@
       obj.credit_card_type || obj.type || obj.payment_method_type ||
       (obj.display_string && (obj.display_string.match(/^([A-Za-z ]+?)\s+/) || [])[1]) || ""
     ).toString().trim().toLowerCase().replace(/\s+/g, "");
-    const id = String(
+    const rawId = String(
       obj.id || obj.payment_method_id || obj.funding_source_id || obj.credit_card_id || "",
     ).trim();
+    const id = decodeNodeId(rawId);
     if (!id || /^\d{1,4}$/.test(id)) return null;
     return {
       id,

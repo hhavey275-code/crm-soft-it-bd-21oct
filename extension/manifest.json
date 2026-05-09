@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DSL & Cards Sync — Meta Ad Accounts",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Passive card capture (Smit-style): when admin opens an ad account billing page, the extension auto-syncs default + backup card last-4 to CRM for account-recovery. No background tab sweeps.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [
