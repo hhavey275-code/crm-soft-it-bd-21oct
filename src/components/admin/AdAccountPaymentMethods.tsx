@@ -28,7 +28,7 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("ad_account_card_assignments")
-        .select("display_string, funding_source_id, ad_account_cards(id, display_string, admin_label, bank_name, holder_name, notes)")
+        .select("display_string, funding_source_id, ad_account_cards(id, display_string, admin_label, bank_name, holder_name, notes, card_type)")
         .eq("ad_account_id", adAccountId)
         .order("detected_at", { ascending: false })
         .limit(50);
