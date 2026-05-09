@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Radio } from "lucide-react";
+import { Radio, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
  * Small inline indicator showing Telegram SMS polling status.
- * Reads `telegram_bot_state.updated_at` (cron updates it every minute).
+ * - `telegram_bot_state.updated_at` → cron heartbeat (every 1 min)
+ * - latest `telegram_messages.created_at` → actual SMS ingestion
+ *
+ * If cron is alive but no SMS ingested for >10 min, shows a warning —
+ * this catches "polling alive but receiving 0 messages" silent failures
+ * (e.g. SMS forwarder app dead, bot kicked from channel, allowed_updates
+ * filter broken).
  */
 export function TelegramPollStatus({ className }: { className?: string }) {
-  const { data } = useQuery({
+  const { data: heartbeat } = useQuery({
     queryKey: ["telegram-bot-state"],
     queryFn: async () => {
       const { data } = await (supabase as any)
@@ -24,13 +30,29 @@ export function TelegramPollStatus({ className }: { className?: string }) {
     staleTime: 0,
   });
 
+  const { data: lastMsg } = useQuery({
+    queryKey: ["telegram-last-message"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("telegram_messages")
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data as { created_at: string } | null;
+    },
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+  });
+
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  if (!data?.updated_at) {
+  if (!heartbeat?.updated_at) {
     return (
       <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
         <Radio className="h-3 w-3" />
@@ -39,33 +61,70 @@ export function TelegramPollStatus({ className }: { className?: string }) {
     );
   }
 
-  const lastMs = new Date(data.updated_at).getTime();
-  const ageSec = Math.max(0, Math.floor((now - lastMs) / 1000));
-  const nextSec = Math.max(0, 60 - ageSec);
+  const lastPollMs = new Date(heartbeat.updated_at).getTime();
+  const pollAgeSec = Math.max(0, Math.floor((now - lastPollMs) / 1000));
+  const nextSec = Math.max(0, 60 - pollAgeSec);
 
-  let color = "text-muted-foreground";
-  let dot = "bg-blue-500";
-  let label: string;
+  const lastMsgMs = lastMsg?.created_at ? new Date(lastMsg.created_at).getTime() : 0;
+  const msgAgeSec = lastMsgMs ? Math.max(0, Math.floor((now - lastMsgMs) / 1000)) : Infinity;
+  const msgAgeMin = Math.floor(msgAgeSec / 60);
 
-  if (ageSec < 5) {
-    color = "text-green-600 dark:text-green-400";
-    dot = "bg-green-500 animate-pulse";
-    label = "Polling now…";
-  } else if (ageSec > 180) {
-    color = "text-destructive";
-    dot = "bg-destructive";
-    const mins = Math.floor(ageSec / 60);
-    label = `Polling stalled (${mins}m ago)`;
-  } else {
-    dot = "bg-blue-500";
-    label = `Last poll ${ageSec}s ago · Next in ${nextSec}s`;
+  // Critical: polling cron itself is dead
+  if (pollAgeSec > 180) {
+    const mins = Math.floor(pollAgeSec / 60);
+    return (
+      <div className={cn("flex items-center gap-1.5 text-xs text-destructive", className)}>
+        <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
+        <Radio className="h-3 w-3 opacity-70" />
+        <span>Polling cron stalled ({mins}m ago)</span>
+      </div>
+    );
   }
 
+  // Warning: cron alive but no SMS ingested for a long time
+  // (forwarder app dead, bot kicked, channel_post not delivered, etc.)
+  if (msgAgeSec > 600) {
+    return (
+      <div className={cn("flex flex-col gap-0.5 text-xs", className)}>
+        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="h-3 w-3" />
+          <span className="font-medium">
+            Polling alive but no SMS for {msgAgeMin}m — check forwarder app / bot channel access
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Radio className="h-3 w-3 opacity-70" />
+          <span>
+            Last poll {pollAgeSec}s ago · Last SMS {msgAgeMin}m ago
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Healthy: polling now
+  if (pollAgeSec < 5) {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400", className)}>
+        <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+        <Radio className="h-3 w-3 opacity-70" />
+        <span>
+          Polling now…
+          {lastMsgMs ? ` · Last SMS ${msgAgeMin < 1 ? `${msgAgeSec}s` : `${msgAgeMin}m`} ago` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  // Healthy: countdown to next poll
   return (
-    <div className={cn("flex items-center gap-1.5 text-xs", color, className)}>
-      <span className={cn("inline-block h-2 w-2 rounded-full", dot)} />
+    <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
+      <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
       <Radio className="h-3 w-3 opacity-70" />
-      <span>{label}</span>
+      <span>
+        Last poll {pollAgeSec}s ago · Next in {nextSec}s
+        {lastMsgMs ? ` · Last SMS ${msgAgeMin < 1 ? `${msgAgeSec}s` : `${msgAgeMin}m`} ago` : ""}
+      </span>
     </div>
   );
 }
