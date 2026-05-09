@@ -471,7 +471,20 @@ async function pushBillingSnapshot(snap) {
 }
 
 // ---------- Card removal ----------
+function decodeFsId(rawId) {
+  const s = String(rawId || "").trim();
+  if (!s) return s;
+  if (/^[A-Za-z0-9+/]+={0,2}$/.test(s) && s.length >= 8) {
+    try {
+      const decoded = atob(s);
+      const m = decoded.match(/(\d{8,})\s*$/);
+      if (m) return m[1];
+    } catch {}
+  }
+  return s;
+}
 async function removeCardFromAccount({ accountId, fundingSourceId, card, tabId }) {
+  fundingSourceId = decodeFsId(fundingSourceId);
   let tab = tabId ? await chrome.tabs.get(tabId).catch(() => null) : null;
   if (!tab) tab = await findFbTab();
   if (!tab) tab = await openFbTab();
