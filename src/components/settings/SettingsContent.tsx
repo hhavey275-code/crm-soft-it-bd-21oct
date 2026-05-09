@@ -1446,7 +1446,7 @@ function DslSyncExtensionSection() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Download className="h-4 w-4 text-primary" />
-        <h2 className="text-lg font-semibold">Chrome Extension — DSL &amp; Cards Sync (v2.3.0)</h2>
+        <h2 className="text-lg font-semibold">Chrome Extension — DSL &amp; Cards Sync (v2.5.0)</h2>
       </div>
       <Separator />
       <Card>
