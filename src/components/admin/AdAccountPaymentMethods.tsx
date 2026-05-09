@@ -44,19 +44,24 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
   });
 
   // DB-cached cards from extension sync (primary source — fast & always current)
-  const { data: cachedCards } = useQuery({
+  const { data: cachedState } = useQuery({
     queryKey: ["account-cached-cards", adAccountId],
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("ad_account_last_known_state")
-        .select("cards")
+        .select("cards, last_synced_at")
         .eq("ad_account_id", adAccountId)
         .maybeSingle();
-      const list = Array.isArray(data?.cards) ? data.cards : [];
-      return list as { id: string; display_string: string; type?: string; is_primary?: boolean; exp_month?: number; exp_year?: number }[];
+      return {
+        cards: (Array.isArray(data?.cards) ? data.cards : []) as { id: string; display_string: string; type?: string; is_primary?: boolean; exp_month?: number; exp_year?: number }[],
+        lastSyncedAt: data?.last_synced_at as string | null | undefined,
+      };
     },
     enabled: !!adAccountId,
   });
+  const cachedCards = cachedState?.cards;
+  const lastSyncedAt = cachedState?.lastSyncedAt;
+
 
   // Live cards via edge function — used only as fallback when no cached cards exist
   const { data: accountCards, isLoading: loadingCards } = useQuery({
