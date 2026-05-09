@@ -260,12 +260,16 @@ export type OcrSuccess = { result: OcrResult; provider: Provider; attempts: Arra
 export async function runOcrWithFallback(imageUrl: string, prioritySetting?: Provider[]): Promise<OcrSuccess> {
   const priority = prioritySetting && prioritySetting.length > 0 ? prioritySetting : await getOcrPriority();
   const attempts: Array<{ provider: Provider; ok: boolean; error?: string }> = [];
+  const maxWaitMs = Number(Deno.env.get("OCR_RETRY_WAIT_MS") || "75000");
+  const triedRetry = new Set<Provider>();
+  const callProvider = async (provider: Provider): Promise<OcrResult> => {
+    if (provider === "lovable") return await callLovable(imageUrl);
+    if (provider === "gemini") return await callGemini(imageUrl);
+    return await callOpenAI(imageUrl);
+  };
   for (const provider of priority) {
     try {
-      let result: OcrResult;
-      if (provider === "lovable") result = await callLovable(imageUrl);
-      else if (provider === "gemini") result = await callGemini(imageUrl);
-      else result = await callOpenAI(imageUrl);
+      const result = await callProvider(provider);
       attempts.push({ provider, ok: true });
       // Log to system_logs
       try {
@@ -280,6 +284,28 @@ export async function runOcrWithFallback(imageUrl: string, prioritySetting?: Pro
     } catch (e: any) {
       attempts.push({ provider, ok: false, error: e?.message || String(e) });
       console.error(`[OCR] ${provider} failed:`, e?.message);
+      if (e?.retryAfterMs && !triedRetry.has(provider)) {
+        const waitMs = clamp(Number(e.retryAfterMs), 3_000, maxWaitMs);
+        triedRetry.add(provider);
+        console.warn(`[OCR] ${provider} rate-limited; retrying once after ${Math.round(waitMs / 1000)}s`);
+        await sleep(waitMs);
+        try {
+          const result = await callProvider(provider);
+          attempts.push({ provider, ok: true });
+          try {
+            const supabase = getServiceClient();
+            await supabase.from("system_logs").insert({
+              action: "OCR Payment Extract",
+              status: "success",
+              details: `provider=${provider}; retried_after_ms=${waitMs}; attempts=${JSON.stringify(attempts)}`,
+            });
+          } catch (_) {}
+          return { result, provider, attempts };
+        } catch (retryErr: any) {
+          attempts.push({ provider, ok: false, error: `retry: ${retryErr?.message || String(retryErr)}` });
+          console.error(`[OCR] ${provider} retry failed:`, retryErr?.message);
+        }
+      }
       continue;
     }
   }
