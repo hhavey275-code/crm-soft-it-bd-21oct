@@ -15,6 +15,7 @@ interface CardRow {
   bank_name?: string | null;
   holder_name?: string | null;
   notes?: string | null;
+  card_type?: string | null;
 }
 
 interface Props {
@@ -29,6 +30,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
   const [bankName, setBankName] = useState("");
   const [holderName, setHolderName] = useState("");
   const [notes, setNotes] = useState("");
+  const [cardType, setCardType] = useState("");
 
   useEffect(() => {
     if (card) {
@@ -36,6 +38,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
       setBankName(card.bank_name ?? "");
       setHolderName(card.holder_name ?? "");
       setNotes(card.notes ?? "");
+      setCardType(card.card_type ?? "");
     }
   }, [card]);
 
@@ -49,6 +52,7 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
           bank_name: bankName.trim() || null,
           holder_name: holderName.trim() || null,
           notes: notes.trim() || null,
+          card_type: cardType.trim() || null,
         })
         .eq("id", card.id);
       if (error) throw error;
@@ -72,12 +76,27 @@ export function EditCardLabelDialog({ card, open, onOpenChange }: Props) {
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div>
-            <Label>Admin Label</Label>
-            <Input value={adminLabel} onChange={(e) => setAdminLabel(e.target.value)} placeholder="e.g. Sumon-er DBBL" />
+            <Label>Card Brand</Label>
+            <select
+              value={cardType}
+              onChange={(e) => setCardType(e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">— Select brand —</option>
+              <option value="visa">Visa</option>
+              <option value="mastercard">Mastercard</option>
+              <option value="amex">American Express</option>
+              <option value="discover">Discover</option>
+              <option value="other">Other</option>
+            </select>
           </div>
           <div>
             <Label>Bank Name</Label>
-            <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. DBBL, EBL" />
+            <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. DBBL, EBL, City Bank" />
+          </div>
+          <div>
+            <Label>Admin Label</Label>
+            <Input value={adminLabel} onChange={(e) => setAdminLabel(e.target.value)} placeholder="e.g. Sumon-er DBBL" />
           </div>
           <div>
             <Label>Holder Name</Label>

@@ -1,5 +1,5 @@
-export function CardBrandIcon({ displayString, size = "sm" }: { displayString: string; size?: "sm" | "xs" }) {
-  const lower = displayString?.toLowerCase() ?? "";
+export function CardBrandIcon({ displayString, brand, size = "sm" }: { displayString: string; brand?: string | null; size?: "sm" | "xs" }) {
+  const lower = ((brand || "") + " " + (displayString || "")).toLowerCase();
   const isXs = size === "xs";
   
   if (lower.includes("visa")) {
