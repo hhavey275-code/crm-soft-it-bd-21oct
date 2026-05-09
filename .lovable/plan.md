@@ -1,68 +1,50 @@
-## Goal
+## Goals
 
-Ad account er **default + backup card er last-4 digit** CRM e reliably store thakbe, jate account access hariye gele card identify kore Meta support / bank theke action neya jay. Background-er invisible auto-sync (ja Meta throttle kore) chere diye, **passive content-script capture** model use korbo (Smit-style).
+1. **Manual card details (brand/bank/label/holder/notes) must NOT be wiped** when the extension re-syncs an ad account. update 
+2. **Ad-account list table** should show only **one card per account** — the default (primary) card from the Meta API, exactly like before.
+3. **Default card always comes from the live API**. Synced/extra cards may optionally be listed under the default, but the default itself is API-driven.
 
-## Current state (already in place)
+## Root causes (found while exploring)
 
-- `extension/content.js` already Meta billing page e DOM + GraphQL theke cards, last-4, brand, default flag scrape kore.
-- `supabase/functions/ingest-dsl` already cards `ad_account_cards` + `ad_account_payment_snapshots` table e store kore (with `is_primary` flag).
-- Background `auto-sync` (invisible window) Meta er throttling er karone unreliable — eta drop korbo.
-- CRM-side card display section ager turn e remove kora hoyeche — etake **read-only recovery view** hisebe firiye anbo.
+**Issue #1 — Manual card details disappear after sync:**
+`supabase/functions/ingest-dsl/index.ts` (line 107–116) upserts `ad_account_cards` with `card_type: card.type ?? null`. Extension rarely captures the brand from FB's API, so it sends `null`/`""` — the upsert overwrites the admin's manually-set brand back to `null`. Other manual fields (`admin_label`, `bank_name`, `holder_name`, `notes`) are not in the payload so they survive — only `card_type` is being clobbered.
 
-## Plan
+**Issue #2/#3 — Multiple cards in list:**
+`src/components/admin/AdminAdAccounts.tsx` (line 1184–1190) maps over `ins.cards` and renders all of them. Previously it rendered only the first/default card.
 
-### 1. Extension — lean into passive capture (v2.3.0)
+## Changes
 
-**File: `extension/content.js`**
-- Billing page e user visit korlei (already DOM + GraphQL parse hocche) — snapshot ready hole **automatically push** kore CRM e (debounced, 1 push per account per session).
-- "Sync to CRM" button thakbe manual override hisebe.
-- Default + backup detection sharpen: GraphQL response e `is_primary` / `is_default` / `default_method` field er sathe DOM "Default" / "Backup" label cross-check.
+### 1. `supabase/functions/ingest-dsl/index.ts` — preserve manual `card_type`
 
-**File: `extension/background.js`**
-- Scheduled mass auto-sync (`runAutoSync` + alarm) **disable** kore dilam (Meta detection-safe + reliability problem).
-- Per-account on-demand sync (`syncSingleAccount`) thakbe — admin manually trigger korle kaj korbe.
-- Pending sync request poller thakbe (jokhon client request kore).
+Inside the `for (const card of cards)` upsert loop (around line 107):
 
-**File: `extension/manifest.json`**
-- Version → `2.3.0`, description update.
+- Build the payload conditionally: only include `card_type` when `card.type` is truthy.
+- This way Postgres `ON CONFLICT DO UPDATE` won't touch the column when the extension has nothing better to offer, so the admin's saved brand stays intact.
+- Same defensive treatment for `exp_month` / `exp_year` (skip when null) so manually-corrected expiry isn't wiped either.
 
-### 2. CRM — card recovery panel (read-only)
+No schema change needed.
 
-**File: new `src/components/admin/AdAccountCardsPanel.tsx`**
-- `ad_account_cards` table theke read kore tabular display:
-  - Brand icon (Visa/MC/Amex via existing `CardBrandIcon`)
-  - `•••• 1234` (last-4)
-  - `Default` / `Backup` badge
-  - Expiry (MM/YY) jodi store thake
-  - Last synced relative time
-- Empty state: "No card data synced yet — open the account on Meta Billing page with the extension installed."
+### 2. `src/components/admin/AdminAdAccounts.tsx` — show only the default card
 
-**File: `src/components/pages/AdAccountDetailPage.tsx`**
-- Ager removal er jaygay (line ~577) ekta compact `AdAccountCardsPanel` add korbo — **shudhu cards**, DSL/Live Billing add korbo na (ja extension-unreliable chilo).
-- Heading: "Cards on file (for account recovery)" + small note "Synced from Meta Ads Billing via extension. Used to identify cards if account access is lost."
+Replace the multi-card map (line 1184–1190) with single-card rendering:
 
-### 3. Extension zip rebuild
+- Pick the default card: `const defaultCard = ins?.cards?.find((c: any) => c.is_primary) ?? ins?.cards?.[0];`
+- Render just that card's `CardBrandIcon` + `display_string`.
+- If `ins.cards.length > 1`, append a tiny muted `+N` chip (e.g. "+2 more") so the admin still knows extras exist — clicking through to the ad-account detail page reveals them in the existing Payment Methods card. (If you'd rather hide the chip entirely, say so and I'll drop it.)
 
-- `public/dsl-sync-extension.zip` regenerate (bump version reference in `AdAccountDetailPage` `EXTENSION_VERSION` constant from `2.1.0` → `2.3.0`).
+### 3. (Optional) `src/components/admin/AdAccountPaymentMethods.tsx` — order by default first
 
-## Out of scope (will not touch)
+Already shows multiple cards on the detail page. Make sure the default (primary, from API) is rendered first and labeled "Default", with synced extras listed below — this matches your point #3 ("default card always from API, synced cards under it"). Current ordering uses cached extension order; switch to: API-default first, then any other cached cards.
 
-- Top-up verify, payment forwarding, Stripe webhook, tenant ledger, sheet-sync (locked flows per `CRITICAL_LOCKED_FUNCTIONS.md`).
-- DSL / Live Billing display (deliberately removed last turn — extension data unreliable for those).
-- Card *removal* mutation flow in extension (already works, untouched).
+## Out of scope
 
-## Technical notes
+- Edit dialog UI (already has Brand + Bank fields from the previous turn — keeping it as-is).
+- Extension code (no change needed; the server-side fix protects manual data regardless of what the extension sends).
+- Database migration (none required).
 
-- **No DB migration needed** — `ad_account_cards` table already exists with `last_four_digits`, `brand`, `is_primary`, `expires` columns (used by `ingest-dsl`).
-- **No new edge function** — reusing `ingest-dsl`.
-- **Auto-push debounce**: in content.js, after `rebuildSnapshot()` populates ≥1 card with real GraphQL id, fire `pushBillingSnapshot` once per `account_id` per page load (track via `state.lastSyncedKey`).
-- **Privacy**: only last-4 + brand + expiry stored — never full PAN, CVV, or cardholder name. (Already true; calling out explicitly.)
+## Verification
 
-## Files to change
-
-1. `extension/manifest.json` — version bump
-2. `extension/content.js` — auto-push on snapshot ready
-3. `extension/background.js` — remove scheduled alarm, keep on-demand
-4. `src/components/admin/AdAccountCardsPanel.tsx` — new component
-5. `src/components/pages/AdAccountDetailPage.tsx` — mount the panel
-6. `public/dsl-sync-extension.zip` — rebuild
+- Edit a card → set brand to Visa + bank "DBBL" → save.
+- Trigger an extension sync.
+- Re-open the ad account → brand and bank still present.
+- Open the admin ad-account list → each row shows exactly one card (the API default), matching the pre-change look.

@@ -104,16 +104,22 @@ async function syncIncomingCards(supabase: any, accounts: any[], now: string) {
     if (!cards.length) continue;
 
     for (const card of cards) {
-      await supabase.from("ad_account_cards").upsert({
+      // Only include fields when extension actually has a value — otherwise
+      // ON CONFLICT DO UPDATE would clobber admin-set brand/expiry with NULL.
+      const payload: Record<string, unknown> = {
         funding_source_id: card.id,
         bm_id: acc.business_manager_id ?? null,
         display_string: card.display_string || `Card ...${card.id.slice(-4)}`,
-        card_type: card.type ?? null,
-        exp_month: card.exp_month ?? null,
-        exp_year: card.exp_year ?? null,
         last_seen_at: now,
         updated_at: now,
-      }, { onConflict: "bm_id,funding_source_id", ignoreDuplicates: false });
+      };
+      if (card.type) payload.card_type = card.type;
+      if (card.exp_month) payload.exp_month = card.exp_month;
+      if (card.exp_year) payload.exp_year = card.exp_year;
+      await supabase.from("ad_account_cards").upsert(payload, {
+        onConflict: "bm_id,funding_source_id",
+        ignoreDuplicates: false,
+      });
     }
 
     const fsIds = cards.map((card) => card.id);
