@@ -83,7 +83,8 @@ export function TelegramPollStatus({ className }: { className?: string }) {
 
   // Warning: cron alive but no SMS ingested for a long time
   // (forwarder app dead, bot kicked, channel_post not delivered, etc.)
-  if (msgAgeSec > 600) {
+  // Only check when we actually have message read access (admins).
+  if (lastMsgMs && msgAgeSec > 600) {
     return (
       <div className={cn("flex flex-col gap-0.5 text-xs", className)}>
         <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
