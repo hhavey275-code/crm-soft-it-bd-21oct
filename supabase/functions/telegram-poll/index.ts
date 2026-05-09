@@ -188,9 +188,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[telegram-poll] ok updates=${updates.length} inserted=${inserted} skipped=${skippedNoText} topup_auto=${autoVerified} tenant_auto=${tenantAutoVerified} offset=${maxNextOffset}`);
+    // Self-loop: if pending still exists after this pass, schedule another run
+    // ~10s later (without blocking the response). Cap iterations to ~12 (~2 min)
+    // per chain via a hop counter. New pending rows fire fresh chains via DB trigger.
+    const hop = Number(body?.hop || 0);
+    const MAX_HOPS = 12;
+    const HOP_DELAY_MS = 10_000;
+    let scheduledNext = false;
+    try {
+      const [{ count: topupStill }, { count: tenantStill }] = await Promise.all([
+        supabase.from('top_up_requests').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+        supabase.from('tenant_payments').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'hold']).gte('created_at', sinceIso),
+      ]);
+      if (((topupStill || 0) > 0 || (tenantStill || 0) > 0) && hop < MAX_HOPS) {
+        scheduledNext = true;
+        // Fire-and-forget after delay; don't await.
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+        setTimeout(() => {
+          fetch(`${supabaseUrl}/functions/v1/telegram-poll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonKey}` },
+            body: JSON.stringify({ hop: hop + 1 }),
+          }).catch((e) => console.error('[telegram-poll] reschedule failed:', e?.message || e));
+        }, HOP_DELAY_MS);
+      }
+    } catch (e: any) {
+      log.push(`reschedule check err: ${e?.message || e}`);
+    }
+
+    console.log(`[telegram-poll] ok hop=${hop} updates=${updates.length} inserted=${inserted} skipped=${skippedNoText} topup_auto=${autoVerified} tenant_auto=${tenantAutoVerified} next=${scheduledNext}`);
     return new Response(JSON.stringify({
       ok: true,
+      hop,
+      scheduled_next: scheduledNext,
       updates: updates.length,
       processed: inserted,
       inserted,
