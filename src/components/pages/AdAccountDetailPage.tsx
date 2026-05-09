@@ -23,7 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
-import { AdAccountSyncedCards } from "@/components/admin/AdAccountSyncedCards";
+// AdAccountSyncedCards removed — cards already shown in Payment Methods section below.
 import { LiveBillingData } from "@/components/admin/LiveBillingData";
 import { CardHistoryTimeline } from "@/components/admin/CardHistoryTimeline";
 import { HackRecoveryPanel } from "@/components/admin/HackRecoveryPanel";
