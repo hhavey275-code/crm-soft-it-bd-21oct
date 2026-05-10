@@ -27,6 +27,9 @@ function DashboardPage() {
 }
 
 function DashboardContent() {
-  const { isAdmin, isSeller, isAgency } = useAuth();
+  const { isAdmin, isSeller, isAgency, loading, user } = useAuth();
+  // Wait for auth + role to hydrate before picking a dashboard, otherwise
+  // on reload the ClientDashboard flashes for admins (race: role=null while loading).
+  if (loading || !user) return <PageSkeleton />;
   return isAdmin ? <AdminDashboard /> : isAgency ? <AgencyDashboard /> : isSeller ? <SellerDashboard /> : <ClientDashboard />;
 }
