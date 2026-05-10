@@ -48,18 +48,19 @@ export function FailedTopUps() {
     return p?.full_name || p?.email || "Unknown";
   };
 
-  // Realtime subscription
+  // Realtime subscription (debounced — coalesce bursts to one refetch / 1.5s)
+  const debouncedFailedInvalidate = useDebouncedCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["failed-topups"] });
+    queryClient.invalidateQueries({ queryKey: ["sidebar-failed-topups"] });
+  }, 1500);
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel("failed-topups-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "failed_topups" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["failed-topups"] });
-        queryClient.invalidateQueries({ queryKey: ["sidebar-failed-topups"] });
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "failed_topups" }, () => debouncedFailedInvalidate())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, queryClient]);
+  }, [user, debouncedFailedInvalidate]);
 
   const retryMutation = useMutation({
     mutationFn: async (failedTopupId: string) => {
