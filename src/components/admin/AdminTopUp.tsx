@@ -167,18 +167,17 @@ export function AdminTopUp() {
 
 
 
+  const debouncedInvalidateTopUp = useDebouncedCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
+  }, 1500);
   useEffect(() => {
     const channel = supabase.channel("admin-topup-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
-        queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "tenant_payments" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests" }, () => debouncedInvalidateTopUp())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tenant_payments" }, () => debouncedInvalidateTopUp())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [debouncedInvalidateTopUp]);
 
   const toggleSms = (id: string) => setExpandedSms(prev => ({ ...prev, [id]: !prev[id] }));
 
