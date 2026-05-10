@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDebouncedCallback } from "@/lib/debounce";
 
 export function useSidebarBadges(): Record<string, number> {
   const { user, isAdmin, isSuperAdmin } = useAuth();
@@ -75,6 +76,12 @@ export function useSidebarBadges(): Record<string, number> {
   // Counts only change when a client submits a request or a topup fails,
   // both of which fire postgres_changes events.
 
+  // Debounce refetches: under heavy write load (many top-ups / chats per
+  // minute) we'd otherwise fire 7 COUNT queries per event. Coalesce into a
+  // single refetch every 3s so the sidebar still feels live but the DB
+  // doesn't get hammered.
+  const debouncedFetch = useDebouncedCallback(fetchCounts, 3000);
+
   // Realtime subscriptions
   useEffect(() => {
     if (!user) return;
@@ -85,14 +92,14 @@ export function useSidebarBadges(): Record<string, number> {
 
     let channel = supabase.channel("sidebar-badges");
     tables.forEach((table) => {
-      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => fetchCounts());
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => debouncedFetch());
     });
     channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, isAdminUser, fetchCounts]);
+  }, [user, isAdminUser, debouncedFetch]);
 
   return badges;
 }

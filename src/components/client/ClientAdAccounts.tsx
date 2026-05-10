@@ -5,6 +5,7 @@ import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedCallback } from "@/lib/debounce";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
@@ -63,24 +64,24 @@ export function ClientAdAccounts() {
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
-  // Realtime subscription for live updates
+  // Realtime subscription for live updates (debounced)
+  const debouncedClientInvalidate = useDebouncedCallback(() => {
+    if (!user?.id) return;
+    queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
+    queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+    queryClient.invalidateQueries({ queryKey: ["client-wallet", user.id] });
+  }, 1500);
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase.channel("client-realtime-updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ad_account_insights" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["client-insights-cache", user.id] });
-        queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "ad_accounts" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user.id] });
-        queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "wallets" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["client-wallet", user.id] });
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "ad_account_insights" }, () => debouncedClientInvalidate())
+      .on("postgres_changes", { event: "*", schema: "public", table: "ad_accounts" }, () => debouncedClientInvalidate())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` }, () => debouncedClientInvalidate())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, queryClient]);
+  }, [user?.id, debouncedClientInvalidate]);
 
   // BM Request state
   const [bmReqAccount, setBmReqAccount] = useState<any>(null);
