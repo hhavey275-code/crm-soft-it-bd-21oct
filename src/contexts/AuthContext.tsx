@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] =
         await Promise.all([
-          supabase.from("user_roles").select("role").eq("user_id", userId).limit(1),
+          supabase.from("user_roles").select("role").eq("user_id", userId),
           supabase.from("profiles").select("*").eq("user_id", userId).single(),
         ]);
       // Guard: if user changed mid-flight (logout/login), discard stale result
