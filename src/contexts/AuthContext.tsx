@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const rolePriority: AppRole[] = ["superadmin", "admin", "agency", "seller", "client"];
       const resolvedRole =
-        rolePriority.find((candidate) => roles?.some((row) => row.role === candidate)) ?? null;
+        rolePriority.find((candidate) => roles?.some((row) => row.role === candidate)) ?? "client";
       setRole(resolvedRole);
       setProfile(prof ?? null);
     } catch (err) {
