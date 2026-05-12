@@ -1,19 +1,1 @@
 project_id = "dhswrfzdqcavgmymllat"
-
-[functions.stripe-webhook]
-verify_jwt = false
-
-[functions.create-stripe-checkout]
-verify_jwt = true
-
-[functions.auto-verify-pending]
-verify_jwt = false
-
-[functions.telegram-poll]
-verify_jwt = false
-
-[functions.tenant-webhook]
-verify_jwt = false
-
-[functions.send-push-notification]
-verify_jwt = false
