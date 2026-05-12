@@ -15,11 +15,24 @@ async function fetchSettings(): Promise<SiteSettings> {
   const { data } = await supabase
     .from("site_settings")
     .select("key, value")
-    .in("key", ["logo_url", "site_name", "header_announcement", "welcome_title", "welcome_note", "announcement_color", "announcement_size"]);
+    .in("key", [
+      "logo_url",
+      "site_name",
+      "header_announcement",
+      "welcome_title",
+      "welcome_note",
+      "announcement_color",
+      "announcement_size",
+    ]);
 
   const settings: SiteSettings = {
-    logoUrl: null, siteName: null, headerAnnouncement: null,
-    welcomeTitle: null, welcomeNote: null, announcementColor: null, announcementSize: null,
+    logoUrl: null,
+    siteName: null,
+    headerAnnouncement: null,
+    welcomeTitle: null,
+    welcomeNote: null,
+    announcementColor: null,
+    announcementSize: null,
   };
 
   if (data) {
