@@ -99,7 +99,9 @@ function RootComponent() {
     try {
       localStorage.removeItem("app-rq-cache");
       localStorage.removeItem("site_settings_cache_v2");
-    } catch {}
+    } catch (error) {
+      console.warn("Legacy cache cleanup skipped", error);
+    }
   }, []);
 
   return (
