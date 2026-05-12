@@ -12,14 +12,26 @@ interface AgencyBranding {
 }
 
 const AgencyBrandingContext = createContext<AgencyBranding>({
-  agencyId: null, name: null, slug: null, logoUrl: null, primaryColor: null, usdRate: null, loading: true,
+  agencyId: null,
+  name: null,
+  slug: null,
+  logoUrl: null,
+  primaryColor: null,
+  usdRate: null,
+  loading: true,
 });
 
 export const useAgencyBranding = () => useContext(AgencyBrandingContext);
 
 export const AgencyBrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [branding, setBranding] = useState<AgencyBranding>({
-    agencyId: null, name: null, slug: null, logoUrl: null, primaryColor: null, usdRate: null, loading: true,
+    agencyId: null,
+    name: null,
+    slug: null,
+    logoUrl: null,
+    primaryColor: null,
+    usdRate: null,
+    loading: true,
   });
 
   useEffect(() => {
@@ -27,23 +39,27 @@ export const AgencyBrandingProvider: React.FC<{ children: React.ReactNode }> = (
     const hostname = window.location.hostname;
     const params = new URLSearchParams(window.location.search);
     let slug: string | null = null;
+    const isLovableHost =
+      hostname.includes("lovable.app") || hostname.includes("lovableproject.com");
     const parts = hostname.split(".");
-    if (parts.length >= 3 && parts[0] !== "www" && !parts[0].includes("preview") && !parts[0].includes("lovable")) {
+    if (!isLovableHost && parts.length >= 3 && parts[0] !== "www") {
       slug = parts[0];
     }
     if (!slug) slug = params.get("agency");
     if (!slug) {
-      setBranding(prev => ({ ...prev, loading: false }));
+      setBranding((prev) => ({ ...prev, loading: false }));
       return;
     }
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("agencies")
         .select("id, name, slug, logo_url, primary_color, usd_rate")
         .eq("slug", slug!)
         .eq("status", "active")
-        .single();
-      if (data) {
+        .maybeSingle();
+      if (error) {
+        setBranding((prev) => ({ ...prev, loading: false }));
+      } else if (data) {
         setBranding({
           agencyId: data.id,
           name: data.name,
@@ -54,14 +70,12 @@ export const AgencyBrandingProvider: React.FC<{ children: React.ReactNode }> = (
           loading: false,
         });
       } else {
-        setBranding(prev => ({ ...prev, loading: false }));
+        setBranding((prev) => ({ ...prev, loading: false }));
       }
     })();
   }, []);
 
   return (
-    <AgencyBrandingContext.Provider value={branding}>
-      {children}
-    </AgencyBrandingContext.Provider>
+    <AgencyBrandingContext.Provider value={branding}>{children}</AgencyBrandingContext.Provider>
   );
 };

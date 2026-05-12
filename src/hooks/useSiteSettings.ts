@@ -11,32 +11,28 @@ interface SiteSettings {
   announcementSize: string | null;
 }
 
-const CACHE_KEY = "site_settings_cache_v2";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — cache used only as instant placeholder
-
-interface CacheEntry { ts: number; data: SiteSettings }
-
-function getCachedSettings(): SiteSettings | undefined {
-  if (typeof window === "undefined") return undefined;
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as CacheEntry;
-    if (!parsed?.ts || Date.now() - parsed.ts > CACHE_TTL_MS) return undefined;
-    return parsed.data;
-  } catch {}
-  return undefined;
-}
-
 async function fetchSettings(): Promise<SiteSettings> {
   const { data } = await supabase
     .from("site_settings")
     .select("key, value")
-    .in("key", ["logo_url", "site_name", "header_announcement", "welcome_title", "welcome_note", "announcement_color", "announcement_size"]);
+    .in("key", [
+      "logo_url",
+      "site_name",
+      "header_announcement",
+      "welcome_title",
+      "welcome_note",
+      "announcement_color",
+      "announcement_size",
+    ]);
 
   const settings: SiteSettings = {
-    logoUrl: null, siteName: null, headerAnnouncement: null,
-    welcomeTitle: null, welcomeNote: null, announcementColor: null, announcementSize: null,
+    logoUrl: null,
+    siteName: null,
+    headerAnnouncement: null,
+    welcomeTitle: null,
+    welcomeNote: null,
+    announcementColor: null,
+    announcementSize: null,
   };
 
   if (data) {
@@ -51,22 +47,16 @@ async function fetchSettings(): Promise<SiteSettings> {
     }
   }
 
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: settings }));
-  } catch {}
   return settings;
 }
 
 export function useSiteSettings() {
   const queryClient = useQueryClient();
-  const cached = typeof document === "undefined" ? undefined : getCachedSettings();
 
   const { data, isLoading } = useQuery({
     queryKey: ["site-settings"],
     queryFn: fetchSettings,
-    initialData: cached,
-    // Always refetch in background so admin updates show up — cache only avoids the blank flash.
-    staleTime: 60_000,
+    staleTime: 15_000,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
