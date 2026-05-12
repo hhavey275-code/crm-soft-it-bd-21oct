@@ -149,7 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch {}
+    } catch (err) {
+      console.warn("local auth cleanup failed (ignored):", err);
+    }
     // Force navigate to /auth
     if (typeof window !== "undefined") {
       window.location.replace("/auth");
