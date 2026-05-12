@@ -244,20 +244,3 @@ export function Tutorial({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-export function TutorialButton() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="gap-2"
-      >
-        <MousePointer2 className="h-4 w-4" />
-        কীভাবে কাজ করে — Tutorial দেখুন
-      </Button>
-      <Tutorial open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}

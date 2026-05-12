@@ -19,7 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Line, ComposedChart, Legend, Area, AreaChart, Tooltip as RTooltip } from "recharts";
-import { TutorialButton } from "@/components/Tutorial";
+import { TutorialButton } from "@/components/TutorialProvider";
 
 
 export function ClientDashboard() {

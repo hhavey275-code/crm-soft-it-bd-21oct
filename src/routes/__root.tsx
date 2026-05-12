@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
 import { AgencyBrandingProvider } from "@/contexts/AgencyBrandingContext";
+import { TutorialProvider } from "@/components/TutorialProvider";
 import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
@@ -111,8 +112,10 @@ function RootComponent() {
           <AgencyBrandingProvider>
             <AuthProvider>
               <TooltipProvider>
-                <Toaster />
-                <Outlet />
+                <TutorialProvider>
+                  <Toaster />
+                  <Outlet />
+                </TutorialProvider>
               </TooltipProvider>
             </AuthProvider>
           </AgencyBrandingProvider>
