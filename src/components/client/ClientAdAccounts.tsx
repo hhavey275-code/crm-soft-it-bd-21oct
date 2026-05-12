@@ -58,9 +58,12 @@ export function ClientAdAccounts() {
   const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [cardFilter, setCardFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
+  const [cardFilter, setCardFilter] = useState(() => sessionStorage.getItem("adAccountsCardFilter") || "all");
+  const [currentPage, setCurrentPage] = useState(() => Number(sessionStorage.getItem("adAccountsPage")) || 1);
+  useEffect(() => { sessionStorage.setItem("adAccountsStatusFilter", statusFilter); }, [statusFilter]);
+  useEffect(() => { sessionStorage.setItem("adAccountsCardFilter", cardFilter); }, [cardFilter]);
+  useEffect(() => { sessionStorage.setItem("adAccountsPage", String(currentPage)); }, [currentPage]);
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
