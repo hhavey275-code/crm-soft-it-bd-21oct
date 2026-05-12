@@ -245,19 +245,15 @@ export function Tutorial({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 export function TutorialButton() {
-  const [open, setOpen] = useState(false);
+  // Use the global TutorialProvider so the overlay survives route changes
+  // (it's mounted once at the root, not inside any page that unmounts on nav).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useTutorial } = require("@/components/TutorialProvider") as typeof import("@/components/TutorialProvider");
+  const { start } = useTutorial();
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="gap-2"
-      >
-        <MousePointer2 className="h-4 w-4" />
-        কীভাবে কাজ করে — Tutorial দেখুন
-      </Button>
-      <Tutorial open={open} onClose={() => setOpen(false)} />
-    </>
+    <Button variant="outline" size="sm" onClick={start} className="gap-2">
+      <MousePointer2 className="h-4 w-4" />
+      কীভাবে কাজ করে — Tutorial দেখুন
+    </Button>
   );
 }
