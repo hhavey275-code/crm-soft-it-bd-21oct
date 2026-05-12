@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
 import { AgencyBrandingProvider } from "@/contexts/AgencyBrandingContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 
@@ -81,6 +81,13 @@ function RootComponent() {
       },
     },
   }));
+
+  useEffect(() => {
+    try {
+      localStorage.removeItem("app-rq-cache");
+      localStorage.removeItem("site_settings_cache_v2");
+    } catch {}
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
