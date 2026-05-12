@@ -48,7 +48,7 @@ export function ClientWallet() {
 
       {/* Wallet Balance Card */}
       {isMobile ? (
-        <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
+        <div data-tutorial="wallet-balance" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm opacity-90">Available Balance</p>
@@ -63,7 +63,7 @@ export function ClientWallet() {
           </div>
         </div>
       ) : (
-        <Card className="bg-primary text-primary-foreground">
+        <Card data-tutorial="wallet-balance" className="bg-primary text-primary-foreground">
           <CardContent className="p-8">
             <p className="text-sm opacity-80">Available Balance</p>
             <p className="text-4xl font-bold mt-1">${Number(wallet?.balance ?? 0).toLocaleString()}</p>
@@ -91,7 +91,7 @@ export function ClientWallet() {
         </div>
       )}
 
-      <Card>
+      <Card data-tutorial="wallet-history">
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-base md:text-lg">Top-Up History</CardTitle>
         </CardHeader>

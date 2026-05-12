@@ -742,8 +742,8 @@ export function ClientAdAccounts() {
 
       {/* Mobile Card Layout */}
       {isMobile ? (
-        <div className="space-y-3">
-          {paginatedAccounts.map((a: any) => {
+         <div className="space-y-3">
+          {paginatedAccounts.map((a: any, idx: number) => {
             const ins = insights[a.id];
             return (
               <Card
@@ -751,6 +751,7 @@ export function ClientAdAccounts() {
                 className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
                 onClick={() => navigate(`/ad-accounts/${a.id}`)}
                 data-state={selectedIds.has(a.id) ? "selected" : undefined}
+                data-tutorial={idx === 0 ? "ad-account-card" : undefined}
               >
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
@@ -789,7 +790,7 @@ export function ClientAdAccounts() {
                       </div>
 
                       {/* Spend progress */}
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()} data-tutorial={idx === 0 ? "ad-account-remaining" : undefined}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
@@ -831,6 +832,7 @@ export function ClientAdAccounts() {
                             className="flex-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground text-xs h-8 shadow-md shadow-primary/25"
                             disabled={isInactive}
                             onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                            data-tutorial={idx === 0 ? "ad-account-topup-btn" : undefined}
                           >
                             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
                             Top Up
