@@ -244,13 +244,3 @@ export function Tutorial({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-export function TutorialButton() {
-  const { useTutorial } = require("@/components/TutorialProvider");
-  const { start } = useTutorial();
-  return (
-    <Button variant="outline" size="sm" onClick={start} className="gap-2">
-      <MousePointer2 className="h-4 w-4" />
-      কীভাবে কাজ করে — Tutorial দেখুন
-    </Button>
-  );
-}
