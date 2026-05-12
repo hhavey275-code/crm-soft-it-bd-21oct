@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { MousePointer2 } from "lucide-react";
 import { Tutorial } from "./Tutorial";
 
 type Ctx = { open: boolean; start: () => void; close: () => void };
@@ -16,6 +18,16 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 
 export function useTutorial() {
   const ctx = useContext(TutorialCtx);
-  if (!ctx) throw new Error("useTutorial must be used inside TutorialProvider");
+  if (!ctx) return { open: false, start: () => {}, close: () => {} };
   return ctx;
+}
+
+export function TutorialButton() {
+  const { start } = useTutorial();
+  return (
+    <Button variant="outline" size="sm" onClick={start} className="gap-2">
+      <MousePointer2 className="h-4 w-4" />
+      কীভাবে কাজ করে — Tutorial দেখুন
+    </Button>
+  );
 }
