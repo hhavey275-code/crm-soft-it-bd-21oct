@@ -491,7 +491,7 @@ export function ClientTopUp() {
   );
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div data-tutorial="topup-form" className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
           <ArrowUpCircle className="h-5 w-5 md:h-6 md:w-6 text-primary" />
