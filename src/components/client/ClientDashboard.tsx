@@ -19,6 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Line, ComposedChart, Legend, Area, AreaChart, Tooltip as RTooltip } from "recharts";
+import { TutorialButton } from "@/components/Tutorial";
 
 
 export function ClientDashboard() {
@@ -301,7 +302,7 @@ export function ClientDashboard() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tutorial="dashboard-welcome">
         <div>
           <h1 className="text-base md:text-lg font-bold text-foreground">
             {greeting()}, {profile?.full_name || "there"}! 👋
@@ -320,6 +321,9 @@ export function ClientDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Tutorial */}
+      <TutorialButton />
 
       {/* Warnings */}
       {isInactive && (
