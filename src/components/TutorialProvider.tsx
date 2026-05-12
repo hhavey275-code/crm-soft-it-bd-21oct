@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { MousePointer2 } from "lucide-react";
-import { Tutorial } from "./Tutorial";
+import { TutorialDemo } from "./TutorialDemo";
 
 type Ctx = { open: boolean; start: () => void; close: () => void };
 const TutorialCtx = createContext<Ctx | null>(null);
@@ -11,7 +11,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   return (
     <TutorialCtx.Provider value={{ open, start: () => setOpen(true), close: () => setOpen(false) }}>
       {children}
-      <Tutorial open={open} onClose={() => setOpen(false)} />
+      <TutorialDemo open={open} onClose={() => setOpen(false)} />
     </TutorialCtx.Provider>
   );
 }
