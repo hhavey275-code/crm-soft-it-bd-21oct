@@ -496,7 +496,11 @@ export function ClientAdAccounts() {
   const safePage = Math.min(currentPage, totalPages);
   const paginatedAccounts = sortedAccounts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  useMemo(() => { setCurrentPage(1); }, [search, statusFilter, cardFilter]);
+  const filterResetRef = useRef(true);
+  useEffect(() => {
+    if (filterResetRef.current) { filterResetRef.current = false; return; }
+    setCurrentPage(1);
+  }, [search, statusFilter, cardFilter]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
