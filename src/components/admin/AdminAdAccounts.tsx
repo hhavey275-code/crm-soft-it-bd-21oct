@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -529,7 +529,11 @@ export function AdminAdAccounts() {
   const safePage = Math.min(currentPage, totalPages);
   const paginatedAccounts = sortedAccounts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  useMemo(() => { setCurrentPage(1); }, [search, statusFilter, cardFilter, activityFilter, viewTab]);
+  const filterResetRef = useRef(true);
+  useEffect(() => {
+    if (filterResetRef.current) { filterResetRef.current = false; return; }
+    setCurrentPage(1);
+  }, [search, statusFilter, cardFilter, activityFilter, viewTab]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
