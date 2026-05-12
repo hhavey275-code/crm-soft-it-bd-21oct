@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roles?.some((row) => row.role === candidate)
       ) ?? null;
       setRole(resolvedRole);
-      setProfile((prof as any) ?? null);
+      setProfile(prof ?? null);
     } catch (err) {
       console.error("Failed to fetch user data:", err);
       if (currentUserId.current === userId) {
