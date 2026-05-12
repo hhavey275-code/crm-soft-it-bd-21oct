@@ -27,8 +27,9 @@ export const AgencyBrandingProvider: React.FC<{ children: React.ReactNode }> = (
     const hostname = window.location.hostname;
     const params = new URLSearchParams(window.location.search);
     let slug: string | null = null;
+    const isLovableHost = hostname.includes("lovable.app") || hostname.includes("lovableproject.com");
     const parts = hostname.split(".");
-    if (parts.length >= 3 && parts[0] !== "www" && !parts[0].includes("preview") && !parts[0].includes("lovable")) {
+    if (!isLovableHost && parts.length >= 3 && parts[0] !== "www") {
       slug = parts[0];
     }
     if (!slug) slug = params.get("agency");
@@ -37,13 +38,15 @@ export const AgencyBrandingProvider: React.FC<{ children: React.ReactNode }> = (
       return;
     }
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("agencies")
         .select("id, name, slug, logo_url, primary_color, usd_rate")
         .eq("slug", slug!)
         .eq("status", "active")
-        .single();
-      if (data) {
+        .maybeSingle();
+      if (error) {
+        setBranding(prev => ({ ...prev, loading: false }));
+      } else if (data) {
         setBranding({
           agencyId: data.id,
           name: data.name,
