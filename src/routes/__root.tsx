@@ -1,7 +1,5 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, Link } from "@tanstack/react-router";
-import { QueryClient } from "@tanstack/react-query";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -75,25 +73,17 @@ function RootComponent() {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60_000,
-        gcTime: 1000 * 60 * 60 * 24, // keep in cache 24h for persistence
+        staleTime: 15_000,
+        gcTime: 5 * 60_000,
         refetchOnWindowFocus: false,
+        refetchOnReconnect: true,
         retry: 1,
       },
     },
   }));
 
-  const [persister] = useState(() =>
-    typeof window !== "undefined"
-      ? createSyncStoragePersister({ storage: window.localStorage, key: "app-rq-cache" })
-      : (undefined as any)
-  );
-
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}
-    >
+    <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <ColorThemeProvider>
           <AgencyBrandingProvider>
@@ -106,6 +96,6 @@ function RootComponent() {
           </AgencyBrandingProvider>
         </ColorThemeProvider>
       </ThemeProvider>
-    </PersistQueryClientProvider>
+    </QueryClientProvider>
   );
 }
