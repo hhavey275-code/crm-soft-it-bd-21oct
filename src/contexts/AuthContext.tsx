@@ -43,19 +43,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserData = useCallback(async (userId: string) => {
     try {
-      const [{ data: roles }, { data: prof }] = await Promise.all([
+      const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).limit(1),
         supabase.from("profiles").select("*").eq("user_id", userId).single(),
       ]);
       // Guard: if user changed mid-flight (logout/login), discard stale result
       if (currentUserId.current !== userId) return;
-      setRole((roles?.[0]?.role as AppRole) ?? null);
+      if (rolesError) console.error("Failed to fetch user roles:", rolesError);
+      if (profileError) console.error("Failed to fetch profile:", profileError);
+
+      const rolePriority: AppRole[] = ["superadmin", "admin", "agency", "seller", "client"];
+      const resolvedRole = rolePriority.find((candidate) =>
+        roles?.some((row) => row.role === candidate)
+      ) ?? null;
+      setRole(resolvedRole);
       setProfile((prof as any) ?? null);
     } catch (err) {
       console.error("Failed to fetch user data:", err);
       if (currentUserId.current === userId) {
         setRole(null);
         setProfile(null);
+      }
+    } finally {
+      if (currentUserId.current === userId) {
+        setLoading(false);
       }
     }
   }, []);
@@ -71,7 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(null);
     }
     if (newUserId) {
+      setLoading(true);
       void fetchUserData(newUserId);
+      return;
     }
     setLoading(false);
   }, [fetchUserData]);
