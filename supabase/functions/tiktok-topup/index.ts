@@ -44,6 +44,30 @@ Deno.serve(async (req)=>{
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
+
+    // Idempotency guard: block duplicate (user, account, amount) within 60s
+    const dedupeUserId = target_user_id || userId;
+    try {
+      const since = new Date(Date.now() - 60_000).toISOString();
+      const { data: recentDup } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("user_id", dedupeUserId)
+        .eq("type", "ad_topup")
+        .eq("reference_id", ad_account_id)
+        .eq("amount", -Number(amount))
+        .gte("created_at", since)
+        .limit(1);
+      if (recentDup && recentDup.length > 0) {
+        return json({
+          error: "Duplicate top-up detected (same amount submitted within the last 60 seconds).",
+          code: "DUPLICATE_TOPUP",
+        }, 409);
+      }
+    } catch (e) {
+      console.warn("Dedupe check failed (non-blocking):", e);
+    }
+
     // Non-admin checks
     if (!isAdmin) {
       const { data: profile } = await supabase.from("profiles").select("status").eq("user_id", userId).single();
