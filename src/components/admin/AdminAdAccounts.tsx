@@ -415,7 +415,7 @@ export function AdminAdAccounts() {
   const getClientName = (userId: string | null) => {
     if (!userId) return "Unassigned";
     const client = clients?.find((c: any) => c.user_id === userId);
-    return client?.full_name || client?.email || userId;
+    return client?.company || client?.full_name || client?.email || userId;
   };
 
   const getClientWallet = (userId: string | null) => {
