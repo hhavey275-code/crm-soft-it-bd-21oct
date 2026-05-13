@@ -278,7 +278,7 @@ export function AdminAdAccounts() {
   const { data: clients } = useQuery({
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email, company");
       return (data as any[]) ?? [];
     },
   });
