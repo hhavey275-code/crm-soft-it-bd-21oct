@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { MousePointer2 } from "lucide-react";
-import { TutorialDemo } from "./TutorialDemo";
+import { Tutorial } from "./Tutorial";
 
 type Ctx = { open: boolean; start: () => void; close: () => void };
 const TutorialCtx = createContext<Ctx | null>(null);
