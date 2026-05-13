@@ -732,7 +732,7 @@ export function AdminAdAccounts() {
               last_spend_date: ins?.last_spend_date ?? null,
               balance: ins?.balance ?? null,
               user_id: uid,
-              client_name: client?.full_name ?? null,
+              client_name: client?.company ?? client?.full_name ?? null,
               client_email: client?.email ?? null,
             };
           })}
