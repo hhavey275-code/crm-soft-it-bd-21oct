@@ -917,7 +917,7 @@ export function ClientAdAccounts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedAccounts.map((a: any) => {
+                {paginatedAccounts.map((a: any, idx: number) => {
                   const ins = insights[a.id];
                   return (
                     <TableRow
