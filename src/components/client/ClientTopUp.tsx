@@ -192,10 +192,9 @@ export function ClientTopUp() {
           const first3 = target.slice(0, 3);
           const last4 = target.slice(-4);
           const last3 = target.slice(-3);
-          const isMaskedOrPartial = /[*xX•●]/.test(ocrAcctRaw) || ocrAcct.length <= 7;
           if (ocrAcct === target) verified = true;
-          else if (isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) verified = true;
-          else if (paymentMethod === "mfs_to_bank" && isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) verified = true;
+          else if (ocrAcct.length >= 7 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) verified = true;
+          else if (paymentMethod === "mfs_to_bank" && ocrAcct.length >= 6 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) verified = true;
           else verified = false;
         } else {
           verified = false;
