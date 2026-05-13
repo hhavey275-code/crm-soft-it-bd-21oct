@@ -11,7 +11,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   return (
     <TutorialCtx.Provider value={{ open, start: () => setOpen(true), close: () => setOpen(false) }}>
       {children}
-      <TutorialDemo open={open} onClose={() => setOpen(false)} />
+      <Tutorial open={open} onClose={() => setOpen(false)} />
     </TutorialCtx.Provider>
   );
 }
