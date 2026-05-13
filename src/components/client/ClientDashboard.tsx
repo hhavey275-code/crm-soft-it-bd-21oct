@@ -387,7 +387,7 @@ export function ClientDashboard() {
       {isMobile ? (
         <div className="space-y-3">
           {/* Wallet Hero */}
-          <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
+          <div data-tutorial="card-wallet" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Wallet Balance</p>
@@ -399,13 +399,13 @@ export function ClientDashboard() {
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0) },
-              { label: "Remaining", value: fmt(totalRemaining) },
-              { label: "Today Spend", value: fmt(todaySpend) },
-              { label: "Today Orders", value: String(todayOrders) },
-              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)) },
+              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
+              { label: "Remaining", value: fmt(totalRemaining), key: "remaining" },
+              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
+              { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
+              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
             ].map((m) => (
-              <Card key={m.label} className="bg-card border border-border/60">
+              <Card key={m.label} data-tutorial={`card-${m.key}`} className="bg-card border border-border/60">
                 <CardContent className="p-2.5 text-center">
                   <p className="text-[10px] text-muted-foreground font-medium truncate">{m.label}</p>
                   <p className="text-base font-bold text-foreground">{m.value}</p>
@@ -413,7 +413,7 @@ export function ClientDashboard() {
               </Card>
             ))}
             {/* Total Spend inside grid */}
-            <Card className="bg-card border border-border/60">
+            <Card data-tutorial="card-total-spend" className="bg-card border border-border/60">
               <CardContent className="p-2.5 text-center relative">
                 <p className="text-[10px] text-muted-foreground font-medium truncate">{totalSpendLabel}</p>
                 <p className="text-base font-bold text-foreground">{fmt(displayTotalSpend)}</p>
@@ -447,7 +447,7 @@ export function ClientDashboard() {
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           {/* Wallet - spanning */}
-          <Card className="col-span-2 lg:col-span-1 bg-gradient-to-br from-primary via-primary/85 to-primary/65 text-primary-foreground border-0 shadow-lg overflow-hidden relative">
+          <Card data-tutorial="card-wallet" className="col-span-2 lg:col-span-1 bg-gradient-to-br from-primary via-primary/85 to-primary/65 text-primary-foreground border-0 shadow-lg overflow-hidden relative">
             <CardContent className="p-5 relative z-10">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center"><Wallet className="h-5 w-5" /></div>
@@ -462,13 +462,13 @@ export function ClientDashboard() {
           </Card>
 
           {[
-            { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone },
-            { title: "Remaining", value: fmt(totalRemaining), icon: TrendingUp },
-            { title: "Today Spend", value: fmt(todaySpend), icon: DollarSign },
-            { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart },
-            { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: ArrowUpCircle },
+            { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone, key: "ad-accounts" },
+            { title: "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
+            { title: "Today Spend", value: fmt(todaySpend), icon: DollarSign, key: "today-spend" },
+            { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart, key: "today-orders" },
+            { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: ArrowUpCircle, key: "total-topup" },
           ].map((m) => (
-            <Card key={m.title} className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
+            <Card key={m.title} data-tutorial={`card-${m.key}`} className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 dark:bg-primary/20">
                   <m.icon className="h-4 w-4 text-primary" />
@@ -482,7 +482,7 @@ export function ClientDashboard() {
           ))}
 
           {/* Total Spending with Calendar — inside grid */}
-          <Card className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
+          <Card data-tutorial="card-total-spend" className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 dark:bg-primary/20">
                 <Activity className="h-4 w-4 text-primary" />

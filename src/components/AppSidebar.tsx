@@ -82,7 +82,6 @@ const clientNavItems = [
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
   { title: "Ads Manager", url: "/ad-accounts", icon: Megaphone, key: "ads-manager" },
   { title: "My Unused Accounts", url: "/my-unused", icon: AlertTriangle, key: "my-unused" },
-  { title: "Wallet", url: "/wallet", icon: Wallet, key: "wallet" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
@@ -239,7 +238,9 @@ export function AppSidebar() {
                 const tutorialKey =
                   item.key === "top-up" ? "nav-top-up" :
                   item.key === "wallet" ? "nav-wallet" :
-                  item.key === "ad-accounts" ? "nav-ad-accounts" : undefined;
+                  item.key === "ad-accounts" ? "nav-ad-accounts" :
+                  item.key === "settings" ? "nav-settings" :
+                  item.key === "dashboard" ? "nav-dashboard" : undefined;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>

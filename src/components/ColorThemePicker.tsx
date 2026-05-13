@@ -14,7 +14,7 @@ export function ColorThemePicker() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Color theme">
+        <Button variant="ghost" size="icon" aria-label="Color theme" data-tutorial="theme-picker-trigger">
           <Palette className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
