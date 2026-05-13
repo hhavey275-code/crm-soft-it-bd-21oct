@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
-import { RateLimitBadge } from "@/components/RateLimitBadge";
+
 import { HoldBadge } from "@/components/HoldBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -933,7 +933,7 @@ export function AdminAdAccounts() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /><RateLimitBadge accountId={a.id} compact /></div>
+                    <div className="flex flex-col items-end gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div>
                   </div>
 
                   {/* Remaining + Progress */}
@@ -1161,7 +1161,7 @@ export function AdminAdAccounts() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </TableCell>
-                      <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /><RateLimitBadge accountId={a.id} compact /></div></TableCell>
+                      <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
