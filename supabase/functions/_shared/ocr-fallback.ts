@@ -158,7 +158,7 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: [
@@ -168,6 +168,7 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
       ],
       tools: [{ type: "function", function: TOOL_SCHEMA }],
       tool_choice: { type: "function", function: { name: "extract_payment" } },
+      max_tokens: 512,
     }),
   });
   if (!resp.ok) {
@@ -192,7 +193,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
   const b64 = btoa(bin);
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -207,6 +208,8 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
       }],
       generationConfig: {
         responseMimeType: "application/json",
+        maxOutputTokens: 512,
+        thinkingConfig: { thinkingBudget: 0 },
         responseSchema: {
           type: "object",
           properties: {
