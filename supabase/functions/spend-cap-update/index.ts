@@ -275,6 +275,37 @@ Deno.serve(async (req)=>{
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
+
+    // ============================================
+    // IDEMPOTENCY GUARD: prevent double top-up
+    // ============================================
+    // If the same user submitted the same (ad_account_id, amount) within the
+    // last 60 seconds, treat it as a duplicate submission (double-click,
+    // network retry, etc.) and refuse silently. This prevents wallet from
+    // being charged twice and the spend cap from being incremented twice.
+    const dedupeUserId = target_user_id || userId;
+    try {
+      const since = new Date(Date.now() - 60_000).toISOString();
+      const { data: recentDup } = await supabase
+        .from("transactions")
+        .select("id, created_at")
+        .eq("user_id", dedupeUserId)
+        .eq("type", "ad_topup")
+        .eq("reference_id", ad_account_id)
+        .eq("amount", -Number(amount))
+        .gte("created_at", since)
+        .limit(1);
+      if (recentDup && recentDup.length > 0) {
+        console.warn(`Duplicate top-up blocked: user=${dedupeUserId} acct=${ad_account_id} amount=${amount} (within 60s of ${recentDup[0].created_at})`);
+        return json({
+          error: "Duplicate top-up detected (same amount submitted within the last 60 seconds). Please refresh to see the result of the previous request.",
+          code: "DUPLICATE_TOPUP",
+        }, 409);
+      }
+    } catch (dedupeErr) {
+      console.warn("Dedupe check failed (non-blocking):", dedupeErr);
+    }
+
     // --- License / System Limit Check (Tenant mode) ---
     const { data: licenseSettings } = await supabase.from("site_settings").select("key, value").in("key", [
       "master_url",
