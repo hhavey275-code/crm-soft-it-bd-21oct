@@ -993,12 +993,12 @@ export function ClientAdAccounts() {
                           )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" data-tutorial={idx === 0 ? "ad-account-3dot" : undefined}>
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
+                              <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
                                 <Pencil className="h-3.5 w-3.5 mr-2" />
                                 Rename
                               </DropdownMenuItem>
