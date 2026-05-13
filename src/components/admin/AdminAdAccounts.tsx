@@ -278,7 +278,7 @@ export function AdminAdAccounts() {
   const { data: clients } = useQuery({
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email, company");
       return (data as any[]) ?? [];
     },
   });
@@ -415,7 +415,7 @@ export function AdminAdAccounts() {
   const getClientName = (userId: string | null) => {
     if (!userId) return "Unassigned";
     const client = clients?.find((c: any) => c.user_id === userId);
-    return client?.full_name || client?.email || userId;
+    return client?.company || client?.full_name || client?.email || userId;
   };
 
   const getClientWallet = (userId: string | null) => {
@@ -732,7 +732,7 @@ export function AdminAdAccounts() {
               last_spend_date: ins?.last_spend_date ?? null,
               balance: ins?.balance ?? null,
               user_id: uid,
-              client_name: client?.full_name ?? null,
+              client_name: client?.company ?? client?.full_name ?? null,
               client_email: client?.email ?? null,
             };
           })}

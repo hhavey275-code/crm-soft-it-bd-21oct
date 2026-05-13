@@ -216,7 +216,7 @@ export function AppSidebar() {
                 )}
                 <div>
                   <p className="text-base font-semibold text-sidebar-foreground leading-tight">{displayName}</p>
-                  <p className="text-xs text-sidebar-muted capitalize mt-1">{role ?? "—"}</p>
+                  <p className="text-xs text-sidebar-muted capitalize mt-1">{role === "client" ? ((profile as any)?.company || (profile as any)?.full_name || "Client") : (role ?? "—")}</p>
                 </div>
               </div>
             )}
