@@ -158,7 +158,7 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: [
@@ -168,6 +168,7 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
       ],
       tools: [{ type: "function", function: TOOL_SCHEMA }],
       tool_choice: { type: "function", function: { name: "extract_payment" } },
+      max_tokens: 512,
     }),
   });
   if (!resp.ok) {
