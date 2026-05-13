@@ -20,11 +20,10 @@ function verifyAccount(target: string, result: any, allowFirst3Last3 = false): b
   const ocrAcct = rawOcrAcct.replace(/\D/g, "");
   if (ocrAcct) {
     if (ocrAcct === t) return true;
-    const isMaskedOrPartial = /[*xX•●]/.test(rawOcrAcct) || ocrAcct.length <= 7;
-    if (isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) return true;
+    if (ocrAcct.length >= 7 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) return true;
     // Narrow exception: bKash/Nagad → Bank receipts often hide the full last 4 digits.
     // Allow first3+last3 ONLY when caller explicitly opts in for mfs_to_bank flow.
-    if (allowFirst3Last3 && isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
+    if (allowFirst3Last3 && ocrAcct.length >= 6 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
   }
   return false;
 }
