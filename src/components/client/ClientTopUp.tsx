@@ -181,13 +181,13 @@ export function ClientTopUp() {
       } else {
         setOcrAmountRaw(0);
       }
-      // Account verification result (with client-side fallback when edge fn omits/returns null)
+      // Account verification result (client mirrors the locked server first3+last4 rule)
       const target = String(selectedBankDetails?.account_number || "").replace(/\D/g, "");
       const ocrAcctRaw = String(data?.account_number || "");
       const ocrAcct = ocrAcctRaw.replace(/\D/g, "");
       let verified: boolean | null = typeof data?.account_verified === 'boolean' ? data.account_verified : null;
-      if (verified === null && target.length >= 6) {
-        // Fallback: replicate edge verifyAccount() locally so user is never stuck on "skipped".
+      if (verified !== true && target.length >= 6) {
+        // Re-check locally as a safe fallback for stale edge responses while keeping strict matching.
         if (ocrAcct) {
           const first3 = target.slice(0, 3);
           const last4 = target.slice(-4);
