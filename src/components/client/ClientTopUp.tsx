@@ -181,15 +181,34 @@ export function ClientTopUp() {
       } else {
         setOcrAmountRaw(0);
       }
-      // Account verification result
-      if (typeof data?.account_verified === 'boolean') {
-        if (!data.account_verified) {
-          setAccountVerified(false);
-          toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
+      // Account verification result (with client-side fallback when edge fn omits/returns null)
+      const target = String(selectedBankDetails?.account_number || "").replace(/\D/g, "");
+      const ocrAcctRaw = String(data?.account_number || "");
+      const ocrAcct = ocrAcctRaw.replace(/\D/g, "");
+      let verified: boolean | null = typeof data?.account_verified === 'boolean' ? data.account_verified : null;
+      if (verified === null && target.length >= 6) {
+        // Fallback: replicate edge verifyAccount() locally so user is never stuck on "skipped".
+        if (ocrAcct) {
+          const first3 = target.slice(0, 3);
+          const last4 = target.slice(-4);
+          const last3 = target.slice(-3);
+          const isMaskedOrPartial = /[*xX•●]/.test(ocrAcctRaw) || ocrAcct.length <= 7;
+          if (ocrAcct === target) verified = true;
+          else if (isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) verified = true;
+          else if (paymentMethod === "mfs_to_bank" && isMaskedOrPartial && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) verified = true;
+          else verified = false;
         } else {
-          setAccountVerified(true);
-          toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
+          verified = false;
         }
+      }
+      if (verified === true) {
+        setAccountVerified(true);
+        toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
+      } else if (verified === false) {
+        setAccountVerified(false);
+        toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
+      } else {
+        setAccountVerified(null);
       }
     } catch (err: any) {
       console.error("OCR extraction failed:", err);
