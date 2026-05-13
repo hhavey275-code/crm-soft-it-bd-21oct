@@ -387,7 +387,7 @@ export function ClientDashboard() {
       {isMobile ? (
         <div className="space-y-3">
           {/* Wallet Hero */}
-          <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
+          <div data-tutorial="card-wallet" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Wallet Balance</p>
@@ -399,13 +399,13 @@ export function ClientDashboard() {
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0) },
-              { label: "Remaining", value: fmt(totalRemaining) },
-              { label: "Today Spend", value: fmt(todaySpend) },
-              { label: "Today Orders", value: String(todayOrders) },
-              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)) },
+              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
+              { label: "Remaining", value: fmt(totalRemaining), key: "remaining" },
+              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
+              { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
+              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
             ].map((m) => (
-              <Card key={m.label} className="bg-card border border-border/60">
+              <Card key={m.label} data-tutorial={`card-${m.key}`} className="bg-card border border-border/60">
                 <CardContent className="p-2.5 text-center">
                   <p className="text-[10px] text-muted-foreground font-medium truncate">{m.label}</p>
                   <p className="text-base font-bold text-foreground">{m.value}</p>
