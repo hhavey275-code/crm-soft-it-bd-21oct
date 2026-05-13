@@ -238,7 +238,9 @@ export function AppSidebar() {
                 const tutorialKey =
                   item.key === "top-up" ? "nav-top-up" :
                   item.key === "wallet" ? "nav-wallet" :
-                  item.key === "ad-accounts" ? "nav-ad-accounts" : undefined;
+                  item.key === "ad-accounts" ? "nav-ad-accounts" :
+                  item.key === "settings" ? "nav-settings" :
+                  item.key === "dashboard" ? "nav-dashboard" : undefined;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
