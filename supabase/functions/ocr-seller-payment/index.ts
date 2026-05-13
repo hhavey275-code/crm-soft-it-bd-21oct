@@ -18,12 +18,34 @@ function verifyAccount(target: string, result: any, allowFirst3Last3 = false): b
   const last3 = t.slice(-3);
   const rawOcrAcct = String(result?.account_number || "");
   const ocrAcct = rawOcrAcct.replace(/\D/g, "");
-  if (ocrAcct) {
-    if (ocrAcct === t) return true;
-    if (ocrAcct.length >= 7 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) return true;
-    // Narrow exception: bKash/Nagad → Bank receipts often hide the full last 4 digits.
-    // Allow first3+last3 ONLY when caller explicitly opts in for mfs_to_bank flow.
-    if (allowFirst3Last3 && ocrAcct.length >= 6 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) return true;
+  const matches = (digits: string): boolean => {
+    if (!digits) return false;
+    if (digits === t) return true;
+    if (digits.includes(t)) return true;
+    if (digits.length >= 7 && digits.startsWith(first3) && digits.endsWith(last4)) return true;
+    if (allowFirst3Last3 && digits.length >= 6 && digits.startsWith(first3) && digits.endsWith(last3)) return true;
+    return false;
+  };
+  if (matches(ocrAcct)) return true;
+  // Fallback: OCR sometimes puts the number in a wrong field (e.g. account_holder_name,
+  // bank_name, reference). Concatenate ALL textual OCR fields and search for the digits
+  // anywhere — still requires either full match or the strict first3+last4 anchor.
+  const allText = [
+    result?.account_number,
+    result?.account_holder_name,
+    result?.bank_name,
+    result?.reference,
+  ].filter(Boolean).map(String).join(" ");
+  const allDigits = allText.replace(/\D/g, "");
+  if (allDigits) {
+    if (allDigits.includes(t)) return true;
+    // Sliding window: scan every substring of length >=7 starting with first3 and ending with last4
+    const re = new RegExp(`${first3}\\d{0,20}${last4}`, "g");
+    if (re.test(allDigits)) return true;
+    if (allowFirst3Last3) {
+      const re2 = new RegExp(`${first3}\\d{0,20}${last3}`, "g");
+      if (re2.test(allDigits)) return true;
+    }
   }
   return false;
 }

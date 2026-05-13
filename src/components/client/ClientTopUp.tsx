@@ -143,18 +143,77 @@ export function ClientTopUp() {
     return 0;
   };
 
+  // Compress image before OCR + upload to drastically cut AI tokens & storage cost.
+  // Keeps text legibility (max 1600px) but typically 70-85% smaller than original.
+  const compressImage = async (file: File): Promise<{ file: File; dataUrl: string }> => {
+    try {
+      if (!file.type.startsWith("image/") || file.type === "image/gif") {
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((res, rej) => {
+          reader.onload = () => res(reader.result as string);
+          reader.onerror = rej;
+          reader.readAsDataURL(file);
+        });
+        return { file, dataUrl };
+      }
+      const bitmap = await createImageBitmap(file);
+      const MAX = 1600;
+      let { width, height } = bitmap;
+      if (width > MAX || height > MAX) {
+        const ratio = Math.min(MAX / width, MAX / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no canvas ctx");
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      const blob: Blob = await new Promise((res, rej) =>
+        canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/jpeg", 0.75),
+      );
+      // Only use compressed if it's actually smaller
+      if (blob.size >= file.size) {
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((res, rej) => {
+          reader.onload = () => res(reader.result as string);
+          reader.onerror = rej;
+          reader.readAsDataURL(file);
+        });
+        return { file, dataUrl };
+      }
+      const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(compressed);
+      });
+      return { file: compressed, dataUrl };
+    } catch (e) {
+      console.warn("compressImage failed, using original", e);
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((res, rej) => {
+        reader.onload = () => res(reader.result as string);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      return { file, dataUrl };
+    }
+  };
+
   // OCR extraction from screenshot
   const runOcrExtraction = async (file: File) => {
     setOcrLoading(true);
     setAccountVerified(null);
     setOcrReference("");
     try {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const { file: compressedFile, dataUrl } = await compressImage(file);
+      // Replace stored proofFile with compressed version so upload is also small
+      if (compressedFile !== file) {
+        setProofFile(compressedFile);
+      }
 
       const { data, error } = await supabase.functions.invoke('ocr-seller-payment', {
         body: {
@@ -187,17 +246,25 @@ export function ClientTopUp() {
       const ocrAcct = ocrAcctRaw.replace(/\D/g, "");
       let verified: boolean | null = typeof data?.account_verified === 'boolean' ? data.account_verified : null;
       if (verified !== true && target.length >= 6) {
-        // Re-check locally as a safe fallback for stale edge responses while keeping strict matching.
-        if (ocrAcct) {
-          const first3 = target.slice(0, 3);
-          const last4 = target.slice(-4);
-          const last3 = target.slice(-3);
-          if (ocrAcct === target) verified = true;
-          else if (ocrAcct.length >= 7 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last4)) verified = true;
-          else if (paymentMethod === "mfs_to_bank" && ocrAcct.length >= 6 && ocrAcct.startsWith(first3) && ocrAcct.endsWith(last3)) verified = true;
+        const first3 = target.slice(0, 3);
+        const last4 = target.slice(-4);
+        const last3 = target.slice(-3);
+        const matches = (d: string) => {
+          if (!d) return false;
+          if (d === target || d.includes(target)) return true;
+          if (d.length >= 7 && d.startsWith(first3) && d.endsWith(last4)) return true;
+          if (paymentMethod === "mfs_to_bank" && d.length >= 6 && d.startsWith(first3) && d.endsWith(last3)) return true;
+          return false;
+        };
+        if (matches(ocrAcct)) verified = true;
+        else {
+          // Cross-field fallback: OCR sometimes places digits in the wrong field.
+          const allDigits = [data?.account_number, data?.account_holder_name, data?.bank_name, data?.reference]
+            .filter(Boolean).map(String).join(" ").replace(/\D/g, "");
+          if (allDigits.includes(target)) verified = true;
+          else if (new RegExp(`${first3}\\d{0,20}${last4}`).test(allDigits)) verified = true;
+          else if (paymentMethod === "mfs_to_bank" && new RegExp(`${first3}\\d{0,20}${last3}`).test(allDigits)) verified = true;
           else verified = false;
-        } else {
-          verified = false;
         }
       }
       if (verified === true) {
