@@ -82,7 +82,6 @@ const clientNavItems = [
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
   { title: "Ads Manager", url: "/ad-accounts", icon: Megaphone, key: "ads-manager" },
   { title: "My Unused Accounts", url: "/my-unused", icon: AlertTriangle, key: "my-unused" },
-  { title: "Wallet", url: "/wallet", icon: Wallet, key: "wallet" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
