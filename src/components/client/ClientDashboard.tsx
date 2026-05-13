@@ -413,7 +413,7 @@ export function ClientDashboard() {
               </Card>
             ))}
             {/* Total Spend inside grid */}
-            <Card className="bg-card border border-border/60">
+            <Card data-tutorial="card-total-spend" className="bg-card border border-border/60">
               <CardContent className="p-2.5 text-center relative">
                 <p className="text-[10px] text-muted-foreground font-medium truncate">{totalSpendLabel}</p>
                 <p className="text-base font-bold text-foreground">{fmt(displayTotalSpend)}</p>
