@@ -126,6 +126,13 @@ export function ClientTopUp() {
     enabled: !!user,
   });
   const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
+  const selectedBankDetailsRef = useRef<any>(null);
+  const paymentMethodRef = useRef<PaymentMethod | null>(null);
+
+  useEffect(() => {
+    selectedBankDetailsRef.current = selectedBankDetails;
+    paymentMethodRef.current = paymentMethod;
+  }, [selectedBankDetails, paymentMethod]);
 
   // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
   // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
@@ -206,14 +213,14 @@ export function ClientTopUp() {
 
   // Pure client-side verification — mirrors the locked server first3+last4 rule.
   // Used both after OCR completes AND when the user changes the selected bank later.
-  const verifyAccountFromData = (data: any, bankAcctNum: string | null | undefined): boolean | null => {
+  const verifyAccountFromData = (data: any, bankAcctNum: string | null | undefined, methodForVerification: PaymentMethod | null = paymentMethod): boolean | null => {
     if (!data) return null;
     const target = String(bankAcctNum || "").replace(/\D/g, "");
     if (target.length < 6) return null;
     const first3 = target.slice(0, 3);
     const last4 = target.slice(-4);
     const last3 = target.slice(-3);
-    const allowFirst3Last3 = paymentMethod === "mfs_to_bank";
+    const allowFirst3Last3 = methodForVerification === "mfs_to_bank";
     const ocrAcct = String(data?.account_number || "").replace(/\D/g, "");
     const matches = (d: string) => {
       if (!d) return false;
