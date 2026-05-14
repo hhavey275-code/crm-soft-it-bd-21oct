@@ -126,6 +126,13 @@ export function ClientTopUp() {
     enabled: !!user,
   });
   const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
+  const selectedBankDetailsRef = useRef<any>(null);
+  const paymentMethodRef = useRef<PaymentMethod | null>(null);
+
+  useEffect(() => {
+    selectedBankDetailsRef.current = selectedBankDetails;
+    paymentMethodRef.current = paymentMethod;
+  }, [selectedBankDetails, paymentMethod]);
 
   // LOCKED: amount mismatch guard. If OCR extracted an amount and the user-entered
   // amount differs by > 15 BDT, block submit. This prevents wrong-screenshot approvals
@@ -206,14 +213,14 @@ export function ClientTopUp() {
 
   // Pure client-side verification — mirrors the locked server first3+last4 rule.
   // Used both after OCR completes AND when the user changes the selected bank later.
-  const verifyAccountFromData = (data: any, bankAcctNum: string | null | undefined): boolean | null => {
+  const verifyAccountFromData = (data: any, bankAcctNum: string | null | undefined, methodForVerification: PaymentMethod | null = paymentMethod): boolean | null => {
     if (!data) return null;
     const target = String(bankAcctNum || "").replace(/\D/g, "");
     if (target.length < 6) return null;
     const first3 = target.slice(0, 3);
     const last4 = target.slice(-4);
     const last3 = target.slice(-3);
-    const allowFirst3Last3 = paymentMethod === "mfs_to_bank";
+    const allowFirst3Last3 = methodForVerification === "mfs_to_bank";
     const ocrAcct = String(data?.account_number || "").replace(/\D/g, "");
     const matches = (d: string) => {
       if (!d) return false;
@@ -235,7 +242,8 @@ export function ClientTopUp() {
   // OCR extraction from screenshot
   const runOcrExtraction = async (file: File) => {
     // Snapshot the bank at call-time so the value used by OCR matches what UI shows.
-    const bankSnapshot = selectedBankDetails;
+    const bankSnapshot = selectedBankDetailsRef.current;
+    const paymentMethodSnapshot = paymentMethodRef.current;
     if (!bankSnapshot?.account_number) {
       toast.error("প্রথমে bank/payment method select করুন, তারপর screenshot upload করুন।");
       return;
@@ -254,7 +262,7 @@ export function ClientTopUp() {
         body: {
           image_url: dataUrl,
           verify_account_number: bankSnapshot.account_number,
-          allow_first3_last3: paymentMethod === "mfs_to_bank",
+          allow_first3_last3: paymentMethodSnapshot === "mfs_to_bank",
         },
       });
       if (error) throw error;
@@ -275,7 +283,7 @@ export function ClientTopUp() {
       } else {
         setOcrAmountRaw(0);
       }
-      const verified = verifyAccountFromData(data, bankSnapshot.account_number);
+      const verified = verifyAccountFromData(data, bankSnapshot.account_number, paymentMethodSnapshot);
       if (verified === true) {
         setAccountVerified(true);
         toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
