@@ -114,6 +114,7 @@ export function ClientTopUp() {
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
   const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
   const [ocrReference, setOcrReference] = useState("");
+  const [ocrRawData, setOcrRawData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: assignedBanks } = useQuery({
