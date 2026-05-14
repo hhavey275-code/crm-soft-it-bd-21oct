@@ -330,6 +330,7 @@ export function ClientTopUp() {
     setAccountVerified(null);
     setOcrAmountRaw(null);
     setOcrReference("");
+    setOcrRawData(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
