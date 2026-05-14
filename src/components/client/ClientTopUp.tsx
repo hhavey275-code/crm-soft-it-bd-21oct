@@ -242,7 +242,8 @@ export function ClientTopUp() {
   // OCR extraction from screenshot
   const runOcrExtraction = async (file: File) => {
     // Snapshot the bank at call-time so the value used by OCR matches what UI shows.
-    const bankSnapshot = selectedBankDetails;
+    const bankSnapshot = selectedBankDetailsRef.current;
+    const paymentMethodSnapshot = paymentMethodRef.current;
     if (!bankSnapshot?.account_number) {
       toast.error("প্রথমে bank/payment method select করুন, তারপর screenshot upload করুন।");
       return;
@@ -261,7 +262,7 @@ export function ClientTopUp() {
         body: {
           image_url: dataUrl,
           verify_account_number: bankSnapshot.account_number,
-          allow_first3_last3: paymentMethod === "mfs_to_bank",
+          allow_first3_last3: paymentMethodSnapshot === "mfs_to_bank",
         },
       });
       if (error) throw error;
@@ -282,7 +283,7 @@ export function ClientTopUp() {
       } else {
         setOcrAmountRaw(0);
       }
-      const verified = verifyAccountFromData(data, bankSnapshot.account_number);
+      const verified = verifyAccountFromData(data, bankSnapshot.account_number, paymentMethodSnapshot);
       if (verified === true) {
         setAccountVerified(true);
         toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
