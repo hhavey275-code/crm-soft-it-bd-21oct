@@ -114,6 +114,7 @@ export function ClientTopUp() {
   const [accountVerified, setAccountVerified] = useState<boolean | null>(null);
   const [ocrAmountRaw, setOcrAmountRaw] = useState<number | null>(null);
   const [ocrReference, setOcrReference] = useState("");
+  const [ocrRawData, setOcrRawData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: assignedBanks } = useQuery({
@@ -203,14 +204,48 @@ export function ClientTopUp() {
     }
   };
 
+  // Pure client-side verification — mirrors the locked server first3+last4 rule.
+  // Used both after OCR completes AND when the user changes the selected bank later.
+  const verifyAccountFromData = (data: any, bankAcctNum: string | null | undefined): boolean | null => {
+    if (!data) return null;
+    const target = String(bankAcctNum || "").replace(/\D/g, "");
+    if (target.length < 6) return null;
+    const first3 = target.slice(0, 3);
+    const last4 = target.slice(-4);
+    const last3 = target.slice(-3);
+    const allowFirst3Last3 = paymentMethod === "mfs_to_bank";
+    const ocrAcct = String(data?.account_number || "").replace(/\D/g, "");
+    const matches = (d: string) => {
+      if (!d) return false;
+      if (d === target || d.includes(target)) return true;
+      if (d.length >= 7 && d.startsWith(first3) && d.endsWith(last4)) return true;
+      if (allowFirst3Last3 && d.length >= 6 && d.startsWith(first3) && d.endsWith(last3)) return true;
+      return false;
+    };
+    if (typeof data?.account_verified === 'boolean' && data.account_verified) return true;
+    if (matches(ocrAcct)) return true;
+    const allDigits = [data?.account_number, data?.account_holder_name, data?.bank_name, data?.reference]
+      .filter(Boolean).map(String).join(" ").replace(/\D/g, "");
+    if (allDigits.includes(target)) return true;
+    if (new RegExp(`${first3}\\d{0,20}${last4}`).test(allDigits)) return true;
+    if (allowFirst3Last3 && new RegExp(`${first3}\\d{0,20}${last3}`).test(allDigits)) return true;
+    return false;
+  };
+
   // OCR extraction from screenshot
   const runOcrExtraction = async (file: File) => {
+    // Snapshot the bank at call-time so the value used by OCR matches what UI shows.
+    const bankSnapshot = selectedBankDetails;
+    if (!bankSnapshot?.account_number) {
+      toast.error("প্রথমে bank/payment method select করুন, তারপর screenshot upload করুন।");
+      return;
+    }
     setOcrLoading(true);
     setAccountVerified(null);
     setOcrReference("");
+    setOcrRawData(null);
     try {
       const { file: compressedFile, dataUrl } = await compressImage(file);
-      // Replace stored proofFile with compressed version so upload is also small
       if (compressedFile !== file) {
         setProofFile(compressedFile);
       }
@@ -218,11 +253,12 @@ export function ClientTopUp() {
       const { data, error } = await supabase.functions.invoke('ocr-seller-payment', {
         body: {
           image_url: dataUrl,
-          verify_account_number: selectedBankDetails?.account_number || null,
+          verify_account_number: bankSnapshot.account_number,
           allow_first3_last3: paymentMethod === "mfs_to_bank",
         },
       });
       if (error) throw error;
+      setOcrRawData(data);
       const extractedRef = String(data?.reference || "").trim();
       setOcrReference(extractedRef);
       if (extractedRef) {
@@ -232,47 +268,20 @@ export function ClientTopUp() {
       if (data?.bdt_amount) {
         const finalAmount = Number(data.bdt_amount);
         setOcrAmountRaw(finalAmount);
-        // OCR now extracts the principal/base amount directly (charge already excluded by AI)
-        if (selectedBankDetails && isMFS(selectedBankDetails.bank_name)) {
+        if (bankSnapshot && isMFS(bankSnapshot.bank_name)) {
           toast.info(`প্রাপ্ত পরিমাণ (চার্জ বাদে): ৳${finalAmount.toLocaleString()}`);
         }
         setBdtAmount(String(finalAmount));
       } else {
         setOcrAmountRaw(0);
       }
-      // Account verification result (client mirrors the locked server first3+last4 rule)
-      const target = String(selectedBankDetails?.account_number || "").replace(/\D/g, "");
-      const ocrAcctRaw = String(data?.account_number || "");
-      const ocrAcct = ocrAcctRaw.replace(/\D/g, "");
-      let verified: boolean | null = typeof data?.account_verified === 'boolean' ? data.account_verified : null;
-      if (verified !== true && target.length >= 6) {
-        const first3 = target.slice(0, 3);
-        const last4 = target.slice(-4);
-        const last3 = target.slice(-3);
-        const matches = (d: string) => {
-          if (!d) return false;
-          if (d === target || d.includes(target)) return true;
-          if (d.length >= 7 && d.startsWith(first3) && d.endsWith(last4)) return true;
-          if (paymentMethod === "mfs_to_bank" && d.length >= 6 && d.startsWith(first3) && d.endsWith(last3)) return true;
-          return false;
-        };
-        if (matches(ocrAcct)) verified = true;
-        else {
-          // Cross-field fallback: OCR sometimes places digits in the wrong field.
-          const allDigits = [data?.account_number, data?.account_holder_name, data?.bank_name, data?.reference]
-            .filter(Boolean).map(String).join(" ").replace(/\D/g, "");
-          if (allDigits.includes(target)) verified = true;
-          else if (new RegExp(`${first3}\\d{0,20}${last4}`).test(allDigits)) verified = true;
-          else if (paymentMethod === "mfs_to_bank" && new RegExp(`${first3}\\d{0,20}${last3}`).test(allDigits)) verified = true;
-          else verified = false;
-        }
-      }
+      const verified = verifyAccountFromData(data, bankSnapshot.account_number);
       if (verified === true) {
         setAccountVerified(true);
         toast.success("✅ অ্যাকাউন্ট নম্বর verified!");
       } else if (verified === false) {
         setAccountVerified(false);
-        toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি!");
+        toast.error("⚠️ Screenshot এ নির্বাচিত অ্যাকাউন্ট নম্বর পাওয়া যায়নি! সঠিক bank select করেছেন কিনা check করুন।");
       } else {
         setAccountVerified(null);
       }
@@ -291,6 +300,20 @@ export function ClientTopUp() {
     }
   };
 
+  // Re-verify account when bank selection changes (no OCR re-call → no token cost).
+  useEffect(() => {
+    if (!ocrRawData || !selectedBankDetails?.account_number) return;
+    const verified = verifyAccountFromData(ocrRawData, selectedBankDetails.account_number);
+    if (verified === true) {
+      setAccountVerified(true);
+    } else if (verified === false) {
+      setAccountVerified(false);
+    } else {
+      setAccountVerified(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBank, paymentMethod]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -307,6 +330,7 @@ export function ClientTopUp() {
     setAccountVerified(null);
     setOcrAmountRaw(null);
     setOcrReference("");
+    setOcrRawData(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
