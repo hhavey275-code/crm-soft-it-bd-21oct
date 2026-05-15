@@ -2001,6 +2001,7 @@ export type Database = {
           agency_id: string | null
           business_address: string | null
           campaign_management_enabled: boolean
+          can_approve_topups: boolean
           color_theme: string
           company: string | null
           created_at: string
@@ -2025,6 +2026,7 @@ export type Database = {
           agency_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
+          can_approve_topups?: boolean
           color_theme?: string
           company?: string | null
           created_at?: string
@@ -2049,6 +2051,7 @@ export type Database = {
           agency_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
+          can_approve_topups?: boolean
           color_theme?: string
           company?: string | null
           created_at?: string

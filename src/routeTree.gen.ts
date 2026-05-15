@@ -22,6 +22,7 @@ import { Route as SignupSuccessRouteImport } from './routes/signup-success'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SellersRouteImport } from './routes/sellers'
+import { Route as SellerTopupsRouteImport } from './routes/seller-topups'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -124,6 +125,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SellersRoute = SellersRouteImport.update({
   id: '/sellers',
   path: '/sellers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellerTopupsRoute = SellerTopupsRouteImport.update({
+  id: '/seller-topups',
+  path: '/seller-topups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -343,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seller-topups': typeof SellerTopupsRoute
   '/sellers': typeof SellersRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -396,6 +403,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seller-topups': typeof SellerTopupsRoute
   '/sellers': typeof SellersRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -449,6 +457,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seller-topups': typeof SellerTopupsRoute
   '/sellers': typeof SellersRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -504,6 +513,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/requests'
     | '/reset-password'
+    | '/seller-topups'
     | '/sellers'
     | '/settings'
     | '/signup'
@@ -557,6 +567,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/requests'
     | '/reset-password'
+    | '/seller-topups'
     | '/sellers'
     | '/settings'
     | '/signup'
@@ -609,6 +620,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/requests'
     | '/reset-password'
+    | '/seller-topups'
     | '/sellers'
     | '/settings'
     | '/signup'
@@ -663,6 +675,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SellerTopupsRoute: typeof SellerTopupsRoute
   SellersRoute: typeof SellersRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
@@ -778,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/sellers'
       fullPath: '/sellers'
       preLoaderRoute: typeof SellersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seller-topups': {
+      id: '/seller-topups'
+      path: '/seller-topups'
+      fullPath: '/seller-topups'
+      preLoaderRoute: typeof SellerTopupsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -1112,6 +1132,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SellerTopupsRoute: SellerTopupsRoute,
   SellersRoute: SellersRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
@@ -1138,12 +1159,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

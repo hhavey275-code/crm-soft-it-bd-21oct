@@ -44,6 +44,7 @@ import {
   type MonthlyClosing,
 } from "@/lib/sellerMonthlyClose";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Lock, Unlock } from "lucide-react";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
@@ -1212,6 +1213,31 @@ export function AdminSellers() {
                 <ArrowLeftRight className="h-4 w-4" />
               </Button>
             </CardContent>
+            <div
+              className="px-4 pb-3 pt-0 flex items-center justify-between gap-2 border-t border-border/50 mt-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-xs text-muted-foreground">
+                Allow Top-Up Approval
+              </div>
+              <Switch
+                checked={!!s.can_approve_topups}
+                onCheckedChange={async (checked) => {
+                  const { error } = await supabase
+                    .from("profiles")
+                    .update({ can_approve_topups: checked } as any)
+                    .eq("user_id", s.user_id);
+                  if (error) { toast.error(error.message); return; }
+                  toast.success(checked ? "Seller can now approve top-ups" : "Approval disabled");
+                  logSystemAction(
+                    checked ? "Seller Top-Up Approval Enabled" : "Seller Top-Up Approval Disabled",
+                    `Seller: ${s.full_name || s.email}`,
+                    user?.id, user?.email
+                  );
+                  queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
+                }}
+              />
+            </div>
           </Card>
           );
         })}
