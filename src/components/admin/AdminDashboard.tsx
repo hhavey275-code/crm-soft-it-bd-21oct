@@ -90,6 +90,9 @@ export function AdminDashboard() {
     } catch { return null; }
   });
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
+  const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
+  const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
+  const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
 
   useEffect(() => {
     try {
