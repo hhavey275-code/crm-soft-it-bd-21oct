@@ -9,6 +9,17 @@ import { supabase } from "@/integrations/supabase/client";
  * Use the heavier `chunkedMetaSync` only when you also need balance, cards,
  * funding source, campaigns, etc. (e.g. "Update All from Meta").
  */
+export type RateLimitedDetail = {
+  id: string;
+  http_code: number | null;
+  error_code: number | null;
+  error_subcode: number | null;
+  error_type: string | null;
+  error_message: string;
+  is_rate_limit: boolean;
+  reason: string;
+};
+
 export async function fetchSpendOnly(
   ids: string[],
   options?: { date_from?: string; date_to?: string },
@@ -16,18 +27,18 @@ export async function fetchSpendOnly(
   spend: Record<string, number>;
   daily: Record<string, { date: string; spend: number }[]>;
   rate_limited: string[];
+  rate_limited_details: RateLimitedDetail[];
   total: number;
   meta_calls: number;
   proxy_ip: string | null;
 }> {
-  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], total: 0, meta_calls: 0, proxy_ip: null };
+  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], rate_limited_details: [], total: 0, meta_calls: 0, proxy_ip: null };
 
-  // Internal chunking — keep payloads small even though the edge function
-  // groups by BM internally. 500 ids per invocation is well within limits.
   const CHUNK = 500;
   const merged: Record<string, number> = {};
   const mergedDaily: Record<string, { date: string; spend: number }[]> = {};
   const allRate: string[] = [];
+  const allRateDetails: RateLimitedDetail[] = [];
   let metaCalls = 0;
   let proxyIp: string | null = null;
 
@@ -42,6 +53,7 @@ export async function fetchSpendOnly(
     if (data?.spend) Object.assign(merged, data.spend);
     if (data?.daily) Object.assign(mergedDaily, data.daily);
     if (Array.isArray(data?.rate_limited)) allRate.push(...data.rate_limited);
+    if (Array.isArray(data?.rate_limited_details)) allRateDetails.push(...data.rate_limited_details);
     if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
     if (data?.meta_calls?.proxy_ip && !proxyIp) proxyIp = data.meta_calls.proxy_ip;
   }
@@ -49,5 +61,5 @@ export async function fetchSpendOnly(
   const total =
     Math.round(Object.values(merged).reduce((s, v) => s + (Number(v) || 0), 0) * 100) / 100;
 
-  return { spend: merged, daily: mergedDaily, rate_limited: allRate, total, meta_calls: metaCalls, proxy_ip: proxyIp };
+  return { spend: merged, daily: mergedDaily, rate_limited: allRate, rate_limited_details: allRateDetails, total, meta_calls: metaCalls, proxy_ip: proxyIp };
 }
