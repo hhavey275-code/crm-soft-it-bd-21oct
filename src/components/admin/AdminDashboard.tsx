@@ -18,7 +18,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
+import { fetchSpendOnly, type RateLimitedDetail } from "@/lib/fetchSpendOnly";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertTriangle } from "lucide-react";
 
 
 const DATE_PRESETS = [
@@ -88,6 +90,9 @@ export function AdminDashboard() {
     } catch { return null; }
   });
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
+  const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
+  const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
+  const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -423,7 +428,14 @@ export function AdminDashboard() {
       const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
       const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
       if (result.rate_limited.length) {
-        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
+        setRateLimitedDetails(result.rate_limited_details ?? []);
+        setRateLimitedSource(`${fromStr} → ${toStr}`);
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`, {
+          action: { label: "View", onClick: () => setRateLimitedDialogOpen(true) },
+          duration: 10000,
+        });
+      } else {
+        setRateLimitedDetails([]);
       }
       const total = result.total;
       setDateSpend(total);
@@ -475,7 +487,12 @@ export function AdminDashboard() {
       const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
       const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
       if (result.rate_limited.length) {
-        toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
+        setRateLimitedDetails(result.rate_limited_details ?? []);
+        setRateLimitedSource(`${format(graphMonth, "MMM yyyy")} sync`);
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`, {
+          action: { label: "View", onClick: () => setRateLimitedDialogOpen(true) },
+          duration: 10000,
+        });
       }
       setMonthSyncCalls(result.meta_calls ?? null);
 
@@ -968,6 +985,79 @@ export function AdminDashboard() {
         </Card>
       </div>
 
+      {rateLimitedDetails.length > 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <b>{rateLimitedDetails.length}</b> account(s) failed to fetch from Meta
+              {rateLimitedSource ? <span className="text-muted-foreground"> · {rateLimitedSource}</span> : null}
+            </span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setRateLimitedDialogOpen(true)}>
+            View accounts
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={rateLimitedDialogOpen} onOpenChange={setRateLimitedDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Accounts skipped by Meta ({rateLimitedDetails.length})</DialogTitle>
+            <DialogDescription>
+              These accounts didn't return spend data. Reasons grouped below — most are Meta rate limits, the rest are token / permission / disabled-account issues.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const map: Record<string, { id: string; account_id?: string; name?: string }> = {};
+            (adAccounts ?? []).forEach((a: any) => { map[a.id] = { id: a.id, account_id: a.account_id, name: a.account_name }; });
+            const grouped: Record<string, RateLimitedDetail[]> = {};
+            rateLimitedDetails.forEach((d) => {
+              const key = d.is_rate_limit ? "Rate limited" : (d.reason || "Unknown");
+              (grouped[key] = grouped[key] || []).push(d);
+            });
+            const order = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
+            return (
+              <div className="space-y-4 mt-2">
+                {order.map((reason) => (
+                  <div key={reason}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={reason === "Rate limited" ? "secondary" : "destructive"}>
+                        {reason}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{grouped[reason].length} account(s)</span>
+                    </div>
+                    <div className="rounded border divide-y">
+                      {grouped[reason].map((d) => {
+                        const acc = map[d.id];
+                        return (
+                          <div
+                            key={d.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-muted/50 cursor-pointer"
+                            onClick={() => { setRateLimitedDialogOpen(false); navigate(`/ad-accounts/${d.id}`); }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium truncate text-primary">{acc?.name || "(unnamed)"}</div>
+                              <div className="text-muted-foreground truncate">
+                                {acc?.account_id ? `act_${acc.account_id}` : d.id}
+                                {d.error_code != null && <> · code {d.error_code}{d.error_subcode ? `/${d.error_subcode}` : ""}</>}
+                                {d.http_code != null && <> · http {d.http_code}</>}
+                              </div>
+                              {d.error_message && reason !== d.error_message && (
+                                <div className="text-muted-foreground/80 truncate italic">{d.error_message}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
