@@ -487,7 +487,12 @@ export function AdminDashboard() {
       const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
       const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
       if (result.rate_limited.length) {
-        toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`);
+        setRateLimitedDetails(result.rate_limited_details ?? []);
+        setRateLimitedSource(`${format(graphMonth, "MMM yyyy")} sync`);
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s).`, {
+          action: { label: "View", onClick: () => setRateLimitedDialogOpen(true) },
+          duration: 10000,
+        });
       }
       setMonthSyncCalls(result.meta_calls ?? null);
 
