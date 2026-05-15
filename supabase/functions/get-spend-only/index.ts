@@ -174,10 +174,81 @@ Deno.serve(async (req) => {
     const spendMap: Record<string, number> = {};
     const dailyMap: Record<string, { date: string; spend: number }[]> = {};
     const rateLimited: string[] = [];
+    type RLDetail = {
+      id: string;
+      http_code: number | null;
+      error_code: number | null;
+      error_subcode: number | null;
+      error_type: string | null;
+      error_message: string;
+      is_rate_limit: boolean;
+      reason: string;
+    };
+    const rateLimitedDetails: RLDetail[] = [];
+
+    function classifyError(httpCode: number | null, errCode: number | null, errSub: number | null, msg: string): { is_rl: boolean; reason: string } {
+      const m = (msg || "").toLowerCase();
+      // Meta rate-limit error codes
+      const rlCodes = new Set([4, 17, 32, 613]);
+      const rlSub = new Set([2446079, 1487742]);
+      if ((errCode != null && rlCodes.has(errCode)) || (errSub != null && rlSub.has(errSub)) || /rate|limit|too many|throttl/i.test(msg)) {
+        return { is_rl: true, reason: msg || "Rate limited by Meta" };
+      }
+      if (errCode === 190) return { is_rl: false, reason: "Invalid / expired access token" };
+      if (errCode === 100) return { is_rl: false, reason: msg || "Invalid parameter" };
+      if (errCode === 200 || /permission/.test(m)) return { is_rl: false, reason: "Permission denied (token lacks ads_read)" };
+      if (errCode === 272 || /disabled|closed/.test(m)) return { is_rl: false, reason: msg || "Ad account disabled/closed" };
+      if (httpCode && httpCode >= 500) return { is_rl: false, reason: `Meta server error (${httpCode})` };
+      if (msg) return { is_rl: false, reason: msg };
+      return { is_rl: false, reason: "Unknown Meta error" };
+    }
+
+    function pushFail(id: string, httpCode: number | null, body: any) {
+      let errCode: number | null = null;
+      let errSub: number | null = null;
+      let errType: string | null = null;
+      let msg = "";
+      try {
+        const parsed = typeof body === "string" ? JSON.parse(body) : body;
+        const e = parsed?.error;
+        if (e) {
+          errCode = e.code ?? null;
+          errSub = e.error_subcode ?? null;
+          errType = e.type ?? null;
+          msg = e.message || e.error_user_msg || "";
+        }
+      } catch { /* ignore */ }
+      const cls = classifyError(httpCode, errCode, errSub, msg);
+      rateLimited.push(id);
+      rateLimitedDetails.push({
+        id,
+        http_code: httpCode,
+        error_code: errCode,
+        error_subcode: errSub,
+        error_type: errType,
+        error_message: msg,
+        is_rate_limit: cls.is_rl,
+        reason: cls.reason,
+      });
+    }
 
     // Initialise zero so caller always gets every requested id back
     for (const a of accounts) { spendMap[a.id] = 0; dailyMap[a.id] = []; }
-    for (const a of noToken) { spendMap[a.id] = 0; dailyMap[a.id] = []; }
+    for (const a of noToken) {
+      spendMap[a.id] = 0;
+      dailyMap[a.id] = [];
+      rateLimited.push(a.id);
+      rateLimitedDetails.push({
+        id: a.id,
+        http_code: null,
+        error_code: null,
+        error_subcode: null,
+        error_type: null,
+        error_message: "",
+        is_rate_limit: false,
+        reason: "Business Manager has no access token",
+      });
+    }
 
     // Fire batches in parallel within a group, but cap concurrency to 4
     // to stay polite to Meta and the proxy.
