@@ -428,7 +428,14 @@ export function AdminDashboard() {
       const { fetchSpendOnly } = await import("@/lib/fetchSpendOnly");
       const result = await fetchSpendOnly(ids, { date_from: fromStr, date_to: toStr });
       if (result.rate_limited.length) {
-        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
+        setRateLimitedDetails(result.rate_limited_details ?? []);
+        setRateLimitedSource(`${fromStr} → ${toStr}`);
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`, {
+          action: { label: "View", onClick: () => setRateLimitedDialogOpen(true) },
+          duration: 10000,
+        });
+      } else {
+        setRateLimitedDetails([]);
       }
       const total = result.total;
       setDateSpend(total);
