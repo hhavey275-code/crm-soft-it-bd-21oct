@@ -44,6 +44,7 @@ import {
   type MonthlyClosing,
 } from "@/lib/sellerMonthlyClose";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Lock, Unlock } from "lucide-react";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
