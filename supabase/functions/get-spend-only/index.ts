@@ -283,32 +283,38 @@ Deno.serve(async (req) => {
             });
 
             if (!res.ok) {
-              // whole batch failed — mark all as rate_limited so caller knows
-              for (const acc of c) rateLimited.push(acc.id);
+              // whole batch failed — read body once and apply to all
+              let bodyTxt = "";
+              try { bodyTxt = await res.text(); } catch { /* ignore */ }
+              for (const acc of c) pushFail(acc.id, res.status, bodyTxt);
               return;
             }
 
             const json = await res.json();
             // batch responses arrive as an array, same order as the request
             if (!Array.isArray(json)) {
-              for (const acc of c) rateLimited.push(acc.id);
+              for (const acc of c) pushFail(acc.id, res.status, json);
               return;
             }
 
             for (let i = 0; i < c.length; i++) {
               const item = json[i];
-              if (!item) continue;
+              if (!item) {
+                pushFail(c[i].id, null, { error: { message: "No batch item returned" } });
+                continue;
+              }
               if (item.code && item.code >= 200 && item.code < 300 && typeof item.body === "string") {
                 const parsed = parseSpendFromBatchBody(item.body);
                 spendMap[c[i].id] = parsed.total;
                 dailyMap[c[i].id] = parsed.daily;
               } else {
-                rateLimited.push(c[i].id);
+                pushFail(c[i].id, item.code ?? null, item.body);
               }
             }
           } catch (err) {
             console.error("Batch error:", err);
-            for (const acc of c) rateLimited.push(acc.id);
+            const msg = err instanceof Error ? err.message : String(err);
+            for (const acc of c) pushFail(acc.id, null, { error: { message: msg } });
           }
         });
       }
