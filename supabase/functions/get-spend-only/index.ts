@@ -400,6 +400,7 @@ Deno.serve(async (req) => {
         spend: spendMap,
         daily: dailyMap,
         rate_limited: rateLimited,
+        rate_limited_details: rateLimitedDetails,
         meta_calls: {
           proxy: getMetaProxyCount(),
           direct: getMetaDirectCount(),
