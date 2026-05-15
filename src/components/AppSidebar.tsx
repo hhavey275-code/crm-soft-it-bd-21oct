@@ -91,6 +91,7 @@ const clientNavItems = [
 
 const sellerNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Top-Up Requests", url: "/seller-topups", icon: ArrowUpCircle, key: "seller-topups" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
