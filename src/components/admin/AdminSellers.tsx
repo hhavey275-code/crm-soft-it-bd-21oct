@@ -1213,8 +1213,6 @@ export function AdminSellers() {
                 <ArrowLeftRight className="h-4 w-4" />
               </Button>
             </CardContent>
-              </Button>
-            </CardContent>
             <div
               className="px-4 pb-3 pt-0 flex items-center justify-between gap-2 border-t border-border/50 mt-0"
               onClick={(e) => e.stopPropagation()}
