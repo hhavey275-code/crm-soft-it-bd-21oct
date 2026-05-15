@@ -18,7 +18,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { fetchSpendOnly } from "@/lib/fetchSpendOnly";
+import { fetchSpendOnly, type RateLimitedDetail } from "@/lib/fetchSpendOnly";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertTriangle } from "lucide-react";
 
 
 const DATE_PRESETS = [
