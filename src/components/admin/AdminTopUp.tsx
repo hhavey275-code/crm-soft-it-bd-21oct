@@ -846,14 +846,14 @@ export function AdminTopUp() {
       </div>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
-          <TabsTrigger value="all" className={cn(isMobile && "text-xs flex-1")}>All</TabsTrigger>
-          <TabsTrigger value="pending" className={cn(isMobile && "text-xs flex-1")}>Pending</TabsTrigger>
-          <TabsTrigger value="approved" className={cn(isMobile && "text-xs flex-1")}>Approved</TabsTrigger>
-          <TabsTrigger value="rejected" className={cn(isMobile && "text-xs flex-1")}>Rejected</TabsTrigger>
-          <TabsTrigger value="hold" className={cn(isMobile && "text-xs flex-1")}>Hold</TabsTrigger>
-          <TabsTrigger value="tenant" className={cn(isMobile && "text-xs flex-1")}>🏢 Tenant</TabsTrigger>
-          <TabsTrigger value="bank_sms" className={cn("gap-1", isMobile && "text-xs flex-1")}>
+        <TabsList className={cn(isMobile ? "w-full grid grid-cols-4 gap-1 h-auto p-1" : "")}>
+          <TabsTrigger value="all" className={cn(isMobile && "text-xs px-1")}>All</TabsTrigger>
+          <TabsTrigger value="pending" className={cn(isMobile && "text-xs px-1")}>Pending</TabsTrigger>
+          <TabsTrigger value="approved" className={cn(isMobile && "text-xs px-1")}>Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className={cn(isMobile && "text-xs px-1")}>Rejected</TabsTrigger>
+          <TabsTrigger value="hold" className={cn(isMobile && "text-xs px-1")}>Hold</TabsTrigger>
+          <TabsTrigger value="tenant" className={cn(isMobile && "text-xs px-1")}>🏢 Tenant</TabsTrigger>
+          <TabsTrigger value="bank_sms" className={cn("gap-1", isMobile && "text-xs px-1")}>
             <MessageSquareText className="h-3.5 w-3.5" />
             SMS
           </TabsTrigger>
