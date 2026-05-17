@@ -125,7 +125,9 @@ export function SellerTopUpApprovals() {
           } as any);
         }
 
-        // Initialize forward flag + invoke forward-proof so Telegram group gets the proof
+        // Initialize forward flag only. Telegram forwarding is handled by the
+        // database trigger on the status change, so we must not invoke it here
+        // as a second path for the same approval.
         try {
           const r = requests.find((x: any) => x.id === id);
           if (r?.bankAccount?.telegram_group_id) {
@@ -134,10 +136,9 @@ export function SellerTopUpApprovals() {
               .update({ telegram_forwarded: false })
               .eq("id", id)
               .is("telegram_forwarded", null);
-            await supabase.functions.invoke("forward-proof", { body: { request_id: id } });
           }
         } catch (e) {
-          console.warn("forward-proof invoke failed (non-blocking):", e);
+          console.warn("telegram_forwarded init failed (non-blocking):", e);
         }
       }
 
