@@ -73,6 +73,8 @@ export function AuthForm() {
         if (error) throw error;
         if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
         toast.success("Welcome back!");
+        window.location.replace("/dashboard");
+        return;
       } else {
         const signUpPayload = {
           email, password,
