@@ -100,18 +100,23 @@ export default function WalletBalancesPage() {
             ) : isMobile ? (
               <div className="space-y-2">
                 {rows.map((row, i) => (
-                  <div key={row.userId} className="flex items-center gap-3 p-2.5 rounded-lg border">
+                  <button
+                    type="button"
+                    key={row.userId}
+                    onClick={() => navigate({ to: "/clients/$id", params: { id: row.userId } })}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-lg border text-left hover:bg-muted/50 transition-colors"
+                  >
                     <div className="flex items-center justify-center h-7 w-7 rounded-full bg-muted text-xs font-bold flex-shrink-0">
                       {i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{row.name}</p>
-                      <p className="text-xs text-muted-foreground">{row.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{row.subtitle}</p>
                     </div>
                     <p className={`text-sm font-bold ${row.balance > 0 ? "text-emerald-600" : row.balance < 0 ? "text-destructive" : "text-muted-foreground"}`}>
                       ${row.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
