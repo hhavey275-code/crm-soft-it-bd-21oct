@@ -25,7 +25,7 @@ export default function WalletBalancesPage() {
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles-wallets"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email, status");
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email, status, company");
       return (data as any[]) ?? [];
     },
     staleTime: 5 * 60_000,
