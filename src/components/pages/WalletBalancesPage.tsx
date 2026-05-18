@@ -36,13 +36,19 @@ export default function WalletBalancesPage() {
     const profileMap: Record<string, any> = {};
     profiles.forEach((p: any) => { profileMap[p.user_id] = p; });
 
-    const list = wallets.map((w: any) => ({
-      userId: w.user_id,
-      name: profileMap[w.user_id]?.full_name || profileMap[w.user_id]?.email || "Unknown",
-      email: profileMap[w.user_id]?.email || "",
-      status: profileMap[w.user_id]?.status || "unknown",
-      balance: Number(w.balance) || 0,
-    }));
+    const list = wallets.map((w: any) => {
+      const p = profileMap[w.user_id];
+      const company = p?.company?.trim();
+      const fullName = p?.full_name?.trim();
+      return {
+        userId: w.user_id,
+        name: company || fullName || p?.email || "Unknown",
+        subtitle: company && fullName ? fullName : (p?.email || ""),
+        email: p?.email || "",
+        status: p?.status || "unknown",
+        balance: Number(w.balance) || 0,
+      };
+    });
 
     list.sort((a: any, b: any) => sortAsc ? a.balance - b.balance : b.balance - a.balance);
     return list;
