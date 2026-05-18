@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function WalletBalancesPage() {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [sortAsc, setSortAsc] = useState(false);
 
   const { data: wallets } = useQuery({
