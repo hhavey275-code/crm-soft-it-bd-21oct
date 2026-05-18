@@ -132,9 +132,18 @@ export default function WalletBalancesPage() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((row, i) => (
-                    <TableRow key={row.userId}>
+                    <TableRow
+                      key={row.userId}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate({ to: "/clients/$id", params: { id: row.userId } })}
+                    >
                       <TableCell className="font-medium">{i + 1}</TableCell>
-                      <TableCell className="font-medium">{row.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{row.name}</div>
+                        {row.subtitle && row.subtitle !== row.email && (
+                          <div className="text-xs text-muted-foreground font-normal">{row.subtitle}</div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{row.email}</TableCell>
                       <TableCell>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${row.status === "active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
