@@ -96,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    let initialized = false;
 
     const safety = setTimeout(() => {
       if (mounted) setLoading((p) => (p ? false : p));
@@ -106,7 +107,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
-      // Never await DB inside this callback (Supabase auth lock deadlock)
+      // Ignore null sessions before initial getSession() resolves, otherwise
+      // an early INITIAL_SESSION(null) flips loading=false → ProtectedGuard
+      // redirects to /auth before the persisted session is restored.
+      if (!initialized && !newSession) return;
+      initialized = true;
       applySession(newSession);
     });
 
@@ -114,9 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .getSession()
       .then(({ data: { session: initial } }) => {
         if (!mounted) return;
+        initialized = true;
         applySession(initial);
       })
       .catch(() => {
+        initialized = true;
         if (mounted) setLoading(false);
       });
 
