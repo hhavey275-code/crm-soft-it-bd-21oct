@@ -487,9 +487,10 @@ export function ClientTopUp() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      // LOCKED: Transaction ID is required. Without it, SMS/Telegram cross-check
-      // is impossible and wrong-screenshot approvals slip through.
-      if (!paymentRef?.trim()) {
+      const isCashDeposit = paymentMethod === "cash_deposit";
+      // LOCKED: Transaction ID is required for all methods EXCEPT cash_deposit.
+      // Cash deposit slips don't have a printed TrxID — only handwritten serials.
+      if (!isCashDeposit && !paymentRef?.trim()) {
         toast.error("Transaction ID আবশ্যক — Screenshot এ TrxID না পেলে ম্যানুয়ালি টাইপ করুন।");
         throw new Error("Missing transaction ID");
       }
@@ -497,10 +498,10 @@ export function ClientTopUp() {
       if (ocrLoading) throw new Error("OCR এখনো চলছে — একটু অপেক্ষা করুন");
       if (ocrAmountRaw === null || ocrAmountRaw <= 0) throw new Error("Screenshot থেকে amount পড়া যায়নি। স্পষ্ট receipt screenshot আপলোড করুন।");
       if (amountMismatch) throw new Error("Screenshot amount এবং submitted amount মিলছে না");
-      if (refMismatch) throw new Error("Screenshot TrxID এবং submitted TrxID মিলছে না");
+      if (!isCashDeposit && refMismatch) throw new Error("Screenshot TrxID এবং submitted TrxID মিলছে না");
       if (accountVerified !== true) throw new Error("Screenshot এ selected account number verify হয়নি");
-      // Check for duplicate payment reference
-      if (paymentRef?.trim()) {
+      // Check for duplicate payment reference (skip for cash deposit — no real TrxID)
+      if (!isCashDeposit && paymentRef?.trim()) {
         const isDuplicate = await checkDuplicateRef(paymentRef);
         if (isDuplicate) {
           setDuplicateRefError("এই Transaction ID দিয়ে ইতোমধ্যে একটি request আছে। একই TXN ID দিয়ে দুইবার request করা যাবে না।");
