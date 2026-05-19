@@ -1011,7 +1011,7 @@ export function ClientTopUp() {
               </p>
             </div>
           )}
-          {refMismatch && (
+          {refMismatch && paymentMethod !== "cash_deposit" && (
             <div className="p-2 rounded-md bg-destructive/10 border border-destructive/30">
               <p className="text-xs text-destructive font-medium">
                 ⚠️ Screenshot এর TrxID ({ocrReference || "পাওয়া যায়নি"}) এবং submitted TrxID ({paymentRef || "খালি"}) মিলছে না। সঠিক proof দিন।
