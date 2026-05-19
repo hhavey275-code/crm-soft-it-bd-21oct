@@ -483,9 +483,12 @@ export function SellerDashboard() {
           {banks.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {banks.map((b) => {
+                // Sum absolute BDT impact through this bank (bdt_payment +amount,
+                // withdraw +amount, usdt_received +usdt×rate). This way USDT-only
+                // banks like Binance no longer show ৳0.
                 const bankTotal = filtered
                   .filter((t: any) => t.bank_account_id === b.id)
-                  .reduce((s: number, t: any) => s + Number(t.bdt_amount || 0), 0);
+                  .reduce((s: number, t: any) => s + Math.abs(computeTransactionDelta(t)), 0);
                 return (
                   <button
                     key={b.id}
