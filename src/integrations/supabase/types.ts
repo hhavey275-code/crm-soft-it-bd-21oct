@@ -3897,6 +3897,12 @@ export type Database = {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
       }
+      topup_requests_mirrored: {
+        Args: { p_ids: string[] }
+        Returns: {
+          top_up_request_id: string
+        }[]
+      }
       update_ledger_entry: {
         Args: {
           p_amount_delta: number
