@@ -100,20 +100,49 @@ export function SellerDashboard() {
     },
   });
 
+  // All banks owned by this seller (BDT bank_accounts.seller_id = me)
+  const { data: ownedBanks } = useQuery({
+    queryKey: ["seller-owned-banks", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("bank_accounts")
+        .select("id, bank_name, account_number, account_name")
+        .eq("seller_id", user!.id);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+  });
+
+  // Bank list = owned banks ∪ USDT-assigned banks ∪ banks seen in transactions.
+  // This way every bank the seller actually uses shows up as a chip, even if
+  // no transactions exist yet (e.g. a new PUBALI account) and even for USDT
+  // banks where the bank's seller_id is NULL (e.g. binance).
   const banks = useMemo(() => {
-    if (!transactions) return [];
     const bankMap = new Map<string, { id: string; name: string; account: string }>();
-    transactions.forEach((t: any) => {
+    const add = (b: any) => {
+      if (!b?.id) return;
+      if (!bankMap.has(b.id)) {
+        bankMap.set(b.id, {
+          id: b.id,
+          name: b.bank_name,
+          account: b.account_number,
+        });
+      }
+    };
+    (ownedBanks || []).forEach(add);
+    (assignedUsdtBanks || []).forEach(add);
+    (transactions || []).forEach((t: any) => {
       if (t.bank_account_id && t.bank_accounts) {
-        bankMap.set(t.bank_account_id, {
+        add({
           id: t.bank_account_id,
-          name: t.bank_accounts.bank_name,
-          account: t.bank_accounts.account_number,
+          bank_name: t.bank_accounts.bank_name,
+          account_number: t.bank_accounts.account_number,
         });
       }
     });
     return Array.from(bankMap.values());
-  }, [transactions]);
+  }, [transactions, ownedBanks, assignedUsdtBanks]);
 
   const filtered = useMemo(() => {
     if (!transactions) return [];
