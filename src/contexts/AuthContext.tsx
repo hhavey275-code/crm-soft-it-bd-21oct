@@ -98,10 +98,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     let initialized = false;
 
-    const safety = setTimeout(() => {
-      if (mounted) setLoading((p) => (p ? false : p));
-    }, 4000);
-
     // Subscribe FIRST (synchronously), then restore session
     const {
       data: { subscription },
@@ -129,7 +125,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
-      clearTimeout(safety);
       subscription.unsubscribe();
     };
   }, [applySession]);

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 
@@ -9,9 +10,19 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!loading && !user) {
-      navigate({ to: "/auth" });
+      void supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!cancelled && !session?.user) {
+          navigate({ to: "/auth", replace: true });
+        }
+      });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading, navigate]);
 
   if (loading) {
