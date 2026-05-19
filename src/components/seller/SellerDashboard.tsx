@@ -507,7 +507,7 @@ export function SellerDashboard() {
                       "ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold",
                       bankFilter === b.id ? "bg-primary-foreground/20" : "bg-muted"
                     )}>
-                      ৳{bankTotal.toLocaleString()}
+                      ৳{Math.round(bankTotal).toLocaleString()}
                     </span>
                   </button>
                 );
