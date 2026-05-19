@@ -1689,7 +1689,7 @@ export function AdminSellers() {
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 text-white"
                         onClick={() => reviewTxnMutation.mutate({ id: t.id, status: "approved" })}
-                        disabled={reviewTxnMutation.isPending}
+                        disabled={reviewTxnMutation.isPending && reviewTxnMutation.variables?.id === t.id}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                       </Button>
@@ -1703,7 +1703,7 @@ export function AdminSellers() {
                           actionLabel: "Reject",
                           onConfirm: () => reviewTxnMutation.mutate({ id: t.id, status: "rejected" }),
                         })}
-                        disabled={reviewTxnMutation.isPending}
+                        disabled={reviewTxnMutation.isPending && reviewTxnMutation.variables?.id === t.id}
                       >
                         <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
                       </Button>
