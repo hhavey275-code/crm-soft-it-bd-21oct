@@ -1044,9 +1044,9 @@ export function ClientTopUp() {
             onClick={() => setStep(3)}
             disabled={
               !bdtAmount || parseFloat(bdtAmount) <= 0 || !proofFile || ocrLoading ||
-              !paymentRef.trim() ||
+              (paymentMethod !== "cash_deposit" && !paymentRef.trim()) ||
               accountVerified !== true ||
-              refMismatch ||
+              (paymentMethod !== "cash_deposit" && refMismatch) ||
               amountMismatch ||
               ocrAmountRaw === null || ocrAmountRaw <= 0
             }
