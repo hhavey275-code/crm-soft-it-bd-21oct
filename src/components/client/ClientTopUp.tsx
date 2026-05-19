@@ -1161,7 +1161,7 @@ export function ClientTopUp() {
             <Button
               className="flex-1"
               onClick={() => submitMutation.mutate()}
-              disabled={isInactive || !!agencyBlocked || !proofFile || !paymentRef.trim() || submitMutation.isPending || ocrLoading || amountMismatch || refMismatch || ocrAmountRaw === null || ocrAmountRaw <= 0 || accountVerified !== true}
+              disabled={isInactive || !!agencyBlocked || !proofFile || (paymentMethod !== "cash_deposit" && !paymentRef.trim()) || submitMutation.isPending || ocrLoading || amountMismatch || (paymentMethod !== "cash_deposit" && refMismatch) || ocrAmountRaw === null || ocrAmountRaw <= 0 || accountVerified !== true}
             >
               {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : agencyBlocked ? "Agency Balance Insufficient" : "Confirm & Submit"}
             </Button>
