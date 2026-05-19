@@ -52,10 +52,12 @@ export function SellerNotInSheetCard({ sellerId }: Props) {
       if (!candidates.length) return [];
 
       const reqIds = candidates.map((r: any) => r.id);
-      const { data: mirrors } = await (supabase as any)
-        .from("seller_transactions")
-        .select("top_up_request_id")
-        .in("top_up_request_id", reqIds);
+      // Use SECURITY DEFINER RPC so we also detect mirrors that belong to a
+      // different/old seller (RLS would otherwise hide them and produce false
+      // "not in sheet" alerts).
+      const { data: mirrors } = await (supabase as any).rpc("topup_requests_mirrored", {
+        p_ids: reqIds,
+      });
       const mirrorSet = new Set((mirrors || []).map((m: any) => m.top_up_request_id));
 
       const missing = candidates.filter((r: any) => !mirrorSet.has(r.id));
