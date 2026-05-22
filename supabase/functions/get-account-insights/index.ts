@@ -688,14 +688,14 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
       const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
       const rawSpendCap = accountData?.spend_cap;
-      const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
+      const metaSpendCap = (rawSpendCap !== undefined && rawSpendCap !== null && rawSpendCap !== "")
+        ? parseFloat(rawSpendCap) / 100
+        : 0;
       adAccountUpdate = {
         id: account.id,
-        amount_spent: metaAmountSpent
+        amount_spent: metaAmountSpent,
+        spend_cap: metaSpendCap
       };
-      if (metaSpendCap > 0) {
-        adAccountUpdate.spend_cap = metaSpendCap;
-      }
       // Map Meta account_status to CRM status
       const metaStatus = accountData?.account_status;
       if (metaStatus !== undefined && metaStatus !== null) {
