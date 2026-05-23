@@ -214,13 +214,18 @@ Deno.serve(async (req) => {
     const tgResult = await tgResp.json();
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
-      // Release the slot so a manual retry can resend.
-      await releaseForwardSlot(supabase, 'client_topup', request_id);
-      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error' }), {
+      // IMPORTANT: do NOT release the slot here. Telegram has seen this
+      // request — releasing causes a parallel/cron call to re-send and
+      // produces duplicate messages in the group. Keep the slot claimed
+      // (telegram_message_id stays NULL) so future auto-calls hit
+      // `already_claimed_strict`. Admin can manually retry by invoking
+      // forward-proof with { force_resend: true } from the UI.
+      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error', slot_locked: true }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
     await completeForwardSlot(
       supabase,
       'client_topup',
