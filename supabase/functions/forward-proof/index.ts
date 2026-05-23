@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { request_id } = await req.json();
+    const { request_id, force_resend } = await req.json();
     if (!request_id) {
       return new Response(JSON.stringify({ error: 'request_id required' }), {
         status: 400,
@@ -32,9 +32,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Manual retry from admin UI: release the slot so a fresh claim can succeed.
+    // Only use this when the operator explicitly clicks "Resend".
+    if (force_resend) {
+      try {
+        await supabase
+          .from('telegram_forward_log')
+          .delete()
+          .eq('source_type', 'client_topup')
+          .eq('source_id', request_id);
+        await supabase
+          .from('top_up_requests')
+          .update({ telegram_forwarded: null })
+          .eq('id', request_id);
+      } catch (e) {
+        console.warn('force_resend slot delete failed:', (e as any)?.message);
+      }
+    }
+
     // (Atomic dedupe via claim_forward_slot happens AFTER we resolve the
     // target group and BEFORE we actually POST to Telegram — so concurrent
     // invocations cannot both send the same message.)
+
+
 
     const { data: reqData, error: reqErr } = await supabase
       .from('top_up_requests')
