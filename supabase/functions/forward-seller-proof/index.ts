@@ -286,15 +286,16 @@ Deno.serve(async (req) => {
 
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
-      // Release the slot so a manual retry can resend.
-      if (seller_transaction_id) {
-        await releaseForwardSlot(supabase, sourceType, seller_transaction_id);
-      }
-      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error' }), {
+      // IMPORTANT: do NOT release the slot here — Telegram has seen this
+      // request. Releasing causes parallel/cron callers to re-send and
+      // produces duplicate messages. Leave slot claimed; admin can manually
+      // retry via { force_resend: true }.
+      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error', slot_locked: true }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // Persist message_id + balance into the previously-claimed row, plus mirror flag.
     if (seller_transaction_id) {
