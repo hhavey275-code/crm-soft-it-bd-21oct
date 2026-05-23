@@ -227,7 +227,23 @@ Deno.serve(async (req) => {
     // first concurrent caller wins the slot. Without an id we fall through (legacy
     // callers without a row id — extremely rare).
     if (seller_transaction_id) {
+      if (force_resend) {
+        try {
+          await supabase
+            .from('telegram_forward_log')
+            .delete()
+            .eq('source_type', sourceType)
+            .eq('source_id', seller_transaction_id);
+          await supabase
+            .from('seller_transactions')
+            .update({ telegram_forwarded: null })
+            .eq('id', seller_transaction_id);
+        } catch (e) {
+          console.warn('force_resend slot delete failed:', (e as any)?.message);
+        }
+      }
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
+
       if (!claimed) {
         // Slot already exists. STRICT no-resend policy — never auto-release
         // and re-claim, because that path produced duplicate Telegram sends
