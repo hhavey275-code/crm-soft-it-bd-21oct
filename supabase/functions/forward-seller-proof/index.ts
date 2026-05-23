@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
       usdt_amount,
       rate,
       withdraw_note,
+      force_resend,
     } = await req.json();
 
     // Withdraw and usdt_received can be text-only (no proof). bdt_payment still needs proof.
@@ -50,6 +51,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // Source-type for the telegram_forward_log table (atomic dedupe happens
     // RIGHT BEFORE the Telegram POST below — not here — so concurrent invocations
