@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
       usdt_amount,
       rate,
       withdraw_note,
+      force_resend,
     } = await req.json();
 
     // Withdraw and usdt_received can be text-only (no proof). bdt_payment still needs proof.
@@ -50,6 +51,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // Source-type for the telegram_forward_log table (atomic dedupe happens
     // RIGHT BEFORE the Telegram POST below — not here — so concurrent invocations
@@ -225,7 +227,23 @@ Deno.serve(async (req) => {
     // first concurrent caller wins the slot. Without an id we fall through (legacy
     // callers without a row id — extremely rare).
     if (seller_transaction_id) {
+      if (force_resend) {
+        try {
+          await supabase
+            .from('telegram_forward_log')
+            .delete()
+            .eq('source_type', sourceType)
+            .eq('source_id', seller_transaction_id);
+          await supabase
+            .from('seller_transactions')
+            .update({ telegram_forwarded: null })
+            .eq('id', seller_transaction_id);
+        } catch (e) {
+          console.warn('force_resend slot delete failed:', (e as any)?.message);
+        }
+      }
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
+
       if (!claimed) {
         // Slot already exists. STRICT no-resend policy — never auto-release
         // and re-claim, because that path produced duplicate Telegram sends
@@ -286,15 +304,16 @@ Deno.serve(async (req) => {
 
     if (!tgResult.ok) {
       console.error('Telegram forward error:', tgResult);
-      // Release the slot so a manual retry can resend.
-      if (seller_transaction_id) {
-        await releaseForwardSlot(supabase, sourceType, seller_transaction_id);
-      }
-      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error' }), {
+      // IMPORTANT: do NOT release the slot here — Telegram has seen this
+      // request. Releasing causes parallel/cron callers to re-send and
+      // produces duplicate messages. Leave slot claimed; admin can manually
+      // retry via { force_resend: true }.
+      return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error', slot_locked: true }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // Persist message_id + balance into the previously-claimed row, plus mirror flag.
     if (seller_transaction_id) {

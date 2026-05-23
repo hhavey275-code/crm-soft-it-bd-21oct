@@ -721,7 +721,7 @@ export function AdminTopUp() {
   // does NOT produce duplicate Telegram messages.
   const resendTopupForwardMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: requestId } });
+      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: requestId, force_resend: true } });
       if (error) throw error;
       return data;
     },
