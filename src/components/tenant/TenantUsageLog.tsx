@@ -269,9 +269,59 @@ export function TenantUsageLog() {
       {/* Audit table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm sm:text-base">Detailed Audit Log</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Master Limit Ledger</CardTitle>
           <CardDescription className="text-xs">
-            Last 200 entries. Limit theke ki kombe / ferot eseche dekha jay.
+            Master DB theke durable ledger: tenant top-up, spend-cap consumption, refund, manual increase/decrease reason সহ।
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 px-3 sm:px-6">
+          {(masterLedger || []).map((row: any) => {
+            const kind = classifyLedgerRow(row.movement_type);
+            const delta = Number(row.amount_delta || 0);
+            const amount = Math.abs(delta);
+            const sign = kind.sign === -1 ? "−" : kind.sign === 1 || delta > 0 ? "+" : "";
+            const meta = row.meta || {};
+            const accountName = meta.account_name || meta.ad_account_name || meta.ad_account_id || null;
+            return (
+              <div key={row.id} className="rounded-lg border bg-card p-3 text-xs space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${kind.badgeClass} inline-flex items-center gap-1`}>
+                    {kind.Icon && <kind.Icon className="h-3 w-3" />}
+                    {kind.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {format(new Date(row.created_at), "dd MMM HH:mm")}
+                  </span>
+                </div>
+                <div className={`text-lg font-bold ${kind.amountClass}`}>
+                  {sign}{fmt(amount)}
+                </div>
+                {row.reason && <p className="text-[11px] italic text-muted-foreground">{row.reason}</p>}
+                {accountName && (
+                  <p className="text-[11px]"><span className="text-muted-foreground">Ad Account:</span> {accountName}</p>
+                )}
+                <div className="grid grid-cols-3 gap-2 border-t pt-2">
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Limit</p><p className="font-semibold">{fmt(Number(row.system_limit_after || 0))}</p></div>
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Used</p><p className="font-semibold">{fmt(Number(row.total_used_after || 0))}</p></div>
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Remaining</p><p className="font-semibold">{fmt(Number(row.remaining_after || 0))}</p></div>
+                </div>
+                <p className="text-[9px] text-muted-foreground truncate" title={row.idempotency_key || row.source || ""}>
+                  {row.source || "master"}{row.source_id ? ` · ${row.source_id}` : ""}
+                </p>
+              </div>
+            );
+          })}
+          {(!masterLedger || masterLedger.length === 0) && (
+            <p className="text-xs text-muted-foreground text-center py-6">Master ledger entry nei akhono.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm sm:text-base">Local Forward Audit</CardTitle>
+          <CardDescription className="text-xs">
+            Tenant theke master-e report pathanor local audit — delivery/status debug er jonno.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
