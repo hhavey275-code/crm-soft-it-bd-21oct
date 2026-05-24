@@ -55,6 +55,61 @@ function classifyRow(action: string | null | undefined, source: string | null | 
   };
 }
 
+function classifyLedgerRow(movementType: string | null | undefined): RowKind {
+  const mt = (movementType || "").toLowerCase();
+
+  if (mt === "usage_topup" || mt === "report-usage") {
+    return {
+      label: "Consumed",
+      sign: -1,
+      badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+      amountClass: "text-destructive",
+      Icon: TrendingDown,
+    };
+  }
+  if (mt === "usage_refund" || mt === "refund-usage") {
+    return {
+      label: "Refunded Used",
+      sign: 1,
+      badgeClass: "bg-green-500/10 text-green-600 border-green-500/20",
+      amountClass: "text-green-600",
+      Icon: TrendingUp,
+    };
+  }
+  if (mt === "limit_purchase" || mt === "limit_manual_increase") {
+    return {
+      label: mt === "limit_purchase" ? "Limit Top-Up" : "Manual Increase",
+      sign: 1,
+      badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      amountClass: "text-blue-600",
+      Icon: TrendingUp,
+    };
+  }
+  if (mt === "limit_manual_decrease") {
+    return {
+      label: "Manual Decrease",
+      sign: -1,
+      badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+      amountClass: "text-destructive",
+      Icon: TrendingDown,
+    };
+  }
+  if (mt === "limit_set") {
+    return {
+      label: "Limit Set",
+      sign: 0,
+      badgeClass: "bg-muted text-muted-foreground border-border",
+      amountClass: "text-foreground",
+    };
+  }
+  return {
+    label: movementType || "—",
+    sign: 0,
+    badgeClass: "bg-muted text-muted-foreground border-border",
+    amountClass: "text-muted-foreground",
+  };
+}
+
 export function TenantUsageLog() {
   const { data: licenseData, refetch: refetchLicense } = useQuery({
     queryKey: ["license-data-usage-log"],
@@ -109,10 +164,28 @@ export function TenantUsageLog() {
     refetchInterval: 30 * 1000,
   });
 
+  const { data: masterLedger, refetch: refetchLedger, isFetching: ledgerFetching } = useQuery({
+    queryKey: ["master-tenant-limit-ledger"],
+    queryFn: async () => {
+      if (!masterUrl || !tenantApiKey) return [];
+      const res = await fetch(`${masterUrl}/functions/v1/tenant-webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Tenant-Key": tenantApiKey },
+        body: JSON.stringify({ action: "get-ledger", limit: 300 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load ledger");
+      return data.ledger || [];
+    },
+    enabled: !!masterUrl && !!tenantApiKey,
+    refetchInterval: 30 * 1000,
+  });
+
   const refreshAll = () => {
     refetchLicense();
     refetchMaster();
     refetchAudit();
+    refetchLedger();
   };
 
   const fmt = (n: number) =>
@@ -130,8 +203,8 @@ export function TenantUsageLog() {
             Limit ki vabe komche ar Master er sathe sync ache kina dekho
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={refreshAll} disabled={masterFetching || auditFetching}>
-          <RefreshCw className={`h-4 w-4 ${(masterFetching || auditFetching) ? "animate-spin" : ""}`} />
+        <Button size="sm" variant="outline" onClick={refreshAll} disabled={masterFetching || auditFetching || ledgerFetching}>
+          <RefreshCw className={`h-4 w-4 ${(masterFetching || auditFetching || ledgerFetching) ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
@@ -196,9 +269,59 @@ export function TenantUsageLog() {
       {/* Audit table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm sm:text-base">Detailed Audit Log</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Master Limit Ledger</CardTitle>
           <CardDescription className="text-xs">
-            Last 200 entries. Limit theke ki kombe / ferot eseche dekha jay.
+            Master DB theke durable ledger: tenant top-up, spend-cap consumption, refund, manual increase/decrease reason সহ।
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 px-3 sm:px-6">
+          {(masterLedger || []).map((row: any) => {
+            const kind = classifyLedgerRow(row.movement_type);
+            const delta = Number(row.amount_delta || 0);
+            const amount = Math.abs(delta);
+            const sign = kind.sign === -1 ? "−" : kind.sign === 1 || delta > 0 ? "+" : "";
+            const meta = row.meta || {};
+            const accountName = meta.account_name || meta.ad_account_name || meta.ad_account_id || null;
+            return (
+              <div key={row.id} className="rounded-lg border bg-card p-3 text-xs space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${kind.badgeClass} inline-flex items-center gap-1`}>
+                    {kind.Icon && <kind.Icon className="h-3 w-3" />}
+                    {kind.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {format(new Date(row.created_at), "dd MMM HH:mm")}
+                  </span>
+                </div>
+                <div className={`text-lg font-bold ${kind.amountClass}`}>
+                  {sign}{fmt(amount)}
+                </div>
+                {row.reason && <p className="text-[11px] italic text-muted-foreground">{row.reason}</p>}
+                {accountName && (
+                  <p className="text-[11px]"><span className="text-muted-foreground">Ad Account:</span> {accountName}</p>
+                )}
+                <div className="grid grid-cols-3 gap-2 border-t pt-2">
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Limit</p><p className="font-semibold">{fmt(Number(row.system_limit_after || 0))}</p></div>
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Used</p><p className="font-semibold">{fmt(Number(row.total_used_after || 0))}</p></div>
+                  <div><p className="text-[9px] uppercase text-muted-foreground">Remaining</p><p className="font-semibold">{fmt(Number(row.remaining_after || 0))}</p></div>
+                </div>
+                <p className="text-[9px] text-muted-foreground truncate" title={row.idempotency_key || row.source || ""}>
+                  {row.source || "master"}{row.source_id ? ` · ${row.source_id}` : ""}
+                </p>
+              </div>
+            );
+          })}
+          {(!masterLedger || masterLedger.length === 0) && (
+            <p className="text-xs text-muted-foreground text-center py-6">Master ledger entry nei akhono.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm sm:text-base">Local Forward Audit</CardTitle>
+          <CardDescription className="text-xs">
+            Tenant theke master-e report pathanor local audit — delivery/status debug er jonno.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">

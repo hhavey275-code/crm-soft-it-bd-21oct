@@ -405,6 +405,20 @@ Deno.serve(async (req) => {
         return json({ ok: true, payments: payments || [] });
       }
 
+      case "get-ledger":
+      case "get_ledger": {
+        const requestedLimit = Number(field("limit") ?? 300);
+        const rowLimit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 300, 1), 500);
+        const { data: ledger, error } = await supabase
+          .from("tenant_limit_ledger")
+          .select("id, movement_type, amount_delta, system_limit_before, system_limit_after, total_used_before, total_used_after, remaining_before, remaining_after, reason, source, source_id, idempotency_key, meta, created_at")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false })
+          .limit(rowLimit);
+        if (error) throw error;
+        return json({ ok: true, ledger: ledger || [] });
+      }
+
       case "submit-payment":
       case "submit_payment": {
         const amount = Number(field("amount") ?? 0);
