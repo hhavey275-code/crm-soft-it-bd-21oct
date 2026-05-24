@@ -164,10 +164,28 @@ export function TenantUsageLog() {
     refetchInterval: 30 * 1000,
   });
 
+  const { data: masterLedger, refetch: refetchLedger, isFetching: ledgerFetching } = useQuery({
+    queryKey: ["master-tenant-limit-ledger"],
+    queryFn: async () => {
+      if (!masterUrl || !tenantApiKey) return [];
+      const res = await fetch(`${masterUrl}/functions/v1/tenant-webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Tenant-Key": tenantApiKey },
+        body: JSON.stringify({ action: "get-ledger", limit: 300 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load ledger");
+      return data.ledger || [];
+    },
+    enabled: !!masterUrl && !!tenantApiKey,
+    refetchInterval: 30 * 1000,
+  });
+
   const refreshAll = () => {
     refetchLicense();
     refetchMaster();
     refetchAudit();
+    refetchLedger();
   };
 
   const fmt = (n: number) =>
@@ -185,8 +203,8 @@ export function TenantUsageLog() {
             Limit ki vabe komche ar Master er sathe sync ache kina dekho
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={refreshAll} disabled={masterFetching || auditFetching}>
-          <RefreshCw className={`h-4 w-4 ${(masterFetching || auditFetching) ? "animate-spin" : ""}`} />
+        <Button size="sm" variant="outline" onClick={refreshAll} disabled={masterFetching || auditFetching || ledgerFetching}>
+          <RefreshCw className={`h-4 w-4 ${(masterFetching || auditFetching || ledgerFetching) ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
