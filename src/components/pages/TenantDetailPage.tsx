@@ -971,6 +971,7 @@ export default function TenantDetailPage() {
                         const remainingBefore = Math.max(0, systemLimit - before);
                         const remainingAfter = Math.max(0, systemLimit - after);
                         const isRefund = row.action === "refund-usage";
+                        const reason = meta.reason || meta.note || "";
                         return (
                           <div key={row.id} className={cn(
                             "border rounded-lg p-2.5 text-xs hover:bg-muted/30 transition-colors",
@@ -983,11 +984,16 @@ export default function TenantDetailPage() {
                               </div>
                               <div className="text-right shrink-0">
                                 <div className={cn("font-bold text-sm", isRefund ? "text-green-600" : "text-orange-600")}>
-                                  {isRefund ? "-" : "+"}${Number(row.amount).toFixed(2)}
+                                  {isRefund ? "+" : "−"}${Number(row.amount).toFixed(2)}
                                 </div>
                                 <div className="text-[10px] text-muted-foreground">{format(new Date(row.created_at), "dd MMM HH:mm")}</div>
                               </div>
                             </div>
+                            {reason && (
+                              <p className="text-[11px] text-muted-foreground italic border-l-2 border-primary/40 pl-2">
+                                Reason: {reason}
+                              </p>
+                            )}
                             <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t">
                               <div>
                                 <p className="text-[9px] uppercase text-muted-foreground">Limit</p>
