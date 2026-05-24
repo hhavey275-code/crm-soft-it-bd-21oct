@@ -55,6 +55,61 @@ function classifyRow(action: string | null | undefined, source: string | null | 
   };
 }
 
+function classifyLedgerRow(movementType: string | null | undefined): RowKind {
+  const mt = (movementType || "").toLowerCase();
+
+  if (mt === "usage_topup" || mt === "report-usage") {
+    return {
+      label: "Consumed",
+      sign: -1,
+      badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+      amountClass: "text-destructive",
+      Icon: TrendingDown,
+    };
+  }
+  if (mt === "usage_refund" || mt === "refund-usage") {
+    return {
+      label: "Refunded Used",
+      sign: 1,
+      badgeClass: "bg-green-500/10 text-green-600 border-green-500/20",
+      amountClass: "text-green-600",
+      Icon: TrendingUp,
+    };
+  }
+  if (mt === "limit_purchase" || mt === "limit_manual_increase") {
+    return {
+      label: mt === "limit_purchase" ? "Limit Top-Up" : "Manual Increase",
+      sign: 1,
+      badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      amountClass: "text-blue-600",
+      Icon: TrendingUp,
+    };
+  }
+  if (mt === "limit_manual_decrease") {
+    return {
+      label: "Manual Decrease",
+      sign: -1,
+      badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+      amountClass: "text-destructive",
+      Icon: TrendingDown,
+    };
+  }
+  if (mt === "limit_set") {
+    return {
+      label: "Limit Set",
+      sign: 0,
+      badgeClass: "bg-muted text-muted-foreground border-border",
+      amountClass: "text-foreground",
+    };
+  }
+  return {
+    label: movementType || "—",
+    sign: 0,
+    badgeClass: "bg-muted text-muted-foreground border-border",
+    amountClass: "text-muted-foreground",
+  };
+}
+
 export function TenantUsageLog() {
   const { data: licenseData, refetch: refetchLicense } = useQuery({
     queryKey: ["license-data-usage-log"],
