@@ -32,15 +32,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Manual retry from admin UI: release the slot so a fresh claim can succeed.
-    // Only use this when the operator explicitly clicks "Resend".
+    // Manual retry from admin UI. STRICT: refuse to delete a slot that has
+    // already produced a real telegram_message_id — that's what was causing
+    // the "Resend" button (and any racing trigger) to produce duplicate
+    // Telegram messages in the group. Only release slots whose previous
+    // attempt actually failed (telegram_message_id IS NULL).
     if (force_resend) {
       try {
+        const { data: existingSlot } = await supabase
+          .from('telegram_forward_log')
+          .select('telegram_message_id')
+          .eq('source_type', 'client_topup')
+          .eq('source_id', request_id)
+          .maybeSingle();
+        if (existingSlot?.telegram_message_id) {
+          console.log(`forward-proof: force_resend BLOCKED for ${request_id} — already forwarded as msg ${existingSlot.telegram_message_id}`);
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              skipped: true,
+              reason: 'already_forwarded_strict',
+              message_id: existingSlot.telegram_message_id,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         await supabase
           .from('telegram_forward_log')
           .delete()
           .eq('source_type', 'client_topup')
-          .eq('source_id', request_id);
+          .eq('source_id', request_id)
+          .is('telegram_message_id', null);
         await supabase
           .from('top_up_requests')
           .update({ telegram_forwarded: null })
@@ -58,7 +80,7 @@ Deno.serve(async (req) => {
 
     const { data: reqData, error: reqErr } = await supabase
       .from('top_up_requests')
-      .select('id, proof_url, bank_account_id, amount, bdt_amount, payment_reference, user_id, created_at, status, reviewed_by')
+      .select('id, proof_url, bank_account_id, amount, bdt_amount, payment_reference, user_id, created_at, status, reviewed_by, telegram_forwarded')
       .eq('id', request_id)
       .single();
     if (reqErr || !reqData) {
@@ -71,6 +93,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'no_proof' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // EARLY STRICT GUARD (second-line defense on top of the slot claim):
+    // if the top-up row already says telegram_forwarded=true, NEVER re-send.
+    // Protects against any caller (cron, UI button, trigger re-fire) racing
+    // or accidentally deleting the slot row. This flow is money/Telegram-
+    // affecting and locked — never weaken without explicit operator approval.
+    if (reqData.telegram_forwarded === true) {
+      console.log(`forward-proof: skip ${request_id} — telegram_forwarded already true (strict flag guard)`);
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded_flag' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // Bot token
