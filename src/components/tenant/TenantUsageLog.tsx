@@ -282,6 +282,7 @@ export function TenantUsageLog() {
             const sign = kind.sign === -1 ? "−" : kind.sign === 1 || delta > 0 ? "+" : "";
             const meta = row.meta || {};
             const accountName = meta.account_name || meta.ad_account_name || meta.ad_account_id || null;
+            const noteText = row.reason || meta.reason || meta.note || null;
             return (
               <div key={row.id} className="rounded-lg border bg-card p-3 text-xs space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -296,7 +297,13 @@ export function TenantUsageLog() {
                 <div className={`text-lg font-bold ${kind.amountClass}`}>
                   {sign}{fmt(amount)}
                 </div>
-                {row.reason && <p className="text-[11px] italic text-muted-foreground">{row.reason}</p>}
+                {noteText ? (
+                  <p className="text-[11px] italic text-muted-foreground border-l-2 border-primary/40 pl-2">
+                    Note: {noteText}
+                  </p>
+                ) : (
+                  <p className="text-[11px] italic text-muted-foreground/60">No note</p>
+                )}
                 {accountName && (
                   <p className="text-[11px]"><span className="text-muted-foreground">Ad Account:</span> {accountName}</p>
                 )}
