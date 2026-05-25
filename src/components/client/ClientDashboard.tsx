@@ -101,9 +101,9 @@ export function ClientDashboard() {
     queryKey: ["client-wallet", user?.id],
     queryFn: async () => { const { data } = await supabase.from("wallets").select("balance").eq("user_id", user!.id).single(); return data; },
     enabled: !!user,
-    staleTime: 30_000,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: adAccounts } = useQuery({
@@ -116,9 +116,9 @@ export function ClientDashboard() {
       return (data as any[]) ?? [];
     },
     enabled: !!user,
-    staleTime: 30_000,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
 
