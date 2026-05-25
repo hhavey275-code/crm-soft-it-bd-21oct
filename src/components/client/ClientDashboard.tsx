@@ -123,6 +123,22 @@ export function ClientDashboard() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: adAccounts } = useQuery({
+    queryKey: ["client-dashboard-ad-accounts", user?.id],
+    queryFn: async () => {
+      const { data: assignments } = await (supabase as any).from("user_ad_accounts").select("ad_account_id").eq("user_id", user!.id);
+      if (!assignments || assignments.length === 0) return [];
+      const ids = assignments.map((a: any) => a.ad_account_id);
+      const { data } = await supabase.from("ad_accounts").select("id, account_name, amount_spent, spend_cap, status").in("id", ids);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
+
+
   const { data: allInsights } = useQuery({
     queryKey: ["client-all-insights", user?.id],
     queryFn: async () => {
