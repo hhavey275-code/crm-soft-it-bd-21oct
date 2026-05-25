@@ -40,6 +40,28 @@ export function ClientDashboard() {
     }
   }, []);
 
+  // Realtime: keep dashboard spend bars in sync with ad_accounts / insights / wallet changes
+  useEffect(() => {
+    if (!user?.id) return;
+    let pending = false;
+    const invalidateAll = () => {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["client-all-insights", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["client-wallet", user.id] });
+      }, 800);
+    };
+    const channel = supabase.channel("client-dashboard-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ad_accounts" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ad_account_insights" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` }, invalidateAll)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
+
   const { data: agencyWallet } = useQuery({
     queryKey: ["agency-wallet-check", agencyId],
     queryFn: async () => {
@@ -96,9 +118,9 @@ export function ClientDashboard() {
     queryKey: ["client-wallet", user?.id],
     queryFn: async () => { const { data } = await supabase.from("wallets").select("balance").eq("user_id", user!.id).single(); return data; },
     enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const { data: adAccounts } = useQuery({
@@ -111,10 +133,11 @@ export function ClientDashboard() {
       return (data as any[]) ?? [];
     },
     enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
+
 
   const { data: allInsights } = useQuery({
     queryKey: ["client-all-insights", user?.id],
