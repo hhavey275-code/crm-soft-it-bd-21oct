@@ -304,6 +304,7 @@ export function SellerDashboard() {
           <Button className="hidden md:inline-flex" size="default" onClick={() => setShowSubmit(true)}>
             <Plus className="h-4 w-4 mr-1" /> Submit USDT
           </Button>
+          <SellerWithdrawRequest />
         </div>
       </div>
 
