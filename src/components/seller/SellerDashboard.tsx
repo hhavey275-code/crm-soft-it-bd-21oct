@@ -8,6 +8,7 @@ import { ImageIcon, CalendarIcon, X, Wallet, ArrowDownLeft, ArrowUpRight, Refres
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { SellerSubmitUsdtDialog } from "./SellerSubmitUsdtDialog";
+import { SellerWithdrawRequest } from "./SellerWithdrawRequest";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -303,6 +304,7 @@ export function SellerDashboard() {
           <Button className="hidden md:inline-flex" size="default" onClick={() => setShowSubmit(true)}>
             <Plus className="h-4 w-4 mr-1" /> Submit USDT
           </Button>
+          <SellerWithdrawRequest />
         </div>
       </div>
 
@@ -671,8 +673,10 @@ export function SellerDashboard() {
                         </>
                       ) : (
                         <div className="flex justify-between col-span-2">
-                          <span className="text-muted-foreground">BDT</span>
-                          <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
+                          <span className="text-muted-foreground">{t.type === "withdraw" ? "Withdraw (BDT)" : "BDT"}</span>
+                          <span className={cn("font-bold tabular-nums", t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-foreground")}>
+                            {t.type === "withdraw" ? "−" : ""}{fmt(Number(t.bdt_amount), "৳")}
+                          </span>
                         </div>
                       )}
                     </div>

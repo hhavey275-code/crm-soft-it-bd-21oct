@@ -1652,31 +1652,45 @@ export function AdminSellers() {
             </Card>
           )}
 
-          {/* Pending USDT Approvals — only seller-submitted USDT, not client/admin top-ups */}
-          {sellerTxns?.some((t: any) => t.status === "pending" && t.type === "usdt_received") && (
+          {/* Pending Seller Submissions — USDT submits + Withdraw requests */}
+          {sellerTxns?.some((t: any) => t.status === "pending" && (t.type === "usdt_received" || t.type === "withdraw")) && (
             <Card className="border-amber-500/30 bg-amber-500/5">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   Pending Seller Submissions
                   <span className="text-xs text-muted-foreground font-normal">
-                    ({sellerTxns.filter((t: any) => t.status === "pending" && t.type === "usdt_received").length})
+                    ({sellerTxns.filter((t: any) => t.status === "pending" && (t.type === "usdt_received" || t.type === "withdraw")).length})
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-2 space-y-2">
-                {sellerTxns.filter((t: any) => t.status === "pending" && t.type === "usdt_received").map((t: any) => {
+                {sellerTxns.filter((t: any) => t.status === "pending" && (t.type === "usdt_received" || t.type === "withdraw")).map((t: any) => {
                   const convBdt = Math.abs(Number(t.usdt_amount || 0)) * Number(t.rate || 0);
+                  const isWithdraw = t.type === "withdraw";
                   return (
                     <div key={t.id} className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-card">
                       <div className="flex-1 min-w-[200px]">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground">${Number(t.usdt_amount || 0).toFixed(2)}</span>
-                          <span className="text-xs text-muted-foreground">@ {Number(t.rate || 0).toFixed(2)}</span>
-                          <span className="text-xs font-semibold text-foreground">≈ ৳{convBdt.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider",
+                            isWithdraw ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                          )}>
+                            {isWithdraw ? "Withdraw Request" : "USDT Submit"}
+                          </span>
+                          {isWithdraw ? (
+                            <span className="text-sm font-bold text-rose-600 dark:text-rose-400">−৳{Number(t.bdt_amount || 0).toLocaleString()}</span>
+                          ) : (
+                            <>
+                              <span className="text-sm font-bold text-foreground">${Number(t.usdt_amount || 0).toFixed(2)}</span>
+                              <span className="text-xs text-muted-foreground">@ {Number(t.rate || 0).toFixed(2)}</span>
+                              <span className="text-xs font-semibold text-foreground">≈ ৳{convBdt.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                            </>
+                          )}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
                           {format(new Date(t.created_at), "MMM d, yyyy h:mm a")}
+                          {t.entry_by_name && <span> · 👤 {t.entry_by_name}</span>}
                           {t.description && <span> · {t.description}</span>}
                         </div>
                       </div>
@@ -1698,8 +1712,8 @@ export function AdminSellers() {
                         variant="outline"
                         className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950"
                         onClick={() => setConfirmDialog({
-                          title: "Reject this submission?",
-                          description: <>This pending USDT submission will be marked as <strong>Rejected</strong>. Type <strong>confirm</strong> to proceed.</>,
+                          title: isWithdraw ? "Reject this withdraw request?" : "Reject this submission?",
+                          description: <>This pending {isWithdraw ? "withdraw request" : "USDT submission"} will be marked as <strong>Rejected</strong>. Type <strong>confirm</strong> to proceed.</>,
                           actionLabel: "Reject",
                           onConfirm: () => reviewTxnMutation.mutate({ id: t.id, status: "rejected" }),
                         })}
@@ -1749,11 +1763,20 @@ export function AdminSellers() {
                           <span className="font-medium text-foreground">{t.entry_by_name}</span>
                         </p>
                       )}
-                      {t.type === "bdt_payment" || t.type === "client_topup" ? (
+                      {t.type === "bdt_payment" || t.type === "client_topup" || t.type === "withdraw" ? (
                         <div className="flex items-center justify-center py-1">
                           <div className="text-center">
-                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">{t.type === "client_topup" ? "Client Top-Up (BDT)" : "BDT Paid"}</span>
-                            <p className={cn("font-extrabold text-lg tabular-nums", t.type === "client_topup" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">
+                              {t.type === "client_topup" ? "Client Top-Up (BDT)" : t.type === "withdraw" ? "Withdraw (BDT)" : "BDT Paid"}
+                            </span>
+                            <p className={cn(
+                              "font-extrabold text-lg tabular-nums",
+                              t.type === "client_topup" ? "text-amber-600 dark:text-amber-400"
+                                : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            )}>
+                              {t.type === "withdraw" ? "−" : ""}৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
                           </div>
                         </div>
                       ) : (
