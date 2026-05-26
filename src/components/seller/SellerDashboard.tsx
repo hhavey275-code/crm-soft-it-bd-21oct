@@ -8,6 +8,7 @@ import { ImageIcon, CalendarIcon, X, Wallet, ArrowDownLeft, ArrowUpRight, Refres
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { SellerSubmitUsdtDialog } from "./SellerSubmitUsdtDialog";
+import { SellerWithdrawRequest } from "./SellerWithdrawRequest";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
