@@ -673,8 +673,10 @@ export function SellerDashboard() {
                         </>
                       ) : (
                         <div className="flex justify-between col-span-2">
-                          <span className="text-muted-foreground">BDT</span>
-                          <span className="font-bold text-foreground">{fmt(Number(t.bdt_amount), "৳")}</span>
+                          <span className="text-muted-foreground">{t.type === "withdraw" ? "Withdraw (BDT)" : "BDT"}</span>
+                          <span className={cn("font-bold tabular-nums", t.type === "withdraw" ? "text-rose-600 dark:text-rose-400" : "text-foreground")}>
+                            {t.type === "withdraw" ? "−" : ""}{fmt(Number(t.bdt_amount), "৳")}
+                          </span>
                         </div>
                       )}
                     </div>
