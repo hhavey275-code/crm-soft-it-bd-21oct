@@ -288,11 +288,24 @@ export function ClientDashboard() {
       });
       if (res.error || res.data?.error) { toast.error(friendlyEdgeError(res.error) || res.data?.error || "Failed"); return; }
       toast.success(`Spend cap increased by $${amount.toLocaleString()}`);
+      const newSpendCap = Number(res.data?.new_spend_cap ?? 0);
       setTopUpAccount(null); setTopUpAmount("");
+      // Wallet always invalidated (balance changed)
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
-      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+      // Only update THIS account in cache — do not refetch the whole list
+      // (avoids unnecessary load; other accounts are unchanged by this top-up)
+      if (newSpendCap > 0) {
+        queryClient.setQueryData(
+          ["client-dashboard-ad-accounts", user?.id],
+          (old: any[] | undefined) =>
+            (old ?? []).map((a) =>
+              a.id === topUpAccount.id ? { ...a, spend_cap: newSpendCap } : a,
+            ),
+        );
+      }
     } catch (err: any) { toast.error(friendlyEdgeError(err)); } finally { setTopUpLoading(false); }
   };
+
 
   const spendOrderConfig = {
     spend: { label: "Spend ($)", color: "hsl(var(--chart-bar-start))" },
