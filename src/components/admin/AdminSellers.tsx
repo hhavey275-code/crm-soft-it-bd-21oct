@@ -1749,11 +1749,20 @@ export function AdminSellers() {
                           <span className="font-medium text-foreground">{t.entry_by_name}</span>
                         </p>
                       )}
-                      {t.type === "bdt_payment" || t.type === "client_topup" ? (
+                      {t.type === "bdt_payment" || t.type === "client_topup" || t.type === "withdraw" ? (
                         <div className="flex items-center justify-center py-1">
                           <div className="text-center">
-                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">{t.type === "client_topup" ? "Client Top-Up (BDT)" : "BDT Paid"}</span>
-                            <p className={cn("font-extrabold text-lg tabular-nums", t.type === "client_topup" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider">
+                              {t.type === "client_topup" ? "Client Top-Up (BDT)" : t.type === "withdraw" ? "Withdraw (BDT)" : "BDT Paid"}
+                            </span>
+                            <p className={cn(
+                              "font-extrabold text-lg tabular-nums",
+                              t.type === "client_topup" ? "text-amber-600 dark:text-amber-400"
+                                : t.type === "withdraw" ? "text-rose-600 dark:text-rose-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            )}>
+                              {t.type === "withdraw" ? "−" : ""}৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
                           </div>
                         </div>
                       ) : (
