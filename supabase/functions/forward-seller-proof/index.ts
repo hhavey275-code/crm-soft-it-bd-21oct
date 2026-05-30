@@ -247,19 +247,11 @@ Deno.serve(async (req) => {
     // callers without a row id — extremely rare).
     if (seller_transaction_id) {
       if (force_resend) {
-        try {
-          await supabase
-            .from('telegram_forward_log')
-            .delete()
-            .eq('source_type', sourceType)
-            .eq('source_id', seller_transaction_id);
-          await supabase
-            .from('seller_transactions')
-            .update({ telegram_forwarded: null })
-            .eq('id', seller_transaction_id);
-        } catch (e) {
-          console.warn('force_resend slot delete failed:', (e as any)?.message);
-        }
+        // HARD LOCK: force_resend is now a no-op. If a slot exists (with or
+        // without a telegram_message_id) we will fall through to the strict
+        // skip branch below and never delete + resend. Operator policy:
+        // ekbar er beshi forward kokhonoi hobe na.
+        console.log(`forward-seller-proof: force_resend IGNORED for ${seller_transaction_id} — strict no-duplicate policy.`);
       }
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
 
