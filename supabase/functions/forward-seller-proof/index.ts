@@ -53,6 +53,25 @@ Deno.serve(async (req) => {
     }
 
 
+    // HARD ALLOWLIST: payment_kind must be one of the seller-side kinds.
+    // client_topup (and anything else) MUST go through forward-proof, never
+    // this function — otherwise we'd claim a different source_type slot and
+    // produce a DUPLICATE Telegram message for the same proof.
+    const ALLOWED_KINDS = new Set(['bdt_payment', 'usdt_received', 'withdraw']);
+    if (!ALLOWED_KINDS.has(payment_kind)) {
+      console.error('forward-seller-proof: REJECTED — invalid payment_kind', { payment_kind, seller_transaction_id });
+      try {
+        await supabase.from('system_logs').insert({
+          action: 'Telegram Forward Rejected',
+          details: `forward-seller-proof called with disallowed payment_kind=${payment_kind || 'null'} (txn=${seller_transaction_id || 'unknown'}). Only bdt_payment / usdt_received / withdraw are allowed; client_topup must use forward-proof.`,
+        });
+      } catch { /* best-effort */ }
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'invalid_payment_kind' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Source-type for the telegram_forward_log table (atomic dedupe happens
     // RIGHT BEFORE the Telegram POST below — not here — so concurrent invocations
     // can't both pass an early read-then-act check).
@@ -61,7 +80,7 @@ Deno.serve(async (req) => {
       usdt_received: 'usdt_received',
       withdraw: 'withdraw',
     };
-    const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
+    const sourceType = sourceTypeMap[payment_kind];
 
     // STRICT: seller_transaction_id is REQUIRED. Without it the atomic
     // claim_forward_slot dedupe below cannot run, and concurrent invocations
@@ -228,19 +247,11 @@ Deno.serve(async (req) => {
     // callers without a row id — extremely rare).
     if (seller_transaction_id) {
       if (force_resend) {
-        try {
-          await supabase
-            .from('telegram_forward_log')
-            .delete()
-            .eq('source_type', sourceType)
-            .eq('source_id', seller_transaction_id);
-          await supabase
-            .from('seller_transactions')
-            .update({ telegram_forwarded: null })
-            .eq('id', seller_transaction_id);
-        } catch (e) {
-          console.warn('force_resend slot delete failed:', (e as any)?.message);
-        }
+        // HARD LOCK: force_resend is now a no-op. If a slot exists (with or
+        // without a telegram_message_id) we will fall through to the strict
+        // skip branch below and never delete + resend. Operator policy:
+        // ekbar er beshi forward kokhonoi hobe na.
+        console.log(`forward-seller-proof: force_resend IGNORED for ${seller_transaction_id} — strict no-duplicate policy.`);
       }
       const claimed = await claimForwardSlot(supabase, sourceType, seller_transaction_id, groupId);
 

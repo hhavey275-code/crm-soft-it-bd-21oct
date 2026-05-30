@@ -32,11 +32,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Manual retry from admin UI. STRICT: refuse to delete a slot that has
-    // already produced a real telegram_message_id — that's what was causing
-    // the "Resend" button (and any racing trigger) to produce duplicate
-    // Telegram messages in the group. Only release slots whose previous
-    // attempt actually failed (telegram_message_id IS NULL).
+    // HARD LOCK (operator: ekbar er beshi forward kokhonoi hobe na):
+    // never delete an existing slot, even when telegram_message_id is NULL.
+    // If a slot exists for this request, ALWAYS skip. To genuinely resend,
+    // an admin must delete the telegram_forward_log row by hand in the DB.
+    // Any force_resend=true from the UI is treated as a no-op (strict).
     if (force_resend) {
       try {
         const { data: existingSlot } = await supabase
@@ -45,30 +45,25 @@ Deno.serve(async (req) => {
           .eq('source_type', 'client_topup')
           .eq('source_id', request_id)
           .maybeSingle();
-        if (existingSlot?.telegram_message_id) {
-          console.log(`forward-proof: force_resend BLOCKED for ${request_id} — already forwarded as msg ${existingSlot.telegram_message_id}`);
+        if (existingSlot) {
+          console.log(`forward-proof: force_resend IGNORED for ${request_id} — slot exists (msg ${existingSlot.telegram_message_id ?? 'null'}). Strict no-duplicate policy.`);
           return new Response(
             JSON.stringify({
               ok: true,
               skipped: true,
-              reason: 'already_forwarded_strict',
-              message_id: existingSlot.telegram_message_id,
+              reason: existingSlot.telegram_message_id ? 'already_forwarded_strict' : 'slot_locked_strict',
+              message_id: existingSlot.telegram_message_id ?? null,
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-        await supabase
-          .from('telegram_forward_log')
-          .delete()
-          .eq('source_type', 'client_topup')
-          .eq('source_id', request_id)
-          .is('telegram_message_id', null);
+        // No slot exists — allow first-time send to proceed; reset legacy flag.
         await supabase
           .from('top_up_requests')
           .update({ telegram_forwarded: null })
           .eq('id', request_id);
       } catch (e) {
-        console.warn('force_resend slot delete failed:', (e as any)?.message);
+        console.warn('force_resend pre-check failed:', (e as any)?.message);
       }
     }
 
