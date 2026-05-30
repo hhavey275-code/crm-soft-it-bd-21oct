@@ -53,6 +53,25 @@ Deno.serve(async (req) => {
     }
 
 
+    // HARD ALLOWLIST: payment_kind must be one of the seller-side kinds.
+    // client_topup (and anything else) MUST go through forward-proof, never
+    // this function — otherwise we'd claim a different source_type slot and
+    // produce a DUPLICATE Telegram message for the same proof.
+    const ALLOWED_KINDS = new Set(['bdt_payment', 'usdt_received', 'withdraw']);
+    if (!ALLOWED_KINDS.has(payment_kind)) {
+      console.error('forward-seller-proof: REJECTED — invalid payment_kind', { payment_kind, seller_transaction_id });
+      try {
+        await supabase.from('system_logs').insert({
+          action: 'Telegram Forward Rejected',
+          details: `forward-seller-proof called with disallowed payment_kind=${payment_kind || 'null'} (txn=${seller_transaction_id || 'unknown'}). Only bdt_payment / usdt_received / withdraw are allowed; client_topup must use forward-proof.`,
+        });
+      } catch { /* best-effort */ }
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'invalid_payment_kind' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Source-type for the telegram_forward_log table (atomic dedupe happens
     // RIGHT BEFORE the Telegram POST below — not here — so concurrent invocations
     // can't both pass an early read-then-act check).
@@ -61,7 +80,7 @@ Deno.serve(async (req) => {
       usdt_received: 'usdt_received',
       withdraw: 'withdraw',
     };
-    const sourceType = sourceTypeMap[payment_kind] || 'seller_payment';
+    const sourceType = sourceTypeMap[payment_kind];
 
     // STRICT: seller_transaction_id is REQUIRED. Without it the atomic
     // claim_forward_slot dedupe below cannot run, and concurrent invocations
