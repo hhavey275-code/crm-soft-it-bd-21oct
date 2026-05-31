@@ -1,0 +1,1 @@
+ALTER TABLE public.tenant_payments ADD COLUMN IF NOT EXISTS admin_note text;
