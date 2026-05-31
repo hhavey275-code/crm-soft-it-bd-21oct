@@ -104,10 +104,11 @@ Deno.serve(async (req) => {
     // Cheap early bail-out via the legacy mirror flag (saves work when we can
     // tell upfront the row was already forwarded). Authoritative dedupe is
     // still the atomic claim_forward_slot below.
+    let entryByName: string | null = null;
     {
       const { data: existing } = await supabase
         .from('seller_transactions')
-        .select('telegram_forwarded, telegram_message_id')
+        .select('telegram_forwarded, telegram_message_id, entry_by_name, reviewed_by')
         .eq('id', seller_transaction_id)
         .maybeSingle();
       if (existing?.telegram_forwarded) {
@@ -115,6 +116,15 @@ Deno.serve(async (req) => {
           JSON.stringify({ ok: true, skipped: true, reason: 'already_forwarded_flag', message_id: existing.telegram_message_id }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
+      }
+      entryByName = (existing as any)?.entry_by_name || null;
+      if (!entryByName && (existing as any)?.reviewed_by) {
+        const { data: rprof } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('user_id', (existing as any).reviewed_by)
+          .maybeSingle();
+        entryByName = rprof?.full_name || rprof?.email || null;
       }
     }
 
