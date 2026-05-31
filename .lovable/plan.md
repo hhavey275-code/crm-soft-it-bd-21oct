@@ -1,63 +1,48 @@
+## Problem
 
-## 1. Withdraw display — BDT only (UI fix)
+Telegram-এ Seller Payment / USDT Given / Withdraw forward হওয়ার সময় শুধু seller-এর নাম দেখাচ্ছে — কে (কোন admin বা seller নিজে) entry submit করেছে সেটা message-এ নেই। Screenshot-এ "Faisal kabir" হচ্ছে seller, কিন্তু কোন admin এই entry টা দিল সেটা কোথাও দেখাচ্ছে না।
 
-Screenshot er card ta admin er "Seller Detail" page theke (`AdminSellers.tsx`). Withdraw type bortomane "else" branch e jay, tai USDT / Rate / Conv. BDT (sob 0) dekhay. Same bug seller's own ledger eo thakte pare.
+## Goal
 
-**File: `src/components/admin/AdminSellers.tsx`**
-- Mobile card (line ~1752): condition theke `t.type === "bdt_payment" || t.type === "client_topup"` → `t.type === "bdt_payment" || t.type === "client_topup" || t.type === "withdraw"`. Label hobe "Withdraw (BDT)", color rose, value `−৳{bdt_amount}`.
-- Desktop table (line ~1930–1933): withdraw row e USDT / Rate / Conv.BDT cell e "—" dekhabo (shudhu BDT column populated).
+প্রতিটা forwarded seller transaction message-এ একটা নতুন line যোগ করব:
 
-**File: `src/components/seller/SellerDashboard.tsx`**
-- Mobile card eo same logic verify — currently non-`usdt_received` already BDT-only, but `withdraw` er label/sign clearer korbo ("Withdraw" + `−৳`).
-- Desktop table (line ~840–851): withdraw row e USDT / Rate / Conv.BDT "—" rakhbo.
+`📥 Entry by: <admin/seller name>`
 
-Running balance / Due-Advance logic kichui change hobe na (already `computeTransactionDelta` only uses `bdt_amount` for withdraw).
+যাতে যে-ই submit করুক (admin on behalf of seller, অথবা seller নিজে), তার নাম clearly দেখা যায়।
 
-## 2. Seller-initiated Withdraw Request
+## Changes
 
-Notun flow: seller nije amount + note diye request korbe → pending row → admin approve korle main balance theke minus.
+### 1. `supabase/functions/forward-seller-proof/index.ts`
 
-### Database
-Existing `seller_transactions` table use korbo (already has `status`, `admin_note`, `reviewed_by`, `reviewed_at`). Withdraw request = ekta row with:
-- `type = 'withdraw'`
-- `bdt_amount = requested amount`
-- `description = seller's note`
-- `status = 'pending'`
-- `seller_id = current seller user id`
-- `entry_by_name = 'self-request'`
+- Seller transaction row fetch করার সময় (already fetched at line ~108 for `telegram_forwarded` check) `entry_by_name`, `reviewed_by` ও select করব।
+- যদি `entry_by_name` থাকে — সেটাই use করব।
+- না থাকলে fallback: `reviewed_by` (admin user_id) → `profiles.full_name / email` lookup করে resolve করব।
+- শেষেও কিছু না পেলে line টা skip করব (কোন "Unknown" দেখাব না)।
+- তিনটা caption branch-এই (`usdt_received`, `withdraw`, `bdt_payment`) seller name line-এর ঠিক পরে `📥 Entry by: …` insert করব।
 
-Pending row already running-balance e count hocche na (`isCountedSellerTransaction` checks `status === 'approved'`).
+### 2. Caller pages — entry_by_name নিশ্চিত করা
 
-**RLS update needed** — ensure sellers can INSERT their own pending withdraw rows into `seller_transactions` (only when `seller_id = auth.uid()` AND `type = 'withdraw'` AND `status = 'pending'`). UPDATE/approve shudhu admin.
+`SellerSubmitUsdtDialog.tsx`-এ already submitter name resolve করে save করা হয়। একই pattern apply করব:
 
-### Frontend — Seller side
+- `src/components/admin/AdminSellers.tsx` — admin যেসব জায়গা থেকে seller_transactions insert/approve করে (BDT payment add, withdraw approve সহ) সেখানে insert-এর সময় logged-in admin-এর `full_name / email` থেকে `entry_by_name` populate করব (যদি ইতিমধ্যে না হয়)।
+- `src/components/seller/SellerWithdrawRequest.tsx` — seller নিজের নাম `entry_by_name`-এ save করব।
 
-**New component: `src/components/seller/SellerWithdrawRequest.tsx`**
-- "Request Withdraw" button → Dialog
-- Inputs: Amount (BDT, required, > 0), Note (optional textarea)
-- Submit → insert seller_transactions row (status='pending'), then create admin notification (same pattern as `AgencyWallet.handleRequestBalance`).
-- Toast confirmation, invalidate `seller-transactions` query.
+কোন business logic change নেই — শুধু একটা informational field populate ও Telegram caption-এ একটা line add।
 
-**Mount in `SellerDashboard.tsx`** — top action bar e button add korbo (near filter toggle / running balance summary).
+## Out of scope
 
-### Frontend — Admin side
+- "🏦 Unknown — N/A" bank line (screenshot-এ লাল circle): এটা bank info, আলাদা bug (Others-path-এ bank name না পাঠানো)। এই plan-এ touch করছি না — চাইলে পরে আলাদাভাবে ঠিক করব।
+- Existing locked dedupe / OCR / approval logic-এ কোন পরিবর্তন নেই।
 
-**In `AdminSellers.tsx`** seller detail view:
-- Pending withdraw rows er pashe "Approve" + "Reject" button (mobile card + desktop table).
-- Approve → `UPDATE seller_transactions SET status='approved', reviewed_by=auth.uid(), reviewed_at=now()`. Existing trigger (`trigger_forward_seller_txn`, `trigger_sheet_sync_on_seller_txn`) already handles forward + sheet sync on approval — no extra work.
-- Reject → `status='rejected'` + optional admin_note.
-- Pending rows visually distinct (amber badge already exists via StatusBadge).
+## Result
 
-### Notifications
-Use existing `notifications` table — on submit insert notification per admin/superadmin (same as AgencyWallet pattern); on approve/reject insert notification for the seller.
+Telegram message এখন দেখাবে:
 
-## 3. Access
-- Route already exists (`/seller-topups` etc.); Withdraw request button bosbe Seller Dashboard er top e — sob seller (role = seller / superadmin) er jonno available.
-- Locked-functions checklist: this touches `seller_transactions` writes but **does NOT modify** the OCR/auto-approval/forwarding logic — only adds a new pending insert path + manual approve path. Forward/sheet-sync triggers already fire on `status` transition to approved, so behavior consistent.
-
-## Technical summary
-- 2 file edits (display): `AdminSellers.tsx`, `SellerDashboard.tsx`
-- 1 new component: `SellerWithdrawRequest.tsx`
-- 1 migration: RLS policy for seller insert + admin update on `seller_transactions` (verify current policies first; may already allow).
-- Admin approve/reject UI snippet in `AdminSellers.tsx`.
-- No edge function or schema column changes needed.
+```
+💰 Seller Payment
+👤 Faisal kabir
+📥 Entry by: <admin name>
+🏦 City Bank — 1502944865001
+৳650,000
+🔖 Ref: …
+```
