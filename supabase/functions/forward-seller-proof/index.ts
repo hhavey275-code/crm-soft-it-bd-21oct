@@ -226,12 +226,13 @@ Deno.serve(async (req) => {
     }
 
     // Compose caption per kind
+    const entryByLine = entryByName ? `\n📥 Entry by: ${entryByName}` : '';
     let caption: string;
     if (payment_kind === 'usdt_received') {
       const usdt = Number(usdt_amount || 0);
       const r = Number(rate || 0);
       const converted = usdt * r;
-      caption = `🔻 <b>USDT Given</b>\n👤 ${resolvedSellerName || 'Unknown'}`;
+      caption = `🔻 <b>USDT Given</b>\n👤 ${resolvedSellerName || 'Unknown'}${entryByLine}`;
       if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n💲 USDT: ${usdt.toLocaleString()}`;
@@ -240,14 +241,14 @@ Deno.serve(async (req) => {
       caption += `\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     } else if (payment_kind === 'withdraw') {
       const w = Number(bdt_amount || 0);
-      caption = `🔻 <b>Withdraw</b>\n👤 ${resolvedSellerName || 'Unknown'}`;
+      caption = `🔻 <b>Withdraw</b>\n👤 ${resolvedSellerName || 'Unknown'}${entryByLine}`;
       if (bank_account_id) caption += `\n🏦 ${bankName} — ${accountNumber}`;
       caption += `\n💰 ৳${formatBdtIN(w)}`;
       if (withdraw_note) caption += `\n📝 ${withdraw_note}`;
       if (reference) caption += `\n🔖 Ref: ${reference}`;
       caption += runningTotalLine;
     } else {
-      caption = `💰 <b>Seller Payment</b>\n👤 ${resolvedSellerName || 'Unknown'}\n🏦 ${bankName} — ${accountNumber}`;
+      caption = `💰 <b>Seller Payment</b>\n👤 ${resolvedSellerName || 'Unknown'}${entryByLine}\n🏦 ${bankName} — ${accountNumber}`;
       if (otherAccountHolderName) caption += `\n📛 ${otherAccountHolderName}`;
       caption += `\n৳${bdt_amount ? Number(bdt_amount).toLocaleString() : 'N/A'}\n🔖 Ref: ${reference || 'N/A'}${runningTotalLine}`;
     }
