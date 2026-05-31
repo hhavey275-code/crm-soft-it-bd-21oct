@@ -3111,6 +3111,7 @@ export type Database = {
       tenant_payments: {
         Row: {
           adjustment_reason: string | null
+          admin_note: string | null
           amount: number
           bank_account_id: string | null
           created_at: string
@@ -3130,6 +3131,7 @@ export type Database = {
         }
         Insert: {
           adjustment_reason?: string | null
+          admin_note?: string | null
           amount: number
           bank_account_id?: string | null
           created_at?: string
@@ -3149,6 +3151,7 @@ export type Database = {
         }
         Update: {
           adjustment_reason?: string | null
+          admin_note?: string | null
           amount?: number
           bank_account_id?: string | null
           created_at?: string
