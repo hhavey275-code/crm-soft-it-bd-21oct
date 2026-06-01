@@ -351,8 +351,14 @@ export function AdminSellers() {
         // and interleave correctly with client_topup rows (which have real times).
         const ocrDate = new Date(ocrResult.date);
         const now = new Date();
-        ocrDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-        entry.created_at = ocrDate.toISOString();
+        // SAFETY: OCR misreads (e.g. "26" parsed as "20") can produce dates years
+        // off. If the parsed date is more than 60 days from today in either
+        // direction, fall back to "now" so the row lands in the correct month tab.
+        const diffDays = Math.abs(ocrDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+        if (!isNaN(ocrDate.getTime()) && diffDays <= 60) {
+          ocrDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+          entry.created_at = ocrDate.toISOString();
+        }
       }
       const { data: insertedRow, error } = await (supabase as any)
         .from("seller_transactions")
