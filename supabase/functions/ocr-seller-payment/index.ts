@@ -14,6 +14,7 @@ function verifyAccount(target: string, result: any, allowFirst3Last3 = false): b
   const t = String(target || "").replace(/\D/g, "");
   if (t.length < 6) return null;
   const first3 = t.slice(0, 3);
+  const first4 = t.slice(0, 4);
   const last4 = t.slice(-4);
   const last3 = t.slice(-3);
   const rawOcrAcct = String(result?.account_number || "");
@@ -23,13 +24,11 @@ function verifyAccount(target: string, result: any, allowFirst3Last3 = false): b
     if (digits === t) return true;
     if (digits.includes(t)) return true;
     if (digits.length >= 7 && digits.startsWith(first3) && digits.endsWith(last4)) return true;
-    if (allowFirst3Last3 && digits.length >= 6 && digits.startsWith(first3) && digits.endsWith(last3)) return true;
+    // Relaxed branch (bKash/Nagad → Bank only): first 4 + last 3 of target.
+    if (allowFirst3Last3 && digits.length >= 7 && digits.startsWith(first4) && digits.endsWith(last3)) return true;
     return false;
   };
   if (matches(ocrAcct)) return true;
-  // Fallback: OCR sometimes puts the number in a wrong field (e.g. account_holder_name,
-  // bank_name, reference). Concatenate ALL textual OCR fields and search for the digits
-  // anywhere — still requires either full match or the strict first3+last4 anchor.
   const allText = [
     result?.account_number,
     result?.account_holder_name,
@@ -39,11 +38,10 @@ function verifyAccount(target: string, result: any, allowFirst3Last3 = false): b
   const allDigits = allText.replace(/\D/g, "");
   if (allDigits) {
     if (allDigits.includes(t)) return true;
-    // Sliding window: scan every substring of length >=7 starting with first3 and ending with last4
     const re = new RegExp(`${first3}\\d{0,20}${last4}`, "g");
     if (re.test(allDigits)) return true;
     if (allowFirst3Last3) {
-      const re2 = new RegExp(`${first3}\\d{0,20}${last3}`, "g");
+      const re2 = new RegExp(`${first4}\\d{0,20}${last3}`, "g");
       if (re2.test(allDigits)) return true;
     }
   }

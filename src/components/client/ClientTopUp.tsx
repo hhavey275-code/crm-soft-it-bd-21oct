@@ -218,15 +218,25 @@ export function ClientTopUp() {
     const target = String(bankAcctNum || "").replace(/\D/g, "");
     if (target.length < 6) return null;
     const first3 = target.slice(0, 3);
+    const first4 = target.slice(0, 4);
     const last4 = target.slice(-4);
     const last3 = target.slice(-3);
-    const allowFirst3Last3 = methodForVerification === "mfs_to_bank";
+    // Relaxed (first4 + last3) allowed when:
+    //  (a) user explicitly chose bKash/Nagad → Bank sub-method, OR
+    //  (b) OCR detected the source as bKash/Nagad AND destination is a real bank (not MFS).
+    const ocrText = [data?.bank_name, data?.source, data?.reference, data?.account_holder_name]
+      .filter(Boolean).map(String).join(" ");
+    const ocrMentionsMFS = /bkash|bikash|বিকাশ|nagad|নগদ/i.test(ocrText);
+    const destBankName = String((selectedBankDetailsRef.current as any)?.bank_name || "");
+    const destIsBank = destBankName ? !isMFS(destBankName) : true;
+    const allowFirst4Last3 =
+      methodForVerification === "mfs_to_bank" || (ocrMentionsMFS && destIsBank);
     const ocrAcct = String(data?.account_number || "").replace(/\D/g, "");
     const matches = (d: string) => {
       if (!d) return false;
       if (d === target || d.includes(target)) return true;
       if (d.length >= 7 && d.startsWith(first3) && d.endsWith(last4)) return true;
-      if (allowFirst3Last3 && d.length >= 6 && d.startsWith(first3) && d.endsWith(last3)) return true;
+      if (allowFirst4Last3 && d.length >= 7 && d.startsWith(first4) && d.endsWith(last3)) return true;
       return false;
     };
     if (typeof data?.account_verified === 'boolean' && data.account_verified) return true;
@@ -235,7 +245,7 @@ export function ClientTopUp() {
       .filter(Boolean).map(String).join(" ").replace(/\D/g, "");
     if (allDigits.includes(target)) return true;
     if (new RegExp(`${first3}\\d{0,20}${last4}`).test(allDigits)) return true;
-    if (allowFirst3Last3 && new RegExp(`${first3}\\d{0,20}${last3}`).test(allDigits)) return true;
+    if (allowFirst4Last3 && new RegExp(`${first4}\\d{0,20}${last3}`).test(allDigits)) return true;
     return false;
   };
 
