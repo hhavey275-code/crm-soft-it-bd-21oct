@@ -46,6 +46,23 @@ const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
 function centsToDollars(cents) {
   return cents / 100;
 }
+async function reportUsageToMaster(licenseMap, amount, idempotencyKey, supabase, source, meta) {
+  if (licenseMap["is_tenant"] !== "true" || !licenseMap["master_url"] || !licenseMap["tenant_api_key"]) return;
+  try {
+    const res = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Tenant-Key": licenseMap["tenant_api_key"] },
+      body: JSON.stringify({ action: "report-usage", amount, idempotency_key: idempotencyKey, source, meta })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (body?.total_used !== undefined) {
+      await supabase.from("site_settings").update({ value: String(body.total_used) }).eq("key", "license_total_used");
+    }
+    if (!res.ok) console.warn("scheduled-sync report-usage failed:", body?.error || res.status);
+  } catch (e) {
+    console.warn("scheduled-sync report-usage threw:", e instanceof Error ? e.message : e);
+  }
+}
 // Fetch all pages with delay between pages
 async function fetchAllPages(url) {
   const results = [];
@@ -63,6 +80,9 @@ async function fetchAllPages(url) {
   return results;
 }
 async function processAutoTopups(supabase, serviceKey) {
+  const { data: licenseRows } = await supabase.from("site_settings").select("key,value").in("key", ["is_tenant", "master_url", "tenant_api_key", "license_total_used"]);
+  const licenseMap = {};
+  (licenseRows || []).forEach((r)=>{ licenseMap[r.key] = r.value; });
   // Fetch all active auto top-up rules
   const { data: rules, error: rulesErr } = await supabase.from("auto_topup_rules").select("*").eq("is_active", true);
   if (rulesErr || !rules || rules.length === 0) return {
@@ -101,7 +121,7 @@ async function processAutoTopups(supabase, serviceKey) {
       }).eq("id", wallet.id);
       // Create transaction
       const cleanAccountId = account.account_id.replace(/^act_/, '');
-      await supabase.from("transactions").insert({
+      const { data: walletTxn } = await supabase.from("transactions").insert({
         user_id: rule.user_id,
         amount: -rule.topup_amount,
         balance_after: newBalance,
@@ -109,7 +129,7 @@ async function processAutoTopups(supabase, serviceKey) {
         description: `Auto Top-Up\n${account.account_name}\n${cleanAccountId}`,
         reference_id: rule.ad_account_id,
         processed_by: `auto:${rule.user_id}`
-      });
+      }).select("id").maybeSingle();
       // Call Meta API to update spend cap
       const bm = account.business_managers;
       const bmToken = await decryptToken(bm.access_token, serviceKey);
@@ -278,6 +298,7 @@ async function processAutoTopups(supabase, serviceKey) {
         action: "Auto Top-Up",
         details: `${account.account_name} (${cleanAccountId}) — $${oldSpendCap} → $${newSpendCap} (triggered at balance $${currentBalance.toFixed(2)}, threshold $${rule.threshold_balance}) ${sharedMetaCallSummary("")}`
       });
+      await reportUsageToMaster(licenseMap, Number(rule.topup_amount), `auto-topup:${walletTxn?.id || rule.id}:${newSpendCap}`, supabase, "scheduled-sync:auto-topup", { ad_account_id: rule.ad_account_id, account_name: account.account_name, account_external_id: cleanAccountId, wallet_txn_id: walletTxn?.id || null, user_id: rule.user_id });
       console.log(`Auto top-up SUCCESS: ${actId} $${oldSpendCap} → $${newSpendCap}`);
       triggered++;
     } catch (err) {

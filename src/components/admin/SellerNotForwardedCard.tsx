@@ -127,7 +127,7 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
   const forwardOne = async (id: string): Promise<"ok" | "skipped" | "error"> => {
     setResults((p) => ({ ...p, [id]: "loading" }));
     try {
-      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: id } });
+      const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: id, force_resend: true } });
       if (error) throw error;
       if (data?.skipped) {
         setResults((p) => ({ ...p, [id]: "skipped" }));
