@@ -43,13 +43,13 @@ Deno.serve(async (req) => {
           .eq('source_type', 'client_topup')
           .eq('source_id', request_id)
           .maybeSingle();
-        if (existingSlot) {
+        if (existingSlot?.telegram_message_id) {
           console.log(`forward-proof: force_resend IGNORED for ${request_id} — slot exists (msg ${existingSlot.telegram_message_id ?? 'null'}). Strict no-duplicate policy.`);
           return new Response(
             JSON.stringify({
               ok: true,
               skipped: true,
-              reason: existingSlot.telegram_message_id ? 'already_forwarded_strict' : 'slot_locked_strict',
+              reason: 'already_forwarded_strict',
               message_id: existingSlot.telegram_message_id ?? null,
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
