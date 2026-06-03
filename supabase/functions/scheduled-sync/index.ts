@@ -46,6 +46,23 @@ const delay = (ms)=>new Promise((r)=>setTimeout(r, ms));
 function centsToDollars(cents) {
   return cents / 100;
 }
+async function reportUsageToMaster(licenseMap, amount, idempotencyKey, supabase, source, meta) {
+  if (licenseMap["is_tenant"] !== "true" || !licenseMap["master_url"] || !licenseMap["tenant_api_key"]) return;
+  try {
+    const res = await fetch(`${licenseMap["master_url"]}/functions/v1/tenant-webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Tenant-Key": licenseMap["tenant_api_key"] },
+      body: JSON.stringify({ action: "report-usage", amount, idempotency_key: idempotencyKey, source, meta })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (body?.total_used !== undefined) {
+      await supabase.from("site_settings").update({ value: String(body.total_used) }).eq("key", "license_total_used");
+    }
+    if (!res.ok) console.warn("scheduled-sync report-usage failed:", body?.error || res.status);
+  } catch (e) {
+    console.warn("scheduled-sync report-usage threw:", e instanceof Error ? e.message : e);
+  }
+}
 // Fetch all pages with delay between pages
 async function fetchAllPages(url) {
   const results = [];
@@ -63,6 +80,9 @@ async function fetchAllPages(url) {
   return results;
 }
 async function processAutoTopups(supabase, serviceKey) {
+  const { data: licenseRows } = await supabase.from("site_settings").select("key,value").in("key", ["is_tenant", "master_url", "tenant_api_key", "license_total_used"]);
+  const licenseMap = {};
+  (licenseRows || []).forEach((r)=>{ licenseMap[r.key] = r.value; });
   // Fetch all active auto top-up rules
   const { data: rules, error: rulesErr } = await supabase.from("auto_topup_rules").select("*").eq("is_active", true);
   if (rulesErr || !rules || rules.length === 0) return {
