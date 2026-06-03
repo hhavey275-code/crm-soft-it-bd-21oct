@@ -346,7 +346,7 @@ export function AdminTopUp() {
     for (const r of missingForwards) {
       const name = r.profile?.full_name || r.profile?.email || r.user_id?.slice(0, 8) || "—";
       try {
-        const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: r.id } });
+        const { data, error } = await supabase.functions.invoke("forward-proof", { body: { request_id: r.id, force_resend: true } });
         if (error) throw error;
         if (data?.skipped) results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "skipped", reason: data.reason });
         else results.push({ id: r.id, name, amount: Number(r.amount || 0), status: "ok" });
