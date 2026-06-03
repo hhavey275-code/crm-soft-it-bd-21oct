@@ -32,11 +32,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // HARD LOCK (operator: ekbar er beshi forward kokhonoi hobe na):
-    // never delete an existing slot, even when telegram_message_id is NULL.
-    // If a slot exists for this request, ALWAYS skip. To genuinely resend,
-    // an admin must delete the telegram_forward_log row by hand in the DB.
-    // Any force_resend=true from the UI is treated as a no-op (strict).
+    // Manual retry path: never resend completed slots, but allow an admin
+    // button to clear a stale pre-claim where no Telegram message_id landed.
+    // Normal auto/trigger calls still stay strict and will not clear slots.
     if (force_resend) {
       try {
         const { data: existingSlot } = await supabase
@@ -57,7 +55,11 @@ Deno.serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-        // No slot exists — allow first-time send to proceed; reset legacy flag.
+        if (existingSlot && !existingSlot.telegram_message_id) {
+          await releaseForwardSlot(supabase, 'client_topup', request_id);
+          console.log(`forward-proof: cleared stale empty slot for manual retry ${request_id}`);
+        }
+        // Allow first-time/manual retry send to proceed; reset legacy flag.
         await supabase
           .from('top_up_requests')
           .update({ telegram_forwarded: null })
@@ -250,6 +252,7 @@ Deno.serve(async (req) => {
       // (telegram_message_id stays NULL) so future auto-calls hit
       // `already_claimed_strict`. Admin can manually retry by invoking
       // forward-proof with { force_resend: true } from the UI.
+      if (force_resend) await releaseForwardSlot(supabase, 'client_topup', request_id);
       return new Response(JSON.stringify({ error: tgResult.description || 'Telegram error', slot_locked: true }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
