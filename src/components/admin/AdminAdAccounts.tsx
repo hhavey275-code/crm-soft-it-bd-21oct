@@ -103,6 +103,23 @@ export function AdminAdAccounts() {
   const [showSelect, setShowSelect] = useState(false);
   const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [lastSyncStatus, setLastSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
+  const [lastFailedIds, setLastFailedIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("adAccountsLastFailedIds");
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+  const recordFailedIds = (ids: string[] | undefined, attemptedIds: string[]) => {
+    setLastFailedIds(prev => {
+      const next = new Set(prev);
+      // Remove attempted ids that succeeded this run
+      attemptedIds.forEach(id => next.delete(id));
+      // Add newly failed
+      (ids || []).forEach(id => next.add(id));
+      try { localStorage.setItem("adAccountsLastFailedIds", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
@@ -305,6 +322,8 @@ export function AdminAdAccounts() {
       const attempted = data?.attempted ?? assignedAccounts.length;
       const succeeded = data?.succeeded ?? (attempted - failed);
       const autoRetried = data?.auto_retried ?? 0;
+      const refreshAllIds = assignedAccounts.map((a: any) => a.id);
+      recordFailedIds(data?.failed_account_ids, refreshAllIds);
       setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
         toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
@@ -344,6 +363,7 @@ export function AdminAdAccounts() {
       const attempted = data?.attempted ?? unassignedAccounts.length;
       const succeeded = data?.succeeded ?? (attempted - failed);
       const autoRetried = data?.auto_retried ?? 0;
+      recordFailedIds(data?.failed_account_ids, unassignedAccounts.map((a: any) => a.id));
       setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
         toast.warning(`⚠️ ${succeeded}/${attempted} inventory updated · ${failed} failed`);
@@ -373,6 +393,7 @@ export function AdminAdAccounts() {
       const attempted = data?.attempted ?? selectedIds.size;
       const succeeded = data?.succeeded ?? (attempted - failed);
       const autoRetried = data?.auto_retried ?? 0;
+      recordFailedIds(data?.failed_account_ids, Array.from(selectedIds));
       setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
         toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
@@ -479,7 +500,8 @@ export function AdminAdAccounts() {
             const tokenMissing = !bm?.access_token;
             const bmInactive = bm && bm.status && bm.status !== "active";
             const metaInvalid = a.meta_account_status === 101;
-            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive)) return false;
+            const syncFailed = lastFailedIds.has(a.id);
+            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive || syncFailed)) return false;
           } else if (a.status?.toLowerCase() !== statusFilter) {
             return false;
           }
