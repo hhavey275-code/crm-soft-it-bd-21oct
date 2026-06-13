@@ -471,7 +471,19 @@ export function AdminAdAccounts() {
     return [...base]
       .filter((a: any) => {
         if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
-        if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
+        if (statusFilter !== "all") {
+          if (statusFilter === "invalid_or_expired") {
+            const bm: any = Array.isArray(a.business_managers) ? a.business_managers[0] : a.business_managers;
+            const tokenExp = bm?.token_expires_at ? new Date(bm.token_expires_at).getTime() : null;
+            const tokenExpired = tokenExp !== null && tokenExp < Date.now();
+            const tokenMissing = !bm?.access_token;
+            const bmInactive = bm && bm.status && bm.status !== "active";
+            const metaInvalid = a.meta_account_status === 101;
+            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive)) return false;
+          } else if (a.status?.toLowerCase() !== statusFilter) {
+            return false;
+          }
+        }
         if (cardFilter !== "all") {
           const ins = insights[a.id];
           if (["Visa","Mastercard","Amex"].includes(cardFilter)) {
