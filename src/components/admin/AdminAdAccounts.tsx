@@ -103,6 +103,23 @@ export function AdminAdAccounts() {
   const [showSelect, setShowSelect] = useState(false);
   const [lastSyncCalls, setLastSyncCalls] = useState<number | null>(null);
   const [lastSyncStatus, setLastSyncStatus] = useState<{ total: number; success: number; failed: number; autoRetried: number } | null>(null);
+  const [lastFailedIds, setLastFailedIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("adAccountsLastFailedIds");
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+  const recordFailedIds = (ids: string[] | undefined, attemptedIds: string[]) => {
+    setLastFailedIds(prev => {
+      const next = new Set(prev);
+      // Remove attempted ids that succeeded this run
+      attemptedIds.forEach(id => next.delete(id));
+      // Add newly failed
+      (ids || []).forEach(id => next.add(id));
+      try { localStorage.setItem("adAccountsLastFailedIds", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
