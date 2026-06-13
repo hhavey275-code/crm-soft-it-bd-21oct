@@ -500,7 +500,8 @@ export function AdminAdAccounts() {
             const tokenMissing = !bm?.access_token;
             const bmInactive = bm && bm.status && bm.status !== "active";
             const metaInvalid = a.meta_account_status === 101;
-            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive)) return false;
+            const syncFailed = lastFailedIds.has(a.id);
+            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive || syncFailed)) return false;
           } else if (a.status?.toLowerCase() !== statusFilter) {
             return false;
           }
