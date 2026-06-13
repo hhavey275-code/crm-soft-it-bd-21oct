@@ -769,6 +769,7 @@ export function AdminAdAccounts() {
             <SelectItem value="disabled">Disabled</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="unsettled">Unsettled</SelectItem>
+            <SelectItem value="invalid_or_expired">Invalid / Expired Token</SelectItem>
           </SelectContent>
         </Select>
         <Select value={activityFilter} onValueChange={setActivityFilter}>
