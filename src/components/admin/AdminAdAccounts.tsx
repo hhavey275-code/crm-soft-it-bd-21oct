@@ -393,6 +393,7 @@ export function AdminAdAccounts() {
       const attempted = data?.attempted ?? selectedIds.size;
       const succeeded = data?.succeeded ?? (attempted - failed);
       const autoRetried = data?.auto_retried ?? 0;
+      recordFailedIds(data?.failed_account_ids, Array.from(selectedIds));
       setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
         toast.warning(`⚠️ ${succeeded}/${attempted} updated · ${failed} failed — click Update again to retry`);
