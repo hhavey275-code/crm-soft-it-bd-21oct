@@ -363,6 +363,7 @@ export function AdminAdAccounts() {
       const attempted = data?.attempted ?? unassignedAccounts.length;
       const succeeded = data?.succeeded ?? (attempted - failed);
       const autoRetried = data?.auto_retried ?? 0;
+      recordFailedIds(data?.failed_account_ids, unassignedAccounts.map((a: any) => a.id));
       setLastSyncStatus({ total: attempted, success: succeeded, failed, autoRetried });
       if (failed > 0) {
         toast.warning(`⚠️ ${succeeded}/${attempted} inventory updated · ${failed} failed`);
