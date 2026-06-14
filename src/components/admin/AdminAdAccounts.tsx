@@ -502,7 +502,9 @@ export function AdminAdAccounts() {
   );
 
   const sortedAccounts = useMemo(() => {
-    const base = viewTab === "inventory" ? unassignedAccounts : assignedAccounts;
+    const base = statusFilter === "invalid_or_expired"
+      ? (accounts || [])
+      : viewTab === "inventory" ? unassignedAccounts : assignedAccounts;
     const q = search.toLowerCase();
     return [...base]
       .filter((a: any) => {
@@ -565,7 +567,7 @@ export function AdminAdAccounts() {
         if (valA > valB) return sortDir === "asc" ? 1 : -1;
         return 0;
       });
-  }, [assignedAccounts, unassignedAccounts, viewTab, insights, sortField, sortDir, search, statusFilter, cardFilter, activityFilter, lastFailedIds]);
+  }, [accounts, assignedAccounts, unassignedAccounts, viewTab, insights, sortField, sortDir, search, statusFilter, cardFilter, activityFilter, lastFailedIds]);
 
   const totalPages = Math.max(1, Math.ceil(sortedAccounts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
