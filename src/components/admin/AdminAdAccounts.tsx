@@ -429,8 +429,14 @@ export function AdminAdAccounts() {
       const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
       return await chunkedMetaSync([accountId]);
     },
-    onSuccess: () => {
-      toast.success("Account updated from Meta");
+    onSuccess: (data, accountId) => {
+      const failed = data?.failed_account_ids?.length ?? 0;
+      recordFailedIds(data?.failed_account_ids, [accountId]);
+      if (failed > 0) {
+        toast.warning("Account failed from Meta — added to Invalid / Expired Token filter");
+      } else {
+        toast.success("Account updated from Meta");
+      }
       refetchInsights();
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
