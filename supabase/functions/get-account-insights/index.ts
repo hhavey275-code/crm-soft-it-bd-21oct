@@ -982,6 +982,7 @@ Deno.serve(async (req)=>{
     const rateLimited = [];
     const adAccountUpdates = [];
     const syncErrors = {};
+    const failedAccountIds = new Set();
     // Multi-account batching: pack 10 accounts (~40-50 sub-requests) into a single
     // Meta `?batch=` POST. Group by access token first (Meta requires one token per
     // batch). Process batches with limited concurrency. 320 accounts → ~32 HTTP calls.
@@ -1010,6 +1011,7 @@ Deno.serve(async (req)=>{
     for (const acc of skippedAccounts) {
       insights[acc.id] = { ...EMPTY_INSIGHT };
       syncErrors[acc.id] = "missing or undecryptable BM token";
+      failedAccountIds.add(acc.id);
     }
     // Build the list of (token, accountsBatch) tasks. Each task = ONE Meta HTTP call.
     // Pack: 10 accounts × ~5 sub-req = 50 sub-req per batch (Meta hard limit).
@@ -1053,7 +1055,10 @@ Deno.serve(async (req)=>{
           insights[result.id] = result.insight;
           if (result.rateLimit) { rateLimited.push(result.rateLimit); hitRateLimit = true; }
           if (result.adAccountUpdate) adAccountUpdates.push(result.adAccountUpdate);
-          if (result.syncError) syncErrors[result.id] = result.syncError;
+          if (result.syncError) {
+            syncErrors[result.id] = result.syncError;
+            failedAccountIds.add(result.id);
+          }
         }
       }
     });
@@ -1533,6 +1538,7 @@ Deno.serve(async (req)=>{
     return new Response(JSON.stringify({
       insights,
       rate_limited: rateLimited,
+      failed_account_ids: Array.from(failedAccountIds),
       via: getLastMetaVia(),
       proxy_ip: getLastMetaIp(),
       meta_calls: {

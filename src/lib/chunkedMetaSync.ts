@@ -63,6 +63,13 @@ export async function chunkedMetaSync(
   let metaCalls = 0;
   const total = ids.length;
   let synced = 0;
+  const addFailedAccountIds = (items?: any[]) => {
+    if (!Array.isArray(items)) return;
+    items.forEach((id) => {
+      const value = String(id ?? "").trim();
+      if (value) failedAccountIds.push(value);
+    });
+  };
 
   const buildBody = (chunk: string[]) => {
     const body: any = { ad_account_ids: chunk, source: "meta" };
@@ -89,6 +96,7 @@ export async function chunkedMetaSync(
             if (retry.error) throw retry.error;
             if (retry.data?.insights) Object.assign(allInsights, retry.data.insights);
             if (retry.data?.rate_limited?.length) allRateLimited.push(...retry.data.rate_limited);
+            addFailedAccountIds(retry.data?.failed_account_ids);
             if (retry.data?.meta_calls?.total) metaCalls += Number(retry.data.meta_calls.total) || 0;
             return true;
           }
@@ -96,6 +104,7 @@ export async function chunkedMetaSync(
         }
         if (data?.insights) Object.assign(allInsights, data.insights);
         if (data?.rate_limited?.length) allRateLimited.push(...data.rate_limited);
+        addFailedAccountIds(data?.failed_account_ids);
         if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
         return true;
       } catch (err: any) {
@@ -144,6 +153,7 @@ export async function chunkedMetaSync(
     }
   }
 
+  failedAccountIds = Array.from(new Set(failedAccountIds));
   const failed = failedAccountIds.length;
   const succeeded = total - failed;
 

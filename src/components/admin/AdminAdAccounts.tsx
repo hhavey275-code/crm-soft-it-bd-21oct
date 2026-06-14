@@ -120,6 +120,15 @@ export function AdminAdAccounts() {
       return next;
     });
   };
+  const isInvalidOrExpiredAccount = (account: any) => {
+    const bm: any = Array.isArray(account.business_managers) ? account.business_managers[0] : account.business_managers;
+    const tokenExp = bm?.token_expires_at ? new Date(bm.token_expires_at).getTime() : null;
+    return account.meta_account_status === 101
+      || (tokenExp !== null && tokenExp < Date.now())
+      || !bm?.access_token
+      || !!(bm && bm.status && bm.status !== "active")
+      || lastFailedIds.has(account.id);
+  };
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem("adAccountsStatusFilter") || "all");
@@ -420,8 +429,14 @@ export function AdminAdAccounts() {
       const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
       return await chunkedMetaSync([accountId]);
     },
-    onSuccess: () => {
-      toast.success("Account updated from Meta");
+    onSuccess: (data, accountId) => {
+      const failed = data?.failed_account_ids?.length ?? 0;
+      recordFailedIds(data?.failed_account_ids, [accountId]);
+      if (failed > 0) {
+        toast.warning("Account failed from Meta — added to Invalid / Expired Token filter");
+      } else {
+        toast.success("Account updated from Meta");
+      }
       refetchInsights();
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
@@ -494,14 +509,7 @@ export function AdminAdAccounts() {
         if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
         if (statusFilter !== "all") {
           if (statusFilter === "invalid_or_expired") {
-            const bm: any = Array.isArray(a.business_managers) ? a.business_managers[0] : a.business_managers;
-            const tokenExp = bm?.token_expires_at ? new Date(bm.token_expires_at).getTime() : null;
-            const tokenExpired = tokenExp !== null && tokenExp < Date.now();
-            const tokenMissing = !bm?.access_token;
-            const bmInactive = bm && bm.status && bm.status !== "active";
-            const metaInvalid = a.meta_account_status === 101;
-            const syncFailed = lastFailedIds.has(a.id);
-            if (!(metaInvalid || tokenExpired || tokenMissing || bmInactive || syncFailed)) return false;
+            if (!isInvalidOrExpiredAccount(a)) return false;
           } else if (a.status?.toLowerCase() !== statusFilter) {
             return false;
           }
@@ -557,7 +565,7 @@ export function AdminAdAccounts() {
         if (valA > valB) return sortDir === "asc" ? 1 : -1;
         return 0;
       });
-  }, [assignedAccounts, unassignedAccounts, viewTab, insights, sortField, sortDir, search, statusFilter, cardFilter, activityFilter]);
+  }, [assignedAccounts, unassignedAccounts, viewTab, insights, sortField, sortDir, search, statusFilter, cardFilter, activityFilter, lastFailedIds]);
 
   const totalPages = Math.max(1, Math.ceil(sortedAccounts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
