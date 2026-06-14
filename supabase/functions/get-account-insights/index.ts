@@ -1538,6 +1538,7 @@ Deno.serve(async (req)=>{
     return new Response(JSON.stringify({
       insights,
       rate_limited: rateLimited,
+      failed_account_ids: Array.from(failedAccountIds),
       via: getLastMetaVia(),
       proxy_ip: getLastMetaIp(),
       meta_calls: {
