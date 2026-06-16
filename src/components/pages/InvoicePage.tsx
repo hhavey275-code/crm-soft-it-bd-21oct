@@ -253,34 +253,44 @@ export default function InvoicePage() {
                 </div>
               </div>
 
-              <div style={{ width: "220px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px" }}>
-                  <span style={{ color: "#666" }}>Sub Total:</span>
-                  <span style={{ color: "#333", fontWeight: 500 }}>
-                    ${Number(invoice.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", borderBottom: "1px solid #ddd" }}>
-                  <span style={{ color: "#666" }}>Tax:</span>
-                  <span style={{ color: "#333", fontWeight: 500 }}>0.00%</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "10px 12px",
-                    marginTop: "6px",
-                    background: accentLight,
-                    border: `2px solid ${accent}`,
-                    borderRadius: "4px",
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: 700, color: accent }}>Total:</span>
-                  <span style={{ fontSize: "16px", fontWeight: 700, color: accent }}>
-                    ${Number(invoice.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+              <div style={{ width: "240px" }}>
+                {(() => {
+                  const usdQty = Number(invoice.amount) || 0;
+                  const rate = Number(invoice.usd_rate) || 0;
+                  const bdtTotal = Number(invoice.bdt_amount) || usdQty * rate;
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px" }}>
+                        <span style={{ color: "#666" }}>Sub Total:</span>
+                        <span style={{ color: "#333", fontWeight: 500 }}>
+                          ৳{bdtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", borderBottom: "1px solid #ddd" }}>
+                        <span style={{ color: "#666" }}>Tax:</span>
+                        <span style={{ color: "#333", fontWeight: 500 }}>0.00%</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          marginTop: "6px",
+                          background: accentLight,
+                          border: `2px solid ${accent}`,
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: accent }}>Total:</span>
+                        <span style={{ fontSize: "16px", fontWeight: 700, color: accent }}>
+                          ৳{bdtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
+
             </div>
 
             {/* Signature */}
