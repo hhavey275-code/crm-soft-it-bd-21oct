@@ -293,17 +293,12 @@ export default function InvoicePage() {
 
             </div>
 
-            {/* Signature */}
+            {/* System generated note */}
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "32px" }}>
-              <div style={{ textAlign: "center" }}>
-                <img
-                  src="/images/ceo-signature.png"
-                  alt="Authorized Signature"
-                  style={{ height: "48px", objectFit: "contain", marginBottom: "4px" }}
-                />
-                <div style={{ borderTop: "1px solid #999", paddingTop: "4px", minWidth: "160px" }}>
-                  <p style={{ fontSize: "11px", fontWeight: 600, color: "#333", margin: 0 }}>Authorised Sign</p>
-                </div>
+              <div style={{ textAlign: "center", minWidth: "220px" }}>
+                <p style={{ fontSize: "11px", fontStyle: "italic", color: "#666", margin: 0 }}>
+                  This is a system generated invoice. No signature required.
+                </p>
               </div>
             </div>
 
