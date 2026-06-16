@@ -3554,6 +3554,7 @@ export type Database = {
           payment_reference: string | null
           proof_url: string | null
           reviewed_by: string | null
+          sheet_bill_bdt: number | null
           status: string
           telegram_forward_error: string | null
           telegram_forwarded: boolean | null
@@ -3563,6 +3564,7 @@ export type Database = {
           usd_rate: number | null
           user_id: string
           verify_attempts: number
+          wallet_due_paid_bdt: number | null
         }
         Insert: {
           ad_account_id?: string | null
@@ -3579,6 +3581,7 @@ export type Database = {
           payment_reference?: string | null
           proof_url?: string | null
           reviewed_by?: string | null
+          sheet_bill_bdt?: number | null
           status?: string
           telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
@@ -3588,6 +3591,7 @@ export type Database = {
           usd_rate?: number | null
           user_id: string
           verify_attempts?: number
+          wallet_due_paid_bdt?: number | null
         }
         Update: {
           ad_account_id?: string | null
@@ -3604,6 +3608,7 @@ export type Database = {
           payment_reference?: string | null
           proof_url?: string | null
           reviewed_by?: string | null
+          sheet_bill_bdt?: number | null
           status?: string
           telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
@@ -3613,6 +3618,7 @@ export type Database = {
           usd_rate?: number | null
           user_id?: string
           verify_attempts?: number
+          wallet_due_paid_bdt?: number | null
         }
         Relationships: [
           {
