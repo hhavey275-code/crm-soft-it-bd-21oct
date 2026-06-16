@@ -535,9 +535,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Card bill deduction
+    // Card bill + wallet-due deduction (Kafela / Holy Gift style clients with a sheet due row)
+    // Order: wallet due (negative balance) cleared first → then sheet/card bill → remainder to wallet as USD
     let finalUsdAmount = Number(amount);
     let cardBillDeducted = 0;
+    let walletDuePaidBdt = 0;
     try {
       const { data: pendingBill } = await supabase
         .from('card_bills')
@@ -548,28 +550,58 @@ Deno.serve(async (req) => {
         .limit(1)
         .single();
       if (pendingBill && pendingBill.due_amount_bdt > 0 && bdtNum > 0) {
-        const dueBdt = Number(pendingBill.due_amount_bdt);
-        const deductBdt = Math.min(dueBdt, bdtNum);
-        cardBillDeducted = deductBdt;
-        const remainingBdt = bdtNum - deductBdt;
         const usdRate = Number(request.usd_rate) || 1;
-        finalUsdAmount = remainingBdt / usdRate;
+
+        // Step 1: clear wallet due (negative balance) first
+        const { data: walletRow } = await supabase
+          .from('wallets').select('balance').eq('user_id', user_id).single();
+        const curBal = Number(walletRow?.balance ?? 0);
+        let remainingBdt = bdtNum;
+        if (curBal < 0) {
+          const dueBdtFull = Math.abs(curBal) * usdRate;
+          walletDuePaidBdt = Math.min(dueBdtFull, remainingBdt);
+          remainingBdt -= walletDuePaidBdt;
+        }
+
+        // Step 2: sheet/card bill from whatever BDT remains
+        const dueBdt = Number(pendingBill.due_amount_bdt);
+        const deductBdt = Math.min(dueBdt, remainingBdt);
+        cardBillDeducted = deductBdt;
+        remainingBdt -= deductBdt;
+
+        // Step 3: wallet credit in USD = (wallet-due portion + remainder) / rate
+        // Wallet-due portion still credited as USD so the wallet add naturally clears the negative balance.
+        finalUsdAmount = (remainingBdt + walletDuePaidBdt) / usdRate;
+
         const newDue = dueBdt - deductBdt;
         await supabase.from('card_bills').update({ due_amount_bdt: newDue, status: newDue <= 0 ? 'paid' : 'pending', updated_at: new Date().toISOString() }).eq('id', pendingBill.id);
+
+        // Persist the BDT split on the top-up request for the invoice
         try {
-          let clientName = '';
+          await supabase.from('top_up_requests').update({
+            sheet_bill_bdt: cardBillDeducted,
+            wallet_due_paid_bdt: walletDuePaidBdt,
+          } as any).eq('id', request_id);
+        } catch (persistErr) {
+          console.error('persist sheet_bill_bdt failed (non-blocking):', persistErr);
+        }
+
+        if (deductBdt > 0) {
           try {
-            const { data: cp } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
-            clientName = cp?.full_name || cp?.email || '';
-          } catch {}
-          const syncUrl = `${supabaseUrl}/functions/v1/sync-card-bills`;
-          await fetch(syncUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'write_payment', user_id, amount_bdt: deductBdt, client_name: clientName }),
-          });
-        } catch (sheetErr) {
-          console.error('sync-card-bills call failed (non-blocking):', sheetErr);
+            let clientName = '';
+            try {
+              const { data: cp } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
+              clientName = cp?.full_name || cp?.email || '';
+            } catch {}
+            const syncUrl = `${supabaseUrl}/functions/v1/sync-card-bills`;
+            await fetch(syncUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'write_payment', user_id, amount_bdt: deductBdt, client_name: clientName }),
+            });
+          } catch (sheetErr) {
+            console.error('sync-card-bills call failed (non-blocking):', sheetErr);
+          }
         }
       }
     } catch (billErr: any) {
