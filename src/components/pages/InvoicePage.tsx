@@ -194,25 +194,37 @@ export default function InvoicePage() {
                   const usdQty = Number(invoice.amount) || 0;
                   const rate = Number(invoice.usd_rate) || 0;
                   const bdtTotal = Number(invoice.bdt_amount) || usdQty * rate;
+                  const metaBdt = usdQty * rate;
+                  const sheetBill = Math.max(0, bdtTotal - metaBdt);
+                  const hasSheet = sheetBill > 0.5;
+                  const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
+                  if (usdQty > 0) {
+                    rows.push({
+                      desc: "Meta Advertising",
+                      rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                      qty: usdQty.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                      total: metaBdt,
+                    });
+                  }
+                  if (hasSheet) {
+                    rows.push({ desc: "Sheet Bill Adjustment", rate: "—", qty: "—", total: sheetBill });
+                  }
+                  const padCount = Math.max(0, 4 - rows.length);
                   return (
                     <>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontSize: "13px", color: "#444" }}>1</td>
-                        <td style={{ padding: "12px", fontSize: "13px", color: "#333", fontWeight: 500 }}>
-                          Meta Advertising
-                        </td>
-                        <td style={{ padding: "12px", fontSize: "13px", color: "#444", textAlign: "right" }}>
-                          ৳{rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td style={{ padding: "12px", fontSize: "13px", color: "#444", textAlign: "right" }}>
-                          {usdQty.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td style={{ padding: "12px", fontSize: "13px", color: "#111", fontWeight: 600, textAlign: "right" }}>
-                          ৳{bdtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                      {[...Array(3)].map((_, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
+                      {rows.map((r, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid #eee" }}>
+                          <td style={{ padding: "12px", fontSize: "13px", color: "#444" }}>{idx + 1}</td>
+                          <td style={{ padding: "12px", fontSize: "13px", color: "#333", fontWeight: 500 }}>{r.desc}</td>
+                          <td style={{ padding: "12px", fontSize: "13px", color: "#444", textAlign: "right" }}>{r.rate}</td>
+                          <td style={{ padding: "12px", fontSize: "13px", color: "#444", textAlign: "right" }}>{r.qty}</td>
+                          <td style={{ padding: "12px", fontSize: "13px", color: "#111", fontWeight: 600, textAlign: "right" }}>
+                            ৳{r.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                      {[...Array(padCount)].map((_, i) => (
+                        <tr key={`pad-${i}`} style={{ borderBottom: "1px solid #eee" }}>
                           <td style={{ padding: "12px", fontSize: "13px", color: "#ccc" }}>&nbsp;</td>
                           <td style={{ padding: "12px" }}>&nbsp;</td>
                           <td style={{ padding: "12px" }}>&nbsp;</td>
