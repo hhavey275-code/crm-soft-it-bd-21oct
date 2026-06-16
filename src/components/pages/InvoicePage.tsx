@@ -195,9 +195,24 @@ export default function InvoicePage() {
                   const rate = Number(invoice.usd_rate) || 0;
                   const bdtTotal = Number(invoice.bdt_amount) || usdQty * rate;
                   const metaBdt = usdQty * rate;
-                  const sheetBill = Math.max(0, bdtTotal - metaBdt);
+
+                  // Prefer stored split (kafela/holy gift after upgrade); fall back to derivation.
+                  const storedSheet = Number((request as any)?.sheet_bill_bdt ?? 0);
+                  const storedWalletDue = Number((request as any)?.wallet_due_paid_bdt ?? 0);
+                  const hasStored = storedSheet > 0.5 || storedWalletDue > 0.5;
+
+                  const sheetBill = hasStored ? storedSheet : Math.max(0, bdtTotal - metaBdt);
+                  const walletDue = hasStored ? storedWalletDue : 0;
                   const hasSheet = sheetBill > 0.5;
+                  const hasWalletDue = walletDue > 0.5;
+
                   const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
+                  if (hasWalletDue) {
+                    rows.push({ desc: "Wallet Due Payment", rate: "—", qty: "—", total: walletDue });
+                  }
+                  if (hasSheet) {
+                    rows.push({ desc: "Sheet Bill Adjustment", rate: "—", qty: "—", total: sheetBill });
+                  }
                   if (usdQty > 0) {
                     rows.push({
                       desc: "Meta Advertising",
@@ -205,9 +220,6 @@ export default function InvoicePage() {
                       qty: usdQty.toLocaleString(undefined, { minimumFractionDigits: 2 }),
                       total: metaBdt,
                     });
-                  }
-                  if (hasSheet) {
-                    rows.push({ desc: "Sheet Bill Adjustment", rate: "—", qty: "—", total: sheetBill });
                   }
                   const padCount = Math.max(0, 4 - rows.length);
                   return (
