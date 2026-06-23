@@ -624,20 +624,51 @@ export function AdminTopUp() {
           throw new Error("This request was already credited to the wallet (duplicate prevention). Refresh the page.");
         }
 
-        // Check for pending card bills and auto-deduct
+        // Wallet-due first → Sheet/card bill → remainder to wallet (mirror of verify-topup logic).
+        // Kafela / Holy Gift style: if wallet balance is negative (CRM due), clear that BEFORE deducting sheet bill.
         try {
           const { data: cardBill } = await (supabase as any).from("card_bills").select("*").eq("user_id", userId).eq("status", "pending").limit(1);
-          if (cardBill && cardBill.length > 0 && Number(cardBill[0].due_amount_bdt) > 0) {
+          const hasBill = cardBill && cardBill.length > 0 && Number(cardBill[0].due_amount_bdt) > 0;
+          const totalBdt = Number(actionDialog?.bdtAmount || 0);
+          const rate = Number(actionDialog?.usdRate || 1);
+          if (hasBill && totalBdt > 0) {
+            // Step 1: clear wallet due (negative balance) first
+            const { data: walletRow } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
+            const curBal = Number(walletRow?.balance ?? 0);
+            let remainingBdt = totalBdt;
+            let walletDuePaidBdt = 0;
+            if (curBal < 0) {
+              const dueBdtFull = Math.abs(curBal) * rate;
+              walletDuePaidBdt = Math.min(dueBdtFull, remainingBdt);
+              remainingBdt -= walletDuePaidBdt;
+            }
+
+            // Step 2: sheet/card bill from whatever BDT remains
             const dueBdt = Number(cardBill[0].due_amount_bdt);
-            const totalBdt = Number(actionDialog?.bdtAmount || 0);
-            const rate = Number(actionDialog?.usdRate || 1);
-            if (totalBdt > 0 && dueBdt > 0) {
-              const deductBdt = Math.min(dueBdt, totalBdt);
-              const remainingBdt = totalBdt - deductBdt;
-              finalAmount = remainingBdt / rate;
-              
-              // Mark card bill as paid and write to Google Sheet
-              await (supabase as any).from("card_bills").update({ status: "paid", due_amount_bdt: 0 }).eq("id", cardBill[0].id);
+            const deductBdt = Math.min(dueBdt, remainingBdt);
+            remainingBdt -= deductBdt;
+
+            // Step 3: wallet credit USD = (wallet-due portion + remainder) / rate
+            finalAmount = (remainingBdt + walletDuePaidBdt) / rate;
+
+            const newDue = dueBdt - deductBdt;
+            await (supabase as any).from("card_bills").update({
+              status: newDue <= 0 ? "paid" : "pending",
+              due_amount_bdt: newDue,
+              updated_at: new Date().toISOString(),
+            }).eq("id", cardBill[0].id);
+
+            // Persist BDT split on the top-up request for the invoice
+            try {
+              await (supabase as any).from("top_up_requests").update({
+                sheet_bill_bdt: deductBdt,
+                wallet_due_paid_bdt: walletDuePaidBdt,
+              }).eq("id", id);
+            } catch (persistErr) {
+              console.error("persist sheet_bill_bdt failed (non-blocking):", persistErr);
+            }
+
+            if (deductBdt > 0) {
               try {
                 let clientName = "";
                 try {
