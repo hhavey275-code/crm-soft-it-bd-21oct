@@ -194,31 +194,49 @@ export default function InvoicePage() {
                   const usdQty = Number(invoice.amount) || 0;
                   const rate = Number(invoice.usd_rate) || 0;
                   const bdtTotal = Number(invoice.bdt_amount) || usdQty * rate;
-                  const metaBdt = usdQty * rate;
 
                   // Prefer stored split (kafela/holy gift after upgrade); fall back to derivation.
                   const storedSheet = Number((request as any)?.sheet_bill_bdt ?? 0);
                   const storedWalletDue = Number((request as any)?.wallet_due_paid_bdt ?? 0);
                   const hasStored = storedSheet > 0.5 || storedWalletDue > 0.5;
 
-                  const sheetBill = hasStored ? storedSheet : Math.max(0, bdtTotal - metaBdt);
+                  const sheetBill = hasStored ? storedSheet : Math.max(0, bdtTotal - usdQty * rate);
                   const walletDue = hasStored ? storedWalletDue : 0;
                   const hasSheet = sheetBill > 0.5;
                   const hasWalletDue = walletDue > 0.5;
 
+                  // Real remainder credited as NEW wallet funds (Meta Ads) =
+                  // total - wallet-due-cleared - sheet. Only show Meta row when this > 0.
+                  const remainderBdt = Math.max(0, bdtTotal - walletDue - sheetBill);
+                  const remainderUsd = rate > 0 ? remainderBdt / rate : 0;
+                  const walletDueUsd = rate > 0 ? walletDue / rate : 0;
+
                   const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
                   if (hasWalletDue) {
-                    rows.push({ desc: "Wallet Due Payment", rate: "—", qty: "—", total: walletDue });
+                    rows.push({
+                      desc: "Wallet Due Payment",
+                      rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                      qty: walletDueUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                      total: walletDue,
+                    });
                   }
                   if (hasSheet) {
                     rows.push({ desc: "Sheet Bill Adjustment", rate: "—", qty: "—", total: sheetBill });
                   }
-                  if (usdQty > 0) {
+                  if (remainderBdt > 0.5 && remainderUsd > 0) {
+                    rows.push({
+                      desc: "Meta Advertising",
+                      rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                      qty: remainderUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                      total: remainderBdt,
+                    });
+                  } else if (!hasStored && usdQty > 0) {
+                    // Legacy invoices (no stored split, no sheet/walletDue) — show full meta row.
                     rows.push({
                       desc: "Meta Advertising",
                       rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
                       qty: usdQty.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                      total: metaBdt,
+                      total: usdQty * rate,
                     });
                   }
                   const padCount = Math.max(0, 4 - rows.length);
