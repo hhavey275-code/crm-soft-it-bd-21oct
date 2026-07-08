@@ -166,6 +166,18 @@ export default function ClientDetailPage() {
     },
   });
 
+  const { data: globalDelta = 0 } = useQuery({
+    queryKey: ["global-rate-delta"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "global_rate_delta")
+        .maybeSingle();
+      return Number(data?.value ?? 0) || 0;
+    },
+  });
+
   const { data: wallet } = useQuery({
     queryKey: ["client-detail-wallet", userId],
     queryFn: async () => {
@@ -1358,14 +1370,14 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
 
-                  {/* USD Rate */}
+                  {/* Default USD Rate (editable — client's onboarding rate / floor) */}
                   <div className="flex items-center gap-3 rounded-xl border border-cyan-200/60 bg-cyan-50/40 dark:bg-cyan-950/20 dark:border-cyan-800/40 p-4 transition-colors hover:bg-cyan-50/60">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10">
                       <DollarSign className="h-4 w-4 text-cyan-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                        USD Rate
+                        Default Rate (floor)
                       </p>
                       {editingRate ? (
                         <div className="flex items-center gap-1 mt-1">
@@ -1375,15 +1387,19 @@ export default function ClientDetailPage() {
                             className="w-20 h-7 text-sm"
                             value={rateInput}
                             onChange={(e) => setRateInput(e.target.value)}
-                            placeholder="e.g. 125"
+                            placeholder="e.g. 129"
                           />
                           <Button
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => {
-                              saveProfileMutation.mutate({
-                                usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput),
-                              });
+                              const parsed = rateInput.trim() === "" ? null : parseFloat(rateInput);
+                              const fields: Record<string, any> = { default_usd_rate: parsed };
+                              // Keep effective rate in sync: usd_rate = default + global delta
+                              if (parsed !== null && !isNaN(parsed)) {
+                                fields.usd_rate = parsed + Number(globalDelta || 0);
+                              }
+                              saveProfileMutation.mutate(fields);
                               setEditingRate(false);
                             }}
                           >
@@ -1402,13 +1418,36 @@ export default function ClientDetailPage() {
                         <p
                           className="font-semibold text-sm text-cyan-700 dark:text-cyan-400 cursor-pointer hover:text-cyan-500 transition-colors"
                           onClick={() => {
-                            setRateInput(clientRate?.toString() ?? "");
+                            setRateInput(
+                              (profile as any)?.default_usd_rate?.toString() ??
+                                clientRate?.toString() ??
+                                "",
+                            );
                             setEditingRate(true);
                           }}
                         >
-                          {clientRate ? `৳${clientRate}` : `Global (৳${globalRate})`}
+                          {(profile as any)?.default_usd_rate
+                            ? `৳${(profile as any).default_usd_rate}`
+                            : clientRate
+                              ? `৳${clientRate}`
+                              : `Global (৳${globalRate})`}
                         </p>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Effective USD Rate (read-only = default + global delta) */}
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-200/60 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-800/40 p-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                      <DollarSign className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Current Rate {Number(globalDelta) > 0 ? `(+${globalDelta} ৳)` : ""}
+                      </p>
+                      <p className="font-semibold text-sm text-emerald-700 dark:text-emerald-400">
+                        {clientRate ? `৳${clientRate}` : "—"}
+                      </p>
                     </div>
                   </div>
 
