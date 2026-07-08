@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,6 +189,17 @@ export default function ClientDetailPage() {
     },
     enabled: !!userId,
   });
+
+  const [adAccountSearch, setAdAccountSearch] = useState("");
+  const filteredAdAccounts = useMemo(() => {
+    const q = adAccountSearch.trim().toLowerCase();
+    if (!q) return adAccounts ?? [];
+    return (adAccounts ?? []).filter((a: any) => {
+      const name = String(a.account_name ?? "").toLowerCase();
+      const id = String(a.account_id ?? "").toLowerCase();
+      return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
+    });
+  }, [adAccounts, adAccountSearch]);
 
   const { data: allAdAccounts } = useQuery({
     queryKey: ["all-ad-accounts-for-assign"],
@@ -621,7 +632,7 @@ export default function ClientDetailPage() {
   // --- Mobile Ad Account Cards ---
   const renderMobileAdAccountCards = () => (
     <div className="space-y-3">
-      {adAccounts?.map((acc: any) => {
+      {filteredAdAccounts?.map((acc: any) => {
         const ins = insights?.[acc.id];
 
         return (
@@ -788,8 +799,10 @@ export default function ClientDetailPage() {
           </Card>
         );
       })}
-      {(!adAccounts || adAccounts.length === 0) && (
-        <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
+      {(!filteredAdAccounts || filteredAdAccounts.length === 0) && (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          {adAccountSearch ? "No accounts match your search" : "No ad accounts assigned"}
+        </p>
       )}
     </div>
   );
@@ -2090,14 +2103,25 @@ export default function ClientDetailPage() {
                 </div>
               </div>
 
+              {/* Search bar for ad accounts */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={adAccountSearch}
+                  onChange={(e) => setAdAccountSearch(e.target.value)}
+                  placeholder="Search ad account by name or ID..."
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+
               {isMobile ? (
                 renderMobileAdAccountCards()
               ) : (
                 <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                   <CardContent className="p-0">
-                    {adAccounts?.length === 0 ? (
+                    {filteredAdAccounts?.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-6 text-center">
-                        No ad accounts assigned
+                        {adAccountSearch ? "No accounts match your search" : "No ad accounts assigned"}
                       </p>
                     ) : (
                       <div className="overflow-x-auto">
@@ -2108,17 +2132,17 @@ export default function ClientDetailPage() {
                                 <TableHead className="w-[40px]">
                                   <Checkbox
                                     checked={
-                                      (adAccounts?.length ?? 0) > 0 &&
-                                      adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))
+                                      (filteredAdAccounts?.length ?? 0) > 0 &&
+                                      filteredAdAccounts?.every((a: any) => unassignSelectedIds.has(a.id))
                                     }
                                     onCheckedChange={() => {
                                       if (
-                                        adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))
+                                        filteredAdAccounts?.every((a: any) => unassignSelectedIds.has(a.id))
                                       )
                                         setUnassignSelectedIds(new Set());
                                       else
                                         setUnassignSelectedIds(
-                                          new Set(adAccounts?.map((a: any) => a.id)),
+                                          new Set(filteredAdAccounts?.map((a: any) => a.id)),
                                         );
                                     }}
                                   />
@@ -2151,7 +2175,7 @@ export default function ClientDetailPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {adAccounts?.map((acc: any) => {
+                            {filteredAdAccounts?.map((acc: any) => {
                               const ins = insights?.[acc.id];
                               return (
                                 <TableRow
