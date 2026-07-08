@@ -21,7 +21,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchSpendOnly, type RateLimitedDetail } from "@/lib/fetchSpendOnly";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
-import { GlobalRateControl } from "./GlobalRateControl";
 
 
 const DATE_PRESETS = [
@@ -562,8 +561,6 @@ export function AdminDashboard() {
 
 
       {/* License Status Widget (Tenant Mode) */}
-      <GlobalRateControl />
-
       {isTenantMode && effectiveLicense && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
