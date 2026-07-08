@@ -632,7 +632,7 @@ export default function ClientDetailPage() {
   // --- Mobile Ad Account Cards ---
   const renderMobileAdAccountCards = () => (
     <div className="space-y-3">
-      {adAccounts?.map((acc: any) => {
+      {filteredAdAccounts?.map((acc: any) => {
         const ins = insights?.[acc.id];
 
         return (
@@ -799,8 +799,10 @@ export default function ClientDetailPage() {
           </Card>
         );
       })}
-      {(!adAccounts || adAccounts.length === 0) && (
-        <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
+      {(!filteredAdAccounts || filteredAdAccounts.length === 0) && (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          {adAccountSearch ? "No accounts match your search" : "No ad accounts assigned"}
+        </p>
       )}
     </div>
   );
