@@ -166,6 +166,18 @@ export default function ClientDetailPage() {
     },
   });
 
+  const { data: globalDelta = 0 } = useQuery({
+    queryKey: ["global-rate-delta"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "global_rate_delta")
+        .maybeSingle();
+      return Number(data?.value ?? 0) || 0;
+    },
+  });
+
   const { data: wallet } = useQuery({
     queryKey: ["client-detail-wallet", userId],
     queryFn: async () => {
