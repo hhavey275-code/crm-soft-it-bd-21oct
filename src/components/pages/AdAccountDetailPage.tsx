@@ -24,7 +24,6 @@ import { useCampaignManagementAccess } from "@/hooks/useCampaignManagementAccess
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 // AdAccountSyncedCards removed — cards already shown in Payment Methods section below.
-import { LiveBillingData } from "@/components/admin/LiveBillingData";
 import { CardHistoryTimeline } from "@/components/admin/CardHistoryTimeline";
 import { HackRecoveryPanel } from "@/components/admin/HackRecoveryPanel";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
@@ -573,20 +572,6 @@ export default function AdAccountDetailPage() {
             size={isMobile ? "xs" : "default"}
           />
         </div>
-
-        {/* === Cards on file (account-recovery view) ===
-            DSL / Live Billing removed (extension data unreliable for those).
-            We KEEP cards: extension passively captures default + backup card
-            last-4 when admin opens the Meta billing page, so if account access
-            is lost, last-4 is recoverable from CRM. */}
-        {!isTikTok && id && (
-          <div className="space-y-2">
-            <LiveBillingData adAccountId={id} metaAccountId={account.account_id} />
-            <p className="text-[11px] text-muted-foreground px-1">
-              Live billing (hidden daily limit, threshold, balance) is synced via the Chrome extension when an admin opens this account's Meta billing page.
-            </p>
-          </div>
-        )}
 
         {/* === Critical Alerts (full-width, top) === */}
         {isAdmin && isTikTok && account.fraud_flag && (
