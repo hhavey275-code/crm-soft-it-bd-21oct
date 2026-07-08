@@ -968,8 +968,8 @@ export function AdminAdAccounts() {
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
-                          <ExternalLink className="h-3 w-3" />
+                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1 -m-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
+                          <ExternalLink className="h-5 w-5" />
                         </a>
                         {a.platform !== "tiktok" && (
                           <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="Old Billing Link">
@@ -1185,8 +1185,8 @@ export function AdminAdAccounts() {
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
                             <div className="mt-0.5 flex items-center gap-1.5">
                               <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                              <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
-                                <ExternalLink className="h-3 w-3" />
+                              <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1 -m-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="New Billing">
+                                <ExternalLink className="h-5 w-5" />
                               </a>
                               {a.platform !== "tiktok" && (
                                 <a href={`https://business.facebook.com/billing_hub/payment_settings/?placement=ads_manager&asset_id=${a.account_id.replace(/^act_/, '')}&payment_account_id_from_jsmodule=${a.account_id.replace(/^act_/, '')}&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin&payment_account_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary border border-border rounded px-1" onClick={(e) => { e.stopPropagation(); recordBillingVisit(a.id, a.account_name); }} title="Old Billing Link">
