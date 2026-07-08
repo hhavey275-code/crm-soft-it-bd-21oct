@@ -190,6 +190,17 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  const [adAccountSearch, setAdAccountSearch] = useState("");
+  const filteredAdAccounts = useMemo(() => {
+    const q = adAccountSearch.trim().toLowerCase();
+    if (!q) return adAccounts ?? [];
+    return (adAccounts ?? []).filter((a: any) => {
+      const name = String(a.account_name ?? "").toLowerCase();
+      const id = String(a.account_id ?? "").toLowerCase();
+      return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
+    });
+  }, [adAccounts, adAccountSearch]);
+
   const { data: allAdAccounts } = useQuery({
     queryKey: ["all-ad-accounts-for-assign"],
     queryFn: async () => {
