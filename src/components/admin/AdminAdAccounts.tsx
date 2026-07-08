@@ -164,30 +164,6 @@ export function AdminAdAccounts() {
     if (cardFilter !== "all") setCardFilter("all");
     if (activityFilter !== "all") setActivityFilter("all");
   };
-
-  // When a jump is pending, move to the correct page and scroll to the row once rendered
-  useEffect(() => {
-    const id = pendingJumpRef.current;
-    if (!id) return;
-    const idx = sortedAccounts.findIndex((a: any) => a.id === id);
-    if (idx < 0) return; // filters/tab still updating
-    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
-    if (targetPage !== currentPage) {
-      setCurrentPage(targetPage);
-      return;
-    }
-    // On correct page — wait a tick for DOM, then scroll
-    const t = setTimeout(() => {
-      const el = document.querySelector(`[data-account-row="${id}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        setFlashAccountId(id);
-        setTimeout(() => setFlashAccountId(null), 2000);
-      }
-      pendingJumpRef.current = null;
-    }, 50);
-    return () => clearTimeout(t);
-  }, [sortedAccounts, currentPage]);
   useEffect(() => { sessionStorage.setItem("adAccountsSortField", sortField); }, [sortField]);
   useEffect(() => { sessionStorage.setItem("adAccountsSortDir", sortDir); }, [sortDir]);
   useEffect(() => { sessionStorage.setItem("adAccountsStatusFilter", statusFilter); }, [statusFilter]);
