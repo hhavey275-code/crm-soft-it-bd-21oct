@@ -46,9 +46,27 @@ export function CardDueBox({ userId, size = "default", className }: CardDueBoxPr
     enabled: !!userId && hasConfig === true,
   });
 
+  // Fetch wallet balance + usd_rate to compute total due (card + wallet in BDT)
+  const { data: walletInfo } = useQuery({
+    queryKey: ["card-due-wallet-info", userId],
+    queryFn: async () => {
+      const [{ data: w }, { data: p }] = await Promise.all([
+        supabase.from("wallets").select("balance").eq("user_id", userId).maybeSingle(),
+        supabase.from("profiles").select("usd_rate").eq("user_id", userId).maybeSingle(),
+      ]);
+      return {
+        balance: Number((w as any)?.balance ?? 0),
+        rate: Number((p as any)?.usd_rate ?? 0),
+      };
+    },
+    enabled: !!userId && hasConfig === true,
+  });
+
   if (!hasConfig) return null;
 
   const dueAmount = Number(cardBill?.due_amount_bdt ?? 0);
+  const walletBdt = Number(walletInfo?.balance ?? 0) * Number(walletInfo?.rate ?? 0);
+  const totalDue = dueAmount + walletBdt;
   const lastSynced = cardBill?.last_synced_at
     ? new Date(cardBill.last_synced_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -98,13 +116,30 @@ export function CardDueBox({ userId, size = "default", className }: CardDueBoxPr
             )}>
               Card Due Bill
             </p>
-            <p className={cn(
-              "font-extrabold tracking-tight leading-snug mt-0.5",
-              isSmall ? "text-lg" : "text-xl",
-              dueAmount > 0 ? "text-warning" : "text-success"
-            )}>
-              ৳{dueAmount.toLocaleString()}
-            </p>
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 mt-0.5">
+              <p className={cn(
+                "font-extrabold tracking-tight leading-snug",
+                isSmall ? "text-lg" : "text-xl",
+                dueAmount > 0 ? "text-warning" : "text-success"
+              )}>
+                ৳{dueAmount.toLocaleString()}
+              </p>
+              <div className="flex items-baseline gap-1.5">
+                <span className={cn(
+                  "font-semibold uppercase tracking-wider text-muted-foreground/70",
+                  isSmall ? "text-[9px]" : "text-[10px]"
+                )}>
+                  Total Due
+                </span>
+                <span className={cn(
+                  "font-bold tracking-tight",
+                  isSmall ? "text-sm" : "text-base",
+                  totalDue > 0 ? "text-warning" : "text-success"
+                )}>
+                  ৳{totalDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
             {lastSynced && (
               <p className="text-[10px] text-muted-foreground/60 mt-0.5">
                 Synced: {lastSynced}
