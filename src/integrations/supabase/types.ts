@@ -2005,6 +2005,7 @@ export type Database = {
           color_theme: string
           company: string | null
           created_at: string
+          default_usd_rate: number | null
           due_limit: number | null
           due_limit_expires_at: string | null
           due_limit_set_at: string | null
@@ -2030,6 +2031,7 @@ export type Database = {
           color_theme?: string
           company?: string | null
           created_at?: string
+          default_usd_rate?: number | null
           due_limit?: number | null
           due_limit_expires_at?: string | null
           due_limit_set_at?: string | null
@@ -2055,6 +2057,7 @@ export type Database = {
           color_theme?: string
           company?: string | null
           created_at?: string
+          default_usd_rate?: number | null
           due_limit?: number | null
           due_limit_expires_at?: string | null
           due_limit_set_at?: string | null
@@ -3838,6 +3841,10 @@ export type Database = {
           p_reason: string
           p_tenant_id: string
         }
+        Returns: Json
+      }
+      apply_global_rate_delta: {
+        Args: { p_new_delta: number; p_reason?: string }
         Returns: Json
       }
       apply_tenant_usage: {
