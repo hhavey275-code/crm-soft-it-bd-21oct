@@ -66,7 +66,8 @@ export function CardDueBox({ userId, size = "default", className }: CardDueBoxPr
 
   const dueAmount = Number(cardBill?.due_amount_bdt ?? 0);
   const walletBdt = Number(walletInfo?.balance ?? 0) * Number(walletInfo?.rate ?? 0);
-  const totalDue = dueAmount + walletBdt;
+  // negative wallet = owes wallet money (add to card due); positive wallet = prepaid credit (subtract)
+  const totalDue = dueAmount - walletBdt;
   const lastSynced = cardBill?.last_synced_at
     ? new Date(cardBill.last_synced_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -132,9 +133,8 @@ export function CardDueBox({ userId, size = "default", className }: CardDueBoxPr
                   Total Due
                 </span>
                 <span className={cn(
-                  "font-bold tracking-tight",
-                  isSmall ? "text-sm" : "text-base",
-                  totalDue > 0 ? "text-warning" : "text-success"
+                  "font-bold tracking-tight text-primary",
+                  isSmall ? "text-sm" : "text-base"
                 )}>
                   ৳{totalDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
