@@ -145,17 +145,49 @@ export function AdminAdAccounts() {
     return m;
   }, [billingVisits]);
   const [flashAccountId, setFlashAccountId] = useState<string | null>(null);
+  const pendingJumpRef = useRef<string | null>(null);
   const handleJumpToLastBilling = () => {
     if (!lastBillingVisit) return;
-    const el = document.querySelector(`[data-account-row="${lastBillingVisit.accountId}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      setFlashAccountId(lastBillingVisit.accountId);
-      setTimeout(() => setFlashAccountId(null), 2000);
-    } else {
-      toast.info("Last visited account is not on this page (filtered or paginated).");
+    const targetId = lastBillingVisit.accountId;
+    const acc = (accounts || []).find((a: any) => a.id === targetId);
+    if (!acc) {
+      toast.info("Account not found in current data.");
+      return;
     }
+    pendingJumpRef.current = targetId;
+    // Ensure the account will be visible: switch tab if needed and clear filters
+    const inAssigned = assignedSet.has(targetId);
+    const desiredTab: "active" | "inventory" = inAssigned ? "active" : "inventory";
+    if (viewTab !== desiredTab) setViewTab(desiredTab);
+    if (search) setSearch("");
+    if (statusFilter !== "all") setStatusFilter("all");
+    if (cardFilter !== "all") setCardFilter("all");
+    if (activityFilter !== "all") setActivityFilter("all");
   };
+
+  // When a jump is pending, move to the correct page and scroll to the row once rendered
+  useEffect(() => {
+    const id = pendingJumpRef.current;
+    if (!id) return;
+    const idx = sortedAccounts.findIndex((a: any) => a.id === id);
+    if (idx < 0) return; // filters/tab still updating
+    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+    // On correct page — wait a tick for DOM, then scroll
+    const t = setTimeout(() => {
+      const el = document.querySelector(`[data-account-row="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setFlashAccountId(id);
+        setTimeout(() => setFlashAccountId(null), 2000);
+      }
+      pendingJumpRef.current = null;
+    }, 50);
+    return () => clearTimeout(t);
+  }, [sortedAccounts, currentPage]);
   useEffect(() => { sessionStorage.setItem("adAccountsSortField", sortField); }, [sortField]);
   useEffect(() => { sessionStorage.setItem("adAccountsSortDir", sortDir); }, [sortDir]);
   useEffect(() => { sessionStorage.setItem("adAccountsStatusFilter", statusFilter); }, [statusFilter]);
