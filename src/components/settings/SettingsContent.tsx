@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useColorTheme, type ColorTheme } from "@/contexts/ColorThemeContext";
 import { OcrFallbackSection } from "@/components/settings/OcrFallbackSection";
+import { GlobalRateControl } from "@/components/admin/GlobalRateControl";
 
 const COLOR_THEMES: { id: ColorTheme; name: string; swatch: string; ring: string }[] = [
   { id: "blue",   name: "Ocean Blue",   swatch: "bg-[hsl(214,100%,44%)]", ring: "ring-[hsl(214,100%,44%)]" },
@@ -647,6 +648,18 @@ export default function SettingsPage() {
 
         {/* ─── ADMIN: OCR Fallback Providers ─── */}
         {isAdmin && <OcrFallbackSection />}
+
+        {/* ─── ADMIN: Global USD Rate Adjustment ─── */}
+        {isAdmin && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              <h2 className="text-lg font-semibold">Global USD Rate</h2>
+            </div>
+            <Separator />
+            <GlobalRateControl />
+          </div>
+        )}
 
         {/* ─── Notification Section (All users) ─── */}
         <div className="space-y-5">
