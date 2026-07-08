@@ -133,9 +133,8 @@ export function CardDueBox({ userId, size = "default", className }: CardDueBoxPr
                   Total Due
                 </span>
                 <span className={cn(
-                  "font-bold tracking-tight",
-                  isSmall ? "text-sm" : "text-base",
-                  totalDue > 0 ? "text-warning" : "text-success"
+                  "font-bold tracking-tight text-primary",
+                  isSmall ? "text-sm" : "text-base"
                 )}>
                   ৳{totalDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
