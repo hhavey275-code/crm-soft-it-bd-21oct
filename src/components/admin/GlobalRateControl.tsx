@@ -51,7 +51,6 @@ export function GlobalRateControl() {
     try {
       const { data, error } = await supabase.rpc("apply_global_rate_delta", {
         p_new_delta: clamped,
-        p_reason: null,
       });
       if (error) throw error;
       const result = data as any;
