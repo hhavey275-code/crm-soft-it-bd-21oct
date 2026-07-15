@@ -80,7 +80,7 @@ export default function InvoicePage() {
       // Fallback: tenant_payments — synthesize invoice
       const { data: tp } = await (supabase as any)
         .from("tenant_payments")
-        .select("*, tenants(name, domain, usd_rate, business_address, phone, contact_email)")
+        .select("*, tenants(name, domain, usd_rate)")
         .eq("id", requestId!)
         .maybeSingle();
       if (!tp) return { invoice: null, request: null, profile: null };
@@ -109,9 +109,9 @@ export default function InvoicePage() {
       const synthProfile = {
         company: tp.tenants?.name || "Tenant",
         full_name: tp.tenants?.name || "Tenant",
-        business_address: tp.tenants?.business_address || tp.tenants?.domain || null,
-        phone: tp.tenants?.phone || null,
-        email: tp.tenants?.contact_email || tp.tenants?.domain || null,
+        business_address: tp.tenants?.domain || null,
+        phone: null,
+        email: tp.tenants?.domain || null,
       };
       return { invoice: synthInvoice, request: synthRequest, profile: synthProfile };
     },
