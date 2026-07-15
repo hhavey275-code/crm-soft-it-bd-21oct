@@ -3,14 +3,55 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Printer, Pencil, Check } from "lucide-react";
-import { useState } from "react";
+import { Printer, Pencil, Check, Download } from "lucide-react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function InvoicePage() {
   const { requestId } = useParams<{ requestId: string }>();
   const { isAdmin } = useAuth();
   const [editMode, setEditMode] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  async function handleDownloadPdf() {
+    if (!invoiceRef.current) return;
+    setDownloading(true);
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const el = invoiceRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        windowWidth: el.scrollWidth,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`Invoice-${data?.invoice?.invoice_number || requestId}.pdf`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate PDF");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", requestId],
@@ -84,12 +125,17 @@ export default function InvoicePage() {
           )}
           <Button onClick={() => window.print()} className="gap-2">
             <Printer className="h-4 w-4" />
-            Print / Download PDF
+            Print
+          </Button>
+          <Button onClick={handleDownloadPdf} disabled={downloading} className="gap-2 ml-2">
+            <Download className="h-4 w-4" />
+            {downloading ? "Generating..." : "Download PDF"}
           </Button>
         </div>
 
         {/* A4 container: 210mm x 297mm */}
         <div
+          ref={invoiceRef}
           contentEditable={editMode}
           suppressContentEditableWarning
           className="invoice-page bg-white text-black shadow-xl relative overflow-hidden"
