@@ -10,12 +10,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
 
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send, Search } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -139,6 +140,7 @@ export function AdminTopUp() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [adminNote, setAdminNote] = useState("");
   const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
@@ -272,6 +274,22 @@ export function AdminTopUp() {
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
       const ts = new Date(r.created_at).getTime();
       if (ts < from.getTime() || ts > to.getTime()) return false;
+    }
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      const acc = String(r.bankAccount?.account_number || "").replace(/\s+/g, "").toLowerCase();
+      const bankName = String(r.bankAccount?.bank_name || "").toLowerCase();
+      const clientName = String(r.profile?.full_name || "").toLowerCase();
+      const clientEmail = String(r.profile?.email || "").toLowerCase();
+      const ref = String(r.payment_reference || "").toLowerCase();
+      const matches =
+        acc.includes(q) ||
+        acc.endsWith(q) ||
+        bankName.includes(q) ||
+        clientName.includes(q) ||
+        clientEmail.includes(q) ||
+        ref.includes(q);
+      if (!matches) return false;
     }
     if (statusFilter === "all" || statusFilter === "bank_sms") return true;
     if (statusFilter === "tenant") return r._source === "tenant";
