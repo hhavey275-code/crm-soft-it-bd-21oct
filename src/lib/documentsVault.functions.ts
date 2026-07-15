@@ -71,8 +71,10 @@ export const setVaultPassword = createServerFn({ method: "POST" })
     const newHash = hashPassword(data.newPassword);
     const { error } = await context.supabase
       .from("site_settings")
-      .update({ value: newHash, updated_at: new Date().toISOString() })
-      .eq("key", "documents_vault_password_hash");
+      .upsert(
+        { key: "documents_vault_password_hash", value: newHash, updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -120,8 +122,10 @@ export const saveVaultCategories = createServerFn({ method: "POST" })
     await assertVaultOwner(context.supabase, context.userId);
     const { error } = await context.supabase
       .from("site_settings")
-      .update({ value: JSON.stringify(data.categories), updated_at: new Date().toISOString() })
-      .eq("key", "documents_vault_categories");
+      .upsert(
+        { key: "documents_vault_categories", value: JSON.stringify(data.categories), updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true, categories: data.categories };
   });
