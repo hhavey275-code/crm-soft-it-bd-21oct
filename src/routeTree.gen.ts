@@ -31,6 +31,7 @@ import { Route as MyUnusedRouteImport } from './routes/my-unused'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
+import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
 import { Route as ChatRouteImport } from './routes/chat'
@@ -170,6 +171,11 @@ const FeedbackRoute = FeedbackRouteImport.update({
 const FailedTopupsRoute = FailedTopupsRouteImport.update({
   id: '/failed-topups',
   path: '/failed-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -341,6 +347,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
@@ -395,6 +402,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
@@ -449,6 +457,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
@@ -505,6 +514,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/client-spend-report'
     | '/dashboard'
+    | '/documents'
     | '/failed-topups'
     | '/feedback'
     | '/meta-oauth-callback'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/client-spend-report'
     | '/dashboard'
+    | '/documents'
     | '/failed-topups'
     | '/feedback'
     | '/meta-oauth-callback'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/client-spend-report'
     | '/dashboard'
+    | '/documents'
     | '/failed-topups'
     | '/feedback'
     | '/meta-oauth-callback'
@@ -667,6 +679,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRoute
   ClientSpendReportRoute: typeof ClientSpendReportRoute
   DashboardRoute: typeof DashboardRoute
+  DocumentsRoute: typeof DocumentsRoute
   FailedTopupsRoute: typeof FailedTopupsRoute
   FeedbackRoute: typeof FeedbackRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
@@ -854,6 +867,13 @@ declare module '@tanstack/react-router' {
       path: '/failed-topups'
       fullPath: '/failed-topups'
       preLoaderRoute: typeof FailedTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -1124,6 +1144,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRoute,
   ClientSpendReportRoute: ClientSpendReportRoute,
   DashboardRoute: DashboardRoute,
+  DocumentsRoute: DocumentsRoute,
   FailedTopupsRoute: FailedTopupsRoute,
   FeedbackRoute: FeedbackRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,

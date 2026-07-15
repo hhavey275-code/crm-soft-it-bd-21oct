@@ -24,6 +24,7 @@ import {
   Wallet,
   RefreshCw,
   Archive,
+  FolderLock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -74,6 +75,7 @@ const adminNavItems = [
   { title: "Admin Performance", url: "/admin/performance", icon: Trophy, key: "admin-performance" },
   { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
   { title: "Stripe Links", url: "/admin/stripe-links", icon: CreditCard, key: "stripe-links" },
+  { title: "Documents Vault", url: "/documents", icon: FolderLock, key: "documents-vault" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
@@ -187,6 +189,13 @@ export function AppSidebar() {
     navItems = clientNavItems.filter(item =>
       !permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key))
     );
+  }
+
+  // Documents Vault: only show for the whitelisted vault-owner email.
+  const ownerEmail = "maksudurrahaman64@gmail.com";
+  const isVaultOwner = (profile?.email ?? "").toLowerCase() === ownerEmail;
+  if (!isVaultOwner) {
+    navItems = navItems.filter(i => i.key !== "documents-vault");
   }
 
   // Inject tenant-only menus after Dashboard if tenant mode
