@@ -3,10 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, Pencil, Check } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function InvoicePage() {
   const { requestId } = useParams<{ requestId: string }>();
+  const { isAdmin } = useAuth();
+  const [editMode, setEditMode] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", requestId],
@@ -68,6 +72,16 @@ export default function InvoicePage() {
 
       <div className="min-h-screen bg-muted/30 p-4 md:p-8 flex flex-col items-center">
         <div className="no-print flex justify-end w-full max-w-[210mm] mb-4">
+          {isAdmin && (
+            <Button
+              variant={editMode ? "default" : "outline"}
+              onClick={() => setEditMode((v) => !v)}
+              className="gap-2 mr-2"
+            >
+              {editMode ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+              {editMode ? "Done Editing" : "Edit"}
+            </Button>
+          )}
           <Button onClick={() => window.print()} className="gap-2">
             <Printer className="h-4 w-4" />
             Print / Download PDF
@@ -76,12 +90,15 @@ export default function InvoicePage() {
 
         {/* A4 container: 210mm x 297mm */}
         <div
+          contentEditable={editMode}
+          suppressContentEditableWarning
           className="invoice-page bg-white text-black shadow-xl relative overflow-hidden"
           style={{
             width: "210mm",
             minHeight: "297mm",
             padding: "0",
             fontFamily: "'Inter', Arial, sans-serif",
+            outline: editMode ? "2px dashed #0066CC" : "none",
           }}
         >
           {/* Top accent bar */}
