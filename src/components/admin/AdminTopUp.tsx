@@ -10,12 +10,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
 
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send, Search } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -139,6 +140,7 @@ export function AdminTopUp() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [adminNote, setAdminNote] = useState("");
   const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
@@ -272,6 +274,22 @@ export function AdminTopUp() {
       const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
       const ts = new Date(r.created_at).getTime();
       if (ts < from.getTime() || ts > to.getTime()) return false;
+    }
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      const acc = String(r.bankAccount?.account_number || "").replace(/\s+/g, "").toLowerCase();
+      const bankName = String(r.bankAccount?.bank_name || "").toLowerCase();
+      const clientName = String(r.profile?.full_name || "").toLowerCase();
+      const clientEmail = String(r.profile?.email || "").toLowerCase();
+      const ref = String(r.payment_reference || "").toLowerCase();
+      const matches =
+        acc.includes(q) ||
+        acc.endsWith(q) ||
+        bankName.includes(q) ||
+        clientName.includes(q) ||
+        clientEmail.includes(q) ||
+        ref.includes(q);
+      if (!matches) return false;
     }
     if (statusFilter === "all" || statusFilter === "bank_sms") return true;
     if (statusFilter === "tenant") return r._source === "tenant";
@@ -890,6 +908,25 @@ export function AdminTopUp() {
           </TabsTrigger>
         </TabsList>
       </Tabs>
+
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by bank last 4 digits, bank name, client, or reference..."
+          className="pl-9 h-9 text-sm"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
       {statusFilter === "bank_sms" ? (
         <BankSmsTab />

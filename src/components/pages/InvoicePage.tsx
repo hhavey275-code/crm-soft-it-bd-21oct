@@ -56,26 +56,64 @@ export default function InvoicePage() {
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", requestId],
     queryFn: async () => {
-      const { data: invoice, error: invErr } = await (supabase as any)
+      // Try client top-up invoice first
+      const { data: invoice } = await (supabase as any)
         .from("invoices")
         .select("*")
         .eq("top_up_request_id", requestId)
-        .single();
-      if (invErr) throw invErr;
+        .maybeSingle();
 
-      const { data: request } = await supabase
-        .from("top_up_requests")
-        .select("*")
+      if (invoice) {
+        const { data: request } = await supabase
+          .from("top_up_requests")
+          .select("*")
+          .eq("id", requestId!)
+          .maybeSingle();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", invoice.user_id)
+          .maybeSingle();
+        return { invoice, request, profile };
+      }
+
+      // Fallback: tenant_payments — synthesize invoice
+      const { data: tp } = await (supabase as any)
+        .from("tenant_payments")
+        .select("*, tenants(name, domain, usd_rate)")
         .eq("id", requestId!)
-        .single();
+        .maybeSingle();
+      if (!tp) return { invoice: null, request: null, profile: null };
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", invoice.user_id)
-        .single();
+      const rate = Number(tp.tenants?.usd_rate) || 120;
+      const bdt = Number(tp.amount) || 0;
+      const usd = tp.limit_amount != null && Number(tp.limit_amount) !== 0
+        ? Number(tp.limit_amount)
+        : (rate > 0 ? bdt / rate : 0);
 
-      return { invoice, request, profile };
+      const synthInvoice = {
+        invoice_number: `TP-${String(tp.id).slice(0, 8).toUpperCase()}`,
+        created_at: tp.created_at,
+        amount: usd,
+        bdt_amount: bdt,
+        usd_rate: rate,
+        user_id: tp.tenant_id,
+        _tenant: true,
+        _payment_type: tp.payment_type,
+      };
+      const synthRequest = {
+        payment_reference: tp.payment_reference || null,
+        sheet_bill_bdt: 0,
+        wallet_due_paid_bdt: 0,
+      };
+      const synthProfile = {
+        company: tp.tenants?.name || "Tenant",
+        full_name: tp.tenants?.name || "Tenant",
+        business_address: tp.tenants?.domain || null,
+        phone: null,
+        email: tp.tenants?.domain || null,
+      };
+      return { invoice: synthInvoice, request: synthRequest, profile: synthProfile };
     },
     enabled: !!requestId,
   });
