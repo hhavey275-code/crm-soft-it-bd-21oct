@@ -1687,6 +1687,54 @@ export type Database = {
         }
         Relationships: []
       }
+      company_documents: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          expires_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string
+          tags: string[]
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          expires_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number
+          id?: string
+          mime_type: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          expires_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       daily_spend_snapshots: {
         Row: {
           account_count: number
@@ -3886,6 +3934,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_vault_owner: { Args: { _user_id: string }; Returns: boolean }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
       recalculate_tenant_ledger: {
