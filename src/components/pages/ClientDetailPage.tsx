@@ -203,15 +203,44 @@ export default function ClientDetailPage() {
   });
 
   const [adAccountSearch, setAdAccountSearch] = useState("");
+  const [adAccountStatusFilter, setAdAccountStatusFilter] = useState<"all" | "active" | "disabled">("all");
+  const [adAccountSort, setAdAccountSort] = useState<{ field: "balance" | "today" | "yesterday" | null; dir: "asc" | "desc" }>({ field: null, dir: "desc" });
   const filteredAdAccounts = useMemo(() => {
     const q = adAccountSearch.trim().toLowerCase();
-    if (!q) return adAccounts ?? [];
-    return (adAccounts ?? []).filter((a: any) => {
-      const name = String(a.account_name ?? "").toLowerCase();
-      const id = String(a.account_id ?? "").toLowerCase();
-      return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
-    });
-  }, [adAccounts, adAccountSearch]);
+    let list = (adAccounts ?? []).slice();
+    if (q) {
+      list = list.filter((a: any) => {
+        const name = String(a.account_name ?? "").toLowerCase();
+        const id = String(a.account_id ?? "").toLowerCase();
+        return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
+      });
+    }
+    if (adAccountStatusFilter !== "all") {
+      list = list.filter((a: any) => {
+        const s = String(a.status ?? "").toLowerCase();
+        if (adAccountStatusFilter === "active") return s === "active";
+        return s !== "active";
+      });
+    }
+    if (adAccountSort.field) {
+      const key = adAccountSort.field === "balance" ? "balance" : adAccountSort.field === "today" ? "today_spend" : "yesterday_spend";
+      const dir = adAccountSort.dir === "asc" ? 1 : -1;
+      list.sort((a: any, b: any) => {
+        const av = Number((insights as any)?.[a.id]?.[key] ?? 0) || 0;
+        const bv = Number((insights as any)?.[b.id]?.[key] ?? 0) || 0;
+        return (av - bv) * dir;
+      });
+    }
+    return list;
+  }, [adAccounts, adAccountSearch, adAccountStatusFilter, adAccountSort, insights]);
+
+  const toggleAdAccountSort = (field: "balance" | "today" | "yesterday") => {
+    setAdAccountSort((prev) =>
+      prev.field === field
+        ? { field, dir: prev.dir === "desc" ? "asc" : "desc" }
+        : { field, dir: "desc" },
+    );
+  };
 
   const { data: allAdAccounts } = useQuery({
     queryKey: ["all-ad-accounts-for-assign"],
