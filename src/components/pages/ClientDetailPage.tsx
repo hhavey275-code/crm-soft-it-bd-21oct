@@ -2246,13 +2246,34 @@ export default function ClientDetailPage() {
                                 <span className="text-xs font-medium">Status</span>
                               </TableHead>
                               <TableHead className="w-[90px]">
-                                <span className="text-xs font-medium">Balance</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("balance")}
+                                >
+                                  Balance
+                                  {adAccountSort.field === "balance" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[100px]">
-                                <span className="text-xs font-medium">Today</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("today")}
+                                >
+                                  Today
+                                  {adAccountSort.field === "today" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[100px]">
-                                <span className="text-xs font-medium">Yesterday</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("yesterday")}
+                                >
+                                  Yesterday
+                                  {adAccountSort.field === "yesterday" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[110px]">
                                 <span className="text-xs font-medium">Card</span>
