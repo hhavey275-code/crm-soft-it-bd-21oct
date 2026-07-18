@@ -2177,14 +2177,29 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Search bar for ad accounts */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={adAccountSearch}
-                  onChange={(e) => setAdAccountSearch(e.target.value)}
-                  placeholder="Search ad account by name or ID..."
-                  className="pl-9 h-9 text-sm"
-                />
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={adAccountSearch}
+                    onChange={(e) => setAdAccountSearch(e.target.value)}
+                    placeholder="Search ad account by name or ID..."
+                    className="pl-9 h-9 text-sm"
+                  />
+                </div>
+                <Select
+                  value={adAccountStatusFilter}
+                  onValueChange={(v) => setAdAccountStatusFilter(v as any)}
+                >
+                  <SelectTrigger className="h-9 text-sm sm:w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {isMobile ? (
