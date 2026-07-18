@@ -203,15 +203,15 @@ export default function ClientDetailPage() {
   });
 
   const [adAccountSearch, setAdAccountSearch] = useState("");
-  const filteredAdAccounts = useMemo(() => {
-    const q = adAccountSearch.trim().toLowerCase();
-    if (!q) return adAccounts ?? [];
-    return (adAccounts ?? []).filter((a: any) => {
-      const name = String(a.account_name ?? "").toLowerCase();
-      const id = String(a.account_id ?? "").toLowerCase();
-      return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
-    });
-  }, [adAccounts, adAccountSearch]);
+  const [adAccountStatusFilter, setAdAccountStatusFilter] = useState<"all" | "active" | "disabled">("all");
+  const [adAccountSort, setAdAccountSort] = useState<{ field: "balance" | "today" | "yesterday" | null; dir: "asc" | "desc" }>({ field: null, dir: "desc" });
+  const toggleAdAccountSort = (field: "balance" | "today" | "yesterday") => {
+    setAdAccountSort((prev) =>
+      prev.field === field
+        ? { field, dir: prev.dir === "desc" ? "asc" : "desc" }
+        : { field, dir: "desc" },
+    );
+  };
 
   const { data: allAdAccounts } = useQuery({
     queryKey: ["all-ad-accounts-for-assign"],
@@ -236,6 +236,40 @@ export default function ClientDetailPage() {
     },
     enabled: !!adAccounts && adAccounts.length > 0,
   });
+
+  const filteredAdAccounts = useMemo(() => {
+    const q = adAccountSearch.trim().toLowerCase();
+    let list = (adAccounts ?? []).slice();
+    if (q) {
+      list = list.filter((a: any) => {
+        const name = String(a.account_name ?? "").toLowerCase();
+        const id = String(a.account_id ?? "").toLowerCase();
+        return name.includes(q) || id.includes(q) || id.replace(/^act_/, "").includes(q);
+      });
+    }
+    if (adAccountStatusFilter !== "all") {
+      list = list.filter((a: any) => {
+        const s = String(a.status ?? "").toLowerCase();
+        if (adAccountStatusFilter === "active") return s === "active";
+        return s !== "active";
+      });
+    }
+    if (adAccountSort.field) {
+      const key =
+        adAccountSort.field === "balance"
+          ? "balance"
+          : adAccountSort.field === "today"
+            ? "today_spend"
+            : "yesterday_spend";
+      const dir = adAccountSort.dir === "asc" ? 1 : -1;
+      list.sort((a: any, b: any) => {
+        const av = Number((insights as any)?.[a.id]?.[key] ?? 0) || 0;
+        const bv = Number((insights as any)?.[b.id]?.[key] ?? 0) || 0;
+        return (av - bv) * dir;
+      });
+    }
+    return list;
+  }, [adAccounts, adAccountSearch, adAccountStatusFilter, adAccountSort, insights]);
 
   // Auto top-up permission check
   const { data: hasAutoTopupPerm = false } = useQuery({
@@ -2143,14 +2177,29 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Search bar for ad accounts */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={adAccountSearch}
-                  onChange={(e) => setAdAccountSearch(e.target.value)}
-                  placeholder="Search ad account by name or ID..."
-                  className="pl-9 h-9 text-sm"
-                />
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={adAccountSearch}
+                    onChange={(e) => setAdAccountSearch(e.target.value)}
+                    placeholder="Search ad account by name or ID..."
+                    className="pl-9 h-9 text-sm"
+                  />
+                </div>
+                <Select
+                  value={adAccountStatusFilter}
+                  onValueChange={(v) => setAdAccountStatusFilter(v as any)}
+                >
+                  <SelectTrigger className="h-9 text-sm sm:w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {isMobile ? (
@@ -2197,13 +2246,34 @@ export default function ClientDetailPage() {
                                 <span className="text-xs font-medium">Status</span>
                               </TableHead>
                               <TableHead className="w-[90px]">
-                                <span className="text-xs font-medium">Balance</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("balance")}
+                                >
+                                  Balance
+                                  {adAccountSort.field === "balance" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[100px]">
-                                <span className="text-xs font-medium">Today</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("today")}
+                                >
+                                  Today
+                                  {adAccountSort.field === "today" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[100px]">
-                                <span className="text-xs font-medium">Yesterday</span>
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium inline-flex items-center gap-1 hover:text-primary"
+                                  onClick={() => toggleAdAccountSort("yesterday")}
+                                >
+                                  Yesterday
+                                  {adAccountSort.field === "yesterday" ? (adAccountSort.dir === "desc" ? "↓" : "↑") : "↕"}
+                                </button>
                               </TableHead>
                               <TableHead className="w-[110px]">
                                 <span className="text-xs font-medium">Card</span>
