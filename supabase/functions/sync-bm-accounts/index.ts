@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
-    const { business_manager_id, include_unassigned } = await req.json();
+    const { business_manager_id, include_unassigned, preview_only } = await req.json();
     if (!business_manager_id) {
       return new Response(JSON.stringify({ error: "business_manager_id required" }), { status: 400, headers: corsHeaders });
     }
@@ -219,40 +219,45 @@ Deno.serve(async (req) => {
     // Then delete any ad_accounts under this BM whose account_id is NOT
     // in the freshly-synced set (i.e. no longer assigned to the System User).
     // ============================================================
+    // Preview-only mode: return the list of accounts from Meta WITHOUT touching the DB.
+    // The admin then hand-picks which accounts to import via the UI. This prevents
+    // sync from auto-adding every assigned account (or auto-deleting existing rows).
     let upsertedCount = 0;
     let deletedCount = 0;
     const deletedAccountIds: string[] = [];
-    try {
-      if (rows.length > 0) {
-        const { error: upsertErr } = await supabase
-          .from("ad_accounts")
-          .upsert(rows, { onConflict: "account_id" });
-        if (upsertErr) console.error("ad_accounts upsert error:", upsertErr);
-        else upsertedCount = rows.length;
-      }
-
-      const keepIds = new Set(rows.map((r) => r.account_id));
-      const { data: existingForBm, error: existingErr } = await supabase
-        .from("ad_accounts")
-        .select("id, account_id")
-        .eq("business_manager_id", bm.id);
-      if (existingErr) {
-        console.error("fetch existing ad_accounts error:", existingErr);
-      } else if (existingForBm && existingForBm.length > 0) {
-        const stale = existingForBm.filter((a: any) => !keepIds.has(a.account_id));
-        if (stale.length > 0) {
-          const staleIds = stale.map((a: any) => a.id);
-          deletedAccountIds.push(...stale.map((a: any) => a.account_id));
-          const { error: delErr } = await supabase
+    if (!preview_only) {
+      try {
+        if (rows.length > 0) {
+          const { error: upsertErr } = await supabase
             .from("ad_accounts")
-            .delete()
-            .in("id", staleIds);
-          if (delErr) console.error("ad_accounts delete error:", delErr);
-          else deletedCount = stale.length;
+            .upsert(rows, { onConflict: "account_id" });
+          if (upsertErr) console.error("ad_accounts upsert error:", upsertErr);
+          else upsertedCount = rows.length;
         }
+
+        const keepIds = new Set(rows.map((r) => r.account_id));
+        const { data: existingForBm, error: existingErr } = await supabase
+          .from("ad_accounts")
+          .select("id, account_id")
+          .eq("business_manager_id", bm.id);
+        if (existingErr) {
+          console.error("fetch existing ad_accounts error:", existingErr);
+        } else if (existingForBm && existingForBm.length > 0) {
+          const stale = existingForBm.filter((a: any) => !keepIds.has(a.account_id));
+          if (stale.length > 0) {
+            const staleIds = stale.map((a: any) => a.id);
+            deletedAccountIds.push(...stale.map((a: any) => a.account_id));
+            const { error: delErr } = await supabase
+              .from("ad_accounts")
+              .delete()
+              .in("id", staleIds);
+            if (delErr) console.error("ad_accounts delete error:", delErr);
+            else deletedCount = stale.length;
+          }
+        }
+      } catch (e) {
+        console.error("auto-sync upsert/delete failed:", e);
       }
-    } catch (e) {
-      console.error("auto-sync upsert/delete failed:", e);
     }
 
     // ============================================================
