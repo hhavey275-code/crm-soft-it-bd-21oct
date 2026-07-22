@@ -197,6 +197,7 @@ export function AdminBusinessManagers() {
       setSyncingBmId(businessManagerId);
       return invokeBmFunction<{ accounts?: SyncedAccount[] }>("sync-bm-accounts", {
         business_manager_id: businessManagerId,
+        preview_only: true,
       });
     },
     onSuccess: async (result: any) => {
@@ -212,12 +213,14 @@ export function AdminBusinessManagers() {
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
 
-      const summary = `Synced ${upserted} • Removed ${deleted}${skipped ? ` • Skipped ${skipped}` : ""}`;
+      const summary = `Fetched ${accounts.length}${skipped ? ` • Skipped ${skipped} unassigned` : ""}`;
       if (accounts.length === 0) {
-        toast.info(`No System User assigned accounts found. ${summary}`);
+        toast.info(`No System User assigned accounts found.`);
         return;
       }
       toast.success(summary);
+      // Suppress unused-var warnings — kept for backward compatibility with old function responses.
+      void upserted; void deleted;
 
       // Still open the import dialog so admin can review the synced list.
       const { data: existing } = await supabase.from("ad_accounts").select("account_id");
@@ -409,6 +412,7 @@ export function AdminBusinessManagers() {
         bms.map(async (bm: any) => {
           const result = await invokeBmFunction<{ accounts?: SyncedAccount[] }>("sync-bm-accounts", {
             business_manager_id: bm.id,
+            preview_only: true,
           });
           if (result.accounts) allSyncedAccounts.push(...result.accounts);
           return result;
