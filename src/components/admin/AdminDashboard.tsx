@@ -221,6 +221,9 @@ export function AdminDashboard() {
         };
       });
     },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   // Realtime subscription removed for performance — data refreshes only via manual actions
