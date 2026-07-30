@@ -40,9 +40,11 @@ export function ClientDashboard() {
     }
   }, []);
 
-  // NOTE: No realtime subscription here by design.
-  // Client dashboard rule: refresh only on 1st login, manual refresh (10 min cooldown),
-  // or after a top-up. Other updates must NOT auto-invalidate.
+  // NOTE: No realtime subscription here by design (no Supabase realtime, no Meta API calls).
+  // Spend/order figures are auto re-read from the DB every 60s so the numbers stay live
+  // without triggering any Meta sync. Everything else follows the original rule:
+  // 1st login, manual refresh (10 min cooldown), or after a top-up.
+  const LIVE_REFETCH_MS = 60_000;
 
 
   const { data: agencyWallet } = useQuery({
@@ -116,9 +118,11 @@ export function ClientDashboard() {
       return (data as any[]) ?? [];
     },
     enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchInterval: LIVE_REFETCH_MS,
+    refetchIntervalInBackground: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
 
@@ -133,9 +137,11 @@ export function ClientDashboard() {
       return data ?? [];
     },
     enabled: !!user && !!adAccounts && adAccounts.length > 0,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchInterval: LIVE_REFETCH_MS,
+    refetchIntervalInBackground: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Realtime subscriptions removed for performance — data refreshes only on manual actions or page reload.
@@ -166,9 +172,11 @@ export function ClientDashboard() {
       return data ?? [];
     },
     enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchInterval: LIVE_REFETCH_MS,
+    refetchIntervalInBackground: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Monthly top-up history (last 6 months)
