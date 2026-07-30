@@ -123,9 +123,11 @@ export function AdminDashboard() {
       const { data } = await supabase.from("wallets").select("user_id, balance");
       return (data as any[]) ?? [];
     },
-    staleTime: 10 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: pendingRequests } = useQuery({
@@ -146,9 +148,11 @@ export function AdminDashboard() {
       const { data } = await supabase.from("ad_accounts").select("id, account_name, status, spend_cap, amount_spent, account_id");
       return (data as any[]) ?? [];
     },
-    staleTime: 10 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: userAdAccounts } = useQuery({
