@@ -92,12 +92,18 @@ export function FailedTopUps() {
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`$${Number(data.refunded_amount).toLocaleString()} refunded to wallet`);
+      if (data?.auto_resolved) {
+        toast.success(data.message || "Top-up had actually succeeded on Meta — no refund issued.");
+      } else {
+        toast.success(`$${Number(data.refunded_amount).toLocaleString()} refunded to wallet`);
+      }
       queryClient.invalidateQueries({ queryKey: ["failed-topups"] });
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-failed-topups"] });
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
