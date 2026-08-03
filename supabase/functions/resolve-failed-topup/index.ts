@@ -1,8 +1,30 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { metaFetch } from "../_shared/meta-fetch.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 };
+async function decryptToken(stored: string, secret: string) {
+  if (!stored?.startsWith("enc:")) return stored;
+  try {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({
+      name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256"
+    }, keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const combined = Uint8Array.from(atob(stored.slice(4)), (c) => c.charCodeAt(0));
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: combined.slice(0, 12) }, key, combined.slice(12));
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    return stored;
+  }
+}
+const VERIFY_TOLERANCE = 1.00;
+function isCapEffectivelyApplied(verifiedDollars: number, expectedDollars: number) {
+  if (!Number.isFinite(verifiedDollars)) return false;
+  if (verifiedDollars >= expectedDollars) return true;
+  return Math.abs(verifiedDollars - expectedDollars) < VERIFY_TOLERANCE;
+}
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response("ok", {
