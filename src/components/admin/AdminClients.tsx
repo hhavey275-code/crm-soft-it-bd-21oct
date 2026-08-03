@@ -50,7 +50,8 @@ const ALL_MENU_KEYS = [
 export function AdminClients() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const canManage = isAdmin || isSuperAdmin;
   const isMobile = useIsMobile();
   const [search, setSearch] = useState("");
   const [permDialogUser, setPermDialogUser] = useState<any>(null);
@@ -75,7 +76,7 @@ export function AdminClients() {
       const { data } = await supabase.from("user_roles").select("*");
       return (data as any[]) ?? [];
     },
-    enabled: isSuperAdmin,
+    enabled: canManage,
   });
 
   const toggleStatusMutation = useMutation({
@@ -311,7 +312,7 @@ export function AdminClients() {
       {items.map((client: any) => {
         const isActive = (client.status ?? "active") === "active";
         const isPending = client.status === "pending";
-        const userRole = isSuperAdmin ? getUserRole(client.user_id) : null;
+        const userRole = canManage ? getUserRole(client.user_id) : null;
         return (
           <Card
             key={client.id}
@@ -329,7 +330,7 @@ export function AdminClients() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <StatusBadge status={isPending ? "pending" : isActive ? "active" : "inactive"} />
-                  {isSuperAdmin && userRole && (
+                  {canManage && userRole && (
                     <span className="capitalize text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted">{userRole}</span>
                   )}
                 </div>
@@ -379,7 +380,7 @@ export function AdminClients() {
                     {isActive ? "Deactivate" : "Activate"}
                   </Button>
                 )}
-                {isSuperAdmin && userRole === "client" && !isPending && (
+                {canManage && userRole === "client" && !isPending && (
                   <>
                     <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => promoteToAdminMutation.mutate(client.user_id)} disabled={promoteToAdminMutation.isPending}>
                       Make Admin
@@ -389,7 +390,7 @@ export function AdminClients() {
                     </Button>
                   </>
                 )}
-                {isSuperAdmin && userRole === "admin" && (
+                {canManage && userRole === "admin" && (
                   <>
                     <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => demoteToClientMutation.mutate(client.user_id)} disabled={demoteToClientMutation.isPending}>Demote</Button>
                     <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => { setPermDialogUser(client); setSelectedMenuKeys([]); }}>
@@ -397,7 +398,7 @@ export function AdminClients() {
                     </Button>
                   </>
                 )}
-                {isSuperAdmin && !isPending && userRole === "client" && (
+                {canManage && !isPending && userRole === "client" && (
                   <Button size="sm" variant="outline" className="rounded-full h-8 text-xs text-blue-600 border-blue-300" onClick={() => impersonateMutation.mutate(client.user_id)} disabled={impersonateMutation.isPending}>
                     <LogIn className="h-3 w-3 mr-1" />Login
                   </Button>
@@ -427,7 +428,7 @@ export function AdminClients() {
           <TableHead>Company</TableHead>
           <TableHead>Joined</TableHead>
           <TableHead>Status</TableHead>
-          {isSuperAdmin && <TableHead>Role</TableHead>}
+          {canManage && <TableHead>Role</TableHead>}
           <TableHead className="text-right w-[100px]">Action</TableHead>
         </TableRow>
       </TableHeader>
@@ -435,7 +436,7 @@ export function AdminClients() {
         {items.map((client: any) => {
           const isActive = (client.status ?? "active") === "active";
           const isPending = client.status === "pending";
-          const userRole = isSuperAdmin ? getUserRole(client.user_id) : null;
+          const userRole = canManage ? getUserRole(client.user_id) : null;
           return (
             <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/clients/${client.user_id}`)}>
               <TableCell className="font-medium truncate max-w-[160px]">{client.full_name || "—"}</TableCell>
@@ -443,7 +444,7 @@ export function AdminClients() {
               <TableCell className="truncate max-w-[120px]">{client.company || "—"}</TableCell>
               <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(client.created_at), "MMM d, yyyy")}</TableCell>
               <TableCell><StatusBadge status={isPending ? "pending" : isActive ? "active" : "inactive"} /></TableCell>
-              {isSuperAdmin && (
+              {canManage && (
                 <TableCell>
                   <span className="capitalize text-xs font-medium px-2 py-1 rounded-full bg-muted whitespace-nowrap">{userRole}</span>
                 </TableCell>
@@ -471,7 +472,7 @@ export function AdminClients() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {isSuperAdmin && userRole === "client" && !isPending && (
+                      {canManage && userRole === "client" && !isPending && (
                         <>
                           <DropdownMenuItem onClick={() => promoteToAdminMutation.mutate(client.user_id)}>
                             <Shield className="h-4 w-4 mr-2" />Make Admin
@@ -487,7 +488,7 @@ export function AdminClients() {
                           <LogIn className="h-4 w-4 mr-2" />Login as Client
                         </DropdownMenuItem>
                       )}
-                      {isSuperAdmin && userRole === "admin" && (
+                      {canManage && userRole === "admin" && (
                         <>
                           <DropdownMenuItem onClick={() => demoteToClientMutation.mutate(client.user_id)}>Demote to Client</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setPermDialogUser(client); setSelectedMenuKeys([]); }}>
@@ -500,7 +501,7 @@ export function AdminClients() {
                           <Building2 className="h-4 w-4 mr-2" />Manage Banks
                         </DropdownMenuItem>
                       )}
-                      {isSuperAdmin && (
+                      {canManage && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteDialog(client)}>
@@ -517,7 +518,7 @@ export function AdminClients() {
         })}
         {items.length === 0 && (
           <TableRow>
-            <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">No clients found</TableCell>
+            <TableCell colSpan={canManage ? 7 : 6} className="text-center text-muted-foreground py-8">No clients found</TableCell>
           </TableRow>
         )}
       </TableBody>
