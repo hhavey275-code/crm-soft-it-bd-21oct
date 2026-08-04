@@ -8,6 +8,7 @@ import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
 import { AgencyBrandingProvider } from "@/contexts/AgencyBrandingContext";
 import { TutorialProvider } from "@/components/TutorialProvider";
 import { useEffect, useState } from "react";
+import { installAppRecovery, recoverFromStaleAssets } from "@/lib/app-recovery";
 
 import appCss from "../styles.css?url";
 
@@ -28,6 +29,27 @@ function NotFoundComponent() {
             Go to Dashboard
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RootErrorComponent({ error }: { error: Error }) {
+  console.error(error);
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-2xl font-bold">Something went wrong</h1>
+        <p className="text-sm text-muted-foreground">
+          The app failed to load. This usually means your browser is holding an old cached
+          version. Tap the button below to clear it and reload.
+        </p>
+        <button
+          onClick={() => void recoverFromStaleAssets()}
+          className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Clear cache & reload
+        </button>
       </div>
     </div>
   );
@@ -64,6 +86,7 @@ export const Route = createRootRoute({
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
+  errorComponent: RootErrorComponent,
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
@@ -97,6 +120,7 @@ function RootComponent() {
   );
 
   useEffect(() => {
+    installAppRecovery();
     try {
       localStorage.removeItem("app-rq-cache");
       localStorage.removeItem("site_settings_cache_v2");
