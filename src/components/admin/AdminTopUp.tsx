@@ -554,7 +554,15 @@ export function AdminTopUp() {
         // Auto-approval still requires strict matching (ref + amount + account + SMS).
         // Manual admin approve is allowed even with mismatches — admin override.
         try {
-          const { data: vData } = await supabase.functions.invoke('verify-topup', { body: { request_id: id } });
+          // Hard timeout: verify-topup can stall up to ~70s when the OCR provider
+          // rate-limits and retries. Manual approve must never wait on that.
+          const verifyPromise = supabase.functions
+            .invoke('verify-topup', { body: { request_id: id } })
+            .then((r: any) => r?.data);
+          const vData: any = await Promise.race([
+            verifyPromise,
+            new Promise((resolve) => setTimeout(() => resolve(null), 10000)),
+          ]);
           if (vData?.auto_approved) autoApprovedByVerify = true;
         } catch (e) {
           // Don't block manual approve on verify-topup errors — just log
