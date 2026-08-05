@@ -62,7 +62,10 @@ function getServiceClient() {
   );
 }
 
+let priorityCache: { value: Provider[]; at: number } | null = null;
+
 export async function getOcrPriority(): Promise<Provider[]> {
+  if (priorityCache && Date.now() - priorityCache.at < 60_000) return priorityCache.value;
   try {
     const supabase = getServiceClient();
     const { data } = await supabase
@@ -73,11 +76,28 @@ export async function getOcrPriority(): Promise<Provider[]> {
     if (data?.value) {
       const arr = JSON.parse(data.value);
       if (Array.isArray(arr) && arr.length > 0) {
-        return arr.filter((p: string) => ["lovable", "gemini", "openai"].includes(p)) as Provider[];
+        const v = arr.filter((p: string) => ["lovable", "gemini", "openai"].includes(p)) as Provider[];
+        priorityCache = { value: v, at: Date.now() };
+        return v;
       }
     }
   } catch (_) { /* ignore */ }
   return ["lovable", "gemini", "openai"];
+}
+
+// Fire-and-forget logging so OCR responses aren't delayed by a DB round-trip.
+function logAsync(status: string, details: string) {
+  try {
+    const supabase = getServiceClient();
+    void supabase.from("system_logs").insert({ action: "OCR Payment Extract", status, details });
+  } catch (_) { /* ignore */ }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
 }
 
 function normalize(obj: any): OcrResult {
