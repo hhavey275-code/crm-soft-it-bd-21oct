@@ -165,7 +165,7 @@ export function ClientTopUp() {
         return { file, dataUrl };
       }
       const bitmap = await createImageBitmap(file);
-      const MAX = 1600;
+      const MAX = 1100;
       let { width, height } = bitmap;
       if (width > MAX || height > MAX) {
         const ratio = Math.min(MAX / width, MAX / height);
@@ -179,7 +179,7 @@ export function ClientTopUp() {
       if (!ctx) throw new Error("no canvas ctx");
       ctx.drawImage(bitmap, 0, 0, width, height);
       const blob: Blob = await new Promise((res, rej) =>
-        canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/jpeg", 0.75),
+        canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/jpeg", 0.62),
       );
       // Only use compressed if it's actually smaller
       if (blob.size >= file.size) {
@@ -273,6 +273,7 @@ export function ClientTopUp() {
           image_url: dataUrl,
           verify_account_number: bankSnapshot.account_number,
           allow_first3_last3: paymentMethodSnapshot === "mfs_to_bank",
+          fast: true,
         },
       });
       if (error) throw error;
