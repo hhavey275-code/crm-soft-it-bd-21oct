@@ -52,7 +52,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { image_url, verify_account_number, allow_first3_last3 } = await req.json();
+    const { image_url, verify_account_number, allow_first3_last3, fast } = await req.json();
     if (!image_url) {
       return new Response(JSON.stringify({ error: "image_url is required" }), {
         status: 400,
@@ -60,7 +60,9 @@ serve(async (req) => {
       });
     }
 
-    const { result, provider, attempts } = await runOcrWithFallback(image_url);
+    // Client-facing uploads run in fast mode: short per-provider timeout, no long
+    // rate-limit sleeps (falls through to the next provider instead).
+    const { result, provider, attempts } = await runOcrWithFallback(image_url, undefined, { fast: fast !== false });
     const account_verified = verify_account_number
       ? verifyAccount(verify_account_number, result, !!allow_first3_last3)
       : null;

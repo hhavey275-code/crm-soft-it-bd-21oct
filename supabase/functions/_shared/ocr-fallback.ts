@@ -62,7 +62,10 @@ function getServiceClient() {
   );
 }
 
+let priorityCache: { value: Provider[]; at: number } | null = null;
+
 export async function getOcrPriority(): Promise<Provider[]> {
+  if (priorityCache && Date.now() - priorityCache.at < 60_000) return priorityCache.value;
   try {
     const supabase = getServiceClient();
     const { data } = await supabase
@@ -73,11 +76,28 @@ export async function getOcrPriority(): Promise<Provider[]> {
     if (data?.value) {
       const arr = JSON.parse(data.value);
       if (Array.isArray(arr) && arr.length > 0) {
-        return arr.filter((p: string) => ["lovable", "gemini", "openai"].includes(p)) as Provider[];
+        const v = arr.filter((p: string) => ["lovable", "gemini", "openai"].includes(p)) as Provider[];
+        priorityCache = { value: v, at: Date.now() };
+        return v;
       }
     }
   } catch (_) { /* ignore */ }
   return ["lovable", "gemini", "openai"];
+}
+
+// Fire-and-forget logging so OCR responses aren't delayed by a DB round-trip.
+function logAsync(status: string, details: string) {
+  try {
+    const supabase = getServiceClient();
+    void supabase.from("system_logs").insert({ action: "OCR Payment Extract", status, details });
+  } catch (_) { /* ignore */ }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
 }
 
 function normalize(obj: any): OcrResult {
@@ -261,34 +281,38 @@ async function callOpenAI(imageUrl: string): Promise<OcrResult> {
 
 export type OcrSuccess = { result: OcrResult; provider: Provider; attempts: Array<{ provider: Provider; ok: boolean; error?: string }> };
 
-export async function runOcrWithFallback(imageUrl: string, prioritySetting?: Provider[]): Promise<OcrSuccess> {
+export async function runOcrWithFallback(
+  imageUrl: string,
+  prioritySetting?: Provider[],
+  opts?: { fast?: boolean },
+): Promise<OcrSuccess> {
+  const fast = !!opts?.fast;
   const priority = prioritySetting && prioritySetting.length > 0 ? prioritySetting : await getOcrPriority();
   const attempts: Array<{ provider: Provider; ok: boolean; error?: string }> = [];
-  const maxWaitMs = Number(Deno.env.get("OCR_RETRY_WAIT_MS") || "75000");
+  // In fast mode never sleep a full quota window — just move to the next provider.
+  const maxWaitMs = fast ? 2_000 : Number(Deno.env.get("OCR_RETRY_WAIT_MS") || "75000");
+  const providerTimeoutMs = fast ? 20_000 : 60_000;
   const triedRetry = new Set<Provider>();
   const callProvider = async (provider: Provider): Promise<OcrResult> => {
-    if (provider === "lovable") return await callLovable(imageUrl);
-    if (provider === "gemini") return await callGemini(imageUrl);
-    return await callOpenAI(imageUrl);
+    const run = provider === "lovable"
+      ? callLovable(imageUrl)
+      : provider === "gemini"
+        ? callGemini(imageUrl)
+        : callOpenAI(imageUrl);
+    return await withTimeout(run, providerTimeoutMs, provider);
   };
   for (const provider of priority) {
     try {
       const result = await callProvider(provider);
       attempts.push({ provider, ok: true });
-      // Log to system_logs
-      try {
-        const supabase = getServiceClient();
-        await supabase.from("system_logs").insert({
-          action: "OCR Payment Extract",
-          status: "success",
-          details: `provider=${provider}; attempts=${JSON.stringify(attempts)}`,
-        });
-      } catch (_) {}
+      logAsync("success", `provider=${provider}; attempts=${JSON.stringify(attempts)}`);
       return { result, provider, attempts };
     } catch (e: any) {
       attempts.push({ provider, ok: false, error: e?.message || String(e) });
       console.error(`[OCR] ${provider} failed:`, e?.message);
-      if (e?.retryAfterMs && !triedRetry.has(provider)) {
+      // Only wait-and-retry the same provider when there is no other provider left to try.
+      const isLast = provider === priority[priority.length - 1];
+      if (e?.retryAfterMs && !triedRetry.has(provider) && (!fast || isLast)) {
         const waitMs = clamp(Number(e.retryAfterMs), 3_000, maxWaitMs);
         triedRetry.add(provider);
         console.warn(`[OCR] ${provider} rate-limited; retrying once after ${Math.round(waitMs / 1000)}s`);
@@ -296,14 +320,7 @@ export async function runOcrWithFallback(imageUrl: string, prioritySetting?: Pro
         try {
           const result = await callProvider(provider);
           attempts.push({ provider, ok: true });
-          try {
-            const supabase = getServiceClient();
-            await supabase.from("system_logs").insert({
-              action: "OCR Payment Extract",
-              status: "success",
-              details: `provider=${provider}; retried_after_ms=${waitMs}; attempts=${JSON.stringify(attempts)}`,
-            });
-          } catch (_) {}
+          logAsync("success", `provider=${provider}; retried_after_ms=${waitMs}; attempts=${JSON.stringify(attempts)}`);
           return { result, provider, attempts };
         } catch (retryErr: any) {
           attempts.push({ provider, ok: false, error: `retry: ${retryErr?.message || String(retryErr)}` });
@@ -314,14 +331,7 @@ export async function runOcrWithFallback(imageUrl: string, prioritySetting?: Pro
     }
   }
   // All failed — log and throw
-  try {
-    const supabase = getServiceClient();
-    await supabase.from("system_logs").insert({
-      action: "OCR Payment Extract",
-      status: "error",
-      details: `All providers failed; attempts=${JSON.stringify(attempts)}`,
-    });
-  } catch (_) {}
+  logAsync("error", `All providers failed; attempts=${JSON.stringify(attempts)}`);
   const summary = attempts.map((a) => `${a.provider}:${a.error || "ok"}`).join(" | ");
   throw new Error(`All OCR providers failed: ${summary}`);
 }
