@@ -53,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
   const [loading, setLoading] = useState(true);
   const currentUserId = useRef<string | null>(null);
+  const retryCount = useRef(0);
 
   const fetchUserData = useCallback(async (userId: string) => {
     try {
@@ -69,6 +70,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (rolesError) console.error("Failed to fetch user roles:", rolesError);
       if (profileError) console.error("Failed to fetch profile:", profileError);
 
+      if (rolesError) {
+        // Roles unknown → do NOT downgrade to "client" (would show the wrong
+        // dashboard to admins). Keep role null and retry.
+        retryCount.current += 1;
+        const delay = Math.min(1000 * 2 ** (retryCount.current - 1), 15_000);
+        window.setTimeout(() => {
+          if (currentUserId.current === userId) void fetchUserData(userId);
+        }, delay);
+        setProfile(prof ?? null);
+        return;
+      }
+
+      retryCount.current = 0;
       const rolePriority: AppRole[] = ["superadmin", "admin", "agency", "seller", "client"];
       const resolvedRole =
         rolePriority.find((candidate) => roles?.some((row) => row.role === candidate)) ?? "client";
@@ -77,13 +91,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("Failed to fetch user data:", err);
       if (currentUserId.current === userId) {
-        // Never leave the whole app on an infinite spinner when Supabase is
-        // temporarily slow. RLS remains the source of truth for data access.
-        setRole("client");
-        setProfile(null);
+        // Never guess the role here: defaulting to "client" showed admins the
+        // wrong dashboard. Leave role null and keep retrying with backoff.
+        retryCount.current += 1;
+        const delay = Math.min(1000 * 2 ** (retryCount.current - 1), 15_000);
         window.setTimeout(() => {
           if (currentUserId.current === userId) void fetchUserData(userId);
-        }, 5_000);
+        }, delay);
       }
     } finally {
       if (currentUserId.current === userId) {
@@ -100,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (newUserId !== currentUserId.current) {
         // User changed → clear stale role/profile immediately to avoid wrong UI
         currentUserId.current = newUserId;
+        retryCount.current = 0;
         setRole(null);
         setProfile(null);
       }
