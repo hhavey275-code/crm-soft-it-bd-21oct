@@ -72,10 +72,6 @@ export function AuthForm() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        });
         toast.success("Welcome back!");
         navigate({ to: "/dashboard", replace: true });
         return;

@@ -57,6 +57,10 @@ Never call forward-* without going through `claim_forward_slot` first.
 - `has_role` is `SECURITY DEFINER` — used in RLS to avoid recursion. Don't rewrite RLS to query `user_roles` directly.
 - `signOut()` must reset state immediately, clear all `sb-*` localStorage keys, then redirect.
 
+**2026-08-06 reliability fix:** Profile/role hydration now exits loading after a 12s network
+timeout and retries in the background; password login no longer repeats `setSession` after
+`signInWithPassword` has already persisted the session. Role storage and RLS are unchanged.
+
 ---
 
 ## 4. Tenant Usage / Limit Ledger (LOCKED)
@@ -120,4 +124,4 @@ Telegram bot token + group IDs live in `site_settings` / `bank_accounts` rows.
 
 ---
 
-**Last reviewed:** 2026-05-08. Bump this date when you re-verify the flow.
+**Last reviewed:** 2026-08-06. Bump this date when you re-verify the flow.
