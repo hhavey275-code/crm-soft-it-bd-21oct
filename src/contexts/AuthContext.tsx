@@ -5,6 +5,17 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
+const USER_DATA_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error("User data request timed out")), timeoutMs);
+    }),
+  ]);
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -46,10 +57,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserData = useCallback(async (userId: string) => {
     try {
       const [{ data: roles, error: rolesError }, { data: prof, error: profileError }] =
-        await Promise.all([
-          supabase.from("user_roles").select("role").eq("user_id", userId),
-          supabase.from("profiles").select("*").eq("user_id", userId).single(),
-        ]);
+        await withTimeout(
+          Promise.all([
+            supabase.from("user_roles").select("role").eq("user_id", userId),
+            supabase.from("profiles").select("*").eq("user_id", userId).single(),
+          ]),
+          USER_DATA_TIMEOUT_MS,
+        );
       // Guard: if user changed mid-flight (logout/login), discard stale result
       if (currentUserId.current !== userId) return;
       if (rolesError) console.error("Failed to fetch user roles:", rolesError);
@@ -63,8 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("Failed to fetch user data:", err);
       if (currentUserId.current === userId) {
-        setRole(null);
+        // Never leave the whole app on an infinite spinner when Supabase is
+        // temporarily slow. RLS remains the source of truth for data access.
+        setRole("client");
         setProfile(null);
+        window.setTimeout(() => {
+          if (currentUserId.current === userId) void fetchUserData(userId);
+        }, 5_000);
       }
     } finally {
       if (currentUserId.current === userId) {
