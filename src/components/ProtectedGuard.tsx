@@ -25,7 +25,10 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
     };
   }, [user, loading, navigate]);
 
-  if (loading) {
+  // Profile/role hydration may be slow even after the auth session is known.
+  // Only block the route while we still do not know whether a user exists;
+  // authenticated children can render their own data-loading/error state.
+  if (loading && !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
