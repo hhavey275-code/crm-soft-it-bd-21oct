@@ -38,7 +38,8 @@ function DashboardContent() {
   const { isAdmin, isSeller, isAgency, loading, user, role } = useAuth();
   // Wait for auth + role to hydrate before picking a dashboard, otherwise
   // on reload the ClientDashboard flashes for admins (race: role=null while loading).
-  if (loading || !user || !role) return <PageSkeleton />;
+  if (loading || !user) return <PageSkeleton />;
+  if (!role) return <RoleUnavailable />;
   return isAdmin ? (
     <AdminDashboard />
   ) : isAgency ? (
@@ -47,5 +48,23 @@ function DashboardContent() {
     <SellerDashboard />
   ) : (
     <ClientDashboard />
+  );
+}
+
+function RoleUnavailable() {
+  return (
+    <div className="space-y-4">
+      <PageSkeleton />
+      <div className="rounded-lg border bg-card p-4 text-center text-sm text-muted-foreground">
+        <p>Connection problem — your account details couldn&apos;t load. Retrying…</p>
+        <button
+          type="button"
+          className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          onClick={() => window.location.reload()}
+        >
+          Reload
+        </button>
+      </div>
+    </div>
   );
 }
