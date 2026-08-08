@@ -2050,6 +2050,7 @@ export type Database = {
           business_address: string | null
           campaign_management_enabled: boolean
           can_approve_topups: boolean
+          can_withdraw: boolean
           color_theme: string
           company: string | null
           created_at: string
@@ -2076,6 +2077,7 @@ export type Database = {
           business_address?: string | null
           campaign_management_enabled?: boolean
           can_approve_topups?: boolean
+          can_withdraw?: boolean
           color_theme?: string
           company?: string | null
           created_at?: string
@@ -2102,6 +2104,7 @@ export type Database = {
           business_address?: string | null
           campaign_management_enabled?: boolean
           can_approve_topups?: boolean
+          can_withdraw?: boolean
           color_theme?: string
           company?: string | null
           created_at?: string
