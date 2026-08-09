@@ -1126,6 +1126,7 @@ export default function ClientDetailPage() {
           </div>
         )}
 
+        <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div
             className={cn(
               "flex items-center gap-3 flex-wrap",
