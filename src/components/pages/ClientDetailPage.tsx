@@ -2057,8 +2057,9 @@ export default function ClientDetailPage() {
                   })}
                 </div>
 
-                {/* Bottom row — larger white cards with icon */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                {/* Wallet row — main, secondary and combined side by side */}
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+
                   {/* Wallet Balance */}
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
