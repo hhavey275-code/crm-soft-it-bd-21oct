@@ -2076,6 +2076,12 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Secondary (sheet-rate) wallet — admin controlled */}
+                  <div className="col-span-2 lg:col-span-4">
+                    {userId && <SecondaryWalletPanel userId={userId} mainBalance={walletBalance} />}
+                  </div>
+
+
                   {/* Total Ad Accounts */}
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
