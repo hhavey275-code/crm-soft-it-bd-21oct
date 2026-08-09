@@ -382,19 +382,21 @@ Deno.serve(async (req)=>{
         const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
         dueLimit = Number(prof?.due_limit ?? 0);
       }
-      // ATOMIC + ledger-consistent deduction. The DB function locks the wallet
-      // row, realigns wallets.balance with the transaction ledger if they have
-      // drifted, then deducts. This makes it impossible for a top-up to leave
-      // the balance HIGHER than before (the old phantom-balance bug).
-      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup", {
+      // ATOMIC + ledger-consistent deduction. The DB function locks the chosen
+      // wallet row (main or secondary), realigns its balance with that wallet's
+      // transaction ledger if they have drifted, then deducts. This makes it
+      // impossible for a top-up to leave the balance HIGHER than before.
+      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup_v2", {
         p_user_id: walletUserId,
         p_amount: amount,
         p_ad_account_id: ad_account_id,
         p_description: `${account.account_name}\n${cleanAccountId}`,
         p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
-        p_allow_negative: isAdmin,
-        p_due_limit: dueLimit,
+        p_wallet_kind: walletKind,
+        p_allow_negative: isAdmin && walletKind === "primary",
+        p_due_limit: walletKind === "primary" ? dueLimit : 0,
       });
+
       if (deductErr) {
         console.error("deduct_wallet_for_topup failed", deductErr);
         return json({ error: "Wallet deduction failed. Please try again." }, 500);
