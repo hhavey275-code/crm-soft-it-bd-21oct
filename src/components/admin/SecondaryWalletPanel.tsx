@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Wallet, Scale } from "lucide-react";
+import { Plus, Minus, Wallet, Scale, DollarSign, Save, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 
@@ -28,6 +28,7 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
   const wallets = useWallets(userId);
   const invalidate = useInvalidate(userId);
   const [rateInput, setRateInput] = useState("");
+  const [editingRate, setEditingRate] = useState(false);
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -57,6 +58,7 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
     onSuccess: () => {
       toast.success("Secondary wallet rate saved");
       setRateInput("");
+      setEditingRate(false);
       invalidate();
     },
     onError: (e: any) => toast.error(e.message ?? "Failed to save rate"),
@@ -81,26 +83,60 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
       </div>
 
       {wallets.secondaryEnabled && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">Secondary USD Rate (৳) — current ৳{wallets.secondaryRate}/USD</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              step="0.01"
-              className="h-9"
-              placeholder={String(wallets.secondaryRate || "124")}
-              value={rateInput}
-              onChange={(e) => setRateInput(e.target.value)}
-            />
-            <Button size="sm" className="h-9" onClick={() => rateMutation.mutate()} disabled={rateMutation.isPending}>
-              Save
-            </Button>
+        <div className="flex items-center gap-3 rounded-xl border border-green-200/60 bg-green-50/40 dark:bg-green-950/20 dark:border-green-800/40 p-4 transition-colors hover:bg-green-50/60">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Secondary Rate (Sheet)
+            </p>
+            {editingRate ? (
+              <div className="flex items-center gap-1 mt-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-20 h-7 text-sm"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder={String(wallets.secondaryRate || "124")}
+                  autoFocus
+                />
+                <Button
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => rateMutation.mutate()}
+                  disabled={rateMutation.isPending}
+                >
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setEditingRate(false)}
+                >
+                  <XCircle className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <p
+                className="font-semibold text-sm text-green-700 dark:text-green-400 cursor-pointer hover:text-green-500 transition-colors"
+                onClick={() => {
+                  setRateInput(String(wallets.secondaryRate ?? ""));
+                  setEditingRate(true);
+                }}
+              >
+                ৳{wallets.secondaryRate}/USD
+              </p>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 /**
  * Compact secondary-wallet balance card, sized like the main Wallet Balance
@@ -140,7 +176,7 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
 
   return (
     <>
-      <Card className="border border-emerald-300/60 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/60 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-900/20 shadow-sm hover:shadow-md transition-shadow">
+      <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-emerald-500/20">
@@ -228,7 +264,7 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
   const totalBdt = mainBdt + secondaryBdt;
   const isDue = totalBdt < 0;
   return (
-    <Card className="border border-purple-300/60 dark:border-purple-800/50 bg-gradient-to-br from-purple-50 via-violet-50 to-purple-100/60 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-purple-900/20 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-purple-500/20">
