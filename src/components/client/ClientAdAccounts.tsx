@@ -199,6 +199,29 @@ export function ClientAdAccounts() {
     }
     setWithdrawLoading(true);
     try {
+      // Permission granted → withdraw straight from Meta into the wallet.
+      if (canWithdraw) {
+        const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+          body: { ad_account_id: withdrawAccount.id, amount },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        await logSystemAction(
+          "Spend Cap Withdraw",
+          `$${amount} withdrawn from ${withdrawAccount.account_name} to wallet`,
+          user!.id,
+          profile?.full_name || user!.email,
+        );
+        toast.success(`$${amount} moved back to your wallet`);
+        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user!.id] });
+        queryClient.invalidateQueries({ queryKey: ["client-wallet", user!.id] });
+        queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
+        setWithdrawAccount(null);
+        setWithdrawAmount("");
+        setWithdrawNote("");
+        return;
+      }
+
       const { error } = await (supabase as any).from("spend_cap_withdraw_requests").insert({
         user_id: user!.id,
         ad_account_id: withdrawAccount.id,
