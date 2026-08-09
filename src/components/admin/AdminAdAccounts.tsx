@@ -177,6 +177,8 @@ export function AdminAdAccounts() {
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawWallet, setWithdrawWallet] = useState<"primary" | "secondary">("primary");
+
   const [withdrawMeta, setWithdrawMeta] = useState<{ real_amount_spent: number; current_spend_cap: number; max_withdrawable: number } | null>(null);
   const [fetchingWithdrawMeta, setFetchingWithdrawMeta] = useState(false);
   const { data: accounts } = useQuery({
