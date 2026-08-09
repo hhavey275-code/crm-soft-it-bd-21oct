@@ -89,6 +89,15 @@ Deno.serve(async (req) => {
       if (!assignment) {
         return json({ error: "Forbidden" }, 403);
       }
+      // Client-side withdraw must be explicitly enabled by an admin.
+      const { data: permProfile } = await supabase
+        .from("profiles")
+        .select("spend_cap_withdraw_enabled")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!permProfile?.spend_cap_withdraw_enabled) {
+        return json({ error: "Spend cap withdraw is not enabled for your account. Please contact support." }, 403);
+      }
     }
 
     const { data: account, error: accountErr } = await supabase
