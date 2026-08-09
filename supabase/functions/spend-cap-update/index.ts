@@ -271,10 +271,12 @@ Deno.serve(async (req)=>{
     const { data: userRole } = await supabase.from("user_roles").select("role").eq("user_id", userId).single();
     const isAdmin = userRole?.role === "admin" || userRole?.role === "superadmin";
     // --- Parse body ---
-    const { ad_account_id, amount, deduct_wallet, target_user_id } = await req.json();
+    const { ad_account_id, amount, deduct_wallet, target_user_id, wallet_kind: walletKindRaw } = await req.json();
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
+    const walletKind = walletKindRaw === "secondary" ? "secondary" : "primary";
+
 
     // ============================================
     // IDEMPOTENCY GUARD: prevent double top-up
