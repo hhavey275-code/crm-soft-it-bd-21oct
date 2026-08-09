@@ -298,6 +298,7 @@ export function AdminAdAccounts() {
       setDialogTab("topup");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-secondary-wallets"] });
     },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
@@ -695,6 +696,7 @@ export function AdminAdAccounts() {
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-secondary-wallets"] });
     },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
