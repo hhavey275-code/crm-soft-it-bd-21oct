@@ -131,6 +131,8 @@ export default function ClientDetailPage() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawWallet, setWithdrawWallet] = useState<"primary" | "secondary">("primary");
+
   const [withdrawMeta, setWithdrawMeta] = useState<{
     max_withdrawable: number;
     current_spend_cap: number;
