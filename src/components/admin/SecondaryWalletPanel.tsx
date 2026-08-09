@@ -81,26 +81,60 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
       </div>
 
       {wallets.secondaryEnabled && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">Secondary USD Rate (৳) — current ৳{wallets.secondaryRate}/USD</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              step="0.01"
-              className="h-9"
-              placeholder={String(wallets.secondaryRate || "124")}
-              value={rateInput}
-              onChange={(e) => setRateInput(e.target.value)}
-            />
-            <Button size="sm" className="h-9" onClick={() => rateMutation.mutate()} disabled={rateMutation.isPending}>
-              Save
-            </Button>
+        <div className="flex items-center gap-3 rounded-xl border border-green-200/60 bg-green-50/40 dark:bg-green-950/20 dark:border-green-800/40 p-4 transition-colors hover:bg-green-50/60">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Secondary Rate (Sheet)
+            </p>
+            {editingRate ? (
+              <div className="flex items-center gap-1 mt-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-20 h-7 text-sm"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder={String(wallets.secondaryRate || "124")}
+                  autoFocus
+                />
+                <Button
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => rateMutation.mutate()}
+                  disabled={rateMutation.isPending}
+                >
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setEditingRate(false)}
+                >
+                  <XCircle className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <p
+                className="font-semibold text-sm text-green-700 dark:text-green-400 cursor-pointer hover:text-green-500 transition-colors"
+                onClick={() => {
+                  setRateInput(String(wallets.secondaryRate ?? ""));
+                  setEditingRate(true);
+                }}
+              >
+                ৳{wallets.secondaryRate}/USD
+              </p>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 /**
  * Compact secondary-wallet balance card, sized like the main Wallet Balance
