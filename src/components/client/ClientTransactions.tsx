@@ -106,7 +106,14 @@ export function ClientTransactions() {
                           {isPositive ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                         </p>
                       </div>
+                      <p className={cn(
+                        "text-[10px] font-semibold uppercase tracking-wide mt-0.5",
+                        tx.wallet_kind === "secondary" ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400"
+                      )}>
+                        {tx.wallet_kind === "secondary" ? "Secondary wallet" : "Main wallet"}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{getDescriptionText(tx)}</p>
+
                       <div className="flex items-center justify-between mt-1.5">
                         <span className="text-[11px] text-muted-foreground">
                           {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
@@ -144,10 +151,19 @@ export function ClientTransactions() {
               </TableHeader>
               <TableBody>
                 {transactions?.map((tx: any) => (
-                  <TableRow key={tx.id}>
+                  <TableRow key={tx.id} className={tx.wallet_kind === "secondary" ? "bg-teal-50/70 dark:bg-teal-950/20" : undefined}>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                    <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="capitalize font-medium">
+                      <span>{tx.type.replace(/_/g, " ")}</span>
+                      <span className={cn(
+                        "block text-[10px] font-semibold uppercase tracking-wide",
+                        tx.wallet_kind === "secondary" ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400"
+                      )}>
+                        {tx.wallet_kind === "secondary" ? "Secondary wallet" : "Main wallet"}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-sm">{renderDescription(tx)}</TableCell>
+
                     <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-emerald-600" : "text-destructive")}>
                       {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                     </TableCell>
