@@ -125,12 +125,17 @@ export default function ClientDetailPage() {
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNote, setWalletNote] = useState("");
 
+  // Main page tab (controlled so mobile wallet cards can show on Overview only)
+  const [mainTab, setMainTab] = useState<string>("overview");
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawWallet, setWithdrawWallet] = useState<"primary" | "secondary">("primary");
+
   const [withdrawMeta, setWithdrawMeta] = useState<{
     max_withdrawable: number;
     current_spend_cap: number;
@@ -613,8 +618,9 @@ export default function ClientDetailPage() {
       const amt = parseFloat(withdrawAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: selectedAccountId, amount: amt },
+        body: { ad_account_id: selectedAccountId, amount: amt, wallet_kind: withdrawWallet },
       });
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
@@ -1127,7 +1133,7 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
+        <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
           <div
             className={cn(
               "flex items-center gap-3 flex-wrap",
@@ -1284,8 +1290,9 @@ export default function ClientDetailPage() {
             </Button>
           )}
 
-          {/* Mobile-only colorful wallet summary — below tabs, above tab content */}
-          {isMobile && userId && (
+          {/* Mobile-only colorful wallet summary — Overview tab only */}
+          {isMobile && userId && mainTab === "overview" && (
+
             <div className="space-y-2">
               {/* Main Wallet — themed blue gradient */}
               <div className="rounded-xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-3.5 text-primary-foreground shadow-md">
@@ -3226,12 +3233,55 @@ export default function ClientDetailPage() {
                   </div>
                 ) : withdrawMeta ? (
                   <>
-                    <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
-                      <span className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4" /> Client Wallet
-                      </span>
-                      <span className="font-semibold">${walletBalance.toLocaleString()}</span>
+                    {/* Destination wallet — admin picks where the withdrawn balance lands */}
+                    <div className="space-y-2">
+                      <Label>Credit To Wallet</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setWithdrawWallet("primary")}
+                          className={cn(
+                            "rounded-lg border p-2.5 text-left transition-colors",
+                            withdrawWallet === "primary"
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-medium">
+                            <Wallet className="h-3.5 w-3.5" /> Main Wallet
+                          </span>
+                          <span className="mt-0.5 block text-sm font-semibold">
+                            ${walletBalance.toLocaleString()}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!wallets.secondaryEnabled}
+                          onClick={() => setWithdrawWallet("secondary")}
+                          className={cn(
+                            "rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                            withdrawWallet === "secondary"
+                              ? "border-emerald-500 bg-emerald-500/10"
+                              : "border-border hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-medium">
+                            <Wallet className="h-3.5 w-3.5" /> Secondary Wallet
+                          </span>
+                          <span className="mt-0.5 block text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                            ${wallets.secondaryBalance.toLocaleString()}
+                          </span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Withdrawn balance{" "}
+                        <span className="font-medium">
+                          {withdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}
+                        </span>{" "}
+                        e joma hobe.
+                      </p>
                     </div>
+
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Current Spend Cap (Meta)</span>
                       <span className="font-medium">

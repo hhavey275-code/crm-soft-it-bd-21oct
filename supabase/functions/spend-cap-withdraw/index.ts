@@ -73,11 +73,15 @@ Deno.serve(async (req) => {
     const { data: roleRow } = await supabase.from("user_roles").select("role").eq("user_id", userId).single();
     const isAdmin = roleRow?.role === "admin" || roleRow?.role === "superadmin";
 
-    const { ad_account_id, amount, dry_run } = await req.json();
+    const { ad_account_id, amount, dry_run, wallet_kind: walletKindRaw } = await req.json();
     const withdrawAmount = Number(amount);
+    // Clients can only ever withdraw into their MAIN wallet. Admins may choose.
+    const walletKind: "primary" | "secondary" =
+      isAdmin && (walletKindRaw === "secondary") ? "secondary" : "primary";
     if (!ad_account_id || !Number.isFinite(withdrawAmount) || withdrawAmount <= 0) {
       return json({ error: "ad_account_id and positive amount required" }, 400);
     }
+
 
     if (!isAdmin) {
       const { data: assignment } = await supabase
@@ -218,16 +222,26 @@ Deno.serve(async (req) => {
     let newBalance: number | null = null;
 
     if (creditedUserId) {
-      const { data: wallet } = await supabase.from("wallets").select("id, balance").eq("user_id", creditedUserId).single();
+      const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
+      let { data: wallet } = await supabase.from(walletTable).select("id, balance").eq("user_id", creditedUserId).maybeSingle();
+      if (!wallet && walletKind === "secondary") {
+        const { data: created } = await supabase
+          .from("secondary_wallets")
+          .insert({ user_id: creditedUserId, balance: 0 })
+          .select("id, balance")
+          .maybeSingle();
+        wallet = created;
+      }
       if (wallet) {
         newBalance = Number(wallet.balance) + withdrawAmount;
-        await supabase.from("wallets").update({ balance: newBalance }).eq("id", wallet.id);
+        await supabase.from(walletTable).update({ balance: newBalance }).eq("id", wallet.id);
         await supabase.from("transactions").insert({
           user_id: creditedUserId,
           amount: withdrawAmount,
           balance_after: newBalance,
           type: "refund",
-          description: `Withdraw credit\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
+          wallet_kind: walletKind,
+          description: `Withdraw credit (${walletKind === "secondary" ? "Secondary" : "Main"} wallet)\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
           reference_id: ad_account_id,
           processed_by: isAdmin ? `admin:${userId}` : `client:${userId}`,
           via: getLastMetaVia(),
@@ -236,6 +250,7 @@ Deno.serve(async (req) => {
         creditedWallet = true;
       }
     }
+
 
     const bmDbId = account.business_manager_id;
     if (bmDbId) {
@@ -250,7 +265,7 @@ Deno.serve(async (req) => {
       user_id: userId,
       user_name: userName,
       action: "Withdraw",
-      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? "Wallet credited" : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
+      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? `${walletKind === "secondary" ? "Secondary" : "Main"} wallet credited` : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
     });
 
     // Persist rate-limit headers + per-call log captured during this invocation
@@ -271,6 +286,8 @@ Deno.serve(async (req) => {
       real_amount_spent: realAmountSpent,
       max_withdrawable: Number(maxWithdrawable.toFixed(2)),
       wallet_credited: creditedWallet,
+      wallet_kind: walletKind,
+
       credited_user_id: creditedUserId,
       new_balance: newBalance,
       via: getLastMetaVia(),
