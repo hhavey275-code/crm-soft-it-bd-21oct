@@ -2066,6 +2066,8 @@ export type Database = {
           monthly_spend: string | null
           others_telegram_group_id: string | null
           phone: string | null
+          secondary_usd_rate: number | null
+          secondary_wallet_enabled: boolean
           status: string
           stripe_customer_id: string | null
           updated_at: string
@@ -2093,6 +2095,8 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          secondary_usd_rate?: number | null
+          secondary_wallet_enabled?: boolean
           status?: string
           stripe_customer_id?: string | null
           updated_at?: string
@@ -2120,6 +2124,8 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          secondary_usd_rate?: number | null
+          secondary_wallet_enabled?: boolean
           status?: string
           stripe_customer_id?: string | null
           updated_at?: string
@@ -2159,6 +2165,33 @@ export type Database = {
           endpoint?: string
           id?: string
           p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      secondary_wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -3703,8 +3736,10 @@ export type Database = {
           reference_id: string | null
           source_ip: string | null
           type: string
+          usd_rate_used: number | null
           user_id: string
           via: string | null
+          wallet_kind: string
         }
         Insert: {
           amount: number
@@ -3717,8 +3752,10 @@ export type Database = {
           reference_id?: string | null
           source_ip?: string | null
           type: string
+          usd_rate_used?: number | null
           user_id: string
           via?: string | null
+          wallet_kind?: string
         }
         Update: {
           amount?: number
@@ -3731,8 +3768,10 @@ export type Database = {
           reference_id?: string | null
           source_ip?: string | null
           type?: string
+          usd_rate_used?: number | null
           user_id?: string
           via?: string | null
+          wallet_kind?: string
         }
         Relationships: [
           {
@@ -3894,6 +3933,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_adjust_secondary_wallet: {
+        Args: { p_amount: number; p_reason: string; p_user_id: string }
+        Returns: Json
+      }
       apply_global_rate_delta: {
         Args: { p_new_delta: number; p_reason?: string }
         Returns: Json
@@ -3935,6 +3978,19 @@ export type Database = {
           p_due_limit?: number
           p_processed_by: string
           p_user_id: string
+        }
+        Returns: Json
+      }
+      deduct_wallet_for_topup_v2: {
+        Args: {
+          p_ad_account_id: string
+          p_allow_negative?: boolean
+          p_amount: number
+          p_description: string
+          p_due_limit?: number
+          p_processed_by: string
+          p_user_id: string
+          p_wallet_kind?: string
         }
         Returns: Json
       }
