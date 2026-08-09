@@ -401,7 +401,7 @@ Deno.serve(async (req)=>{
         p_description: `${account.account_name}\n${cleanAccountId}`,
         p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
         p_wallet_kind: walletKind,
-        p_allow_negative: isAdmin && walletKind === "primary",
+        p_allow_negative: isAdmin,
         p_due_limit: walletKind === "primary" ? dueLimit : 0,
       });
 
