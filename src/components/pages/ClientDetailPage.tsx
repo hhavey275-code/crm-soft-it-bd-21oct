@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets } from "@/hooks/useWallets";
 import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
+import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1733,6 +1734,8 @@ export default function ClientDetailPage() {
                   </div>
                   {/* Secondary (sheet-rate) wallet on/off + rate */}
                   {userId && <SecondaryWalletToggle userId={userId} />}
+                  {/* Client-side spend cap withdraw permission */}
+                  {userId && <SpendCapWithdrawToggle userId={userId} />}
                 </div>
               </CardContent>
             </Card>

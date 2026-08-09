@@ -2071,6 +2071,7 @@ export type Database = {
           phone: string | null
           secondary_usd_rate: number | null
           secondary_wallet_enabled: boolean
+          spend_cap_withdraw_enabled: boolean
           status: string
           stripe_customer_id: string | null
           updated_at: string
@@ -2100,6 +2101,7 @@ export type Database = {
           phone?: string | null
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
+          spend_cap_withdraw_enabled?: boolean
           status?: string
           stripe_customer_id?: string | null
           updated_at?: string
@@ -2129,6 +2131,7 @@ export type Database = {
           phone?: string | null
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
+          spend_cap_withdraw_enabled?: boolean
           status?: string
           stripe_customer_id?: string | null
           updated_at?: string

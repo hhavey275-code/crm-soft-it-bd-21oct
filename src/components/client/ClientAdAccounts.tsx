@@ -101,7 +101,45 @@ export function ClientAdAccounts() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawNote, setWithdrawNote] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMax, setWithdrawMax] = useState<number | null>(null);
+  const [withdrawMaxLoading, setWithdrawMaxLoading] = useState(false);
   const [isTenantMode, setIsTenantMode] = useState(false);
+
+  /** Admin-granted permission to pull unused ad account balance back to wallet. */
+  const { data: canWithdraw } = useQuery({
+    queryKey: ["client-can-withdraw", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("spend_cap_withdraw_enabled")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return !!data?.spend_cap_withdraw_enabled;
+    },
+  });
+
+  const openWithdraw = async (a: any) => {
+    setWithdrawAccount(a);
+    setWithdrawAmount("");
+    setWithdrawNote("");
+    setWithdrawMax(null);
+    if (!canWithdraw) return;
+    setWithdrawMaxLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: a.id, amount: 1, dry_run: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setWithdrawMax(Number((data as any)?.max_withdrawable ?? 0));
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err) || "Could not read live limit from Meta");
+    } finally {
+      setWithdrawMaxLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     isTenantInstance().then(setIsTenantMode);
@@ -161,6 +199,29 @@ export function ClientAdAccounts() {
     }
     setWithdrawLoading(true);
     try {
+      // Permission granted → withdraw straight from Meta into the wallet.
+      if (canWithdraw) {
+        const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+          body: { ad_account_id: withdrawAccount.id, amount },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        await logSystemAction(
+          "Spend Cap Withdraw",
+          `$${amount} withdrawn from ${withdrawAccount.account_name} to wallet`,
+          user!.id,
+          profile?.full_name || user!.email,
+        );
+        toast.success(`$${amount} moved back to your wallet`);
+        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user!.id] });
+        queryClient.invalidateQueries({ queryKey: ["client-wallet", user!.id] });
+        queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
+        setWithdrawAccount(null);
+        setWithdrawAmount("");
+        setWithdrawNote("");
+        return;
+      }
+
       const { error } = await (supabase as any).from("spend_cap_withdraw_requests").insert({
         user_id: user!.id,
         ad_account_id: withdrawAccount.id,
@@ -844,17 +905,6 @@ export function ClientAdAccounts() {
                             Top Up
                           </Button>
                         )}
-                        {!a.client_topup_disabled && wallets.secondaryEnabled && (
-                          <Button
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            disabled={isInactive}
-                            title="Top Up (Secondary Wallet)"
-                            onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
-                          >
-                            <ArrowUpCircle className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0" data-tutorial={idx === 0 ? "ad-account-3dot" : undefined}>
@@ -869,9 +919,9 @@ export function ClientAdAccounts() {
                             <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                               Request BM Access
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setWithdrawAccount(a); setWithdrawAmount(""); setWithdrawNote(""); }}>
+                            <DropdownMenuItem onClick={() => openWithdraw(a)}>
                               <ArrowDownCircle className="h-3.5 w-3.5 mr-2" />
-                              Request Spend Cap Withdraw
+                              {canWithdraw ? "Withdraw to Wallet" : "Request Spend Cap Withdraw"}
                             </DropdownMenuItem>
                             {hasAutoTopupPermission && (
                               <DropdownMenuItem onClick={() => {
@@ -1009,17 +1059,6 @@ export function ClientAdAccounts() {
                               Top Up
                             </Button>
                           )}
-                          {!a.client_topup_disabled && wallets.secondaryEnabled && (
-                            <Button
-                              size="icon"
-                              className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
-                              disabled={isInactive}
-                              title="Top Up (Secondary Wallet)"
-                              onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
-                            >
-                              <ArrowUpCircle className="h-4 w-4" />
-                            </Button>
-                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8" data-tutorial={idx === 0 ? "ad-account-3dot" : undefined}>
@@ -1034,9 +1073,9 @@ export function ClientAdAccounts() {
                               <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                                 Request BM Access
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setWithdrawAccount(a); setWithdrawAmount(""); setWithdrawNote(""); }}>
+                              <DropdownMenuItem onClick={() => openWithdraw(a)}>
                                 <ArrowDownCircle className="h-3.5 w-3.5 mr-2" />
-                                Request Spend Cap Withdraw
+                                {canWithdraw ? "Withdraw to Wallet" : "Request Spend Cap Withdraw"}
                               </DropdownMenuItem>
                               {hasAutoTopupPermission && (
                                 <DropdownMenuItem onClick={() => {
@@ -1116,17 +1155,6 @@ export function ClientAdAccounts() {
                 ${walletBalance.toLocaleString()}
               </span>
             </div>
-            {wallets.secondaryEnabled && (
-              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800">
-                <span className="flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                  <Wallet className="h-4 w-4" />
-                  Secondary Wallet (৳{wallets.secondaryRate})
-                </span>
-                <span className={`font-semibold ${wallets.secondaryBalance < 0 ? 'text-destructive' : 'text-teal-700 dark:text-teal-400'}`}>
-                  ${wallets.secondaryBalance.toLocaleString()}
-                </span>
-              </div>
-            )}
             {dueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
@@ -1148,15 +1176,13 @@ export function ClientAdAccounts() {
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Amount exceeds your main wallet balance{dueLimit > 0 ? " + due limit" : ""}{wallets.secondaryEnabled ? " — you can still use the secondary wallet" : ""}</p>
+                <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
               )}
-              {wallets.secondaryEnabled && parsedAmount > wallets.secondaryBalance && parsedAmount > 0 && (
-                <p className="text-sm text-muted-foreground">Secondary wallet has ${wallets.secondaryBalance.toLocaleString()} available</p>
-              )}
             </div>
+
             {parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
@@ -1168,23 +1194,14 @@ export function ClientAdAccounts() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-            {wallets.secondaryEnabled && topUpWallet === "secondary" ? (
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => topUpMutation.mutate("secondary")}
-                disabled={!topUpAmount || parsedAmount <= 0 || parsedAmount > wallets.secondaryBalance || topUpMutation.isPending}
-              >
-                {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => topUpMutation.mutate("primary")}
-                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
-              >
-                {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
-              </Button>
-            )}
+            <Button
+              onClick={() => topUpMutation.mutate("primary")}
+              disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
+            >
+              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+            </Button>
           </DialogFooter>
+
 
 
         </DialogContent>
@@ -1232,12 +1249,36 @@ export function ClientAdAccounts() {
       <Dialog open={!!withdrawAccount} onOpenChange={(open) => { if (!open) setWithdrawAccount(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Request Spend Cap Withdraw</DialogTitle>
+            <DialogTitle>{canWithdraw ? "Withdraw to Wallet" : "Request Spend Cap Withdraw"}</DialogTitle>
             <DialogDescription>
-              Request a spend cap reduction for <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will review and process it manually.
+              {canWithdraw ? (
+                <>
+                  Move unused balance from{" "}
+                  <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span> back into your
+                  wallet. Only the amount Meta still allows can be withdrawn.
+                </>
+              ) : (
+                <>
+                  Request a spend cap reduction for{" "}
+                  <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will
+                  review and process it manually.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {canWithdraw && (
+              <div className="flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
+                <span className="text-muted-foreground">Max withdrawable (live from Meta)</span>
+                <span className="font-semibold">
+                  {withdrawMaxLoading
+                    ? "Checking…"
+                    : withdrawMax != null
+                      ? `$${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      : "—"}
+                </span>
+              </div>
+            )}
             <div>
               <Label>Amount (USD) *</Label>
               <Input
@@ -1249,23 +1290,38 @@ export function ClientAdAccounts() {
                 placeholder="e.g. 100"
                 className="mt-1.5"
               />
+              {canWithdraw && withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax && (
+                <p className="mt-1.5 text-sm text-destructive">
+                  Max withdrawable is ${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
-            <div>
-              <Label>Note (optional)</Label>
-              <Input
-                value={withdrawNote}
-                onChange={(e) => setWithdrawNote(e.target.value)}
-                placeholder="Reason or instructions"
-                className="mt-1.5"
-              />
-            </div>
+            {!canWithdraw && (
+              <div>
+                <Label>Note (optional)</Label>
+                <Input
+                  value={withdrawNote}
+                  onChange={(e) => setWithdrawNote(e.target.value)}
+                  placeholder="Reason or instructions"
+                  className="mt-1.5"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWithdrawAccount(null)}>Cancel</Button>
-            <Button onClick={handleWithdrawSubmit} disabled={withdrawLoading || !withdrawAmount}>
-              {withdrawLoading ? "Submitting..." : "Submit Request"}
+            <Button
+              onClick={handleWithdrawSubmit}
+              disabled={
+                withdrawLoading ||
+                !withdrawAmount ||
+                (canWithdraw && (withdrawMaxLoading || (withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax)))
+              }
+            >
+              {withdrawLoading ? "Processing..." : canWithdraw ? "Withdraw Now" : "Submit Request"}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
       {/* Rename Dialog */}

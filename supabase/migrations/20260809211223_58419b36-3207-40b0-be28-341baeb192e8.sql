@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS spend_cap_withdraw_enabled boolean NOT NULL DEFAULT false;
