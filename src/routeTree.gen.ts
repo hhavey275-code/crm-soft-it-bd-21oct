@@ -61,6 +61,7 @@ import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-link
 import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
+import { Route as ApiPublicWhatsappNotifyRouteImport } from './routes/api.public.whatsapp-notify'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
@@ -323,6 +324,11 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
+const ApiPublicWhatsappNotifyRoute = ApiPublicWhatsappNotifyRouteImport.update({
+  id: '/api/public/whatsapp-notify',
+  path: '/api/public/whatsapp-notify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdsManagerCampaignsRoute = ApiAdsManagerCampaignsRouteImport.update({
   id: '/api/ads-manager/campaigns',
   path: '/api/ads-manager/campaigns',
@@ -383,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -437,6 +444,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsIndexRoute
   '/tenants': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -493,6 +501,7 @@ export interface FileRoutesById {
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -550,6 +559,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/tenants/'
     | '/api/ads-manager/campaigns'
+    | '/api/public/whatsapp-notify'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -604,6 +614,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/tenants'
     | '/api/ads-manager/campaigns'
+    | '/api/public/whatsapp-notify'
   id:
     | '__root__'
     | '/'
@@ -659,6 +670,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/tenants/'
     | '/api/ads-manager/campaigns'
+    | '/api/public/whatsapp-notify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -711,6 +723,7 @@ export interface RootRouteChildren {
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
+  ApiPublicWhatsappNotifyRoute: typeof ApiPublicWhatsappNotifyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1079,6 +1092,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
+    '/api/public/whatsapp-notify': {
+      id: '/api/public/whatsapp-notify'
+      path: '/api/public/whatsapp-notify'
+      fullPath: '/api/public/whatsapp-notify'
+      preLoaderRoute: typeof ApiPublicWhatsappNotifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ads-manager/campaigns': {
       id: '/api/ads-manager/campaigns'
       path: '/api/ads-manager/campaigns'
@@ -1176,6 +1196,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
+  ApiPublicWhatsappNotifyRoute: ApiPublicWhatsappNotifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
