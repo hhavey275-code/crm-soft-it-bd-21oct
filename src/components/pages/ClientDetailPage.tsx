@@ -3191,7 +3191,10 @@ export default function ClientDetailPage() {
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
-                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      variant={topUpWallet === "secondary" ? "default" : "outline"}
+                      className={topUpWallet === "secondary"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
                       onClick={() => topUpMutation.mutate("secondary")}
                       disabled={
                         !selectedAccountId ||
