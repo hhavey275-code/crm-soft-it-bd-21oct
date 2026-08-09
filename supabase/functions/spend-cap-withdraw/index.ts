@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
       user_id: userId,
       user_name: userName,
       action: "Withdraw",
-      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? "Wallet credited" : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
+      details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} withdrawn — Cap: $${currentSpendCap} → $${newSpendCap} — ${creditedWallet ? `${walletKind === "secondary" ? "Secondary" : "Main"} wallet credited` : "No client assigned"} [via=${getLastMetaVia()} IP: ${getLastMetaIp() ?? "n/a"}]`,
     });
 
     // Persist rate-limit headers + per-call log captured during this invocation
