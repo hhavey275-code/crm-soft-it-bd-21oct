@@ -2060,7 +2060,8 @@ export default function ClientDetailPage() {
                 </div>
 
                 {/* Wallet row — main, secondary and combined side by side */}
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <div className={cn("grid gap-3", wallets.secondaryEnabled ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4")}>
+
 
                   {/* Wallet Balance */}
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
@@ -2102,11 +2103,10 @@ export default function ClientDetailPage() {
                   {/* Secondary (sheet-rate) wallet + combined total — admin controlled */}
                   {userId && <SecondaryWalletCard userId={userId} />}
                   {userId && <CombinedTotalCard userId={userId} />}
-                </div>
 
-                {/* Account stat cards */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                  {/* Account stat cards */}
                   {/* Total Ad Accounts */}
+
 
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
