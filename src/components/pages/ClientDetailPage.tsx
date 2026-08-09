@@ -1289,8 +1289,9 @@ export default function ClientDetailPage() {
             </Button>
           )}
 
-          {/* Mobile-only colorful wallet summary — below tabs, above tab content */}
-          {isMobile && userId && (
+          {/* Mobile-only colorful wallet summary — Overview tab only */}
+          {isMobile && userId && mainTab === "overview" && (
+
             <div className="space-y-2">
               {/* Main Wallet — themed blue gradient */}
               <div className="rounded-xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-3.5 text-primary-foreground shadow-md">
