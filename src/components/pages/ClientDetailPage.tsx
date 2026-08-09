@@ -1733,6 +1733,8 @@ export default function ClientDetailPage() {
                   </div>
                   {/* Secondary (sheet-rate) wallet on/off + rate */}
                   {userId && <SecondaryWalletToggle userId={userId} />}
+                  {/* Client-side spend cap withdraw permission */}
+                  {userId && <SpendCapWithdrawToggle userId={userId} />}
                 </div>
               </CardContent>
             </Card>
