@@ -92,8 +92,11 @@ export function ClientWallet() {
               <p className="text-sm text-purple-700 dark:text-purple-400">
                 Combined Due / Adv
               </p>
-              <p className={`text-2xl font-bold mt-1 ${wallets.totalBdt < 0 ? "text-destructive" : "text-purple-700 dark:text-purple-300"}`}>
-                {formatBdt(wallets.totalBdt)}
+              <p className="text-2xl font-bold mt-1 text-purple-700 dark:text-purple-300">
+                {wallets.totalBdt < 0 ? "-" : ""}{formatBdt(wallets.totalBdt)}
+                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-purple-700/70 dark:text-purple-400/70">
+                  {wallets.totalBdt < 0 ? "Due" : "Adv"}
+                </span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Main ${wallets.mainBalance.toLocaleString()} × ৳{wallets.mainRate} + Secondary ${wallets.secondaryBalance.toLocaleString()} × ৳{wallets.secondaryRate}
