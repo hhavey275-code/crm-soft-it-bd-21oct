@@ -415,23 +415,23 @@ export function ClientDashboard() {
       {/* Secondary wallet + combined BDT total — only when enabled for this client */}
       {clientWallets.secondaryEnabled && (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-          <Card className="border-teal-300/70 bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/30 dark:to-emerald-950/20 dark:border-teal-800/50">
+          <Card className="border-green-300/70 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/20 dark:border-green-800/50">
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-teal-700 dark:text-teal-400">Secondary Wallet</p>
-              <p className="text-2xl font-bold mt-1 text-teal-800 dark:text-teal-300">
+              <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
+              <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
                 ${clientWallets.secondaryBalance.toLocaleString()}
               </p>
-              <p className="text-[11px] text-teal-700/70 dark:text-teal-400/70 mt-0.5">
+              <p className="text-[11px] text-green-700/70 dark:text-green-400/70 mt-0.5">
                 Rate ৳{clientWallets.secondaryRate}/USD
               </p>
             </CardContent>
           </Card>
-          <Card className="border border-border/60">
+          <Card className="border-purple-300/70 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800/50">
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-muted-foreground">Combined Due / Adv</p>
+              <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Combined Due / Adv</p>
               <p className={cn(
                 "text-2xl font-bold mt-1",
-                clientWallets.totalBdt < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"
+                clientWallets.totalBdt < 0 ? "text-destructive" : "text-purple-700 dark:text-purple-300"
               )}>
                 {formatBdt(clientWallets.totalBdt)}
               </p>

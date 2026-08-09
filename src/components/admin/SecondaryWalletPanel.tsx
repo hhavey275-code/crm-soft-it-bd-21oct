@@ -167,7 +167,7 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
               </button>
             </div>
           </div>
-          <p className={`text-2xl font-bold tracking-tight ${wallets.secondaryBalance < 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"}`}>
+          <p className={`text-2xl font-bold tracking-tight ${wallets.secondaryBalance < 0 ? "text-destructive" : "text-green-700 dark:text-green-300"}`}>
             ${wallets.secondaryBalance.toLocaleString()}
           </p>
         </CardContent>
@@ -225,11 +225,11 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
   const totalBdt = mainBdt + secondaryBdt;
   const isDue = totalBdt < 0;
   return (
-    <Card className="border border-indigo-300/60 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50 via-violet-50 to-indigo-100/60 dark:from-indigo-950/40 dark:via-violet-950/30 dark:to-indigo-900/20 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border border-purple-300/60 dark:border-purple-800/50 bg-gradient-to-br from-purple-50 via-violet-50 to-purple-100/60 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-purple-900/20 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
-          <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-indigo-500/20">
-            <Scale className="h-4.5 w-4.5 text-indigo-600 dark:text-indigo-400" />
+          <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-purple-500/20">
+            <Scale className="h-4.5 w-4.5 text-purple-600 dark:text-purple-400" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">Combined Due / Adv</p>
@@ -238,7 +238,7 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
             </p>
           </div>
         </div>
-        <p className={`text-2xl font-bold tracking-tight ${isDue ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+        <p className={`text-2xl font-bold tracking-tight ${isDue ? "text-destructive" : "text-purple-700 dark:text-purple-300"}`}>
           {isDue ? "-" : ""}{formatBdt(totalBdt)}
         </p>
       </CardContent>

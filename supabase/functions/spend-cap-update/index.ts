@@ -758,13 +758,15 @@ Deno.serve(async (req)=>{
     // transaction history shows previous limit → new spend cap.
     if (walletTxnId) {
       try {
+        const txnAccountId = String(account.account_id || "").replace(/^act_/, "");
         await supabase.from("transactions").update({
-          description: `${account.account_name}\n${cleanAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
+          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
           old_spend_cap: Number(oldSpendCapDollars),
           new_spend_cap: Number(newSpendCapDollars),
         }).eq("id", walletTxnId);
       } catch (e) { console.warn("cap description update failed:", e); }
     }
+
 
     // ============================================
     // STEP 4.5: Post-update health check — diagnostic
