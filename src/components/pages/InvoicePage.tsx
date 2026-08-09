@@ -74,8 +74,25 @@ export default function InvoicePage() {
           .select("*")
           .eq("user_id", invoice.user_id)
           .maybeSingle();
-        return { invoice, request, profile };
+
+        // How much of this deposit was pulled into the secondary wallet
+        // (auto-settlement moves main surplus onto secondary due).
+        const from = new Date(new Date(invoice.created_at).getTime() - 5 * 60 * 1000).toISOString();
+        const to = new Date(new Date(invoice.created_at).getTime() + 30 * 60 * 1000).toISOString();
+        const { data: settleTx } = await (supabase as any)
+          .from("transactions")
+          .select("amount, wallet_kind, description, created_at")
+          .eq("user_id", invoice.user_id)
+          .eq("wallet_kind", "secondary")
+          .gte("created_at", from)
+          .lte("created_at", to);
+        const secondaryUsd = (settleTx ?? [])
+          .filter((t: any) => String(t.description || "").toLowerCase().includes("secondary wallet due settled"))
+          .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+
+        return { invoice, request, profile, secondaryUsd };
       }
+
 
       // Fallback: tenant_payments — synthesize invoice
       const { data: tp } = await (supabase as any)
