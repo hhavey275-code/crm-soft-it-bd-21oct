@@ -3178,18 +3178,20 @@ export default function ClientDetailPage() {
                         ).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Main Wallet After</span>
-                      <span
-                        className={cn(
-                          "font-medium",
-                          walletBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
-                        )}
-                      >
-                        ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
-                      </span>
-                    </div>
-                    {wallets.secondaryEnabled && (
+                    {!(wallets.secondaryEnabled && topUpWallet === "secondary") && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Main Wallet After</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            walletBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {wallets.secondaryEnabled && topUpWallet === "secondary" && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Secondary Wallet After</span>
                         <span
@@ -3208,12 +3210,9 @@ export default function ClientDetailPage() {
                   <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>
                     Cancel
                   </Button>
-                  {wallets.secondaryEnabled && (
+                  {wallets.secondaryEnabled && topUpWallet === "secondary" ? (
                     <Button
-                      variant={topUpWallet === "secondary" ? "default" : "outline"}
-                      className={topUpWallet === "secondary"
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       onClick={() => topUpMutation.mutate("secondary")}
                       disabled={
                         !selectedAccountId ||
@@ -3224,20 +3223,21 @@ export default function ClientDetailPage() {
                     >
                       {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
                     </Button>
+                  ) : (
+                    <Button
+                      onClick={() => topUpMutation.mutate("primary")}
+                      disabled={
+                        !selectedAccountId ||
+                        !topUpAmount ||
+                        parseFloat(topUpAmount) <= 0 ||
+                        topUpMutation.isPending
+                      }
+                    >
+                      {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                    </Button>
                   )}
-                  <Button
-                    variant={wallets.secondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
-                    onClick={() => topUpMutation.mutate("primary")}
-                    disabled={
-                      !selectedAccountId ||
-                      !topUpAmount ||
-                      parseFloat(topUpAmount) <= 0 ||
-                      topUpMutation.isPending
-                    }
-                  >
-                    {topUpMutation.isPending ? "Processing..." : wallets.secondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
-                  </Button>
                 </DialogFooter>
+
 
               </TabsContent>
               <TabsContent value="withdraw" className="space-y-4 pt-2">
