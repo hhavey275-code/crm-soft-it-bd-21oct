@@ -313,7 +313,9 @@ export function AdminAdAccounts() {
   const { data: clients } = useQuery({
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email, company");
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, company, secondary_wallet_enabled, secondary_usd_rate" as any);
       return (data as any[]) ?? [];
     },
   });
@@ -325,6 +327,15 @@ export function AdminAdAccounts() {
       return (data as any[]) ?? [];
     },
   });
+
+  const { data: allSecondaryWallets } = useQuery({
+    queryKey: ["admin-all-secondary-wallets"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("secondary_wallets").select("user_id, balance");
+      return (data as any[]) ?? [];
+    },
+  });
+
 
   const refreshAllMutation = useMutation({
     mutationFn: async () => {
