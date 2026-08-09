@@ -1474,26 +1474,24 @@ export function AdminAdAccounts() {
               )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-                {assignedSecondaryEnabled && (
+                {assignedSecondaryEnabled && topUpWallet === "secondary" ? (
                   <Button
-                    variant={topUpWallet === "secondary" ? "default" : "outline"}
-                    className={topUpWallet === "secondary"
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={() => topUpMutation.mutate("secondary")}
                     disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
                   >
                     {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
                   </Button>
+                ) : (
+                  <Button
+                    onClick={() => topUpMutation.mutate("primary")}
+                    disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
+                  >
+                    {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                  </Button>
                 )}
-                <Button
-                  variant={assignedSecondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
-                  onClick={() => topUpMutation.mutate("primary")}
-                  disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
-                >
-                  {topUpMutation.isPending ? "Processing..." : assignedSecondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
-                </Button>
               </DialogFooter>
+
             </TabsContent>
             <TabsContent value="withdraw" className="space-y-4 pt-2">
               {fetchingWithdrawMeta ? (
