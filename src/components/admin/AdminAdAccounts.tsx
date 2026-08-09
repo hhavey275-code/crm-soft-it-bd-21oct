@@ -479,6 +479,17 @@ export function AdminAdAccounts() {
     return allWallets?.find((w: any) => w.user_id === userId);
   };
 
+  /** True when the client has the secondary (sheet-rate) wallet enabled. */
+  const hasSecondaryWallet = (userId: string | null) => {
+    if (!userId) return false;
+    return !!clients?.find((c: any) => c.user_id === userId)?.secondary_wallet_enabled;
+  };
+
+  const getSecondaryBalance = (userId: string | null) => {
+    if (!userId) return 0;
+    return Number(allSecondaryWallets?.find((w: any) => w.user_id === userId)?.balance ?? 0);
+  };
+
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortField(field); setSortDir("asc"); }
