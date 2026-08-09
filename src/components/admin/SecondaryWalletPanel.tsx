@@ -28,6 +28,7 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
   const wallets = useWallets(userId);
   const invalidate = useInvalidate(userId);
   const [rateInput, setRateInput] = useState("");
+  const [editingRate, setEditingRate] = useState(false);
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
