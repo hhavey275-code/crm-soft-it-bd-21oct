@@ -1323,6 +1323,7 @@ export function AdminAdAccounts() {
                         })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
                         {a.external_topup_required ? (
                           <Button
                             size="icon"
@@ -1333,10 +1334,23 @@ export function AdminAdAccounts() {
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         ) : (
-                          <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
-                            <ArrowUpCircle className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
+                              <ArrowUpCircle className="h-4 w-4" />
+                            </Button>
+                            {hasSecondaryWallet(getAssignedUserId(a.id)) && (
+                              <Button
+                                size="icon"
+                                className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                title="Top Up (Secondary Wallet)"
+                                onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
+                              >
+                                <ArrowUpCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
