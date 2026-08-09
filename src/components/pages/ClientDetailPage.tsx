@@ -125,8 +125,11 @@ export default function ClientDetailPage() {
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNote, setWalletNote] = useState("");
 
+  // Main page tab (controlled so mobile wallet cards can show on Overview only)
+  const [mainTab, setMainTab] = useState<string>("overview");
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
