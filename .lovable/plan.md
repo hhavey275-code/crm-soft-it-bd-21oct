@@ -1,70 +1,62 @@
-## Goal
-Ekta private "Documents" section jekhane admin/superadmin company formation er PDF (EIN, TIN, BIN, Trade License, Articles of Incorporation, Tax Return, etc.) upload kore category-wise organize kore rakhbe. Sidebar theke click korle **extra password prompt** ashbe (login chara o), sohi password dile vault khulbe.
+# Dual Wallet (Regular + Sheet Rate) System
 
-## Access Model
-- **Route:** `/documents` — sidebar e "Documents" menu (lock icon), only visible to `superadmin` (ba tumi bolle admin o).
-- **Double gate:**
-  1. Already logged in (AuthContext)
-  2. Vault password prompt (session-only unlock, refresh korle abar chaibe — safer). Password hash DB te thakbe (`site_settings.documents_vault_password_hash`), tumi settings e giye set/change korte parba.
-- Wrong password 5 bar hole 10 min lock.
+হ্যাঁ, বুঝেছি। যেসব client-এর data এখন sheet থেকে আসে (Holy Gift, Cafe La ইত্যাদি) তাদের জন্য দুইটা আলাদা wallet — একটা regular dollar rate (যেমন ১২৯৳), আরেকটা sheet rate (যেমন ১২৪৳)। দুইটার balance আলাদা, উপরে একটা combined total, top-up limit update-এর সময় কোন wallet থেকে যাবে সেটা বাছা যাবে, transaction history-তে দুই ধরনের entry আলাদা রঙে দেখাবে, আর feature শুধু যাদের জন্য ON করা হবে তাদের জন্যই চালু থাকবে।
 
-## Categories (default, editable)
-- Articles of Incorporation
-- EIN Letter
-- TIN Certificate
-- BIN Certificate
-- Trade License
-- Tax Return
-- Bank Documents
-- Other
+## Client যা দেখবে
 
-Tumi settings e new category add/rename/delete korte parba.
+- **Wallet page**: উপরে "Total Balance" কার্ড (primary + secondary), নিচে দুইটা কার্ড — "Main Wallet · ৳129/$" এবং "Sheet Wallet · ৳124/$"। Feature OFF থাকলে আগের মতোই একটাই কার্ড, কোনো পরিবর্তন নেই।
+- **Top-up request**: কোন wallet-এ টাকা যোগ হবে সেটা বাছার toggle (Main / Sheet), rate সেই wallet-এর rate অনুযায়ী auto বসবে (BDT ↔ USD হিসাব)।
+- **Spend cap / limit update**: dialog-এ source selector — Main wallet, Sheet wallet, অথবা "Auto (Main আগে, বাকিটা Sheet)"। প্রতিটা wallet-এর available balance পাশে দেখাবে।
+- **Transaction history**: প্রতিটা row-এ wallet badge — Main = primary/blue, Sheet = teal/amber; আর একটা filter (All / Main / Sheet)। Limit update entry-তে "spend cap $X → $Y" আগের মতোই থাকবে, শুধু কোন wallet থেকে হয়েছে সেটা রঙ + badge দিয়ে আলাদা হবে।
 
-## Storage
-- Supabase Storage bucket: `company-documents` (**private**, RLS locked to superadmin).
-- File download hobe **signed URL** diye (5 min expiry) — direct public link nai.
+## Admin যা দেখবে
 
-## Database
-Notun table `public.company_documents`:
-- `id`, `category` (text), `title`, `description`, `file_path` (storage key), `file_size`, `mime_type`, `uploaded_by`, `expires_at` (optional — license expiry reminder), `tags` (text[]), `created_at`, `updated_at`
-- RLS: only superadmin SELECT/INSERT/UPDATE/DELETE.
-- `site_settings` e 2 ta column: `documents_vault_password_hash`, `documents_vault_categories` (jsonb array).
+- Client detail page-এ toggle: **"Secondary (sheet) wallet enabled"** + secondary rate ইনপুট।
+- দুই wallet-এর balance আলাদা, manual credit/debit করার সময় কোন wallet সেটা বাছা যাবে।
+- Top-up approve করার সময় কোন wallet-এ credit হবে দেখা + বদলানো যাবে।
 
-## UI (`/documents`)
-- **Unlock screen:** password input → unlock (session storage e flag, tab close hole gone).
-- **Vault dashboard:**
-  - Top: Search bar + "Upload" button + category filter chips
-  - Left: Category sidebar with count (e.g. "EIN (2)", "Trade License (1)")
-  - Main: Card grid — each card shows: category badge, title, upload date, expiry (if set, red if soon), file size, actions (Preview PDF, Download, Edit meta, Delete)
-  - PDF preview inline (iframe with signed URL)
-- **Upload dialog:** category dropdown, title, description, optional expiry date, tags, file picker (PDF/image accepted, max 20MB).
-- **Expiry alerts:** dashboard e top e banner — "Trade License expires in 15 days".
+## Deduction rule
 
-## Security Notes
-- Vault password ≠ login password (nijer alada mone rakhte hobe).
-- Password bcrypt/scrypt hash kore DB te (never plain).
-- Signed URLs short-lived (300s).
-- All access logged to `system_logs` (who viewed/downloaded which doc, when).
-- Session unlock flag e sessionStorage use korbo (localStorage na) — tab close = auto lock.
+- Explicit ভাবে wallet বাছা হলে শুধু সেই wallet থেকেই কাটবে (balance না থাকলে error)।
+- "Auto" হলে আগে primary, বাকিটা secondary — একটাই atomic operation, দুইটা আলাদা ledger row (একটা primary, একটা secondary) একই reference id দিয়ে।
+- Refund হলে ঠিক যে wallet থেকে কাটা হয়েছিল সেখানেই ফেরত যাবে।
 
-## Implementation Steps
-1. Migration: `company_documents` table + `site_settings` columns + RLS policies + `company-documents` storage bucket + storage policies.
-2. Server functions: `unlock-vault` (verify password), `set-vault-password`, `upload-document`, `get-signed-url`, `delete-document`.
-3. Frontend:
-   - `src/routes/documents.tsx` (route)
-   - `src/components/pages/DocumentsVaultPage.tsx`
-   - `src/components/vault/VaultUnlock.tsx`
-   - `src/components/vault/DocumentGrid.tsx`
-   - `src/components/vault/UploadDocumentDialog.tsx`
-   - `src/components/vault/DocumentCard.tsx`
-   - Vault password setter in `SettingsContent.tsx` (superadmin only)
-4. Sidebar link add (lock icon, superadmin only).
-5. Expiry cron: pg_cron daily job → notification if any doc expires in ≤30 days.
+## Technical plan
 
-## Questions before I build
-1. **Access:** Sudhu tumi (superadmin), naki admin ra o dekhbe?
-2. **Vault password:** Ekhoni ekta default set kore dibo (tumi porey change korba) naki first visit e setup korbe?
-3. **Expiry reminder:** Push notification, in-app notification, ba dono?
-4. **File types:** Sudhu PDF, naki JPG/PNG scan o allow korbo?
+**Database (migration)**
+- `profiles`: `secondary_wallet_enabled boolean default false`, `secondary_usd_rate numeric` (null হলে primary rate)।
+- নতুন টেবিল `secondary_wallets` (user_id unique, balance, currency, timestamps) — grants + RLS: client নিজের row পড়বে, admin/superadmin সব, service_role all।
+- `transactions`: `wallet_kind text not null default 'primary'` (`'primary' | 'secondary'`, validation trigger), `usd_rate_used numeric` (audit-এর জন্য কোন rate-এ হয়েছে)।
+- `top_up_requests`: `wallet_kind text default 'primary'` — কোন wallet-এ credit হবে।
+- নতুন RPC `deduct_wallet_for_topup_v2(p_user_id, p_amount, p_ad_account_id, p_description, p_processed_by, p_source text /* primary|secondary|auto */, p_allow_negative, p_due_limit)`:
+  - দুই wallet row lock করে, প্রতিটাকে নিজের ledger (`wallet_kind` অনুযায়ী sum) দিয়ে reconcile করে, তারপর কাটে — existing atomic/phantom-balance protection দুই wallet-এর জন্যই থাকবে।
+  - Return: প্রতি wallet-এর before/after + কোন কোন txn তৈরি হলো।
+  - পুরোনো `deduct_wallet_for_topup` অপরিবর্তিত থাকবে (backward compatible), v2 শুধু primary মানে identical behaviour।
 
-Bolo, tarpor implement kori.
+**Edge function `spend-cap-update`**
+- Request body-তে নতুন optional `wallet_source` ('primary' | 'secondary' | 'auto', default 'primary')।
+- Deduction v2 RPC দিয়ে; refund path-ও wallet_kind অনুযায়ী সঠিক wallet-এ ফেরত দেবে।
+- `failed_topups` ও system log-এ wallet_kind রাখা হবে যাতে retry ঠিক wallet ব্যবহার করে।
+
+**Top-up approve path (`verify-topup` / admin approve)**
+- Request-এর `wallet_kind` অনুযায়ী সঠিক wallet-এ credit + সঠিক rate দিয়ে BDT→USD হিসাব।
+
+**Frontend**
+- নতুন hook `useWallets(userId)` — primary + secondary + total + enabled flag + rates এক জায়গায়।
+- `ClientWallet.tsx`: total + দুই wallet কার্ড (feature OFF হলে অপরিবর্তিত)।
+- `ClientTopUp.tsx`: wallet selector + rate সেই অনুযায়ী।
+- Spend cap dialog(গুলো) (`ClientAdAccounts`, `AdAccountDetailPage`, admin top-up path): wallet source selector।
+- `ClientTransactions.tsx` + `ClientDetailPage` ledger: wallet badge, রঙ আলাদা (semantic token দিয়ে, hardcoded color নয়), filter।
+- `ClientDetailPage` admin section: enable toggle + secondary rate + secondary manual credit/debit।
+
+**Safety**
+- Feature OFF (`secondary_wallet_enabled = false`) হলে সব code path আজকের মতোই আচরণ করবে — কোনো existing client প্রভাবিত হবে না।
+- Existing সব transaction automatically `wallet_kind = 'primary'` হয়ে যাবে, তাই পুরোনো history অটুট থাকবে।
+
+## Build order
+
+1. Migration (columns, secondary_wallets, RPC v2)।
+2. Edge function `spend-cap-update` + top-up approve path।
+3. Admin toggle + rate UI।
+4. Client wallet/top-up/limit-update/transaction UI।
+5. একটা test client-এ ON করে end-to-end যাচাই।
