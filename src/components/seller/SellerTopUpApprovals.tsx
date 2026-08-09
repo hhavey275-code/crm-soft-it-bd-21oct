@@ -118,11 +118,14 @@ export function SellerTopUpApprovals() {
         if (!existingTx?.length) {
           const { data: w } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
           const newBalance = Number(w?.balance || 0) + Number(amount);
-          await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
-          await supabase.from("transactions").insert({
+          // Ledger row FIRST — the duplicate-credit trigger blocks a second
+          // insert, so a repeated approval can never inflate the wallet.
+          const { error: txErr } = await supabase.from("transactions").insert({
             user_id: userId, type: "top_up", amount, balance_after: newBalance,
             reference_id: id, description: "Top-up approved by seller", processed_by: `seller:${user!.id}`,
           } as any);
+          if (txErr) throw new Error("Already credited (duplicate prevention). Please refresh.");
+          await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         }
 
         // Initialize forward flag only. Telegram forwarding is handled by the

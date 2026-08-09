@@ -612,6 +612,23 @@ Deno.serve(async (req) => {
     const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user_id).single();
     const currentBalance = Number(wallet?.balance ?? 0);
     const newBalance = currentBalance + finalUsdAmount;
+
+    // CRITICAL: write the ledger row BEFORE touching the wallet. The
+    // `prevent_duplicate_topup_credit` trigger rejects a second top_up row for
+    // the same reference_id, so any duplicate/retry approval fails here with no
+    // money moved. Crediting first left phantom balances when the insert failed.
+    const txDescription = cardBillDeducted > 0 ? `Wallet top-up auto-approved (Card bill ৳${cardBillDeducted.toLocaleString()} deducted)` : 'Wallet top-up auto-approved';
+    const { error: txErr } = await supabase.from('transactions').insert({
+      user_id,
+      type: 'top_up',
+      amount: finalUsdAmount,
+      balance_after: newBalance,
+      reference_id: request_id,
+      description: txDescription,
+      processed_by: 'system',
+    });
+    if (txErr) throw txErr;
+
     const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
     if (walletErr) throw walletErr;
 
@@ -625,19 +642,6 @@ Deno.serve(async (req) => {
         await supabase.from('agency_wallets').update({ balance: newAgencyBalance }).eq('agency_id', userProfile.agency_id);
       }
     }
-
-    // Transaction
-    const txDescription = cardBillDeducted > 0 ? `Wallet top-up auto-approved (Card bill ৳${cardBillDeducted.toLocaleString()} deducted)` : 'Wallet top-up auto-approved';
-    const { error: txErr } = await supabase.from('transactions').insert({
-      user_id,
-      type: 'top_up',
-      amount: finalUsdAmount,
-      balance_after: newBalance,
-      reference_id: request_id,
-      description: txDescription,
-      processed_by: 'system',
-    });
-    if (txErr) throw txErr;
 
     // Invoice
     const { data: invNum } = await supabase.rpc('generate_invoice_number');
