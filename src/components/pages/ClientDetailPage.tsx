@@ -3,6 +3,9 @@ import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWallets } from "@/hooks/useWallets";
+import { SecondaryWalletPanel } from "@/components/admin/SecondaryWalletPanel";
+
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
