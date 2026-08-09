@@ -3207,6 +3207,7 @@ export default function ClientDetailPage() {
                     </Button>
                   )}
                   <Button
+                    variant={wallets.secondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
                     onClick={() => topUpMutation.mutate("primary")}
                     disabled={
                       !selectedAccountId ||
