@@ -2103,11 +2103,10 @@ export default function ClientDetailPage() {
                   {/* Secondary (sheet-rate) wallet + combined total — admin controlled */}
                   {userId && <SecondaryWalletCard userId={userId} />}
                   {userId && <CombinedTotalCard userId={userId} />}
-                </div>
 
-                {/* Account stat cards */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                  {/* Account stat cards */}
                   {/* Total Ad Accounts */}
+
 
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
