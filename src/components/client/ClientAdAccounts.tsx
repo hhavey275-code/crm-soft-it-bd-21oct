@@ -919,9 +919,9 @@ export function ClientAdAccounts() {
                             <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                               Request BM Access
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setWithdrawAccount(a); setWithdrawAmount(""); setWithdrawNote(""); }}>
+                            <DropdownMenuItem onClick={() => openWithdraw(a)}>
                               <ArrowDownCircle className="h-3.5 w-3.5 mr-2" />
-                              Request Spend Cap Withdraw
+                              {canWithdraw ? "Withdraw to Wallet" : "Request Spend Cap Withdraw"}
                             </DropdownMenuItem>
                             {hasAutoTopupPermission && (
                               <DropdownMenuItem onClick={() => {
