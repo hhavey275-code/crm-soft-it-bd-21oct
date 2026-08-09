@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets } from "@/hooks/useWallets";
 import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
+import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
