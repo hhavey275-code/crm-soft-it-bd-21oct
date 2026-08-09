@@ -584,7 +584,8 @@ Deno.serve(async (req)=>{
           amount,
           old_spend_cap: oldSpendCapDollars,
           error_message: metaErrorMsg,
-          status: "pending"
+          status: "pending",
+          wallet_kind: walletKind
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
@@ -647,7 +648,8 @@ Deno.serve(async (req)=>{
             amount: amount,
             old_spend_cap: oldSpendCapDollars,
             error_message: mismatchMsg,
-            status: "pending"
+            status: "pending",
+          wallet_kind: walletKind
           }).select("id").single();
           await supabase.from("system_logs").insert({
             user_id: userId,
@@ -706,7 +708,8 @@ Deno.serve(async (req)=>{
         amount: amount,
         old_spend_cap: oldSpendCapDollars,
         error_message: safeMsg,
-        status: "pending"
+        status: "pending",
+          wallet_kind: walletKind
       }).select("id").single();
       await supabase.from("system_logs").insert({
         user_id: userId,
