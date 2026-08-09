@@ -509,14 +509,24 @@ Deno.serve(async (req)=>{
         // Do a GET to check if spend cap was actually updated.
         let actuallySucceeded = false;
         try {
-          const verifyResult = await verifySpendCap(actId, bmToken);
-          if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
-            actuallySucceeded = true;
-            console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
+          // Retry the confirmation read a few times — Meta can be slow or
+          // rate-limited, and a missed confirmation creates a false "failed"
+          // top-up that the client can then duplicate.
+          for (const waitMs of [0, 4000, 8000]) {
+            if (waitMs) await delay(waitMs);
+            const verifyResult = await verifySpendCap(actId, bmToken);
+            if (verifyResult.ok) {
+              if (isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+                actuallySucceeded = true;
+                console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
+              }
+              break;
+            }
           }
         } catch (verifyErr) {
           console.warn("Post-failure verification GET also failed", verifyErr);
         }
+
         if (actuallySucceeded) {
           // Spend cap was actually updated — proceed as success
           const currentAmountSpent = Number(account.amount_spent);
