@@ -1094,17 +1094,6 @@ export function ClientAdAccounts() {
                 ${walletBalance.toLocaleString()}
               </span>
             </div>
-            {wallets.secondaryEnabled && (
-              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800">
-                <span className="flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                  <Wallet className="h-4 w-4" />
-                  Secondary Wallet (৳{wallets.secondaryRate})
-                </span>
-                <span className={`font-semibold ${wallets.secondaryBalance < 0 ? 'text-destructive' : 'text-teal-700 dark:text-teal-400'}`}>
-                  ${wallets.secondaryBalance.toLocaleString()}
-                </span>
-              </div>
-            )}
             {dueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
@@ -1126,15 +1115,13 @@ export function ClientAdAccounts() {
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Amount exceeds your main wallet balance{dueLimit > 0 ? " + due limit" : ""}{wallets.secondaryEnabled ? " — you can still use the secondary wallet" : ""}</p>
+                <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
               )}
-              {wallets.secondaryEnabled && parsedAmount > wallets.secondaryBalance && parsedAmount > 0 && (
-                <p className="text-sm text-muted-foreground">Secondary wallet has ${wallets.secondaryBalance.toLocaleString()} available</p>
-              )}
             </div>
+
             {parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
