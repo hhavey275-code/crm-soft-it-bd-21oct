@@ -1256,6 +1256,65 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
+          {/* Mobile-only colorful wallet summary — below tabs, above tab content */}
+          {isMobile && userId && (
+            <div className="space-y-3">
+              {/* Main Wallet — themed blue gradient */}
+              <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-90">Wallet Balance</p>
+                    <p className="text-3xl font-bold tracking-tight mt-1">
+                      ${walletBalance.toLocaleString()}
+                    </p>
+                    <p className="text-xs opacity-70 mt-1">{wallet?.currency ?? "USD"}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Secondary Wallet — green gradient (only when enabled) */}
+              {wallets.secondaryEnabled && (
+                <div className="rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-500/85 to-emerald-500/65 p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90">Secondary Wallet</p>
+                      <p className="text-3xl font-bold tracking-tight mt-1">
+                        ${wallets.secondaryBalance.toLocaleString()}
+                      </p>
+                      <p className="text-xs opacity-70 mt-1">৳{wallets.secondaryRate}/USD</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <Wallet className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Combined Due / Adv — purple gradient (only when enabled) */}
+              {wallets.secondaryEnabled && (
+                <div className="rounded-2xl bg-gradient-to-br from-purple-600 via-purple-600/85 to-purple-600/65 p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90">Combined Due / Adv</p>
+                      <p className="text-3xl font-bold tracking-tight mt-1">
+                        {wallets.totalBdt < 0 ? "-" : ""}{formatBdt(wallets.totalBdt)}
+                      </p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {wallets.totalBdt < 0 ? "Due" : "Advance"}
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <Scale className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Client Info Tab */}
           <TabsContent value="info" className="mt-0">
             <Card
