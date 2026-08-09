@@ -30,6 +30,8 @@ import { logSystemAction } from "@/lib/systemLog";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 import { ArrowDownCircle } from "lucide-react";
+import { useWallets } from "@/hooks/useWallets";
+
 
 const PAGE_SIZE = 20;
 
@@ -47,6 +49,8 @@ interface InsightsData {
 export function ClientAdAccounts() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
+  const wallets = useWallets(user?.id);
+
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
