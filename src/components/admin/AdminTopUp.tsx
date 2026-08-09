@@ -721,6 +721,12 @@ export function AdminTopUp() {
         if (txError) throw new Error("This request was already credited (duplicate prevention). Refresh the page.");
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
+        // Deposit settlement: once the main wallet due is cleared, the leftover
+        // amount automatically pays down the secondary (sheet-rate) wallet due.
+        try {
+          await (supabase as any).rpc("settle_secondary_from_main", { p_user_id: userId });
+        } catch (e) { console.error("secondary settlement failed (non-blocking):", e); }
+
         const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
         await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
       }
