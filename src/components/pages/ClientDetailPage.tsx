@@ -1711,6 +1711,8 @@ export default function ClientDetailPage() {
                       disabled={saveProfileMutation.isPending}
                     />
                   </div>
+                  {/* Secondary (sheet-rate) wallet on/off + rate */}
+                  {userId && <SecondaryWalletToggle userId={userId} />}
                 </div>
               </CardContent>
             </Card>
