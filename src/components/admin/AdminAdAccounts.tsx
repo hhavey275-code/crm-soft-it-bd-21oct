@@ -286,7 +286,7 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       const amt = parseFloat(withdrawAmount);
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: topUpAccount.id, amount: amt },
+        body: { ad_account_id: topUpAccount.id, amount: amt, wallet_kind: withdrawWallet },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
