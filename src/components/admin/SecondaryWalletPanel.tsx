@@ -220,7 +220,10 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
 export function CombinedTotalCard({ userId }: { userId: string }) {
   const wallets = useWallets(userId);
   if (!wallets.secondaryEnabled) return null;
-  const isDue = wallets.totalBdt < 0;
+  const mainBdt = wallets.mainBalance * wallets.mainRate;
+  const secondaryBdt = wallets.secondaryBalance * wallets.secondaryRate;
+  const totalBdt = mainBdt + secondaryBdt;
+  const isDue = totalBdt < 0;
   return (
     <Card className="border border-indigo-300/60 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50 via-violet-50 to-indigo-100/60 dark:from-indigo-950/40 dark:via-violet-950/30 dark:to-indigo-900/20 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -231,14 +234,15 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">Combined {isDue ? "Due" : "Advance"}</p>
             <p className="text-[10px] text-muted-foreground truncate">
-              Main ৳{wallets.mainRate} + Secondary ৳{wallets.secondaryRate}
+              Main {formatBdt(mainBdt)} ({wallets.mainBalance < 0 ? "-" : ""}${Math.abs(wallets.mainBalance).toLocaleString()} × ৳{wallets.mainRate}) + Secondary {formatBdt(secondaryBdt)} (৳{wallets.secondaryRate})
             </p>
           </div>
         </div>
         <p className={`text-2xl font-bold tracking-tight ${isDue ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-          {formatBdt(wallets.totalBdt)}
+          {isDue ? "-" : ""}{formatBdt(totalBdt)}
         </p>
       </CardContent>
     </Card>
   );
 }
+

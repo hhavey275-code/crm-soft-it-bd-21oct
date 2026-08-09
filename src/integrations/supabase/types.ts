@@ -4036,6 +4036,7 @@ export type Database = {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
       }
+      settle_secondary_from_main: { Args: { p_user_id: string }; Returns: Json }
       topup_requests_mirrored: {
         Args: { p_ids: string[] }
         Returns: {

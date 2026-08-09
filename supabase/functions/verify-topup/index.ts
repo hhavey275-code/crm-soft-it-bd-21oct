@@ -632,6 +632,15 @@ Deno.serve(async (req) => {
     const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
     if (walletErr) throw walletErr;
 
+    // Deposit settlement: leftover after the main wallet due is cleared pays
+    // down the secondary (sheet-rate) wallet due.
+    try {
+      await supabase.rpc('settle_secondary_from_main', { p_user_id: user_id });
+    } catch (e) {
+      console.error('secondary settlement failed (non-blocking):', e);
+    }
+
+
     // Agency wallet deduction
     const { data: userProfile } = await supabase.from('profiles').select('agency_id').eq('user_id', user_id).single();
     if (userProfile?.agency_id) {
