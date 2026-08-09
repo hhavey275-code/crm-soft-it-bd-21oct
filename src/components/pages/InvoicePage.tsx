@@ -432,6 +432,11 @@ export default function InvoicePage() {
                   <p style={{ fontSize: "10px", color: "#888", lineHeight: 1.6 }}>
                     Reference: {request?.payment_reference || "—"}
                   </p>
+                  {secondaryUsd > 0.005 && (
+                    <p style={{ fontSize: "10px", color: "#888", lineHeight: 1.6 }}>
+                      Wallet split: Main ${(Math.max(0, (Number(invoice.amount) || 0) - secondaryUsd)).toLocaleString(undefined, { minimumFractionDigits: 2 })} · Secondary ${secondaryUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
                 </div>
               </div>
 
