@@ -772,10 +772,18 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-stretch gap-2" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className={cn(
+                    "mt-2 grid gap-2",
+                    wallets.secondaryEnabled
+                      ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                      : "grid-cols-[minmax(0,1fr)_auto]"
+                  )}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button
                     size="sm"
-                    className="flex-1 min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
+                    className="w-full min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
                     onClick={() => {
                       setSelectedAccountId(acc.id);
                       setTopUpWallet("primary");
@@ -785,12 +793,12 @@ export default function ClientDetailPage() {
                     }}
                   >
                     <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{wallets.secondaryEnabled ? "Main" : "Top Up"}</span>
+                    <span className="truncate">Top Up</span>
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
                       size="sm"
-                      className="flex-1 min-w-0 gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
+                      className="w-full min-w-0 gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         setSelectedAccountId(acc.id);
