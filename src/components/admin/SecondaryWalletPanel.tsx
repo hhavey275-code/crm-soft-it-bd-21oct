@@ -58,6 +58,7 @@ export function SecondaryWalletToggle({ userId }: { userId: string }) {
     onSuccess: () => {
       toast.success("Secondary wallet rate saved");
       setRateInput("");
+      setEditingRate(false);
       invalidate();
     },
     onError: (e: any) => toast.error(e.message ?? "Failed to save rate"),
