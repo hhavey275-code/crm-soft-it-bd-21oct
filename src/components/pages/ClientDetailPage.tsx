@@ -1257,38 +1257,65 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
+          {isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-full rounded-lg"
+              disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+              onClick={async () => {
+                if (!adAccounts || adAccounts.length === 0) return;
+                setInsightsLoading(true);
+                try {
+                  const ids = adAccounts.map((a: any) => a.id);
+                  const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+                  await chunkedMetaSync(ids);
+                  await Promise.all([refetchInsights(), refetchAdAccounts()]);
+                  toast.success("Insights updated from Meta!");
+                } catch {
+                  toast.error("Failed to update from Meta");
+                } finally {
+                  setInsightsLoading(false);
+                }
+              }}
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", insightsLoading && "animate-spin")} />
+              {insightsLoading ? "Updating..." : "Update from Meta"}
+            </Button>
+          )}
+
           {/* Mobile-only colorful wallet summary — below tabs, above tab content */}
           {isMobile && userId && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Main Wallet — themed blue gradient */}
-              <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
+              <div className="rounded-xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-3.5 text-primary-foreground shadow-md">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm opacity-90">Wallet Balance</p>
-                    <p className="text-3xl font-bold tracking-tight mt-1">
+                    <p className="text-xs opacity-90">Wallet Balance</p>
+                    <p className="mt-0.5 text-2xl font-bold tracking-tight">
                       ${walletBalance.toLocaleString()}
                     </p>
-                    <p className="text-xs opacity-70 mt-1">{wallet?.currency ?? "USD"}</p>
+                    <p className="mt-0.5 text-[10px] opacity-70">{wallet?.currency ?? "USD"}</p>
                   </div>
-                  <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <Wallet className="h-6 w-6" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <Wallet className="h-4.5 w-4.5" />
                   </div>
                 </div>
               </div>
 
               {/* Secondary Wallet — green gradient (only when enabled) */}
               {wallets.secondaryEnabled && (
-                <div className="rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-500/85 to-emerald-500/65 p-5 text-white shadow-lg">
+                <div className="rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-500/85 to-emerald-500/65 p-3.5 text-white shadow-md">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm opacity-90">Secondary Wallet</p>
-                      <p className="text-3xl font-bold tracking-tight mt-1">
+                      <p className="text-xs opacity-90">Secondary Wallet</p>
+                      <p className="mt-0.5 text-2xl font-bold tracking-tight">
                         ${wallets.secondaryBalance.toLocaleString()}
                       </p>
-                      <p className="text-xs opacity-70 mt-1">৳{wallets.secondaryRate}/USD</p>
+                      <p className="mt-0.5 text-[10px] opacity-70">৳{wallets.secondaryRate}/USD</p>
                     </div>
-                    <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <Wallet className="h-6 w-6" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+                      <Wallet className="h-4.5 w-4.5" />
                     </div>
                   </div>
                 </div>
@@ -1296,19 +1323,19 @@ export default function ClientDetailPage() {
 
               {/* Combined Due / Adv — purple gradient (only when enabled) */}
               {wallets.secondaryEnabled && (
-                <div className="rounded-2xl bg-gradient-to-br from-purple-600 via-purple-600/85 to-purple-600/65 p-5 text-white shadow-lg">
+                <div className="rounded-xl bg-gradient-to-br from-purple-600 via-purple-600/85 to-purple-600/65 p-3.5 text-white shadow-md">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm opacity-90">Combined Due / Adv</p>
-                      <p className="text-3xl font-bold tracking-tight mt-1">
+                      <p className="text-xs opacity-90">Combined Due / Adv</p>
+                      <p className="mt-0.5 text-2xl font-bold tracking-tight">
                         {wallets.totalBdt < 0 ? "-" : ""}{formatBdt(wallets.totalBdt)}
                       </p>
-                      <p className="text-xs opacity-70 mt-1">
+                      <p className="mt-0.5 text-[10px] opacity-70">
                         {wallets.totalBdt < 0 ? "Due" : "Advance"}
                       </p>
                     </div>
-                    <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <Scale className="h-6 w-6" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+                      <Scale className="h-4.5 w-4.5" />
                     </div>
                   </div>
                 </div>
@@ -1821,54 +1848,37 @@ export default function ClientDetailPage() {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Today's Performance
               </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
-                onClick={async () => {
-                  if (!adAccounts || adAccounts.length === 0) return;
-                  setInsightsLoading(true);
-                  try {
-                    const ids = adAccounts.map((a: any) => a.id);
-                    const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-                    await chunkedMetaSync(ids);
-                    await Promise.all([refetchInsights(), refetchAdAccounts()]);
-                    toast.success("Insights updated from Meta!");
-                  } catch {
-                    toast.error("Failed to update from Meta");
-                  } finally {
-                    setInsightsLoading(false);
-                  }
-                }}
-              >
-                <RefreshCw
-                  className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")}
-                />
-                {insightsLoading ? "Updating..." : "Update from Meta"}
-              </Button>
+              {!isMobile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                  onClick={async () => {
+                    if (!adAccounts || adAccounts.length === 0) return;
+                    setInsightsLoading(true);
+                    try {
+                      const ids = adAccounts.map((a: any) => a.id);
+                      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+                      await chunkedMetaSync(ids);
+                      await Promise.all([refetchInsights(), refetchAdAccounts()]);
+                      toast.success("Insights updated from Meta!");
+                    } catch {
+                      toast.error("Failed to update from Meta");
+                    } finally {
+                      setInsightsLoading(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")} />
+                  {insightsLoading ? "Updating..." : "Update from Meta"}
+                </Button>
+              )}
             </div>
 
             {/* Metrics */}
             {isMobile ? (
               <div className="space-y-3">
-                {/* Wallet Hero */}
-                <Card className="bg-gradient-to-br from-primary/90 to-blue-600 text-primary-foreground border-0 shadow-lg shadow-primary/20">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-medium text-primary-foreground/70">
-                          Wallet Balance
-                        </p>
-                        <p className="text-3xl font-bold">${walletBalance.toLocaleString()}</p>
-                      </div>
-                      <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                        <Wallet className="h-6 w-6" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* 2x2 compact metrics */}
                 <div className="grid grid-cols-2 gap-2">
                   <Card className="bg-card border border-border/60">
