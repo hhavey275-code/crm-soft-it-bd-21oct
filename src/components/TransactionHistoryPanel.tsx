@@ -211,16 +211,16 @@ export function TransactionHistoryPanel({
       <CardContent className="pt-5">
         {header}
         <div className="mt-4 overflow-x-auto">
-          <Table>
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[130px]">Date</TableHead>
-                <TableHead className="w-[120px]">Type</TableHead>
-                <TableHead className="min-w-[180px]">Ad Account / Note</TableHead>
-                <TableHead className="w-[170px]">Spend Cap</TableHead>
-                <TableHead className="w-[100px] text-right">Amount</TableHead>
-                <TableHead className="w-[110px] text-right">Balance</TableHead>
-                <TableHead className="w-[150px]">Processed By</TableHead>
+                <TableHead className="w-[11%]">Date</TableHead>
+                <TableHead className="w-[12%]">Type</TableHead>
+                <TableHead className="w-[30%]">Ad Account / Note</TableHead>
+                <TableHead className="w-[16%]">Spend Cap</TableHead>
+                <TableHead className="w-[9%] text-right">Amount</TableHead>
+                <TableHead className="w-[10%] text-right">Balance</TableHead>
+                <TableHead className="w-[12%]">Processed By</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -231,16 +231,16 @@ export function TransactionHistoryPanel({
                   <TableRow
                     key={tx.id}
                     className={cn(
-                      "align-top",
+                      "align-middle",
                       isSecondary && "bg-teal-50/60 dark:bg-teal-950/20",
                     )}
                   >
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    <TableCell className="py-2.5 whitespace-nowrap text-[13px] text-muted-foreground">
                       {format(new Date(tx.created_at), "MMM d, yyyy")}
-                      <span className="block text-[10px]">{format(new Date(tx.created_at), "HH:mm")}</span>
+                      <span className="block text-[11px]">{format(new Date(tx.created_at), "HH:mm")}</span>
                     </TableCell>
-                    <TableCell className="text-xs">
-                      <span className="font-medium capitalize">{tx.type.replace(/_/g, " ")}</span>
+                    <TableCell className="py-2.5 text-[13px]">
+                      <span className="block font-medium capitalize leading-tight">{tx.type.replace(/_/g, " ")}</span>
                       <Badge
                         variant="outline"
                         className={cn(
@@ -253,36 +253,36 @@ export function TransactionHistoryPanel({
                         {isSecondary ? "Secondary" : "Main"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-[280px] text-xs">
+                    <TableCell className="py-2.5 text-[13px] break-words">
                       <span className="font-medium">
-                        <ExpandableText text={linkedAccount?.account_name || title} limit={38} />
+                        <ExpandableText text={linkedAccount?.account_name || title} limit={44} />
                       </span>
                       {(linkedAccount?.account_id || sub) && (
-                        <span className="block font-mono text-[10px] text-muted-foreground">
+                        <span className="block font-mono text-[11px] text-muted-foreground">
                           {(linkedAccount?.account_id || sub || "").replace(/^act_/, "")}
                         </span>
                       )}
                       {extra && (
-                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                          <ExpandableText text={extra} limit={48} />
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                          <ExpandableText text={extra} limit={60} />
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>{capCell(cap)}</TableCell>
+                    <TableCell className="py-2.5">{capCell(cap)}</TableCell>
                     <TableCell
                       className={cn(
-                        "text-right text-xs font-semibold whitespace-nowrap",
+                        "py-2.5 text-right text-[13px] font-semibold whitespace-nowrap",
                         isPositive ? "text-emerald-600" : "text-destructive",
                       )}
                     >
                       {isPositive ? "+" : "-"}
                       {money(Number(tx.amount))}
                     </TableCell>
-                    <TableCell className="text-right text-xs font-medium whitespace-nowrap">
+                    <TableCell className="py-2.5 text-right text-[13px] font-medium whitespace-nowrap">
                       ${Number(tx.balance_after ?? 0).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      <ExpandableText text={resolveProcessedBy?.(tx) || "—"} limit={26} />
+                    <TableCell className="py-2.5 text-[12px] text-muted-foreground break-words">
+                      <ExpandableText text={resolveProcessedBy?.(tx) || "—"} limit={28} />
                     </TableCell>
                   </TableRow>
                 );
