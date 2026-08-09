@@ -1170,7 +1170,10 @@ export function ClientAdAccounts() {
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
             {wallets.secondaryEnabled && (
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
+                variant={topUpWallet === "secondary" ? "default" : "outline"}
+                className={topUpWallet === "secondary"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
                 onClick={() => topUpMutation.mutate("secondary")}
                 disabled={!topUpAmount || parsedAmount <= 0 || parsedAmount > wallets.secondaryBalance || topUpMutation.isPending}
               >
@@ -1178,6 +1181,7 @@ export function ClientAdAccounts() {
               </Button>
             )}
             <Button
+              variant={wallets.secondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
               onClick={() => topUpMutation.mutate("primary")}
               disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
             >
