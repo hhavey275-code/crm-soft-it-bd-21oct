@@ -1249,12 +1249,36 @@ export function ClientAdAccounts() {
       <Dialog open={!!withdrawAccount} onOpenChange={(open) => { if (!open) setWithdrawAccount(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Request Spend Cap Withdraw</DialogTitle>
+            <DialogTitle>{canWithdraw ? "Withdraw to Wallet" : "Request Spend Cap Withdraw"}</DialogTitle>
             <DialogDescription>
-              Request a spend cap reduction for <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will review and process it manually.
+              {canWithdraw ? (
+                <>
+                  Move unused balance from{" "}
+                  <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span> back into your
+                  wallet. Only the amount Meta still allows can be withdrawn.
+                </>
+              ) : (
+                <>
+                  Request a spend cap reduction for{" "}
+                  <span className="font-medium text-foreground">{withdrawAccount?.account_name}</span>. Support will
+                  review and process it manually.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {canWithdraw && (
+              <div className="flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
+                <span className="text-muted-foreground">Max withdrawable (live from Meta)</span>
+                <span className="font-semibold">
+                  {withdrawMaxLoading
+                    ? "Checking…"
+                    : withdrawMax != null
+                      ? `$${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      : "—"}
+                </span>
+              </div>
+            )}
             <div>
               <Label>Amount (USD) *</Label>
               <Input
@@ -1266,23 +1290,38 @@ export function ClientAdAccounts() {
                 placeholder="e.g. 100"
                 className="mt-1.5"
               />
+              {canWithdraw && withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax && (
+                <p className="mt-1.5 text-sm text-destructive">
+                  Max withdrawable is ${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
-            <div>
-              <Label>Note (optional)</Label>
-              <Input
-                value={withdrawNote}
-                onChange={(e) => setWithdrawNote(e.target.value)}
-                placeholder="Reason or instructions"
-                className="mt-1.5"
-              />
-            </div>
+            {!canWithdraw && (
+              <div>
+                <Label>Note (optional)</Label>
+                <Input
+                  value={withdrawNote}
+                  onChange={(e) => setWithdrawNote(e.target.value)}
+                  placeholder="Reason or instructions"
+                  className="mt-1.5"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWithdrawAccount(null)}>Cancel</Button>
-            <Button onClick={handleWithdrawSubmit} disabled={withdrawLoading || !withdrawAmount}>
-              {withdrawLoading ? "Submitting..." : "Submit Request"}
+            <Button
+              onClick={handleWithdrawSubmit}
+              disabled={
+                withdrawLoading ||
+                !withdrawAmount ||
+                (canWithdraw && (withdrawMaxLoading || (withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax)))
+              }
+            >
+              {withdrawLoading ? "Processing..." : canWithdraw ? "Withdraw Now" : "Submit Request"}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
       {/* Rename Dialog */}
