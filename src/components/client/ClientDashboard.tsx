@@ -429,11 +429,11 @@ export function ClientDashboard() {
           <Card className="border-purple-300/70 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800/50">
             <CardContent className="p-4">
               <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Combined Due / Adv</p>
-              <p className={cn(
-                "text-2xl font-bold mt-1",
-                clientWallets.totalBdt < 0 ? "text-destructive" : "text-purple-700 dark:text-purple-300"
-              )}>
-                {formatBdt(clientWallets.totalBdt)}
+              <p className="text-2xl font-bold mt-1 text-purple-700 dark:text-purple-300">
+                {clientWallets.totalBdt < 0 ? "-" : ""}{formatBdt(clientWallets.totalBdt)}
+                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-purple-700/70 dark:text-purple-400/70">
+                  {clientWallets.totalBdt < 0 ? "Due" : "Adv"}
+                </span>
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 Main ${clientWallets.mainBalance.toLocaleString()} × ৳{clientWallets.mainRate} + Secondary ${clientWallets.secondaryBalance.toLocaleString()} × ৳{clientWallets.secondaryRate}
