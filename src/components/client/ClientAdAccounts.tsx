@@ -1003,10 +1003,21 @@ export function ClientAdAccounts() {
                               variant="default"
                               className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25"
                               disabled={isInactive}
-                              onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                              onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); }}
                             >
                               <ArrowUpCircle className="h-4 w-4" />
                               Top Up
+                            </Button>
+                          )}
+                          {!a.client_topup_disabled && wallets.secondaryEnabled && (
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                              disabled={isInactive}
+                              title="Top Up (Secondary Wallet)"
+                              onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
+                            >
+                              <ArrowUpCircle className="h-4 w-4" />
                             </Button>
                           )}
                           <DropdownMenu>
