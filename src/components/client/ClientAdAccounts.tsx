@@ -1146,23 +1146,14 @@ export function ClientAdAccounts() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-            {wallets.secondaryEnabled && topUpWallet === "secondary" ? (
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => topUpMutation.mutate("secondary")}
-                disabled={!topUpAmount || parsedAmount <= 0 || parsedAmount > wallets.secondaryBalance || topUpMutation.isPending}
-              >
-                {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => topUpMutation.mutate("primary")}
-                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
-              >
-                {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
-              </Button>
-            )}
+            <Button
+              onClick={() => topUpMutation.mutate("primary")}
+              disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
+            >
+              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+            </Button>
           </DialogFooter>
+
 
 
         </DialogContent>
