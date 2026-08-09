@@ -3112,7 +3112,7 @@ export default function ClientDetailPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Wallet After</span>
+                      <span className="text-muted-foreground">Main Wallet After</span>
                       <span
                         className={cn(
                           "font-medium",
@@ -3122,14 +3122,41 @@ export default function ClientDetailPage() {
                         ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
                       </span>
                     </div>
+                    {wallets.secondaryEnabled && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Secondary Wallet After</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            wallets.secondaryBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          ${(wallets.secondaryBalance - parseFloat(topUpAmount)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>
                     Cancel
                   </Button>
+                  {wallets.secondaryEnabled && (
+                    <Button
+                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      onClick={() => topUpMutation.mutate("secondary")}
+                      disabled={
+                        !selectedAccountId ||
+                        !topUpAmount ||
+                        parseFloat(topUpAmount) <= 0 ||
+                        topUpMutation.isPending
+                      }
+                    >
+                      {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => topUpMutation.mutate()}
+                    onClick={() => topUpMutation.mutate("primary")}
                     disabled={
                       !selectedAccountId ||
                       !topUpAmount ||
@@ -3137,9 +3164,10 @@ export default function ClientDetailPage() {
                       topUpMutation.isPending
                     }
                   >
-                    {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                    {topUpMutation.isPending ? "Processing..." : wallets.secondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
                   </Button>
                 </DialogFooter>
+
               </TabsContent>
               <TabsContent value="withdraw" className="space-y-4 pt-2">
                 {fetchingWithdrawMeta ? (
