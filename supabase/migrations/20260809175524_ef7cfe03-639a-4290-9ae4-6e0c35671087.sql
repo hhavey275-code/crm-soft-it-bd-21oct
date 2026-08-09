@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.deduct_wallet_for_topup(uuid, numeric, uuid, text, text, boolean, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.deduct_wallet_for_topup(uuid, numeric, uuid, text, text, boolean, numeric) TO service_role;
