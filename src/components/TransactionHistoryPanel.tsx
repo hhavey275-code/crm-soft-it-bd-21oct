@@ -278,7 +278,7 @@ export function TransactionHistoryPanel({
                 className={cn(
                   "rounded-xl border p-3",
                   isSecondary
-                    ? "border-teal-200/70 bg-teal-50/60 dark:border-teal-900/50 dark:bg-teal-950/20"
+                    ? "border-green-200/70 bg-green-50/40 dark:border-green-900/50 dark:bg-green-950/15"
                     : "border-border/60 bg-card",
                 )}
               >
@@ -313,7 +313,7 @@ export function TransactionHistoryPanel({
                       className={cn(
                         "mt-1 h-4 px-1.5 text-[9px] font-semibold uppercase tracking-wide",
                         isSecondary
-                          ? "border-teal-300 text-teal-700 dark:text-teal-300"
+                          ? "border-green-300 text-green-700 dark:text-green-300"
                           : "border-blue-300 text-blue-700 dark:text-blue-300",
                       )}
                     >
@@ -322,7 +322,11 @@ export function TransactionHistoryPanel({
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       <ExpandableText text={linkedAccount?.account_name || title} limit={40} />
                     </p>
-                    {cap && <p className="mt-0.5 text-[11px] font-medium">Cap {capCell(cap)}</p>}
+                    {cap && (
+                      <p className="mt-1 flex items-center gap-1 text-xs font-semibold">
+                        <span className="text-muted-foreground">Cap</span> {capCell(cap)}
+                      </p>
+                    )}
                     {extra && (
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
                         <ExpandableText text={extra} limit={50} />
@@ -360,8 +364,8 @@ export function TransactionHistoryPanel({
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[11%]">Date</TableHead>
                 <TableHead className="w-[12%]">Type</TableHead>
-                <TableHead className="w-[30%]">Ad Account / Note</TableHead>
-                <TableHead className="w-[16%]">Spend Cap</TableHead>
+                <TableHead className="w-[27%]">Ad Account / Note</TableHead>
+                <TableHead className="w-[19%] text-[13px] font-semibold">Spend Cap</TableHead>
                 <TableHead className="w-[9%] text-right">Amount</TableHead>
                 <TableHead className="w-[10%] text-right">Balance</TableHead>
                 <TableHead className="w-[12%]">Processed By</TableHead>
@@ -376,7 +380,7 @@ export function TransactionHistoryPanel({
                     key={tx.id}
                     className={cn(
                       "align-middle",
-                      isSecondary && "bg-teal-50/60 dark:bg-teal-950/20",
+                      isSecondary && "bg-green-50/40 dark:bg-green-950/15",
                     )}
                   >
                     <TableCell className="py-2.5 whitespace-nowrap text-[13px] text-muted-foreground">
@@ -390,7 +394,7 @@ export function TransactionHistoryPanel({
                         className={cn(
                           "mt-1 block w-fit h-4 px-1.5 text-[9px] font-semibold uppercase tracking-wide",
                           isSecondary
-                            ? "border-teal-300 text-teal-700 dark:text-teal-300"
+                            ? "border-green-300 text-green-700 dark:text-green-300"
                             : "border-blue-300 text-blue-700 dark:text-blue-300",
                         )}
                       >
