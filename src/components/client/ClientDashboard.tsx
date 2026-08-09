@@ -410,6 +410,37 @@ export function ClientDashboard() {
       {/* Card Due Box — only shows if configured */}
       {user && <CardDueBox userId={user.id} size="sm" />}
 
+      {/* Secondary wallet + combined BDT total — only when enabled for this client */}
+      {clientWallets.secondaryEnabled && (
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+          <Card className="border-teal-300/70 bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/30 dark:to-emerald-950/20 dark:border-teal-800/50">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-teal-700 dark:text-teal-400">Secondary Wallet</p>
+              <p className="text-2xl font-bold mt-1 text-teal-800 dark:text-teal-300">
+                ${clientWallets.secondaryBalance.toLocaleString()}
+              </p>
+              <p className="text-[11px] text-teal-700/70 dark:text-teal-400/70 mt-0.5">
+                Rate ৳{clientWallets.secondaryRate}/USD
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">Combined Due / Adv</p>
+              <p className={cn(
+                "text-2xl font-bold mt-1",
+                clientWallets.totalBdt < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"
+              )}>
+                {formatBdt(clientWallets.totalBdt)}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Main ${clientWallets.mainBalance.toLocaleString()} × ৳{clientWallets.mainRate} + Secondary ${clientWallets.secondaryBalance.toLocaleString()} × ৳{clientWallets.secondaryRate}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* ========== METRIC CARDS ========== */}
       {isMobile ? (
         <div className="space-y-3">
