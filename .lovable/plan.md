@@ -1,62 +1,58 @@
-# Dual Wallet (Regular + Sheet Rate) System
+# Dual Wallet (Main + Secondary Sheet-Rate Wallet)
 
-হ্যাঁ, বুঝেছি। যেসব client-এর data এখন sheet থেকে আসে (Holy Gift, Cafe La ইত্যাদি) তাদের জন্য দুইটা আলাদা wallet — একটা regular dollar rate (যেমন ১২৯৳), আরেকটা sheet rate (যেমন ১২৪৳)। দুইটার balance আলাদা, উপরে একটা combined total, top-up limit update-এর সময় কোন wallet থেকে যাবে সেটা বাছা যাবে, transaction history-তে দুই ধরনের entry আলাদা রঙে দেখাবে, আর feature শুধু যাদের জন্য ON করা হবে তাদের জন্যই চালু থাকবে।
+লক্ষ্য: Holy Gift, Cafe La-এর মতো client-দের হিসাব আর sheet-এ রাখতে হবে না — পুরো হিসাব CRM-এই থাকবে। প্রতি enabled client-এর দুইটা wallet: **Main wallet** (regular rate, যেমন ৳129/$) আর **Secondary wallet** (sheet rate, যেমন ৳124/$)। উপরে একটা **combined card** যেখানে দুই wallet মিলিয়ে total due / advance দেখাবে।
 
-## Client যা দেখবে
+## মূল নিয়ম
 
-- **Wallet page**: উপরে "Total Balance" কার্ড (primary + secondary), নিচে দুইটা কার্ড — "Main Wallet · ৳129/$" এবং "Sheet Wallet · ৳124/$"। Feature OFF থাকলে আগের মতোই একটাই কার্ড, কোনো পরিবর্তন নেই।
-- **Top-up request**: কোন wallet-এ টাকা যোগ হবে সেটা বাছার toggle (Main / Sheet), rate সেই wallet-এর rate অনুযায়ী auto বসবে (BDT ↔ USD হিসাব)।
-- **Spend cap / limit update**: dialog-এ source selector — Main wallet, Sheet wallet, অথবা "Auto (Main আগে, বাকিটা Sheet)"। প্রতিটা wallet-এর available balance পাশে দেখাবে।
-- **Transaction history**: প্রতিটা row-এ wallet badge — Main = primary/blue, Sheet = teal/amber; আর একটা filter (All / Main / Sheet)। Limit update entry-তে "spend cap $X → $Y" আগের মতোই থাকবে, শুধু কোন wallet থেকে হয়েছে সেটা রঙ + badge দিয়ে আলাদা হবে।
+- Limit update (spend cap top-up)-এর সময় **দুইটা আলাদা button**: নীল = Main wallet থেকে, অন্য রঙ (teal/amber) = Secondary wallet থেকে। কোনো auto-split নেই — যে button, সেই wallet থেকেই ডলার minus হবে।
+- প্রতিটা wallet-এর নিজের USD rate; সেই rate দিয়েই ওই wallet-এর BDT due/advance হিসাব হবে, আর combined card-এ দুইটার BDT যোগ হয়ে total due/advance দেখাবে।
+- **Secondary wallet-এ balance/limit শুধু admin দিতে পারবে** — client secondary wallet-এ top-up request করতে পারবে না। Client শুধু Main wallet-এ আগের মতোই top-up request করবে।
+- Feature শুধু যাদের জন্য admin ON করবে তাদের জন্যই চলবে; বাকি সবার কাছে আজকের UI/behaviour হুবহু অপরিবর্তিত।
+- Transaction history-তে প্রতিটা entry-তে wallet badge + আলাদা রঙ, আর All / Main / Secondary filter — কোন limit update কোন wallet থেকে হয়েছে (spend cap $X → $Y সহ) স্পষ্ট দেখা যাবে।
+
+## Client যা দেখবে (feature ON হলে)
+
+- **Combined card** (উপরে): Total Due / Total Advance — BDT + USD দুইভাবেই।
+- নিচে দুইটা কার্ড: `Main Wallet · ৳129/$` এবং `Secondary Wallet · ৳124/$` — প্রতিটার balance আলাদা।
+- **Limit update dialog**: দুইটা button — "Top up from Main" (blue) এবং "Top up from Secondary" (teal)। প্রতিটার পাশে ওই wallet-এর available balance; balance না থাকলে সেই button disabled।
+- **Transactions**: wallet badge/রঙ + filter।
+- Top-up (deposit) form-এ কোনো পরিবর্তন নেই — সেটা সবসময় Main wallet।
 
 ## Admin যা দেখবে
 
-- Client detail page-এ toggle: **"Secondary (sheet) wallet enabled"** + secondary rate ইনপুট।
-- দুই wallet-এর balance আলাদা, manual credit/debit করার সময় কোন wallet সেটা বাছা যাবে।
-- Top-up approve করার সময় কোন wallet-এ credit হবে দেখা + বদলানো যাবে।
-
-## Deduction rule
-
-- Explicit ভাবে wallet বাছা হলে শুধু সেই wallet থেকেই কাটবে (balance না থাকলে error)।
-- "Auto" হলে আগে primary, বাকিটা secondary — একটাই atomic operation, দুইটা আলাদা ledger row (একটা primary, একটা secondary) একই reference id দিয়ে।
-- Refund হলে ঠিক যে wallet থেকে কাটা হয়েছিল সেখানেই ফেরত যাবে।
+- Client detail page-এ: **Secondary wallet enabled** toggle + **Secondary USD rate** ইনপুট।
+- Secondary wallet-এ manual credit / debit (limit দেওয়া) — reason সহ, ledger-এ log হবে।
+- Admin যখন client-এর হয়ে limit update করবে, একইভাবে দুইটা button পাবে।
+- Client list / detail-এ combined total due/advance দেখাবে, তাই sheet খোলার দরকার থাকবে না।
 
 ## Technical plan
 
 **Database (migration)**
-- `profiles`: `secondary_wallet_enabled boolean default false`, `secondary_usd_rate numeric` (null হলে primary rate)।
-- নতুন টেবিল `secondary_wallets` (user_id unique, balance, currency, timestamps) — grants + RLS: client নিজের row পড়বে, admin/superadmin সব, service_role all।
-- `transactions`: `wallet_kind text not null default 'primary'` (`'primary' | 'secondary'`, validation trigger), `usd_rate_used numeric` (audit-এর জন্য কোন rate-এ হয়েছে)।
-- `top_up_requests`: `wallet_kind text default 'primary'` — কোন wallet-এ credit হবে।
-- নতুন RPC `deduct_wallet_for_topup_v2(p_user_id, p_amount, p_ad_account_id, p_description, p_processed_by, p_source text /* primary|secondary|auto */, p_allow_negative, p_due_limit)`:
-  - দুই wallet row lock করে, প্রতিটাকে নিজের ledger (`wallet_kind` অনুযায়ী sum) দিয়ে reconcile করে, তারপর কাটে — existing atomic/phantom-balance protection দুই wallet-এর জন্যই থাকবে।
-  - Return: প্রতি wallet-এর before/after + কোন কোন txn তৈরি হলো।
-  - পুরোনো `deduct_wallet_for_topup` অপরিবর্তিত থাকবে (backward compatible), v2 শুধু primary মানে identical behaviour।
+- `profiles`: `secondary_wallet_enabled boolean not null default false`, `secondary_usd_rate numeric`।
+- নতুন টেবিল `secondary_wallets` (user_id unique, balance numeric default 0, currency, created_at, updated_at) + GRANTs + RLS (client নিজের row read; admin/superadmin সব; service_role all) + updated_at trigger।
+- `transactions`: `wallet_kind text not null default 'primary'` (`primary` | `secondary`, validation trigger), `usd_rate_used numeric`। পুরোনো সব row automatically `primary`, তাই history অটুট।
+- নতুন RPC `deduct_wallet_for_topup_v2(p_user_id, p_amount, p_ad_account_id, p_description, p_processed_by, p_wallet_kind, p_allow_negative, p_due_limit)`:
+  - নির্দিষ্ট wallet row lock → সেই wallet-এর ledger (`wallet_kind` অনুযায়ী sum) দিয়ে reconcile → deduct → ledger row insert।
+  - Balance না থাকলে `insufficient_balance` return (secondary-তে due_limit প্রযোজ্য নয়)।
+  - বর্তমান atomic/phantom-balance protection দুই wallet-এই থাকবে; পুরোনো `deduct_wallet_for_topup` অপরিবর্তিত থাকবে।
+- নতুন RPC `admin_adjust_secondary_wallet(p_user_id, p_amount, p_reason, p_admin)` — admin-only credit/debit + ledger + system log।
 
 **Edge function `spend-cap-update`**
-- Request body-তে নতুন optional `wallet_source` ('primary' | 'secondary' | 'auto', default 'primary')।
-- Deduction v2 RPC দিয়ে; refund path-ও wallet_kind অনুযায়ী সঠিক wallet-এ ফেরত দেবে।
-- `failed_topups` ও system log-এ wallet_kind রাখা হবে যাতে retry ঠিক wallet ব্যবহার করে।
-
-**Top-up approve path (`verify-topup` / admin approve)**
-- Request-এর `wallet_kind` অনুযায়ী সঠিক wallet-এ credit + সঠিক rate দিয়ে BDT→USD হিসাব।
+- Body-তে নতুন optional `wallet_kind` ('primary' default | 'secondary')।
+- Deduction ও refund path v2 RPC দিয়ে, সবসময় ঠিক সেই wallet-এ ফেরত।
+- `failed_topups` + system log-এ `wallet_kind` রাখা হবে, যাতে retry ভুল wallet ব্যবহার না করে।
 
 **Frontend**
-- নতুন hook `useWallets(userId)` — primary + secondary + total + enabled flag + rates এক জায়গায়।
-- `ClientWallet.tsx`: total + দুই wallet কার্ড (feature OFF হলে অপরিবর্তিত)।
-- `ClientTopUp.tsx`: wallet selector + rate সেই অনুযায়ী।
-- Spend cap dialog(গুলো) (`ClientAdAccounts`, `AdAccountDetailPage`, admin top-up path): wallet source selector।
-- `ClientTransactions.tsx` + `ClientDetailPage` ledger: wallet badge, রঙ আলাদা (semantic token দিয়ে, hardcoded color নয়), filter।
-- `ClientDetailPage` admin section: enable toggle + secondary rate + secondary manual credit/debit।
-
-**Safety**
-- Feature OFF (`secondary_wallet_enabled = false`) হলে সব code path আজকের মতোই আচরণ করবে — কোনো existing client প্রভাবিত হবে না।
-- Existing সব transaction automatically `wallet_kind = 'primary'` হয়ে যাবে, তাই পুরোনো history অটুট থাকবে।
+- নতুন hook `useWallets(userId)`: main balance, secondary balance, দুই rate, enabled flag, এবং combined BDT total (main×rate1 + secondary×rate2)।
+- `ClientWallet.tsx`: combined card + দুই wallet কার্ড (OFF হলে অপরিবর্তিত)।
+- Limit-update dialog গুলো (`ClientAdAccounts`, `AdAccountDetailPage`, admin top-up path): দুইটা button, semantic color token দিয়ে (hardcoded color নয়)।
+- `ClientTransactions.tsx` + `ClientDetailPage` ledger: wallet badge, রঙ, filter।
+- `ClientDetailPage` admin panel: toggle + secondary rate + secondary credit/debit dialog।
 
 ## Build order
 
-1. Migration (columns, secondary_wallets, RPC v2)।
-2. Edge function `spend-cap-update` + top-up approve path।
-3. Admin toggle + rate UI।
-4. Client wallet/top-up/limit-update/transaction UI।
-5. একটা test client-এ ON করে end-to-end যাচাই।
+1. Migration (columns, `secondary_wallets`, RPC v2, admin adjust RPC)।
+2. `spend-cap-update` edge function-এ `wallet_kind` support + refund correctness।
+3. Admin UI: toggle, rate, secondary balance দেওয়া।
+4. Client UI: combined card, দুই wallet কার্ড, দুইটা top-up button, transaction badge/filter।
+5. একটা client (যেমন Holy Gift)-এ ON করে end-to-end যাচাই — দুই wallet থেকে limit update, refund, combined due মিলিয়ে দেখা।
