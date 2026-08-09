@@ -447,11 +447,12 @@ Deno.serve(async (req)=>{
     const dbSpendCapDollars = Number(account.spend_cap);
     const live = await fetchLiveSpendCap(actId, bmToken);
     if (!live.ok) {
-      // Refund wallet if it was deducted
+      // Refund the SAME wallet the amount was deducted from
       if (shouldDeductWallet && walletId !== null) {
-        const { data: walletNow } = await supabase.from("wallets").select("balance").eq("id", walletId).single();
+        const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
+        const { data: walletNow } = await supabase.from(walletTable).select("balance").eq("id", walletId).single();
         const refundedBalance = Number(walletNow?.balance ?? newBalance) + amount;
-        await supabase.from("wallets").update({ balance: refundedBalance }).eq("id", walletId);
+        await supabase.from(walletTable).update({ balance: refundedBalance }).eq("id", walletId);
         await supabase.from("transactions").insert({
           user_id: walletUserId,
           amount: amount,
@@ -460,8 +461,10 @@ Deno.serve(async (req)=>{
           description: `Auto-refund: could not read live spend cap from Meta (${live.error})`,
           reference_id: ad_account_id,
           processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+          wallet_kind: walletKind,
         });
       }
+
       await supabase.from("system_logs").insert({
         user_id: userId,
         user_name: userName,
