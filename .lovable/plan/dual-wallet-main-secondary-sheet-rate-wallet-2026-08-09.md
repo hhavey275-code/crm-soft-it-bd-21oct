@@ -9,11 +9,12 @@
 - **Secondary wallet-এ balance/limit শুধু admin দিতে পারবে** — client secondary wallet-এ top-up request করতে পারবে না। Client শুধু Main wallet-এ আগের মতোই top-up request করবে।
 - Feature শুধু যাদের জন্য admin ON করবে তাদের জন্যই চলবে; বাকি সবার কাছে আজকের UI/behaviour হুবহু অপরিবর্তিত।
 - Transaction history-তে প্রতিটা entry-তে wallet badge + আলাদা রঙ, আর All / Main / Secondary filter — কোন limit update কোন wallet থেকে হয়েছে (spend cap $X → $Y সহ) স্পষ্ট দেখা যাবে।
+- SECONDAT WALLET ER RATE JENO CHANGE KORA JAY , MAIN WALLET ER MOTO 
 
 ## Client যা দেখবে (feature ON হলে)
 
-- **Combined card** (উপরে): Total Due / Total Advance — BDT + USD দুইভাবেই।
-- নিচে দুইটা কার্ড: `Main Wallet · ৳129/$` এবং `Secondary Wallet · ৳124/$` — প্রতিটার balance আলাদা।
+- **Combined card** (উপরে): Total Due / Total Advance — BDT ONLY 
+- নিচে দুইটা কার্ড: `Main Wallet · ৳129/$` এবং `Secondary Wallet · ৳124/$` — প্রতিটার balance আলাদা। SECONDAY WALLET E BDT SOHO .DOLLAR AND BDT
 - **Limit update dialog**: দুইটা button — "Top up from Main" (blue) এবং "Top up from Secondary" (teal)। প্রতিটার পাশে ওই wallet-এর available balance; balance না থাকলে সেই button disabled।
 - **Transactions**: wallet badge/রঙ + filter।
 - Top-up (deposit) form-এ কোনো পরিবর্তন নেই — সেটা সবসময় Main wallet।
@@ -28,6 +29,7 @@
 ## Technical plan
 
 **Database (migration)**
+
 - `profiles`: `secondary_wallet_enabled boolean not null default false`, `secondary_usd_rate numeric`।
 - নতুন টেবিল `secondary_wallets` (user_id unique, balance numeric default 0, currency, created_at, updated_at) + GRANTs + RLS (client নিজের row read; admin/superadmin সব; service_role all) + updated_at trigger।
 - `transactions`: `wallet_kind text not null default 'primary'` (`primary` | `secondary`, validation trigger), `usd_rate_used numeric`। পুরোনো সব row automatically `primary`, তাই history অটুট।
@@ -37,12 +39,14 @@
   - বর্তমান atomic/phantom-balance protection দুই wallet-এই থাকবে; পুরোনো `deduct_wallet_for_topup` অপরিবর্তিত থাকবে।
 - নতুন RPC `admin_adjust_secondary_wallet(p_user_id, p_amount, p_reason, p_admin)` — admin-only credit/debit + ledger + system log।
 
-**Edge function `spend-cap-update`**
+**Edge function `spend-cap-update**`
+
 - Body-তে নতুন optional `wallet_kind` ('primary' default | 'secondary')।
 - Deduction ও refund path v2 RPC দিয়ে, সবসময় ঠিক সেই wallet-এ ফেরত।
 - `failed_topups` + system log-এ `wallet_kind` রাখা হবে, যাতে retry ভুল wallet ব্যবহার না করে।
 
 **Frontend**
+
 - নতুন hook `useWallets(userId)`: main balance, secondary balance, দুই rate, enabled flag, এবং combined BDT total (main×rate1 + secondary×rate2)।
 - `ClientWallet.tsx`: combined card + দুই wallet কার্ড (OFF হলে অপরিবর্তিত)।
 - Limit-update dialog গুলো (`ClientAdAccounts`, `AdAccountDetailPage`, admin top-up path): দুইটা button, semantic color token দিয়ে (hardcoded color নয়)।
