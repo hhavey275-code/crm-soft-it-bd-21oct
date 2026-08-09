@@ -187,6 +187,9 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  const wallets = useWallets(userId);
+
+
   const { data: adAccounts, refetch: refetchAdAccounts } = useQuery({
     queryKey: ["client-detail-ad-accounts", userId],
     queryFn: async () => {
