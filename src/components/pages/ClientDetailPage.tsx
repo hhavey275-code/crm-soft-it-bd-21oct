@@ -93,6 +93,8 @@ import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
 import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
+import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
+
 
 export default function ClientDetailPage() {
   const params = useParams<{ userId?: string; id?: string }>();
