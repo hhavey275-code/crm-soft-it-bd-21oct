@@ -539,14 +539,15 @@ export function ClientAdAccounts() {
   const usingDueLimit = parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
   const topUpMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
-        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true },
+        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
+
     onSuccess: async (data) => {
       toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
       const topUpAccId = topUpAccount.id;
