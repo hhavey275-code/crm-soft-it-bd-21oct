@@ -101,7 +101,45 @@ export function ClientAdAccounts() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawNote, setWithdrawNote] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMax, setWithdrawMax] = useState<number | null>(null);
+  const [withdrawMaxLoading, setWithdrawMaxLoading] = useState(false);
   const [isTenantMode, setIsTenantMode] = useState(false);
+
+  /** Admin-granted permission to pull unused ad account balance back to wallet. */
+  const { data: canWithdraw } = useQuery({
+    queryKey: ["client-can-withdraw", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("spend_cap_withdraw_enabled")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return !!data?.spend_cap_withdraw_enabled;
+    },
+  });
+
+  const openWithdraw = async (a: any) => {
+    setWithdrawAccount(a);
+    setWithdrawAmount("");
+    setWithdrawNote("");
+    setWithdrawMax(null);
+    if (!canWithdraw) return;
+    setWithdrawMaxLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: a.id, amount: 1, dry_run: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setWithdrawMax(Number((data as any)?.max_withdrawable ?? 0));
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err) || "Could not read live limit from Meta");
+    } finally {
+      setWithdrawMaxLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     isTenantInstance().then(setIsTenantMode);
