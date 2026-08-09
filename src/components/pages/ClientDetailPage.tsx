@@ -2517,14 +2517,27 @@ export default function ClientDetailPage() {
                           } else if (pb.startsWith("client:")) {
                             processedByLabel = profile?.full_name || profile?.email || "Client";
                           }
+                          const isSecondary = tx.wallet_kind === "secondary";
                           return (
-                            <TableRow key={tx.id}>
+                            <TableRow
+                              key={tx.id}
+                              className={isSecondary ? "bg-teal-50/70 dark:bg-teal-950/20" : undefined}
+                            >
                               <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
                                 {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
                               </TableCell>
                               <TableCell className="capitalize font-medium text-xs">
-                                {tx.type.replace(/_/g, " ")}
+                                <span>{tx.type.replace(/_/g, " ")}</span>
+                                <span
+                                  className={cn(
+                                    "block text-[10px] font-semibold uppercase tracking-wide",
+                                    isSecondary ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400",
+                                  )}
+                                >
+                                  {isSecondary ? "Secondary wallet" : "Main wallet"}
+                                </span>
                               </TableCell>
+
                               <TableCell className="text-xs">
                                 {hasNewline ? (
                                   <div>
