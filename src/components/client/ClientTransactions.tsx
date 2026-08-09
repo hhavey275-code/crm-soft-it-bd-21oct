@@ -81,6 +81,12 @@ export function ClientTransactions() {
     return desc;
   };
 
+  /** "Cap: $x → $y" line, when the top-up recorded a spend-cap movement. */
+  const getCapText = (tx: any) => {
+    const parts = (tx.description || "").split("\n");
+    return parts.length > 2 ? parts[2] : null;
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <h1 className="text-xl md:text-2xl font-bold">Transaction History</h1>
