@@ -559,6 +559,7 @@ export function ClientAdAccounts() {
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
