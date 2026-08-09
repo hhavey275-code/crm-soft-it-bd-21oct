@@ -343,21 +343,41 @@ export default function InvoicePage() {
                   if (hasSheet) {
                     rows.push({ desc: "Sheet Bill Adjustment", rate: "—", qty: "—", total: sheetBill });
                   }
-                  if (remainderBdt > 0.5 && remainderUsd > 0) {
-                    rows.push({
-                      desc: "Meta Advertising",
-                      rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-                      qty: remainderUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                      total: remainderBdt,
-                    });
-                  } else if (!hasStored && usdQty > 0) {
-                    // Legacy invoices (no stored split, no sheet/walletDue) — show full meta row.
-                    rows.push({
-                      desc: "Meta Advertising",
-                      rate: `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-                      qty: usdQty.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                      total: usdQty * rate,
-                    });
+                  const metaUsd =
+                    remainderBdt > 0.5 && remainderUsd > 0
+                      ? remainderUsd
+                      : !hasStored && usdQty > 0
+                        ? usdQty
+                        : 0;
+                  const metaBdt =
+                    remainderBdt > 0.5 && remainderUsd > 0 ? remainderBdt : metaUsd * rate;
+                  if (metaUsd > 0) {
+                    const secUsd = Math.min(Math.max(0, secondaryUsd), metaUsd);
+                    const mainUsd = metaUsd - secUsd;
+                    const rateStr = `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                    if (secUsd > 0.005) {
+                      if (mainUsd > 0.005) {
+                        rows.push({
+                          desc: "Meta Advertising — Main Wallet",
+                          rate: rateStr,
+                          qty: mainUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                          total: mainUsd * rate,
+                        });
+                      }
+                      rows.push({
+                        desc: "Meta Advertising — Secondary Wallet Adjustment",
+                        rate: rateStr,
+                        qty: secUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: metaBdt - mainUsd * rate,
+                      });
+                    } else {
+                      rows.push({
+                        desc: "Meta Advertising",
+                        rate: rateStr,
+                        qty: metaUsd.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: metaBdt,
+                      });
+                    }
                   }
                   const padCount = Math.max(0, 4 - rows.length);
                   return (
