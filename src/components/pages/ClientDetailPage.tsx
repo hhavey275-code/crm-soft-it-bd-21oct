@@ -775,6 +775,7 @@ export default function ClientDetailPage() {
                     className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
                     onClick={() => {
                       setSelectedAccountId(acc.id);
+                      setTopUpWallet("primary");
                       setTopUpDialogOpen(true);
                       setTopUpAmount("");
                       setDialogTab("topup");
@@ -783,6 +784,22 @@ export default function ClientDetailPage() {
                     <ArrowUpCircle className="h-3.5 w-3.5" />
                     Top Up
                   </Button>
+                  {wallets.secondaryEnabled && (
+                    <Button
+                      size="icon"
+                      className="h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      title="Top Up (Secondary Wallet)"
+                      onClick={() => {
+                        setSelectedAccountId(acc.id);
+                        setTopUpWallet("secondary");
+                        setTopUpDialogOpen(true);
+                        setTopUpAmount("");
+                        setDialogTab("topup");
+                      }}
+                    >
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant={acc.client_topup_disabled ? "destructive" : "outline"}
