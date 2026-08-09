@@ -95,6 +95,7 @@ export function AdminAdAccounts() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [externalTopUpAccount, setExternalTopUpAccount] = useState<any>(null);
   const [sortField, setSortField] = useState<string>(() => sessionStorage.getItem("adAccountsSortField") || "account_name");
