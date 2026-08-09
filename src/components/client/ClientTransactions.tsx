@@ -122,6 +122,9 @@ export function ClientTransactions() {
                         {tx.wallet_kind === "secondary" ? "Secondary wallet" : "Main wallet"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{getDescriptionText(tx)}</p>
+                      {getCapText(tx) && (
+                        <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 truncate">{getCapText(tx)}</p>
+                      )}
 
                       <div className="flex items-center justify-between mt-1.5">
                         <span className="text-[11px] text-muted-foreground">
