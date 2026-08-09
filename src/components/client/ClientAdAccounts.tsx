@@ -1009,17 +1009,6 @@ export function ClientAdAccounts() {
                               Top Up
                             </Button>
                           )}
-                          {!a.client_topup_disabled && wallets.secondaryEnabled && (
-                            <Button
-                              size="icon"
-                              className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
-                              disabled={isInactive}
-                              title="Top Up (Secondary Wallet)"
-                              onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
-                            >
-                              <ArrowUpCircle className="h-4 w-4" />
-                            </Button>
-                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8" data-tutorial={idx === 0 ? "ad-account-3dot" : undefined}>
