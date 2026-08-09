@@ -1436,9 +1436,15 @@ export function AdminAdAccounts() {
                     <span className="font-medium">{assignedClientName}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet Balance</span>
+                    <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Main Wallet Balance</span>
                     <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
                   </div>
+                  {assignedSecondaryEnabled && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400"><Wallet className="h-4 w-4" /> Secondary Wallet</span>
+                      <span className={`font-semibold ${assignedSecondaryBalance < 0 ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400'}`}>${assignedSecondaryBalance.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">No client assigned — wallet will not be deducted</div>
@@ -1453,7 +1459,8 @@ export function AdminAdAccounts() {
                 {willGoNegative && parsedAmount > 0 && assignedUserId && (
                   <div className="flex items-center gap-2 text-sm text-yellow-600">
                     <AlertTriangle className="h-4 w-4" />
-                    Client balance will go negative by ${(parsedAmount - clientBalance).toLocaleString()}
+                    {topUpWallet === "secondary" ? "Secondary" : "Client"} balance will go negative by $
+                    {(parsedAmount - (topUpWallet === "secondary" ? assignedSecondaryBalance : clientBalance)).toLocaleString()}
                   </div>
                 )}
               </div>
@@ -1465,8 +1472,24 @@ export function AdminAdAccounts() {
               )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-                <Button onClick={() => topUpMutation.mutate()} disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}>
-                  {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                {assignedSecondaryEnabled && (
+                  <Button
+                    variant={topUpWallet === "secondary" ? "default" : "outline"}
+                    className={topUpWallet === "secondary"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
+                    onClick={() => topUpMutation.mutate("secondary")}
+                    disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
+                  >
+                    {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
+                  </Button>
+                )}
+                <Button
+                  variant={assignedSecondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
+                  onClick={() => topUpMutation.mutate("primary")}
+                  disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
+                >
+                  {topUpMutation.isPending ? "Processing..." : assignedSecondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
                 </Button>
               </DialogFooter>
             </TabsContent>
