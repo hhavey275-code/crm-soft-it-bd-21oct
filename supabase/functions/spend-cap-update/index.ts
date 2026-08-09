@@ -760,9 +760,12 @@ Deno.serve(async (req)=>{
       try {
         await supabase.from("transactions").update({
           description: `${account.account_name}\n${cleanAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
+          old_spend_cap: Number(oldSpendCapDollars),
+          new_spend_cap: Number(newSpendCapDollars),
         }).eq("id", walletTxnId);
       } catch (e) { console.warn("cap description update failed:", e); }
     }
+
     // ============================================
     // STEP 4.5: Post-update health check — diagnostic
     // ============================================
