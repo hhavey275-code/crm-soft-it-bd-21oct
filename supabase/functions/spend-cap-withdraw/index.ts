@@ -73,11 +73,15 @@ Deno.serve(async (req) => {
     const { data: roleRow } = await supabase.from("user_roles").select("role").eq("user_id", userId).single();
     const isAdmin = roleRow?.role === "admin" || roleRow?.role === "superadmin";
 
-    const { ad_account_id, amount, dry_run } = await req.json();
+    const { ad_account_id, amount, dry_run, wallet_kind: walletKindRaw } = await req.json();
     const withdrawAmount = Number(amount);
+    // Clients can only ever withdraw into their MAIN wallet. Admins may choose.
+    const walletKind: "primary" | "secondary" =
+      isAdmin && (walletKindRaw === "secondary") ? "secondary" : "primary";
     if (!ad_account_id || !Number.isFinite(withdrawAmount) || withdrawAmount <= 0) {
       return json({ error: "ad_account_id and positive amount required" }, 400);
     }
+
 
     if (!isAdmin) {
       const { data: assignment } = await supabase
