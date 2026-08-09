@@ -3233,12 +3233,55 @@ export default function ClientDetailPage() {
                   </div>
                 ) : withdrawMeta ? (
                   <>
-                    <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
-                      <span className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4" /> Client Wallet
-                      </span>
-                      <span className="font-semibold">${walletBalance.toLocaleString()}</span>
+                    {/* Destination wallet — admin picks where the withdrawn balance lands */}
+                    <div className="space-y-2">
+                      <Label>Credit To Wallet</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setWithdrawWallet("primary")}
+                          className={cn(
+                            "rounded-lg border p-2.5 text-left transition-colors",
+                            withdrawWallet === "primary"
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-medium">
+                            <Wallet className="h-3.5 w-3.5" /> Main Wallet
+                          </span>
+                          <span className="mt-0.5 block text-sm font-semibold">
+                            ${walletBalance.toLocaleString()}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!wallets.secondaryEnabled}
+                          onClick={() => setWithdrawWallet("secondary")}
+                          className={cn(
+                            "rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                            withdrawWallet === "secondary"
+                              ? "border-emerald-500 bg-emerald-500/10"
+                              : "border-border hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-medium">
+                            <Wallet className="h-3.5 w-3.5" /> Secondary Wallet
+                          </span>
+                          <span className="mt-0.5 block text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                            ${wallets.secondaryBalance.toLocaleString()}
+                          </span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Withdrawn balance{" "}
+                        <span className="font-medium">
+                          {withdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}
+                        </span>{" "}
+                        e joma hobe.
+                      </p>
                     </div>
+
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Current Spend Cap (Meta)</span>
                       <span className="font-medium">
