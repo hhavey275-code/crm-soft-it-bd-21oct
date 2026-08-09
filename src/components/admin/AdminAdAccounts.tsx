@@ -1053,12 +1053,12 @@ export function AdminAdAccounts() {
                   </div>
 
                   {/* Spent / Limit + Top Up */}
-                  <div className="flex items-center justify-between mt-2.5">
-                    <div className="flex gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-start justify-between gap-2 mt-2.5">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground min-w-0">
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {a.external_topup_required ? (
                         <Button
                           size="sm"
@@ -1081,7 +1081,7 @@ export function AdminAdAccounts() {
                           {hasSecondaryWallet(uid) && (
                             <Button
                               size="icon"
-                              className="h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                              className="h-8 w-8 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
                               title="Top Up (Secondary Wallet)"
                               onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
                             >
