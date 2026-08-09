@@ -1127,63 +1127,14 @@ export default function ClientDetailPage() {
         )}
 
         {/* Main Tabs */}
-        {/* Mobile wallet cards — main / secondary / combined (hidden Overview tab on mobile) */}
-        {isMobile && (
+        {/* Mobile wallet cards — secondary + combined only (main wallet lives in Overview tab) */}
+        {isMobile && wallets.secondaryEnabled && userId && (
           <div className="space-y-3">
-            <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-4 text-primary-foreground shadow-lg">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs opacity-90">Main Wallet Balance</p>
-                  <p className="mt-1 text-2xl font-bold tracking-tight">
-                    ${walletBalance.toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"
-                    aria-label="Add balance"
-                    onClick={() => {
-                      setWalletDialogType("credit");
-                      setWalletAmount("");
-                      setWalletNote("");
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                  <button
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"
-                    aria-label="Deduct balance"
-                    onClick={() => {
-                      setWalletDialogType("debit");
-                      setWalletAmount("");
-                      setWalletNote("");
-                    }}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            {wallets.secondaryEnabled && userId && (
-              <div className="grid grid-cols-1 gap-3">
-                <SecondaryWalletCard userId={userId} />
-                <CombinedTotalCard userId={userId} />
-              </div>
-            )}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: "Accounts", value: adAccounts?.length ?? 0, cls: "text-teal-600" },
-                { label: "Active", value: activeAccounts.length, cls: "text-emerald-600" },
-                { label: "Disabled", value: disabledAccounts.length, cls: "text-red-600" },
-              ].map((s) => (
-                <div key={s.label} className="rounded-xl border border-border/60 bg-card p-2.5 text-center">
-                  <p className="text-[10px] text-muted-foreground">{s.label}</p>
-                  <p className={cn("text-lg font-bold", s.cls)}>{s.value}</p>
-                </div>
-              ))}
-            </div>
+            <SecondaryWalletCard userId={userId} />
+            <CombinedTotalCard userId={userId} />
           </div>
         )}
+
 
         <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div
