@@ -667,17 +667,22 @@ export function AdminAdAccounts() {
   const assignedWallet = getClientWallet(assignedUserId);
   const assignedClientName = getClientName(assignedUserId);
   const clientBalance = Number(assignedWallet?.balance ?? 0);
+  const assignedSecondaryEnabled = hasSecondaryWallet(assignedUserId);
+  const assignedSecondaryBalance = getSecondaryBalance(assignedUserId);
   const parsedAmount = parseFloat(topUpAmount) || 0;
-  const willGoNegative = parsedAmount > clientBalance;
+  const willGoNegative = topUpWallet === "secondary"
+    ? parsedAmount > assignedSecondaryBalance
+    : parsedAmount > clientBalance;
 
   const topUpMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (walletKind: "primary" | "secondary" = topUpWallet) => {
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
         body: {
           ad_account_id: topUpAccount.id,
           amount: parsedAmount,
           deduct_wallet: !!assignedUserId,
           target_user_id: assignedUserId,
+          wallet_kind: walletKind,
         },
       });
       if (error) throw error;
