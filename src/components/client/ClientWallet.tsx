@@ -78,7 +78,7 @@ export function ClientWallet() {
       {/* Secondary wallet + combined total (only when enabled for this client) */}
       {wallets.secondaryEnabled && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Card className="border-green-300/70 bg-green-50 dark:bg-green-950/20 dark:border-green-800/50">
+          <Card className="border-border/60 bg-card">
             <CardContent className="p-5">
               <p className="text-sm text-green-700 dark:text-green-400">Secondary Wallet Balance</p>
               <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
@@ -87,7 +87,7 @@ export function ClientWallet() {
               <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-1">Rate ৳{wallets.secondaryRate}/USD</p>
             </CardContent>
           </Card>
-          <Card className="border-purple-300/70 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800/50">
+          <Card className="border-border/60 bg-card">
             <CardContent className="p-5">
               <p className="text-sm text-purple-700 dark:text-purple-400">
                 Combined Due / Adv

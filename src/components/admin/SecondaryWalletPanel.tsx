@@ -176,7 +176,7 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
 
   return (
     <>
-      <Card className="border border-emerald-300/60 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/60 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-900/20 shadow-sm hover:shadow-md transition-shadow">
+      <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-emerald-500/20">
@@ -264,7 +264,7 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
   const totalBdt = mainBdt + secondaryBdt;
   const isDue = totalBdt < 0;
   return (
-    <Card className="border border-purple-300/60 dark:border-purple-800/50 bg-gradient-to-br from-purple-50 via-violet-50 to-purple-100/60 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-purple-900/20 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-purple-500/20">

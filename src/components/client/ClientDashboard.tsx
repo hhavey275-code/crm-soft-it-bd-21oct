@@ -415,7 +415,7 @@ export function ClientDashboard() {
       {/* Secondary wallet + combined BDT total — only when enabled for this client */}
       {clientWallets.secondaryEnabled && (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-          <Card className="border-green-300/70 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/20 dark:border-green-800/50">
+          <Card className="border-border/60 bg-card">
             <CardContent className="p-4">
               <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
               <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
@@ -426,7 +426,7 @@ export function ClientDashboard() {
               </p>
             </CardContent>
           </Card>
-          <Card className="border-purple-300/70 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800/50">
+          <Card className="border-border/60 bg-card">
             <CardContent className="p-4">
               <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Combined Due / Adv</p>
               <p className="text-2xl font-bold mt-1 text-purple-700 dark:text-purple-300">
