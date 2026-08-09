@@ -232,7 +232,7 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
             <Scale className="h-4.5 w-4.5 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">Combined {isDue ? "Due" : "Advance"}</p>
+            <p className="text-sm font-semibold text-foreground truncate">Combined Due / Adv</p>
             <p className="text-[10px] text-muted-foreground truncate">
               Main {formatBdt(mainBdt)} ({wallets.mainBalance < 0 ? "-" : ""}${Math.abs(wallets.mainBalance).toLocaleString()} × ৳{wallets.mainRate}) + Secondary {formatBdt(secondaryBdt)} (৳{wallets.secondaryRate})
             </p>
