@@ -93,6 +93,8 @@ import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
 import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
+import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
+
 
 export default function ClientDetailPage() {
   const params = useParams<{ userId?: string; id?: string }>();
@@ -2513,130 +2515,25 @@ export default function ClientDetailPage() {
 
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="mt-0">
-            {isMobile ? (
-              <div>
-                <h2 className="text-base font-semibold mb-3">Transaction History</h2>
-                {renderMobileTransactionCards()}
-              </div>
-            ) : (
-              <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead>Date</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Ad Account</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Balance After</TableHead>
-                          <TableHead>Processed By</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {transactions?.map((tx: any) => {
-                          const linkedAccount =
-                            tx.reference_id && tx.type === "ad_topup"
-                              ? adAccounts?.find((a: any) => a.id === tx.reference_id)
-                              : null;
-                          const desc = tx.description || "—";
-                          const hasNewline = desc.includes("\n");
-                          const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                          const pb = tx.processed_by || "";
-                          let processedByLabel = "—";
-                          if (pb === "system") processedByLabel = "Auto Approved by System";
-                          else if (pb.startsWith("admin:")) {
-                            const adminId = pb.split(":")[1];
-                            const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
-                            processedByLabel =
-                              adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
-                          } else if (pb.startsWith("client:")) {
-                            processedByLabel = profile?.full_name || profile?.email || "Client";
-                          }
-                          const isSecondary = tx.wallet_kind === "secondary";
-                          return (
-                            <TableRow
-                              key={tx.id}
-                              className={isSecondary ? "bg-teal-50/70 dark:bg-teal-950/20" : undefined}
-                            >
-                              <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
-                                {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
-                              </TableCell>
-                              <TableCell className="capitalize font-medium text-xs">
-                                <span>{tx.type.replace(/_/g, " ")}</span>
-                                <span
-                                  className={cn(
-                                    "block text-[10px] font-semibold uppercase tracking-wide",
-                                    isSecondary ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400",
-                                  )}
-                                >
-                                  {isSecondary ? "Secondary wallet" : "Main wallet"}
-                                </span>
-                              </TableCell>
-
-                              <TableCell className="text-xs">
-                                {hasNewline ? (
-                                  <div>
-                                    <span>{descName}</span>
-                                    <span className="block text-[11px] text-muted-foreground">
-                                      {descId}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  desc
-                                )}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {linkedAccount ? (
-                                  <div>
-                                    <p className="font-medium">{linkedAccount.account_name}</p>
-                                    <p className="text-[11px] text-muted-foreground font-mono">
-                                      {linkedAccount.account_id.replace(/^act_/, "")}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </TableCell>
-                              <TableCell
-                                className={cn(
-                                  "font-semibold text-xs",
-                                  Number(tx.amount) >= 0 ? "text-emerald-600" : "text-destructive",
-                                )}
-                              >
-                                {Number(tx.amount) >= 0 ? "+" : ""}$
-                                {Math.abs(Number(tx.amount)).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="font-medium text-xs">
-                                ${Number(tx.balance_after ?? 0).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {processedByLabel}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                        {(!transactions || transactions.length === 0) && (
-                          <TableRow>
-                            <TableCell
-                              colSpan={7}
-                              className="text-center text-muted-foreground py-8"
-                            >
-                              No transactions yet
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <TransactionHistoryPanel
+              transactions={transactions}
+              adAccounts={adAccounts}
+              secondaryEnabled={wallets.secondaryEnabled}
+              isMobile={isMobile}
+              resolveProcessedBy={(tx: any) => {
+                const pb = tx.processed_by || "";
+                if (pb === "system") return "Auto Approved by System";
+                if (pb.startsWith("admin:")) {
+                  const adminId = pb.split(":")[1];
+                  const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
+                  return adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
+                }
+                if (pb.startsWith("client:")) return profile?.full_name || profile?.email || "Client";
+                return "—";
+              }}
+            />
           </TabsContent>
+
 
           {/* Bank Info Tab */}
           <TabsContent value="banks" className="mt-0 space-y-4">

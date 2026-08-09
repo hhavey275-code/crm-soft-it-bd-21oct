@@ -3735,6 +3735,8 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          new_spend_cap: number | null
+          old_spend_cap: number | null
           processed_by: string | null
           reference_id: string | null
           source_ip: string | null
@@ -3751,6 +3753,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          new_spend_cap?: number | null
+          old_spend_cap?: number | null
           processed_by?: string | null
           reference_id?: string | null
           source_ip?: string | null
@@ -3767,6 +3771,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          new_spend_cap?: number | null
+          old_spend_cap?: number | null
           processed_by?: string | null
           reference_id?: string | null
           source_ip?: string | null
