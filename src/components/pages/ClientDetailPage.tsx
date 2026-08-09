@@ -618,8 +618,9 @@ export default function ClientDetailPage() {
       const amt = parseFloat(withdrawAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: selectedAccountId, amount: amt },
+        body: { ad_account_id: selectedAccountId, amount: amt, wallet_kind: withdrawWallet },
       });
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
