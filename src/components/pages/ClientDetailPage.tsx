@@ -749,7 +749,7 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Spent / Limit + Top Up */}
-              <div className="flex items-center justify-between mt-2.5">
+              <div className="mt-2.5 space-y-2">
                 <div className="flex gap-4 text-xs text-muted-foreground">
                   <span>
                     Spent:{" "}
@@ -772,10 +772,10 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-stretch gap-2" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
-                    className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                    className="flex-1 min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
                     onClick={() => {
                       setSelectedAccountId(acc.id);
                       setTopUpWallet("primary");
@@ -784,13 +784,13 @@ export default function ClientDetailPage() {
                       setDialogTab("topup");
                     }}
                   >
-                    <ArrowUpCircle className="h-3.5 w-3.5" />
-                    Top Up
+                    <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{wallets.secondaryEnabled ? "Main" : "Top Up"}</span>
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      size="sm"
+                      className="flex-1 min-w-0 gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         setSelectedAccountId(acc.id);
@@ -800,13 +800,14 @@ export default function ClientDetailPage() {
                         setDialogTab("topup");
                       }}
                     >
-                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                      <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Secondary</span>
                     </Button>
                   )}
                   <Button
                     size="icon"
                     variant={acc.client_topup_disabled ? "destructive" : "outline"}
-                    className="h-8 w-8 rounded-full"
+                    className="h-8 w-8 shrink-0 rounded-full"
                     title={acc.client_topup_disabled ? "Client top-up disabled" : "Disable client top-up"}
                     onClick={async () => {
                       const next = !acc.client_topup_disabled;
@@ -1118,6 +1119,64 @@ export default function ClientDetailPage() {
         )}
 
         {/* Main Tabs */}
+        {/* Mobile wallet cards — main / secondary / combined (hidden Overview tab on mobile) */}
+        {isMobile && (
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-4 text-primary-foreground shadow-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs opacity-90">Main Wallet Balance</p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight">
+                    ${walletBalance.toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"
+                    aria-label="Add balance"
+                    onClick={() => {
+                      setWalletDialogType("credit");
+                      setWalletAmount("");
+                      setWalletNote("");
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"
+                    aria-label="Deduct balance"
+                    onClick={() => {
+                      setWalletDialogType("debit");
+                      setWalletAmount("");
+                      setWalletNote("");
+                    }}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            {wallets.secondaryEnabled && userId && (
+              <div className="grid grid-cols-1 gap-3">
+                <SecondaryWalletCard userId={userId} />
+                <CombinedTotalCard userId={userId} />
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Accounts", value: adAccounts?.length ?? 0, cls: "text-teal-600" },
+                { label: "Active", value: activeAccounts.length, cls: "text-emerald-600" },
+                { label: "Disabled", value: disabledAccounts.length, cls: "text-red-600" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl border border-border/60 bg-card p-2.5 text-center">
+                  <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                  <p className={cn("text-lg font-bold", s.cls)}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div
             className={cn(
