@@ -405,16 +405,18 @@ Deno.serve(async (req)=>{
         p_due_limit: walletKind === "primary" ? dueLimit : 0,
       });
 
+      const walletLabel = walletKind === "secondary" ? "Secondary wallet" : "Wallet";
       if (deductErr) {
-        console.error("deduct_wallet_for_topup failed", deductErr);
-        return json({ error: "Wallet deduction failed. Please try again." }, 500);
+        console.error("deduct_wallet_for_topup_v2 failed", deductErr);
+        return json({ error: `${walletLabel} deduction failed. Please try again.` }, 500);
       }
       const res: any = deductRes;
       if (!res?.ok) {
-        if (res?.error === "wallet_not_found") return json({ error: "Wallet not found for user" }, 404);
-        if (res?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
-        return json({ error: "Wallet deduction failed" }, 400);
+        if (res?.error === "wallet_not_found") return json({ error: `${walletLabel} not found for user` }, 404);
+        if (res?.error === "insufficient_balance") return json({ error: `Insufficient ${walletKind === "secondary" ? "secondary wallet" : "wallet"} balance` }, 400);
+        return json({ error: `${walletLabel} deduction failed` }, 400);
       }
+
       newBalance = Number(res.balance_after);
       walletId = res.wallet_id;
       walletTxnId = res.transaction_id ?? null;
