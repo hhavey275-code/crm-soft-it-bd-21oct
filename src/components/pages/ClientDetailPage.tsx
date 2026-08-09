@@ -749,7 +749,7 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Spent / Limit + Top Up */}
-              <div className="flex items-center justify-between mt-2.5">
+              <div className="mt-2.5 space-y-2">
                 <div className="flex gap-4 text-xs text-muted-foreground">
                   <span>
                     Spent:{" "}
@@ -772,10 +772,10 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-stretch gap-2" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
-                    className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                    className="flex-1 min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
                     onClick={() => {
                       setSelectedAccountId(acc.id);
                       setTopUpWallet("primary");
@@ -784,13 +784,13 @@ export default function ClientDetailPage() {
                       setDialogTab("topup");
                     }}
                   >
-                    <ArrowUpCircle className="h-3.5 w-3.5" />
-                    Top Up
+                    <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{wallets.secondaryEnabled ? "Main" : "Top Up"}</span>
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      size="sm"
+                      className="flex-1 min-w-0 gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         setSelectedAccountId(acc.id);
@@ -800,13 +800,14 @@ export default function ClientDetailPage() {
                         setDialogTab("topup");
                       }}
                     >
-                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                      <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Secondary</span>
                     </Button>
                   )}
                   <Button
                     size="icon"
                     variant={acc.client_topup_disabled ? "destructive" : "outline"}
-                    className="h-8 w-8 rounded-full"
+                    className="h-8 w-8 shrink-0 rounded-full"
                     title={acc.client_topup_disabled ? "Client top-up disabled" : "Disable client top-up"}
                     onClick={async () => {
                       const next = !acc.client_topup_disabled;
