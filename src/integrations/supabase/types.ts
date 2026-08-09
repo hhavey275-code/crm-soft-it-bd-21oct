@@ -3926,6 +3926,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      deduct_wallet_for_topup: {
+        Args: {
+          p_ad_account_id: string
+          p_allow_negative?: boolean
+          p_amount: number
+          p_description: string
+          p_due_limit?: number
+          p_processed_by: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       delete_ledger_entry: { Args: { p_id: string }; Returns: Json }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }

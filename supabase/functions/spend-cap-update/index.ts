@@ -374,38 +374,49 @@ Deno.serve(async (req)=>{
     let walletId = null;
     let walletTxnId: string | null = null;
     if (shouldDeductWallet) {
-      const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
-      if (walletErr || !wallet) return json({
-        error: "Wallet not found for user"
-      }, 404);
-      // Admin/superadmin can top up even with insufficient balance (go negative)
+      const cleanAccountId = account.account_id.replace(/^act_/, '');
+      let dueLimit = 0;
       if (!isAdmin) {
         const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
-        const dueLimit = Number(prof?.due_limit ?? 0);
-        if (Number(wallet.balance) + dueLimit < amount) return json({
-          error: "Insufficient wallet balance"
-        }, 400);
+        dueLimit = Number(prof?.due_limit ?? 0);
       }
-      newBalance = Number(wallet.balance) - amount;
-      walletId = wallet.id;
-      // Deduct wallet
-      await supabase.from("wallets").update({
-        balance: newBalance
-      }).eq("id", wallet.id);
-      // Create transaction record (capture id to use as stable usage idempotency key)
-      const cleanAccountId = account.account_id.replace(/^act_/, '');
-      const { data: txnRow } = await supabase.from("transactions").insert({
-        user_id: walletUserId,
-        amount: -amount,
-        balance_after: newBalance,
-        type: "ad_topup",
-        description: `${account.account_name}\n${cleanAccountId}`,
-        reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`
-      }).select("id").maybeSingle();
-      walletTxnId = (txnRow as any)?.id ?? null;
+      // ATOMIC + ledger-consistent deduction. The DB function locks the wallet
+      // row, realigns wallets.balance with the transaction ledger if they have
+      // drifted, then deducts. This makes it impossible for a top-up to leave
+      // the balance HIGHER than before (the old phantom-balance bug).
+      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup", {
+        p_user_id: walletUserId,
+        p_amount: amount,
+        p_ad_account_id: ad_account_id,
+        p_description: `${account.account_name}\n${cleanAccountId}`,
+        p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+        p_allow_negative: isAdmin,
+        p_due_limit: dueLimit,
+      });
+      if (deductErr) {
+        console.error("deduct_wallet_for_topup failed", deductErr);
+        return json({ error: "Wallet deduction failed. Please try again." }, 500);
+      }
+      const res: any = deductRes;
+      if (!res?.ok) {
+        if (res?.error === "wallet_not_found") return json({ error: "Wallet not found for user" }, 404);
+        if (res?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
+        return json({ error: "Wallet deduction failed" }, 400);
+      }
+      newBalance = Number(res.balance_after);
+      walletId = res.wallet_id;
+      walletTxnId = res.transaction_id ?? null;
+      if (res.reconciled) {
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Wallet Balance Reconciled",
+          details: `Wallet for user ${walletUserId} was realigned to its transaction ledger before top-up (new balance $${Number(res.balance_before).toFixed(2)} → $${newBalance.toFixed(2)} after $${amount} deduction).`,
+        });
+      }
       if (walletTxnId) usageIdempotencyKey = `wallet_txn:${walletTxnId}`;
     }
+
     // ============================================
     // STEP 2: Call Meta API
     // ============================================
@@ -498,14 +509,24 @@ Deno.serve(async (req)=>{
         // Do a GET to check if spend cap was actually updated.
         let actuallySucceeded = false;
         try {
-          const verifyResult = await verifySpendCap(actId, bmToken);
-          if (verifyResult.ok && isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
-            actuallySucceeded = true;
-            console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
+          // Retry the confirmation read a few times — Meta can be slow or
+          // rate-limited, and a missed confirmation creates a false "failed"
+          // top-up that the client can then duplicate.
+          for (const waitMs of [0, 4000, 8000]) {
+            if (waitMs) await delay(waitMs);
+            const verifyResult = await verifySpendCap(actId, bmToken);
+            if (verifyResult.ok) {
+              if (isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+                actuallySucceeded = true;
+                console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
+              }
+              break;
+            }
           }
         } catch (verifyErr) {
           console.warn("Post-failure verification GET also failed", verifyErr);
         }
+
         if (actuallySucceeded) {
           // Spend cap was actually updated — proceed as success
           const currentAmountSpent = Number(account.amount_spent);
@@ -562,60 +583,69 @@ Deno.serve(async (req)=>{
           wallet_charged: shouldDeductWallet
         }, rateLimited ? 429 : 400);
       }
-      // Verify with GET
-      const verifyResult = await verifySpendCap(actId, bmToken);
+      // Verify with GET.
+      // IMPORTANT: the POST above returned 200 OK, so Meta ACCEPTED the cap.
+      // A failing/rate-limited verify GET must NOT be reported as a failed
+      // top-up (that caused false "failed" entries + double top-ups).
+      let verifyResult = await verifySpendCap(actId, bmToken);
+      if (!verifyResult.ok) {
+        // extra attempts with longer backoff before giving up on verification
+        for (const waitMs of [5000, 10000]) {
+          await delay(waitMs);
+          verifyResult = await verifySpendCap(actId, bmToken);
+          if (verifyResult.ok) break;
+        }
+      }
       if (!verifyResult.ok) {
         const verifyErrorMsg = verifyResult.error || "Meta verify failed";
-        console.warn("Meta verification failed (after retry)", { actId, message: verifyErrorMsg });
-        // POST may have succeeded — flag clearly in error_message so admin
-        // can confirm in Meta before retrying (which would double-apply).
-        const safeMsg = `Verification failed: ${verifyErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
-        const { data: failedRecord } = await supabase.from("failed_topups").insert({
-          user_id: walletUserId,
-          ad_account_id: ad_account_id,
-          amount: amount,
-          old_spend_cap: oldSpendCapDollars,
-          error_message: safeMsg,
-          status: "pending"
-        }).select("id").single();
+        console.warn("Verification unreadable — POST was accepted, treating as success", { actId, message: verifyErrorMsg });
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
-          action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${safeMsg}${metaCallSummary()}`
+          action: "Spend Cap Updated (Unverified)",
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars}. Meta accepted the update but the verification read failed (${verifyErrorMsg}). Not marked as failed to avoid a duplicate top-up.${metaCallSummary()}`
         });
-        return json({
-          error: `${safeMsg} Amount deducted from wallet.`,
-          failed_topup_id: failedRecord?.id,
-          wallet_charged: shouldDeductWallet
-        }, 400);
-      }
-      const verifiedDollars = verifyResult.dollars;
-      if (isCapEffectivelyApplied(verifiedDollars, newSpendCapDollars)) {
-        console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
+      } else if (isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
+        console.log(`Meta verified: $${verifyResult.dollars} (expected $${newSpendCapDollars})`);
       } else {
-        const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
-        console.warn(mismatchMsg);
-        const { data: failedRecord } = await supabase.from("failed_topups").insert({
-          user_id: walletUserId,
-          ad_account_id: ad_account_id,
-          amount: amount,
-          old_spend_cap: oldSpendCapDollars,
-          error_message: mismatchMsg,
-          status: "pending"
-        }).select("id").single();
-        await supabase.from("system_logs").insert({
-          user_id: userId,
-          user_name: userName,
-          action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}${metaCallSummary()}`
-        });
-        return json({
-          error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
-          failed_topup_id: failedRecord?.id,
-          wallet_charged: shouldDeductWallet
-        }, 400);
+        // Mismatch — re-read once more; Meta is often just slow to reflect it.
+        await delay(6000);
+        const recheck = await verifySpendCap(actId, bmToken);
+        if (recheck.ok && isCapEffectivelyApplied(recheck.dollars, newSpendCapDollars)) {
+          console.log(`Meta verified on recheck: $${recheck.dollars}`);
+        } else if (!recheck.ok) {
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Spend Cap Updated (Unverified)",
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars}. Recheck read failed; not marked as failed.${metaCallSummary()}`
+          });
+        } else {
+          const verifiedDollars = recheck.dollars;
+          const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+          console.warn(mismatchMsg);
+          const { data: failedRecord } = await supabase.from("failed_topups").insert({
+            user_id: walletUserId,
+            ad_account_id: ad_account_id,
+            amount: amount,
+            old_spend_cap: oldSpendCapDollars,
+            error_message: mismatchMsg,
+            status: "pending"
+          }).select("id").single();
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Top-Up Failed",
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}${metaCallSummary()}`
+          });
+          return json({
+            error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+            failed_topup_id: failedRecord?.id,
+            wallet_charged: shouldDeductWallet
+          }, 400);
+        }
       }
+
     } catch (err) {
       const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
