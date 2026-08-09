@@ -374,38 +374,49 @@ Deno.serve(async (req)=>{
     let walletId = null;
     let walletTxnId: string | null = null;
     if (shouldDeductWallet) {
-      const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
-      if (walletErr || !wallet) return json({
-        error: "Wallet not found for user"
-      }, 404);
-      // Admin/superadmin can top up even with insufficient balance (go negative)
+      const cleanAccountId = account.account_id.replace(/^act_/, '');
+      let dueLimit = 0;
       if (!isAdmin) {
         const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
-        const dueLimit = Number(prof?.due_limit ?? 0);
-        if (Number(wallet.balance) + dueLimit < amount) return json({
-          error: "Insufficient wallet balance"
-        }, 400);
+        dueLimit = Number(prof?.due_limit ?? 0);
       }
-      newBalance = Number(wallet.balance) - amount;
-      walletId = wallet.id;
-      // Deduct wallet
-      await supabase.from("wallets").update({
-        balance: newBalance
-      }).eq("id", wallet.id);
-      // Create transaction record (capture id to use as stable usage idempotency key)
-      const cleanAccountId = account.account_id.replace(/^act_/, '');
-      const { data: txnRow } = await supabase.from("transactions").insert({
-        user_id: walletUserId,
-        amount: -amount,
-        balance_after: newBalance,
-        type: "ad_topup",
-        description: `${account.account_name}\n${cleanAccountId}`,
-        reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`
-      }).select("id").maybeSingle();
-      walletTxnId = (txnRow as any)?.id ?? null;
+      // ATOMIC + ledger-consistent deduction. The DB function locks the wallet
+      // row, realigns wallets.balance with the transaction ledger if they have
+      // drifted, then deducts. This makes it impossible for a top-up to leave
+      // the balance HIGHER than before (the old phantom-balance bug).
+      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup", {
+        p_user_id: walletUserId,
+        p_amount: amount,
+        p_ad_account_id: ad_account_id,
+        p_description: `${account.account_name}\n${cleanAccountId}`,
+        p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+        p_allow_negative: isAdmin,
+        p_due_limit: dueLimit,
+      });
+      if (deductErr) {
+        console.error("deduct_wallet_for_topup failed", deductErr);
+        return json({ error: "Wallet deduction failed. Please try again." }, 500);
+      }
+      const res: any = deductRes;
+      if (!res?.ok) {
+        if (res?.error === "wallet_not_found") return json({ error: "Wallet not found for user" }, 404);
+        if (res?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
+        return json({ error: "Wallet deduction failed" }, 400);
+      }
+      newBalance = Number(res.balance_after);
+      walletId = res.wallet_id;
+      walletTxnId = res.transaction_id ?? null;
+      if (res.reconciled) {
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Wallet Balance Reconciled",
+          details: `Wallet for user ${walletUserId} was realigned to its transaction ledger before top-up (new balance $${Number(res.balance_before).toFixed(2)} → $${newBalance.toFixed(2)} after $${amount} deduction).`,
+        });
+      }
       if (walletTxnId) usageIdempotencyKey = `wallet_txn:${walletTxnId}`;
     }
+
     // ============================================
     // STEP 2: Call Meta API
     // ============================================
