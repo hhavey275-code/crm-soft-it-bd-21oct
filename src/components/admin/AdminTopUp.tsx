@@ -712,10 +712,15 @@ export function AdminTopUp() {
         const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
         const currentBalance = Number(wallet?.balance ?? 0);
         const newBalance = currentBalance + finalAmount;
+        // CRITICAL: insert the ledger row FIRST. The DB trigger
+        // `prevent_duplicate_topup_credit` rejects a second row for the same
+        // reference_id, so a duplicate/double-click approval fails here BEFORE
+        // any money is added. Crediting the wallet first caused silent
+        // phantom balances when the insert was blocked.
+        const { error: txError } = await supabase.from("transactions").insert({ user_id: userId, type: "top_up", amount: finalAmount, balance_after: newBalance, reference_id: id, description: "Wallet top-up approved", processed_by: `admin:${user!.id}` } as any);
+        if (txError) throw new Error("This request was already credited (duplicate prevention). Refresh the page.");
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
-        const { error: txError } = await supabase.from("transactions").insert({ user_id: userId, type: "top_up", amount: finalAmount, balance_after: newBalance, reference_id: id, description: "Wallet top-up approved", processed_by: `admin:${user!.id}` } as any);
-        if (txError) throw txError;
         const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
         await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
       }
