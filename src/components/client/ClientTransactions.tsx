@@ -61,11 +61,14 @@ export function ClientTransactions() {
   const renderDescription = (tx: any) => {
     const desc = tx.description || "—";
     if (desc.includes("\n")) {
-      const [name, accountId] = desc.split("\n");
+      const [name, accountId, capLine] = desc.split("\n");
       return (
         <div>
           <span>{name}</span>
           <span className="block text-xs text-muted-foreground">{accountId}</span>
+          {capLine && (
+            <span className="block text-xs font-medium text-blue-600 dark:text-blue-400">{capLine}</span>
+          )}
         </div>
       );
     }
@@ -76,6 +79,12 @@ export function ClientTransactions() {
     const desc = tx.description || "—";
     if (desc.includes("\n")) return desc.split("\n")[0];
     return desc;
+  };
+
+  /** "Cap: $x → $y" line, when the top-up recorded a spend-cap movement. */
+  const getCapText = (tx: any) => {
+    const parts = (tx.description || "").split("\n");
+    return parts.length > 2 ? parts[2] : null;
   };
 
   return (
@@ -113,6 +122,9 @@ export function ClientTransactions() {
                         {tx.wallet_kind === "secondary" ? "Secondary wallet" : "Main wallet"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{getDescriptionText(tx)}</p>
+                      {getCapText(tx) && (
+                        <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 truncate">{getCapText(tx)}</p>
+                      )}
 
                       <div className="flex items-center justify-between mt-1.5">
                         <span className="text-[11px] text-muted-foreground">

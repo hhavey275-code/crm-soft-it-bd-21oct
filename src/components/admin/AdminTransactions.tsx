@@ -45,11 +45,14 @@ export function AdminTransactions() {
   const renderDescription = (tx: any) => {
     const desc = tx.description || "—";
     if (desc.includes("\n")) {
-      const [name, accountId] = desc.split("\n");
+      const [name, accountId, capLine] = desc.split("\n");
       return (
         <div>
           <span>{name}</span>
           <span className="block text-xs text-muted-foreground">{accountId}</span>
+          {capLine && (
+            <span className="block text-xs font-medium text-blue-600 dark:text-blue-400">{capLine}</span>
+          )}
         </div>
       );
     }

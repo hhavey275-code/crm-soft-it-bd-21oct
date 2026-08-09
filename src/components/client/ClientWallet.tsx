@@ -90,7 +90,7 @@ export function ClientWallet() {
           <Card>
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">
-                Combined Total ({wallets.totalBdt < 0 ? "Due" : "Advance"})
+                Combined Due / Adv
               </p>
               <p className={`text-2xl font-bold mt-1 ${wallets.totalBdt < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
                 {formatBdt(wallets.totalBdt)}
