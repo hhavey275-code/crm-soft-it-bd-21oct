@@ -378,10 +378,18 @@ Deno.serve(async (req)=>{
     if (shouldDeductWallet) {
       const cleanAccountId = account.account_id.replace(/^act_/, '');
       let dueLimit = 0;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("due_limit, secondary_wallet_enabled")
+        .eq("user_id", walletUserId)
+        .single();
       if (!isAdmin) {
-        const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
         dueLimit = Number(prof?.due_limit ?? 0);
       }
+      if (walletKind === "secondary" && !prof?.secondary_wallet_enabled) {
+        return json({ error: "Secondary wallet is not enabled for this client" }, 400);
+      }
+
       // ATOMIC + ledger-consistent deduction. The DB function locks the chosen
       // wallet row (main or secondary), realigns its balance with that wallet's
       // transaction ledger if they have drifted, then deducts. This makes it
