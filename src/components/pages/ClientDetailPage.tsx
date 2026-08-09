@@ -1126,17 +1126,6 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        {/* Main Tabs */}
-        {/* Mobile wallet cards — secondary + combined only (main wallet lives in Overview tab) */}
-        {isMobile && wallets.secondaryEnabled && userId && (
-          <div className="space-y-3">
-            <SecondaryWalletCard userId={userId} />
-            <CombinedTotalCard userId={userId} />
-          </div>
-        )}
-
-
-        <Tabs defaultValue={isMobile ? "info" : "overview"} className="space-y-4">
           <div
             className={cn(
               "flex items-center gap-3 flex-wrap",
