@@ -7,10 +7,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Wallet } from "lucide-react";
+import { useWallets, formatBdt } from "@/hooks/useWallets";
 
 export function ClientWallet() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const wallets = useWallets(user?.id);
+
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
