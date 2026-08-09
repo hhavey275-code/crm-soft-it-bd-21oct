@@ -123,6 +123,7 @@ export default function ClientDetailPage() {
 
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
