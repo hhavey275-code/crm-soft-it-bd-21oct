@@ -167,8 +167,11 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
               </button>
             </div>
           </div>
-          <p className={`text-2xl font-bold tracking-tight ${wallets.secondaryBalance < 0 ? "text-destructive" : "text-green-700 dark:text-green-300"}`}>
+          <p className="flex items-baseline gap-2 text-2xl font-bold tracking-tight text-green-700 dark:text-green-300">
             ${wallets.secondaryBalance.toLocaleString()}
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700/70 dark:text-green-400/70">
+              {wallets.secondaryBalance < 0 ? "Due" : "Adv"}
+            </span>
           </p>
         </CardContent>
       </Card>
