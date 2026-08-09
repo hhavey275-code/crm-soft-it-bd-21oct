@@ -3,6 +3,9 @@ import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWallets } from "@/hooks/useWallets";
+import { SecondaryWalletPanel } from "@/components/admin/SecondaryWalletPanel";
+
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
@@ -186,6 +189,9 @@ export default function ClientDetailPage() {
     },
     enabled: !!userId,
   });
+
+  const wallets = useWallets(userId);
+
 
   const { data: adAccounts, refetch: refetchAdAccounts } = useQuery({
     queryKey: ["client-detail-ad-accounts", userId],
@@ -541,7 +547,7 @@ export default function ClientDetailPage() {
   });
 
   const topUpMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
       const amt = parseFloat(topUpAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
@@ -550,8 +556,10 @@ export default function ClientDetailPage() {
           amount: amt,
           deduct_wallet: true,
           target_user_id: userId,
+          wallet_kind: walletKind,
         },
       });
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
@@ -2068,6 +2076,12 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Secondary (sheet-rate) wallet — admin controlled */}
+                  <div className="col-span-2 lg:col-span-4">
+                    {userId && <SecondaryWalletPanel userId={userId} mainBalance={walletBalance} />}
+                  </div>
+
+
                   {/* Total Ad Accounts */}
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
@@ -2503,14 +2517,27 @@ export default function ClientDetailPage() {
                           } else if (pb.startsWith("client:")) {
                             processedByLabel = profile?.full_name || profile?.email || "Client";
                           }
+                          const isSecondary = tx.wallet_kind === "secondary";
                           return (
-                            <TableRow key={tx.id}>
+                            <TableRow
+                              key={tx.id}
+                              className={isSecondary ? "bg-teal-50/70 dark:bg-teal-950/20" : undefined}
+                            >
                               <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
                                 {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
                               </TableCell>
                               <TableCell className="capitalize font-medium text-xs">
-                                {tx.type.replace(/_/g, " ")}
+                                <span>{tx.type.replace(/_/g, " ")}</span>
+                                <span
+                                  className={cn(
+                                    "block text-[10px] font-semibold uppercase tracking-wide",
+                                    isSecondary ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400",
+                                  )}
+                                >
+                                  {isSecondary ? "Secondary wallet" : "Main wallet"}
+                                </span>
                               </TableCell>
+
                               <TableCell className="text-xs">
                                 {hasNewline ? (
                                   <div>
@@ -3112,7 +3139,7 @@ export default function ClientDetailPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Wallet After</span>
+                      <span className="text-muted-foreground">Main Wallet After</span>
                       <span
                         className={cn(
                           "font-medium",
@@ -3122,14 +3149,41 @@ export default function ClientDetailPage() {
                         ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
                       </span>
                     </div>
+                    {wallets.secondaryEnabled && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Secondary Wallet After</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            wallets.secondaryBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          ${(wallets.secondaryBalance - parseFloat(topUpAmount)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>
                     Cancel
                   </Button>
+                  {wallets.secondaryEnabled && (
+                    <Button
+                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      onClick={() => topUpMutation.mutate("secondary")}
+                      disabled={
+                        !selectedAccountId ||
+                        !topUpAmount ||
+                        parseFloat(topUpAmount) <= 0 ||
+                        topUpMutation.isPending
+                      }
+                    >
+                      {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => topUpMutation.mutate()}
+                    onClick={() => topUpMutation.mutate("primary")}
                     disabled={
                       !selectedAccountId ||
                       !topUpAmount ||
@@ -3137,9 +3191,10 @@ export default function ClientDetailPage() {
                       topUpMutation.isPending
                     }
                   >
-                    {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                    {topUpMutation.isPending ? "Processing..." : wallets.secondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
                   </Button>
                 </DialogFooter>
+
               </TabsContent>
               <TabsContent value="withdraw" className="space-y-4 pt-2">
                 {fetchingWithdrawMeta ? (

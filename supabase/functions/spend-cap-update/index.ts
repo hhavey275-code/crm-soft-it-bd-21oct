@@ -271,10 +271,12 @@ Deno.serve(async (req)=>{
     const { data: userRole } = await supabase.from("user_roles").select("role").eq("user_id", userId).single();
     const isAdmin = userRole?.role === "admin" || userRole?.role === "superadmin";
     // --- Parse body ---
-    const { ad_account_id, amount, deduct_wallet, target_user_id } = await req.json();
+    const { ad_account_id, amount, deduct_wallet, target_user_id, wallet_kind: walletKindRaw } = await req.json();
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
+    const walletKind = walletKindRaw === "secondary" ? "secondary" : "primary";
+
 
     // ============================================
     // IDEMPOTENCY GUARD: prevent double top-up
@@ -376,33 +378,45 @@ Deno.serve(async (req)=>{
     if (shouldDeductWallet) {
       const cleanAccountId = account.account_id.replace(/^act_/, '');
       let dueLimit = 0;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("due_limit, secondary_wallet_enabled")
+        .eq("user_id", walletUserId)
+        .single();
       if (!isAdmin) {
-        const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
         dueLimit = Number(prof?.due_limit ?? 0);
       }
-      // ATOMIC + ledger-consistent deduction. The DB function locks the wallet
-      // row, realigns wallets.balance with the transaction ledger if they have
-      // drifted, then deducts. This makes it impossible for a top-up to leave
-      // the balance HIGHER than before (the old phantom-balance bug).
-      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup", {
+      if (walletKind === "secondary" && !prof?.secondary_wallet_enabled) {
+        return json({ error: "Secondary wallet is not enabled for this client" }, 400);
+      }
+
+      // ATOMIC + ledger-consistent deduction. The DB function locks the chosen
+      // wallet row (main or secondary), realigns its balance with that wallet's
+      // transaction ledger if they have drifted, then deducts. This makes it
+      // impossible for a top-up to leave the balance HIGHER than before.
+      const { data: deductRes, error: deductErr } = await supabase.rpc("deduct_wallet_for_topup_v2", {
         p_user_id: walletUserId,
         p_amount: amount,
         p_ad_account_id: ad_account_id,
         p_description: `${account.account_name}\n${cleanAccountId}`,
         p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
-        p_allow_negative: isAdmin,
-        p_due_limit: dueLimit,
+        p_wallet_kind: walletKind,
+        p_allow_negative: isAdmin && walletKind === "primary",
+        p_due_limit: walletKind === "primary" ? dueLimit : 0,
       });
+
+      const walletLabel = walletKind === "secondary" ? "Secondary wallet" : "Wallet";
       if (deductErr) {
-        console.error("deduct_wallet_for_topup failed", deductErr);
-        return json({ error: "Wallet deduction failed. Please try again." }, 500);
+        console.error("deduct_wallet_for_topup_v2 failed", deductErr);
+        return json({ error: `${walletLabel} deduction failed. Please try again.` }, 500);
       }
       const res: any = deductRes;
       if (!res?.ok) {
-        if (res?.error === "wallet_not_found") return json({ error: "Wallet not found for user" }, 404);
-        if (res?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
-        return json({ error: "Wallet deduction failed" }, 400);
+        if (res?.error === "wallet_not_found") return json({ error: `${walletLabel} not found for user` }, 404);
+        if (res?.error === "insufficient_balance") return json({ error: `Insufficient ${walletKind === "secondary" ? "secondary wallet" : "wallet"} balance` }, 400);
+        return json({ error: `${walletLabel} deduction failed` }, 400);
       }
+
       newBalance = Number(res.balance_after);
       walletId = res.wallet_id;
       walletTxnId = res.transaction_id ?? null;
@@ -433,11 +447,12 @@ Deno.serve(async (req)=>{
     const dbSpendCapDollars = Number(account.spend_cap);
     const live = await fetchLiveSpendCap(actId, bmToken);
     if (!live.ok) {
-      // Refund wallet if it was deducted
+      // Refund the SAME wallet the amount was deducted from
       if (shouldDeductWallet && walletId !== null) {
-        const { data: walletNow } = await supabase.from("wallets").select("balance").eq("id", walletId).single();
+        const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
+        const { data: walletNow } = await supabase.from(walletTable).select("balance").eq("id", walletId).single();
         const refundedBalance = Number(walletNow?.balance ?? newBalance) + amount;
-        await supabase.from("wallets").update({ balance: refundedBalance }).eq("id", walletId);
+        await supabase.from(walletTable).update({ balance: refundedBalance }).eq("id", walletId);
         await supabase.from("transactions").insert({
           user_id: walletUserId,
           amount: amount,
@@ -446,8 +461,10 @@ Deno.serve(async (req)=>{
           description: `Auto-refund: could not read live spend cap from Meta (${live.error})`,
           reference_id: ad_account_id,
           processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+          wallet_kind: walletKind,
         });
       }
+
       await supabase.from("system_logs").insert({
         user_id: userId,
         user_name: userName,
@@ -567,7 +584,8 @@ Deno.serve(async (req)=>{
           amount,
           old_spend_cap: oldSpendCapDollars,
           error_message: metaErrorMsg,
-          status: "pending"
+          status: "pending",
+          wallet_kind: walletKind
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
@@ -630,7 +648,8 @@ Deno.serve(async (req)=>{
             amount: amount,
             old_spend_cap: oldSpendCapDollars,
             error_message: mismatchMsg,
-            status: "pending"
+            status: "pending",
+          wallet_kind: walletKind
           }).select("id").single();
           await supabase.from("system_logs").insert({
             user_id: userId,
@@ -689,7 +708,8 @@ Deno.serve(async (req)=>{
         amount: amount,
         old_spend_cap: oldSpendCapDollars,
         error_message: safeMsg,
-        status: "pending"
+        status: "pending",
+          wallet_kind: walletKind
       }).select("id").single();
       await supabase.from("system_logs").insert({
         user_id: userId,

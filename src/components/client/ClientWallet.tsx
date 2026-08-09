@@ -7,10 +7,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Wallet } from "lucide-react";
+import { useWallets, formatBdt } from "@/hooks/useWallets";
 
 export function ClientWallet() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const wallets = useWallets(user?.id);
+
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -51,7 +54,7 @@ export function ClientWallet() {
         <div data-tutorial="wallet-balance" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90">Available Balance</p>
+              <p className="text-sm opacity-90">{wallets.secondaryEnabled ? "Main Wallet Balance" : "Available Balance"}</p>
               <p className="text-3xl font-bold tracking-tight mt-1">
                 ${Number(wallet?.balance ?? 0).toLocaleString()}
               </p>
@@ -65,12 +68,41 @@ export function ClientWallet() {
       ) : (
         <Card data-tutorial="wallet-balance" className="bg-primary text-primary-foreground">
           <CardContent className="p-8">
-            <p className="text-sm opacity-80">Available Balance</p>
+            <p className="text-sm opacity-80">{wallets.secondaryEnabled ? "Main Wallet Balance" : "Available Balance"}</p>
             <p className="text-4xl font-bold mt-1">${Number(wallet?.balance ?? 0).toLocaleString()}</p>
             <p className="text-sm mt-2 opacity-70">{wallet?.currency ?? "USD"}</p>
           </CardContent>
         </Card>
       )}
+
+      {/* Secondary wallet + combined total (only when enabled for this client) */}
+      {wallets.secondaryEnabled && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Card className="border-teal-300/70 bg-teal-50 dark:bg-teal-950/20 dark:border-teal-800/50">
+            <CardContent className="p-5">
+              <p className="text-sm text-teal-700 dark:text-teal-400">Secondary Wallet Balance</p>
+              <p className="text-2xl font-bold mt-1 text-teal-800 dark:text-teal-300">
+                ${wallets.secondaryBalance.toLocaleString()}
+              </p>
+              <p className="text-xs text-teal-700/70 dark:text-teal-400/70 mt-1">Rate ৳{wallets.secondaryRate}/USD</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">
+                Combined Total ({wallets.totalBdt < 0 ? "Due" : "Advance"})
+              </p>
+              <p className={`text-2xl font-bold mt-1 ${wallets.totalBdt < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {formatBdt(wallets.totalBdt)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Main ${wallets.mainBalance.toLocaleString()} × ৳{wallets.mainRate} + Secondary ${wallets.secondaryBalance.toLocaleString()} × ৳{wallets.secondaryRate}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
 
       {/* Due Limit Notice */}
       {dueLimit > 0 && dueExpiresAt && (

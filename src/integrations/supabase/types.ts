@@ -1839,6 +1839,7 @@ export type Database = {
           resolved_via: string | null
           status: string
           user_id: string
+          wallet_kind: string
         }
         Insert: {
           ad_account_id: string
@@ -1854,6 +1855,7 @@ export type Database = {
           resolved_via?: string | null
           status?: string
           user_id: string
+          wallet_kind?: string
         }
         Update: {
           ad_account_id?: string
@@ -1869,6 +1871,7 @@ export type Database = {
           resolved_via?: string | null
           status?: string
           user_id?: string
+          wallet_kind?: string
         }
         Relationships: [
           {

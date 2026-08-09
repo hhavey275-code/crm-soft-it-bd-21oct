@@ -30,6 +30,8 @@ import { logSystemAction } from "@/lib/systemLog";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 import { ArrowDownCircle } from "lucide-react";
+import { useWallets } from "@/hooks/useWallets";
+
 
 const PAGE_SIZE = 20;
 
@@ -47,6 +49,8 @@ interface InsightsData {
 export function ClientAdAccounts() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
+  const wallets = useWallets(user?.id);
+
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
@@ -539,14 +543,15 @@ export function ClientAdAccounts() {
   const usingDueLimit = parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
   const topUpMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
-        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true },
+        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
+
     onSuccess: async (data) => {
       toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
       const topUpAccId = topUpAccount.id;
@@ -554,6 +559,7 @@ export function ClientAdAccounts() {
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
@@ -1081,12 +1087,23 @@ export function ClientAdAccounts() {
             <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
               <span className="flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
-                Wallet Balance
+                Main Wallet
               </span>
               <span className={`font-semibold ${walletBalance < 0 ? 'text-destructive' : ''}`}>
                 ${walletBalance.toLocaleString()}
               </span>
             </div>
+            {wallets.secondaryEnabled && (
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800">
+                <span className="flex items-center gap-2 text-teal-700 dark:text-teal-400">
+                  <Wallet className="h-4 w-4" />
+                  Secondary Wallet (৳{wallets.secondaryRate})
+                </span>
+                <span className={`font-semibold ${wallets.secondaryBalance < 0 ? 'text-destructive' : 'text-teal-700 dark:text-teal-400'}`}>
+                  ${wallets.secondaryBalance.toLocaleString()}
+                </span>
+              </div>
+            )}
             {dueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
@@ -1108,13 +1125,16 @@ export function ClientAdAccounts() {
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
+                <p className="text-sm text-destructive">Amount exceeds your main wallet balance{dueLimit > 0 ? " + due limit" : ""}{wallets.secondaryEnabled ? " — you can still use the secondary wallet" : ""}</p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
               )}
+              {wallets.secondaryEnabled && parsedAmount > wallets.secondaryBalance && parsedAmount > 0 && (
+                <p className="text-sm text-muted-foreground">Secondary wallet has ${wallets.secondaryBalance.toLocaleString()} available</p>
+              )}
             </div>
-            {parsedAmount > 0 && !exceedsBalance && (
+            {parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
                 <span className="font-medium text-primary">
@@ -1125,13 +1145,23 @@ export function ClientAdAccounts() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
+            {wallets.secondaryEnabled && (
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={() => topUpMutation.mutate("secondary")}
+                disabled={!topUpAmount || parsedAmount <= 0 || parsedAmount > wallets.secondaryBalance || topUpMutation.isPending}
+              >
+                {topUpMutation.isPending ? "Processing..." : "Top Up (Secondary)"}
+              </Button>
+            )}
             <Button
-              onClick={() => topUpMutation.mutate()}
+              onClick={() => topUpMutation.mutate("primary")}
               disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
             >
-              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+              {topUpMutation.isPending ? "Processing..." : wallets.secondaryEnabled ? "Top Up (Main)" : "Top Up Now"}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 

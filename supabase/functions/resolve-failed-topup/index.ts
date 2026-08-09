@@ -131,13 +131,15 @@ Deno.serve(async (req)=>{
         });
       }
     }
-    // Refund wallet
-    const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", failedTopup.user_id).single();
+    // Refund the SAME wallet the failed top-up was charged to
+    const refundWalletKind = failedTopup.wallet_kind === "secondary" ? "secondary" : "primary";
+    const refundWalletTable = refundWalletKind === "secondary" ? "secondary_wallets" : "wallets";
+    const { data: wallet, error: walletErr } = await supabase.from(refundWalletTable).select("id, balance").eq("user_id", failedTopup.user_id).single();
     if (walletErr || !wallet) return json({
       error: "Wallet not found"
     }, 404);
     const newBalance = Number(wallet.balance) + Number(failedTopup.amount);
-    await supabase.from("wallets").update({
+    await supabase.from(refundWalletTable).update({
       balance: newBalance
     }).eq("id", wallet.id);
     // Create refund transaction
@@ -148,8 +150,10 @@ Deno.serve(async (req)=>{
       type: "refund",
       description: `Refund: Failed top-up\n${accountName}\n${accountId}`,
       reference_id: failedTopup.ad_account_id,
-      processed_by: isAdmin ? `admin:${userId}` : `client:${failedTopup.user_id}`
+      processed_by: isAdmin ? `admin:${userId}` : `client:${failedTopup.user_id}`,
+      wallet_kind: refundWalletKind
     });
+
     // Delete the failed topup record
     await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
     // Log to system_logs
