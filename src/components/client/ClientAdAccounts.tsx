@@ -54,6 +54,7 @@ export function ClientAdAccounts() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
