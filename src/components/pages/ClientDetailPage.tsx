@@ -2434,14 +2434,31 @@ export default function ClientDetailPage() {
                                         className="h-8 w-8"
                                         onClick={() => {
                                           setSelectedAccountId(acc.id);
+                                          setTopUpWallet("primary");
                                           setTopUpDialogOpen(true);
                                           setTopUpAmount("");
                                           setDialogTab("topup");
                                         }}
-                                        title="Top Up"
+                                        title="Top Up (Main Wallet)"
                                       >
                                         <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
+                                      {wallets.secondaryEnabled && (
+                                        <Button
+                                          size="icon"
+                                          className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                          onClick={() => {
+                                            setSelectedAccountId(acc.id);
+                                            setTopUpWallet("secondary");
+                                            setTopUpDialogOpen(true);
+                                            setTopUpAmount("");
+                                            setDialogTab("topup");
+                                          }}
+                                          title="Top Up (Secondary Wallet)"
+                                        >
+                                          <ArrowUpCircle className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                       <Button
                                         size="icon"
                                         variant={acc.client_topup_disabled ? "destructive" : "outline"}
