@@ -53,6 +53,7 @@ import {
   Phone,
   CalendarDays,
   Wallet,
+  Scale,
   MonitorSmartphone,
   CheckCircle,
   XCircle,
