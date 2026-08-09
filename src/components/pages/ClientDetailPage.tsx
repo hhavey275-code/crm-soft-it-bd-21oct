@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets } from "@/hooks/useWallets";
-import { SecondaryWalletPanel } from "@/components/admin/SecondaryWalletPanel";
+import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,6 +123,7 @@ export default function ClientDetailPage() {
 
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -774,6 +775,7 @@ export default function ClientDetailPage() {
                     className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
                     onClick={() => {
                       setSelectedAccountId(acc.id);
+                      setTopUpWallet("primary");
                       setTopUpDialogOpen(true);
                       setTopUpAmount("");
                       setDialogTab("topup");
@@ -782,6 +784,22 @@ export default function ClientDetailPage() {
                     <ArrowUpCircle className="h-3.5 w-3.5" />
                     Top Up
                   </Button>
+                  {wallets.secondaryEnabled && (
+                    <Button
+                      size="icon"
+                      className="h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      title="Top Up (Secondary Wallet)"
+                      onClick={() => {
+                        setSelectedAccountId(acc.id);
+                        setTopUpWallet("secondary");
+                        setTopUpDialogOpen(true);
+                        setTopUpAmount("");
+                        setDialogTab("topup");
+                      }}
+                    >
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant={acc.client_topup_disabled ? "destructive" : "outline"}
@@ -1711,6 +1729,8 @@ export default function ClientDetailPage() {
                       disabled={saveProfileMutation.isPending}
                     />
                   </div>
+                  {/* Secondary (sheet-rate) wallet on/off + rate */}
+                  {userId && <SecondaryWalletToggle userId={userId} />}
                 </div>
               </CardContent>
             </Card>
@@ -2076,10 +2096,11 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Secondary (sheet-rate) wallet — admin controlled */}
-                  <div className="col-span-2 lg:col-span-4">
-                    {userId && <SecondaryWalletPanel userId={userId} mainBalance={walletBalance} />}
-                  </div>
+                  {/* Secondary (sheet-rate) wallet + combined total — admin controlled */}
+                  {userId && <SecondaryWalletCard userId={userId} />}
+                  {userId && <CombinedTotalCard userId={userId} />}
+
+
 
 
                   {/* Total Ad Accounts */}
@@ -2430,14 +2451,31 @@ export default function ClientDetailPage() {
                                         className="h-8 w-8"
                                         onClick={() => {
                                           setSelectedAccountId(acc.id);
+                                          setTopUpWallet("primary");
                                           setTopUpDialogOpen(true);
                                           setTopUpAmount("");
                                           setDialogTab("topup");
                                         }}
-                                        title="Top Up"
+                                        title="Top Up (Main Wallet)"
                                       >
                                         <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
+                                      {wallets.secondaryEnabled && (
+                                        <Button
+                                          size="icon"
+                                          className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                          onClick={() => {
+                                            setSelectedAccountId(acc.id);
+                                            setTopUpWallet("secondary");
+                                            setTopUpDialogOpen(true);
+                                            setTopUpAmount("");
+                                            setDialogTab("topup");
+                                          }}
+                                          title="Top Up (Secondary Wallet)"
+                                        >
+                                          <ArrowUpCircle className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                       <Button
                                         size="icon"
                                         variant={acc.client_topup_disabled ? "destructive" : "outline"}
@@ -3170,7 +3208,10 @@ export default function ClientDetailPage() {
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
-                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      variant={topUpWallet === "secondary" ? "default" : "outline"}
+                      className={topUpWallet === "secondary"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
                       onClick={() => topUpMutation.mutate("secondary")}
                       disabled={
                         !selectedAccountId ||
@@ -3183,6 +3224,7 @@ export default function ClientDetailPage() {
                     </Button>
                   )}
                   <Button
+                    variant={wallets.secondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
                     onClick={() => topUpMutation.mutate("primary")}
                     disabled={
                       !selectedAccountId ||

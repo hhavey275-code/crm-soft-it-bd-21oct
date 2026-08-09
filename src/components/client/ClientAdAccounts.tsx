@@ -54,6 +54,7 @@ export function ClientAdAccounts() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -836,11 +837,22 @@ export function ClientAdAccounts() {
                             size="sm"
                             className="flex-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground text-xs h-8 shadow-md shadow-primary/25"
                             disabled={isInactive}
-                            onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                            onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); }}
                             data-tutorial={idx === 0 ? "ad-account-topup-btn" : undefined}
                           >
                             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
                             Top Up
+                          </Button>
+                        )}
+                        {!a.client_topup_disabled && wallets.secondaryEnabled && (
+                          <Button
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            disabled={isInactive}
+                            title="Top Up (Secondary Wallet)"
+                            onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
+                          >
+                            <ArrowUpCircle className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         <DropdownMenu>
@@ -991,10 +1003,21 @@ export function ClientAdAccounts() {
                               variant="default"
                               className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25"
                               disabled={isInactive}
-                              onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                              onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); }}
                             >
                               <ArrowUpCircle className="h-4 w-4" />
                               Top Up
+                            </Button>
+                          )}
+                          {!a.client_topup_disabled && wallets.secondaryEnabled && (
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                              disabled={isInactive}
+                              title="Top Up (Secondary Wallet)"
+                              onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
+                            >
+                              <ArrowUpCircle className="h-4 w-4" />
                             </Button>
                           )}
                           <DropdownMenu>
@@ -1147,7 +1170,10 @@ export function ClientAdAccounts() {
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
             {wallets.secondaryEnabled && (
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
+                variant={topUpWallet === "secondary" ? "default" : "outline"}
+                className={topUpWallet === "secondary"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"}
                 onClick={() => topUpMutation.mutate("secondary")}
                 disabled={!topUpAmount || parsedAmount <= 0 || parsedAmount > wallets.secondaryBalance || topUpMutation.isPending}
               >
@@ -1155,6 +1181,7 @@ export function ClientAdAccounts() {
               </Button>
             )}
             <Button
+              variant={wallets.secondaryEnabled && topUpWallet === "secondary" ? "outline" : "default"}
               onClick={() => topUpMutation.mutate("primary")}
               disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
             >
