@@ -222,16 +222,26 @@ Deno.serve(async (req) => {
     let newBalance: number | null = null;
 
     if (creditedUserId) {
-      const { data: wallet } = await supabase.from("wallets").select("id, balance").eq("user_id", creditedUserId).single();
+      const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
+      let { data: wallet } = await supabase.from(walletTable).select("id, balance").eq("user_id", creditedUserId).maybeSingle();
+      if (!wallet && walletKind === "secondary") {
+        const { data: created } = await supabase
+          .from("secondary_wallets")
+          .insert({ user_id: creditedUserId, balance: 0 })
+          .select("id, balance")
+          .maybeSingle();
+        wallet = created;
+      }
       if (wallet) {
         newBalance = Number(wallet.balance) + withdrawAmount;
-        await supabase.from("wallets").update({ balance: newBalance }).eq("id", wallet.id);
+        await supabase.from(walletTable).update({ balance: newBalance }).eq("id", wallet.id);
         await supabase.from("transactions").insert({
           user_id: creditedUserId,
           amount: withdrawAmount,
           balance_after: newBalance,
           type: "refund",
-          description: `Withdraw credit\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
+          wallet_kind: walletKind,
+          description: `Withdraw credit (${walletKind === "secondary" ? "Secondary" : "Main"} wallet)\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
           reference_id: ad_account_id,
           processed_by: isAdmin ? `admin:${userId}` : `client:${userId}`,
           via: getLastMetaVia(),
@@ -240,6 +250,7 @@ Deno.serve(async (req) => {
         creditedWallet = true;
       }
     }
+
 
     const bmDbId = account.business_manager_id;
     if (bmDbId) {
