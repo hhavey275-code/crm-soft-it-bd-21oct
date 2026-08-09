@@ -38,8 +38,12 @@ export function useWallets(userId?: string | null): WalletsInfo {
 
       const profile = profileRes.data as any;
       const fallbackRate = Number((siteRateRes.data as any)?.value ?? 0) || 0;
-      const mainRate = Number(profile?.usd_rate ?? 0) || fallbackRate;
-      const secondaryRate = Number(profile?.secondary_usd_rate ?? 0) || mainRate;
+      const secondaryRateRaw = Number(profile?.secondary_usd_rate ?? 0) || 0;
+      // If no per-client main rate is set, fall back to the site rate, then to the
+      // secondary rate so the combined BDT total is never silently zero.
+      const mainRate = Number(profile?.usd_rate ?? 0) || fallbackRate || secondaryRateRaw;
+      const secondaryRate = secondaryRateRaw || mainRate;
+
 
       return {
         mainBalance: Number((walletRes.data as any)?.balance ?? 0),
