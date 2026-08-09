@@ -24,6 +24,7 @@ import { TutorialButton } from "@/components/TutorialProvider";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
+  const clientWallets = useWallets(user?.id);
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
