@@ -490,17 +490,35 @@ export function ClientTopUp() {
     ? (wallets.secondaryRate || Number(usdRate) || 0)
     : (Number(usdRate) || 0);
 
-  const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
+  // Secondary deposits are credited in full to the secondary wallet; the card
+  // bill / main-wallet due adjustment only applies to main wallet deposits.
+  const effectiveBdt = bdtAmount
+    ? (isSecondaryDeposit ? parseFloat(bdtAmount) : Math.max(0, parseFloat(bdtAmount) - cardDueBdt))
+    : 0;
   const usdEquivalent = bdtAmount && depositRate ? (effectiveBdt / depositRate).toFixed(2) : "0.00";
 
   const alloc = useMemo(() => {
     const total = parseFloat(bdtAmount) || 0;
     const rate = depositRate || 1;
     let rem = total;
-    // Secondary deposits go straight to the secondary wallet — main wallet due
-    // is not touched, so it must not show up in the breakdown either.
-    const mainDueBdt = isSecondaryDeposit ? 0 : Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
 
+    if (isSecondaryDeposit) {
+      // Whole payment lands in the secondary (sheet-rate) wallet. Any secondary
+      // due is cleared automatically by the credit itself.
+      return {
+        total,
+        rate,
+        mainDueBdt: 0,
+        mainDuePaid: 0,
+        sheetPaid: 0,
+        secDueBdt: 0,
+        secDuePaid: 0,
+        creditBdt: total,
+        creditUsd: total / rate,
+      };
+    }
+
+    const mainDueBdt = Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
     const mainDuePaid = Math.min(mainDueBdt, rem);
     rem -= mainDuePaid;
     const sheetPaid = Math.min(cardDueBdt, rem);
@@ -521,7 +539,8 @@ export function ClientTopUp() {
       creditBdt: rem,
       creditUsd: rem / rate,
     };
-  }, [bdtAmount, depositRate, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+  }, [bdtAmount, depositRate, isSecondaryDeposit, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+
 
 
   const bdt = (n: number) => `৳${Math.round(n).toLocaleString()}`;
