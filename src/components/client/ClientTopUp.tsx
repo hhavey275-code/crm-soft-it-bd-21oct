@@ -1120,7 +1120,8 @@ export function ClientTopUp() {
 
               {bdtAmount && parseFloat(bdtAmount) > 0 && (
                 <div className="space-y-2">
-                  {cardDueBdt > 0 && (
+                  {!isSecondaryDeposit && cardDueBdt > 0 && (
+
                     <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
                       <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া: ৳{cardDueBdt.toLocaleString()}</p>
                       <div className="grid grid-cols-3 gap-1.5 text-center">
