@@ -98,22 +98,32 @@ export function TransactionHistoryPanel({
   const rows = useMemo(
     () =>
       walletFiltered.filter((tx: any) => {
+        const day = format(new Date(tx.created_at), "yyyy-MM-dd");
         if (month !== "all" && format(new Date(tx.created_at), "yyyy-MM") !== month) return false;
+        if (dateFrom && day < dateFrom) return false;
+        if (dateTo && day > dateTo) return false;
         if (account !== "all" && accountNameOf(tx) !== account) return false;
         return true;
       }),
-    [walletFiltered, month, account, adAccounts],
+    [walletFiltered, month, account, dateFrom, dateTo, adAccounts],
   );
 
-  /** Per-account totals (spent = negative amounts) for the current filters. */
+  /** Per-account totals (spent = negative amounts) for the current filters, split per wallet. */
   const breakdown = useMemo(() => {
-    const map = new Map<string, { spent: number; added: number; count: number }>();
+    const map = new Map<
+      string,
+      { spent: number; added: number; count: number; spentMain: number; spentSecondary: number }
+    >();
     rows.forEach((tx: any) => {
       const key = accountNameOf(tx);
-      const cur = map.get(key) ?? { spent: 0, added: 0, count: 0 };
+      const cur =
+        map.get(key) ?? { spent: 0, added: 0, count: 0, spentMain: 0, spentSecondary: 0 };
       const amt = Number(tx.amount) || 0;
-      if (amt < 0) cur.spent += Math.abs(amt);
-      else cur.added += amt;
+      if (amt < 0) {
+        cur.spent += Math.abs(amt);
+        if (tx.wallet_kind === "secondary") cur.spentSecondary += Math.abs(amt);
+        else cur.spentMain += Math.abs(amt);
+      } else cur.added += amt;
       cur.count += 1;
       map.set(key, cur);
     });
@@ -123,13 +133,19 @@ export function TransactionHistoryPanel({
   const totals = useMemo(() => {
     let spent = 0;
     let added = 0;
+    let spentMain = 0;
+    let spentSecondary = 0;
     rows.forEach((tx: any) => {
       const amt = Number(tx.amount) || 0;
-      if (amt < 0) spent += Math.abs(amt);
-      else added += amt;
+      if (amt < 0) {
+        spent += Math.abs(amt);
+        if (tx.wallet_kind === "secondary") spentSecondary += Math.abs(amt);
+        else spentMain += Math.abs(amt);
+      } else added += amt;
     });
-    return { spent, added };
+    return { spent, added, spentMain, spentSecondary };
   }, [rows]);
+
 
   const counts = useMemo(() => {
     const list = transactions ?? [];
