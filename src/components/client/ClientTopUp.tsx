@@ -1199,6 +1199,10 @@ export function ClientTopUp() {
                 </div>
               </div>
 
+              <AllocationBreakdown compact />
+
+
+
               {/* Card Bill Due Warning */}
               {cardDueBdt > 0 && (
                 <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
