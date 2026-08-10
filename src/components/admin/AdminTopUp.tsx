@@ -650,6 +650,36 @@ export function AdminTopUp() {
           throw new Error("This request was already credited to the wallet (duplicate prevention). Refresh the page.");
         }
 
+        const reqRowForWallet = requests?.find((r: any) => r.id === id);
+        const targetWalletKind: "primary" | "secondary" =
+          (reqRowForWallet as any)?.target_wallet === "secondary" ? "secondary" : "primary";
+
+        if (targetWalletKind === "secondary") {
+          // Secondary (sheet-rate) wallet deposit — credited atomically by the
+          // RPC (ledger row first, then balance) so no phantom balance.
+          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
+            p_user_id: userId,
+            p_amount: finalAmount,
+            p_wallet_kind: "secondary",
+            p_reference_id: id,
+            p_description: `Wallet top-up approved (Secondary wallet @ ৳${actionDialog?.usdRate ?? ""}/USD)`,
+            p_processed_by: `admin:${user!.id}`,
+          });
+          if (creditErr) throw creditErr;
+          if (creditRes && creditRes.success === false) throw new Error(creditRes.error || "Credit failed");
+
+          const { data: invNumData2 } = await supabase.rpc("generate_invoice_number" as any);
+          await (supabase as any).from("invoices").insert({
+            top_up_request_id: id,
+            invoice_number: invNumData2 || `INV-${Date.now()}`,
+            user_id: userId,
+            amount: finalAmount,
+            bdt_amount: actionDialog?.bdtAmount,
+            usd_rate: actionDialog?.usdRate,
+          });
+        } else {
+
+
         // Wallet-due first → Sheet/card bill → remainder to wallet (mirror of verify-topup logic).
         // Kafela / Holy Gift style: if wallet balance is negative (CRM due), clear that BEFORE deducting sheet bill.
         try {
@@ -729,7 +759,9 @@ export function AdminTopUp() {
 
         const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
         await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
+        }
       }
+
       await supabase.from("notifications").insert({
         user_id: userId, type: "top_up_update",
         title: action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
@@ -1278,7 +1310,9 @@ export function AdminTopUp() {
                     ? `এটি ৳${Number(row?._original_amount || 0).toLocaleString()} subscription payment। Approve করলে ${row?._duration_months || 1} মাস subscription extend হবে।`
                     : `এটি ৳${Number(row?._original_amount || 0).toLocaleString()} limit purchase। Approve করলে system limit বাড়বে।`;
                 }
-                return `This will add $${actionDialog?.amount?.toLocaleString()} USD to the client's wallet${actionDialog?.bdtAmount ? ` (৳${Number(actionDialog.bdtAmount).toLocaleString()} BDT @ ৳${actionDialog.usdRate}/USD)` : ""}.`;
+                const wk = (row as any)?.target_wallet === "secondary" ? "Secondary (Sheet rate)" : "Main";
+                return `This will add $${actionDialog?.amount?.toLocaleString()} USD to the client's ${wk} wallet${actionDialog?.bdtAmount ? ` (৳${Number(actionDialog.bdtAmount).toLocaleString()} BDT @ ৳${actionDialog.usdRate}/USD)` : ""}.`;
+
               }
               return actionDialog?.action === "rejected" ? "The client will be notified of the rejection." : "The request will be put on hold.";
             })()}

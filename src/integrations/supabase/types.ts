@@ -2069,6 +2069,7 @@ export type Database = {
           monthly_spend: string | null
           others_telegram_group_id: string | null
           phone: string | null
+          secondary_deposit_enabled: boolean
           secondary_usd_rate: number | null
           secondary_wallet_enabled: boolean
           spend_cap_withdraw_enabled: boolean
@@ -2099,6 +2100,7 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          secondary_deposit_enabled?: boolean
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
           spend_cap_withdraw_enabled?: boolean
@@ -2129,6 +2131,7 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          secondary_deposit_enabled?: boolean
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
           spend_cap_withdraw_enabled?: boolean
@@ -3649,6 +3652,7 @@ export type Database = {
           reviewed_by: string | null
           sheet_bill_bdt: number | null
           status: string
+          target_wallet: string
           telegram_forward_error: string | null
           telegram_forwarded: boolean | null
           telegram_forwarded_at: string | null
@@ -3676,6 +3680,7 @@ export type Database = {
           reviewed_by?: string | null
           sheet_bill_bdt?: number | null
           status?: string
+          target_wallet?: string
           telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
           telegram_forwarded_at?: string | null
@@ -3703,6 +3708,7 @@ export type Database = {
           reviewed_by?: string | null
           sheet_bill_bdt?: number | null
           status?: string
+          target_wallet?: string
           telegram_forward_error?: string | null
           telegram_forwarded?: boolean | null
           telegram_forwarded_at?: string | null
@@ -3980,6 +3986,17 @@ export type Database = {
           p_source_type: string
         }
         Returns: undefined
+      }
+      credit_wallet_for_payment: {
+        Args: {
+          p_amount: number
+          p_description: string
+          p_processed_by: string
+          p_reference_id: string
+          p_user_id: string
+          p_wallet_kind: string
+        }
+        Returns: Json
       }
       deduct_wallet_for_topup: {
         Args: {

@@ -103,6 +103,8 @@ export function ClientTopUp() {
 
   // Wizard state
   const [step, setStep] = useState(0);
+  const [targetWallet, setTargetWallet] = useState<"primary" | "secondary">("primary");
+
   const [category, setCategory] = useState<PaymentCategory | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [selectedBank, setSelectedBank] = useState("");
@@ -461,15 +463,61 @@ export function ClientTopUp() {
   });
 
   const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
-  const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
-  const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
 
   // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
   const wallets = useWallets(user?.id);
+
+  // Only clients an admin explicitly allows may deposit into the secondary wallet.
+  const { data: secondaryDepositAllowed } = useQuery({
+    queryKey: ["secondary-deposit-enabled", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("secondary_deposit_enabled")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return !!data?.secondary_deposit_enabled;
+    },
+  });
+
+  const canPickWallet = !!secondaryDepositAllowed && wallets.secondaryEnabled;
+  const effectiveTargetWallet: "primary" | "secondary" = canPickWallet ? targetWallet : "primary";
+  const isSecondaryDeposit = effectiveTargetWallet === "secondary";
+
+  // Deposit rate: secondary wallet deposits convert at the sheet rate.
+  const depositRate = isSecondaryDeposit
+    ? (wallets.secondaryRate || Number(usdRate) || 0)
+    : (Number(usdRate) || 0);
+
+  // Secondary deposits are credited in full to the secondary wallet; the card
+  // bill / main-wallet due adjustment only applies to main wallet deposits.
+  const effectiveBdt = bdtAmount
+    ? (isSecondaryDeposit ? parseFloat(bdtAmount) : Math.max(0, parseFloat(bdtAmount) - cardDueBdt))
+    : 0;
+  const usdEquivalent = bdtAmount && depositRate ? (effectiveBdt / depositRate).toFixed(2) : "0.00";
+
   const alloc = useMemo(() => {
     const total = parseFloat(bdtAmount) || 0;
-    const rate = Number(usdRate) || wallets.mainRate || 1;
+    const rate = depositRate || 1;
     let rem = total;
+
+    if (isSecondaryDeposit) {
+      // Whole payment lands in the secondary (sheet-rate) wallet. Any secondary
+      // due is cleared automatically by the credit itself.
+      return {
+        total,
+        rate,
+        mainDueBdt: 0,
+        mainDuePaid: 0,
+        sheetPaid: 0,
+        secDueBdt: 0,
+        secDuePaid: 0,
+        creditBdt: total,
+        creditUsd: total / rate,
+      };
+    }
+
     const mainDueBdt = Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
     const mainDuePaid = Math.min(mainDueBdt, rem);
     rem -= mainDuePaid;
@@ -491,7 +539,9 @@ export function ClientTopUp() {
       creditBdt: rem,
       creditUsd: rem / rate,
     };
-  }, [bdtAmount, usdRate, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+  }, [bdtAmount, depositRate, isSecondaryDeposit, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+
+
 
   const bdt = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
@@ -528,7 +578,7 @@ export function ClientTopUp() {
           </div>
         ))}
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
-          <span className="text-muted-foreground">Main wallet-এ জমা হবে</span>
+          <span className="text-muted-foreground">{isSecondaryDeposit ? "Secondary wallet-এ জমা হবে" : "Main wallet-এ জমা হবে"}</span>
           <span className="font-bold text-primary">
             ${alloc.creditUsd.toFixed(2)} <span className="font-normal text-muted-foreground">({bdt(alloc.creditBdt)})</span>
           </span>
@@ -606,7 +656,8 @@ export function ClientTopUp() {
         user_id: user!.id,
         amount: parseFloat(usdEquivalent),
         bdt_amount: parseFloat(bdtAmount),
-        usd_rate: usdRate,
+        usd_rate: depositRate,
+        target_wallet: effectiveTargetWallet,
         bank_account_id: selectedBank,
         payment_reference: paymentRef || null,
         payment_method: paymentMethod === "online_transfer" ? "bank_transfer" : paymentMethod,
@@ -629,6 +680,8 @@ export function ClientTopUp() {
       setPaymentRef("");
       setPaymentMethod(null);
       setCategory(null);
+      setTargetWallet("primary");
+
       clearFile();
     },
     onError: (err: any) => {
@@ -1034,9 +1087,41 @@ export function ClientTopUp() {
                 <p className="text-xs text-muted-foreground">Minimum: ৳500</p>
               </div>
 
+              {canPickWallet && (
+                <div className="space-y-2">
+                  <Label>Deposit To</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTargetWallet("primary")}
+                      className={cn(
+                        "rounded-lg border p-2.5 text-left transition-colors",
+                        targetWallet === "primary" ? "border-primary bg-primary/10" : "border-border/60 hover:bg-muted/50"
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Main wallet</p>
+                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.mainRate || usdRate}/USD</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetWallet("secondary")}
+                      className={cn(
+                        "rounded-lg border p-2.5 text-left transition-colors",
+                        targetWallet === "secondary" ? "border-fuchsia-500 bg-fuchsia-500/10" : "border-border/60 hover:bg-muted/50"
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Secondary wallet</p>
+                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.secondaryRate || usdRate}/USD (sheet rate)</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
               {bdtAmount && parseFloat(bdtAmount) > 0 && (
                 <div className="space-y-2">
-                  {cardDueBdt > 0 && (
+                  {!isSecondaryDeposit && cardDueBdt > 0 && (
+
                     <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
                       <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া: ৳{cardDueBdt.toLocaleString()}</p>
                       <div className="grid grid-cols-3 gap-1.5 text-center">
@@ -1058,9 +1143,9 @@ export function ClientTopUp() {
                   <AllocationBreakdown />
 
                   <div className="rounded-lg bg-primary/10 p-4 text-center">
-                    <p className="text-xs text-muted-foreground">{cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
+                    <p className="text-xs text-muted-foreground">{isSecondaryDeposit ? 'Secondary wallet-এ জমা হবে' : cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
                     <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
-                    <p className="text-xs text-muted-foreground">@ ৳{usdRate}/USD</p>
+                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? " (Secondary wallet)" : ""}</p>
                   </div>
                 </div>
               )}
@@ -1204,7 +1289,7 @@ export function ClientTopUp() {
 
 
               {/* Card Bill Due Warning */}
-              {cardDueBdt > 0 && (
+              {!isSecondaryDeposit && cardDueBdt > 0 && (
                 <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া</p>
                   <p className="text-xs text-amber-600 dark:text-amber-500">
