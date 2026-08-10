@@ -654,6 +654,8 @@ Deno.serve(async (req) => {
 
     const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
     if (walletErr) throw walletErr;
+    }
+
 
     // Deposit settlement: leftover after the main wallet due is cleared pays
     // down the secondary (sheet-rate) wallet due.
