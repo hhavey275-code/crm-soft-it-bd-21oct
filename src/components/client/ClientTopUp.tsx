@@ -103,6 +103,8 @@ export function ClientTopUp() {
 
   // Wizard state
   const [step, setStep] = useState(0);
+  const [targetWallet, setTargetWallet] = useState<"primary" | "secondary">("primary");
+
   const [category, setCategory] = useState<PaymentCategory | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [selectedBank, setSelectedBank] = useState("");
