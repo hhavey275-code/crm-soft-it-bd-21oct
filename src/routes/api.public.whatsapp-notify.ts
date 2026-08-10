@@ -24,10 +24,58 @@ function fmtUsd(n: number) {
   return `$${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// The configured ID is sometimes the WhatsApp Business Account (WABA) ID rather
+// than the phone-number ID. Resolve (and cache) the real sender phone-number ID.
+let resolvedSenderId: string | null = null;
+async function resolveSenderId(configuredId: string, token: string): Promise<string> {
+  if (resolvedSenderId) return resolvedSenderId;
+  try {
+    const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${configuredId}/phone_numbers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j: any = await r.json().catch(() => ({}));
+    const first = j?.data?.[0]?.id;
+    if (r.ok && first) {
+      resolvedSenderId = String(first);
+      return resolvedSenderId;
+    }
+  } catch {
+    // fall through to the configured id
+  }
+  resolvedSenderId = configuredId;
+  return configuredId;
+}
+
+
 export const Route = createFileRoute("/api/public/whatsapp-notify")({
   server: {
     handlers: {
+      // Diagnostic: verifies the configured ID and lists phone numbers if it's a WABA id.
+      GET: async ({ request }) => {
+        const notifySecret = process.env["WHATSAPP_NOTIFY_SECRET"];
+        if (!notifySecret || request.headers.get("x-notify-secret") !== notifySecret) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        const token = process.env["WHATSAPP_ACCESS_TOKEN"] || "";
+        const id = process.env["WHATSAPP_PHONE_NUMBER_ID"] || "";
+        const g = async (p: string) => {
+          const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${p}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          return { status: r.status, body: await r.json().catch(() => ({})) };
+        };
+        return new Response(
+          JSON.stringify({
+            configured_id: id,
+            token_tail: token.slice(-6),
+            id_lookup: await g(id),
+            phone_numbers: await g(`${id}/phone_numbers`),
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      },
       POST: async ({ request }) => {
+
         const json = (body: unknown, status = 200) =>
           new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -99,7 +147,8 @@ export const Route = createFileRoute("/api/public/whatsapp-notify")({
               },
             };
 
-        const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`, {
+        const senderId = await resolveSenderId(phoneNumberId, token);
+        const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${senderId}/messages`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
