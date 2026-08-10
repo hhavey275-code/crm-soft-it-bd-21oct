@@ -76,17 +76,28 @@ export function SellerDashboard() {
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["seller-transactions", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("seller_transactions")
-        .select("*, bank_accounts(bank_name, account_number), top_up_requests(payment_reference)")
-        .eq("seller_id", user!.id)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
-      if (error) throw error;
-      return (data as any[]) ?? [];
+      // CRITICAL: paginate past Supabase's 1000-row default limit, otherwise
+      // sellers with >1000 ledger rows see a truncated (wrong) Due/Advance total
+      // that doesn't match the admin view.
+      const pageSize = 1000;
+      const rows: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await (supabase as any)
+          .from("seller_transactions")
+          .select("*, bank_accounts(bank_name, account_number), top_up_requests(payment_reference)")
+          .eq("seller_id", user!.id)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...((data as any[]) ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows;
     },
     enabled: !!user,
   });
+
 
   const { data: assignedUsdtBanks } = useQuery({
     queryKey: ["seller-assigned-usdt-banks", user?.id],
