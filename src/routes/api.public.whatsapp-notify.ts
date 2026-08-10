@@ -147,7 +147,8 @@ export const Route = createFileRoute("/api/public/whatsapp-notify")({
               },
             };
 
-        const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`, {
+        const senderId = await resolveSenderId(phoneNumberId, token);
+        const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${senderId}/messages`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
