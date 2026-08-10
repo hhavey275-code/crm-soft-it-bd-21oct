@@ -1063,6 +1063,37 @@ export function ClientTopUp() {
                 <p className="text-xs text-muted-foreground">Minimum: ৳500</p>
               </div>
 
+              {canPickWallet && (
+                <div className="space-y-2">
+                  <Label>Deposit To</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTargetWallet("primary")}
+                      className={cn(
+                        "rounded-lg border p-2.5 text-left transition-colors",
+                        targetWallet === "primary" ? "border-primary bg-primary/10" : "border-border/60 hover:bg-muted/50"
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Main wallet</p>
+                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.mainRate || usdRate}/USD</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetWallet("secondary")}
+                      className={cn(
+                        "rounded-lg border p-2.5 text-left transition-colors",
+                        targetWallet === "secondary" ? "border-fuchsia-500 bg-fuchsia-500/10" : "border-border/60 hover:bg-muted/50"
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Secondary wallet</p>
+                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.secondaryRate || usdRate}/USD (sheet rate)</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
               {bdtAmount && parseFloat(bdtAmount) > 0 && (
                 <div className="space-y-2">
                   {cardDueBdt > 0 && (
