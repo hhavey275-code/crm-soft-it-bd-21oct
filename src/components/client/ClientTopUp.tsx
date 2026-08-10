@@ -556,7 +556,7 @@ export function ClientTopUp() {
           </div>
         ))}
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
-          <span className="text-muted-foreground">Main wallet-এ জমা হবে</span>
+          <span className="text-muted-foreground">{isSecondaryDeposit ? "Secondary wallet-এ জমা হবে" : "Main wallet-এ জমা হবে"}</span>
           <span className="font-bold text-primary">
             ${alloc.creditUsd.toFixed(2)} <span className="font-normal text-muted-foreground">({bdt(alloc.creditBdt)})</span>
           </span>
