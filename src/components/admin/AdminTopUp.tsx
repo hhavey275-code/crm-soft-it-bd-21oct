@@ -759,7 +759,9 @@ export function AdminTopUp() {
 
         const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
         await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
+        }
       }
+
       await supabase.from("notifications").insert({
         user_id: userId, type: "top_up_update",
         title: action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
