@@ -1083,7 +1083,7 @@ export function AdminAdAccounts() {
                           {hasSecondaryWallet(uid) && (
                             <Button
                               size="icon"
-                              className="h-8 w-8 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                              className="h-8 w-8 shrink-0 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                               title="Top Up (Secondary Wallet)"
                               onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
                             >
@@ -1350,7 +1350,7 @@ export function AdminAdAccounts() {
                             {hasSecondaryWallet(getAssignedUserId(a.id)) && (
                               <Button
                                 size="icon"
-                                className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                 title="Top Up (Secondary Wallet)"
                                 onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
                               >

@@ -805,7 +805,7 @@ export default function ClientDetailPage() {
                   {wallets.secondaryEnabled && (
                     <Button
                       size="sm"
-                      className="w-full min-w-0 gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
+                      className="w-full min-w-0 gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         setSelectedAccountId(acc.id);
@@ -2555,7 +2555,7 @@ export default function ClientDetailPage() {
                                       {wallets.secondaryEnabled && (
                                         <Button
                                           size="icon"
-                                          className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                          className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                           onClick={() => {
                                             setSelectedAccountId(acc.id);
                                             setTopUpWallet("secondary");
