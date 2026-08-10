@@ -461,14 +461,39 @@ export function ClientTopUp() {
   });
 
   const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
-  const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
-  const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
 
   // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
   const wallets = useWallets(user?.id);
+
+  // Only clients an admin explicitly allows may deposit into the secondary wallet.
+  const { data: secondaryDepositAllowed } = useQuery({
+    queryKey: ["secondary-deposit-enabled", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("secondary_deposit_enabled")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return !!data?.secondary_deposit_enabled;
+    },
+  });
+
+  const canPickWallet = !!secondaryDepositAllowed && wallets.secondaryEnabled;
+  const effectiveTargetWallet: "primary" | "secondary" = canPickWallet ? targetWallet : "primary";
+  const isSecondaryDeposit = effectiveTargetWallet === "secondary";
+
+  // Deposit rate: secondary wallet deposits convert at the sheet rate.
+  const depositRate = isSecondaryDeposit
+    ? (wallets.secondaryRate || Number(usdRate) || 0)
+    : (Number(usdRate) || 0);
+
+  const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
+  const usdEquivalent = bdtAmount && depositRate ? (effectiveBdt / depositRate).toFixed(2) : "0.00";
+
   const alloc = useMemo(() => {
     const total = parseFloat(bdtAmount) || 0;
-    const rate = Number(usdRate) || wallets.mainRate || 1;
+    const rate = depositRate || 1;
     let rem = total;
     const mainDueBdt = Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
     const mainDuePaid = Math.min(mainDueBdt, rem);
@@ -491,7 +516,8 @@ export function ClientTopUp() {
       creditBdt: rem,
       creditUsd: rem / rate,
     };
-  }, [bdtAmount, usdRate, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+  }, [bdtAmount, depositRate, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+
 
   const bdt = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
