@@ -1838,6 +1838,8 @@ export default function ClientDetailPage() {
                   {userId && <SecondaryWalletToggle userId={userId} />}
                   {/* Client-side spend cap withdraw permission */}
                   {userId && <SpendCapWithdrawToggle userId={userId} />}
+                  {userId && <SecondaryDepositToggle userId={userId} />}
+
                 </div>
               </CardContent>
             </Card>
