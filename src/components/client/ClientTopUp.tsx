@@ -658,6 +658,8 @@ export function ClientTopUp() {
       setPaymentRef("");
       setPaymentMethod(null);
       setCategory(null);
+      setTargetWallet("primary");
+
       clearFile();
     },
     onError: (err: any) => {
