@@ -2,6 +2,10 @@
 
 এখন client payment দিলে টাকা সব সময় **Main wallet**-এ জমা হয় (secondary-র due থাকলে শুধু সেটা adjust হয়)। লক্ষ্য: client চাইলে payment সরাসরি **Secondary wallet**-এ জমা করতে পারবে।
 
+Ey option ta sobar jonno thakbe na..jader k admin allow dibe taray jeno pai.secondary wallet on thakleo sob client secondary wallet e balance joma korte parbe na.specific jeno hoy.eta profile theke managed thakbe
+
+&nbsp;
+
 ## Client যা দেখবে
 
 - Top-up form-এ (যাদের secondary wallet on আছে) একটা ছোট selector: **"Deposit To: Main wallet / Secondary wallet"**।
@@ -19,6 +23,7 @@
 ## Approval-এ টাকা কোথায় যাবে
 
 Approve করলে:
+
 1. Target wallet = request-এ সেভ করা wallet (default `primary`)।
 2. Secondary হলে: secondary rate দিয়ে USD বের হবে, `secondary_wallets.balance` বাড়বে, ledger row-এ `wallet_kind='secondary'` থাকবে।
 3. Main হলে: বর্তমান flow (main due → sheet bill → main credit + `settle_secondary_from_main`) অপরিবর্তিত।
