@@ -24,6 +24,29 @@ function fmtUsd(n: number) {
   return `$${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// The configured ID is sometimes the WhatsApp Business Account (WABA) ID rather
+// than the phone-number ID. Resolve (and cache) the real sender phone-number ID.
+let resolvedSenderId: string | null = null;
+async function resolveSenderId(configuredId: string, token: string): Promise<string> {
+  if (resolvedSenderId) return resolvedSenderId;
+  try {
+    const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${configuredId}/phone_numbers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j: any = await r.json().catch(() => ({}));
+    const first = j?.data?.[0]?.id;
+    if (r.ok && first) {
+      resolvedSenderId = String(first);
+      return resolvedSenderId;
+    }
+  } catch {
+    // fall through to the configured id
+  }
+  resolvedSenderId = configuredId;
+  return configuredId;
+}
+
+
 export const Route = createFileRoute("/api/public/whatsapp-notify")({
   server: {
     handlers: {
