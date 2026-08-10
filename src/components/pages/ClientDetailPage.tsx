@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
+import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
+
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
