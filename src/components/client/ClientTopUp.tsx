@@ -1289,7 +1289,7 @@ export function ClientTopUp() {
 
 
               {/* Card Bill Due Warning */}
-              {cardDueBdt > 0 && (
+              {!isSecondaryDeposit && cardDueBdt > 0 && (
                 <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">⚠️ কার্ড বিল বকেয়া</p>
                   <p className="text-xs text-amber-600 dark:text-amber-500">
