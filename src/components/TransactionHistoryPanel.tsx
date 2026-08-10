@@ -61,6 +61,8 @@ export function TransactionHistoryPanel({
   const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary">("all");
   const [month, setMonth] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const accountNameOf = (tx: any) => {
     const linked =
