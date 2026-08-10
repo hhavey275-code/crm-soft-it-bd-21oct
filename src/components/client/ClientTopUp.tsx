@@ -1120,7 +1120,7 @@ export function ClientTopUp() {
                   <div className="rounded-lg bg-primary/10 p-4 text-center">
                     <p className="text-xs text-muted-foreground">{cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
                     <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
-                    <p className="text-xs text-muted-foreground">@ ৳{usdRate}/USD</p>
+                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? " (Secondary wallet)" : ""}</p>
                   </div>
                 </div>
               )}
