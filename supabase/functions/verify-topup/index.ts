@@ -535,10 +535,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Which wallet did the client target? Secondary (sheet-rate) deposits are
+    // credited in full to the secondary wallet — no card bill / main-due pass.
+    const { data: targetRow } = await supabase
+      .from('top_up_requests')
+      .select('target_wallet')
+      .eq('id', request_id)
+      .maybeSingle();
+    const isSecondaryDeposit = (targetRow as any)?.target_wallet === 'secondary';
+
     // Card bill + wallet-due deduction (Kafela / Holy Gift style clients with a sheet due row)
     // Order: wallet due (negative balance) cleared first → then sheet/card bill → remainder to wallet as USD
     let finalUsdAmount = Number(amount);
     let cardBillDeducted = 0;
+    let walletDuePaidBdt = 0;
+    if (isSecondaryDeposit) {
+      const { data: creditRes, error: creditErr } = await supabase.rpc('credit_wallet_for_payment', {
+        p_user_id: user_id,
+        p_amount: finalUsdAmount,
+        p_wallet_kind: 'secondary',
+        p_reference_id: request_id,
+        p_description: 'Wallet top-up auto-approved (Secondary wallet)',
+        p_processed_by: 'system',
+      });
+      if (creditErr) throw creditErr;
+      if (creditRes && (creditRes as any).success === false) throw new Error((creditRes as any).error || 'Credit failed');
+    } else {
+
     let walletDuePaidBdt = 0;
     try {
       const { data: pendingBill } = await supabase
