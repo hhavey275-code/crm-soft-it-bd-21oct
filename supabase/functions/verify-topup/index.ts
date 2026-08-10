@@ -562,7 +562,7 @@ Deno.serve(async (req) => {
       if (creditRes && (creditRes as any).success === false) throw new Error((creditRes as any).error || 'Credit failed');
     } else {
 
-    let walletDuePaidBdt = 0;
+
     try {
       const { data: pendingBill } = await supabase
         .from('card_bills')
