@@ -14,6 +14,7 @@ import { ArrowUpCircle, Banknote, DollarSign, ImageIcon, X, FileText, ChevronLef
 
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWallets } from "@/hooks/useWallets";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 import { TelegramPollStatus } from "@/components/TelegramPollStatus";
