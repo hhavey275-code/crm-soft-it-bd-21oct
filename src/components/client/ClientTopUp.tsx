@@ -14,6 +14,7 @@ import { ArrowUpCircle, Banknote, DollarSign, ImageIcon, X, FileText, ChevronLef
 
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWallets } from "@/hooks/useWallets";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 import { TelegramPollStatus } from "@/components/TelegramPollStatus";
@@ -462,6 +463,79 @@ export function ClientTopUp() {
   const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
   const effectiveBdt = bdtAmount ? Math.max(0, parseFloat(bdtAmount) - cardDueBdt) : 0;
   const usdEquivalent = bdtAmount && usdRate ? (effectiveBdt / usdRate).toFixed(2) : "0.00";
+
+  // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
+  const wallets = useWallets(user?.id);
+  const alloc = useMemo(() => {
+    const total = parseFloat(bdtAmount) || 0;
+    const rate = Number(usdRate) || wallets.mainRate || 1;
+    let rem = total;
+    const mainDueBdt = Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
+    const mainDuePaid = Math.min(mainDueBdt, rem);
+    rem -= mainDuePaid;
+    const sheetPaid = Math.min(cardDueBdt, rem);
+    rem -= sheetPaid;
+    const secDueBdt = wallets.secondaryEnabled
+      ? Math.max(0, -wallets.secondaryBalance) * (wallets.secondaryRate || rate)
+      : 0;
+    const secDuePaid = Math.min(secDueBdt, rem);
+    rem -= secDuePaid;
+    return {
+      total,
+      rate,
+      mainDueBdt,
+      mainDuePaid,
+      sheetPaid,
+      secDueBdt,
+      secDuePaid,
+      creditBdt: rem,
+      creditUsd: rem / rate,
+    };
+  }, [bdtAmount, usdRate, cardDueBdt, wallets.mainBalance, wallets.mainRate, wallets.secondaryBalance, wallets.secondaryRate, wallets.secondaryEnabled]);
+
+  const bdt = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
+  const AllocationBreakdown = ({ compact = false }: { compact?: boolean }) => {
+    if (!alloc.total) return null;
+    const rows: { label: string; value: string; cls: string }[] = [
+      { label: "মোট পেমেন্ট", value: bdt(alloc.total), cls: "font-semibold" },
+    ];
+    if (alloc.mainDueBdt > 0)
+      rows.push({
+        label: `Main wallet due adjust (due ${bdt(alloc.mainDueBdt)})`,
+        value: `-${bdt(alloc.mainDuePaid)}`,
+        cls: "text-blue-600 font-semibold",
+      });
+    if (cardDueBdt > 0)
+      rows.push({
+        label: `Sheet / card bill adjust (due ${bdt(cardDueBdt)})`,
+        value: `-${bdt(alloc.sheetPaid)}`,
+        cls: "text-amber-600 font-semibold",
+      });
+    if (alloc.secDueBdt > 0)
+      rows.push({
+        label: `Secondary wallet bill adjust (due ${bdt(alloc.secDueBdt)})`,
+        value: `-${bdt(alloc.secDuePaid)}`,
+        cls: "text-emerald-600 font-semibold",
+      });
+    return (
+      <div className={cn("rounded-lg border border-border/60 bg-muted/30 p-3 space-y-1.5", compact && "p-2.5")}>
+        <p className="text-[11px] font-semibold text-muted-foreground">Payment Adjustment Details</p>
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">{r.label}</span>
+            <span className={r.cls}>{r.value}</span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
+          <span className="text-muted-foreground">Main wallet-এ জমা হবে</span>
+          <span className="font-bold text-primary">
+            ${alloc.creditUsd.toFixed(2)} <span className="font-normal text-muted-foreground">({bdt(alloc.creditBdt)})</span>
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   // Filter banks by category
   const filteredBanks = assignedBanks?.filter((cb: any) => {
@@ -981,6 +1055,8 @@ export function ClientTopUp() {
                       </div>
                     </div>
                   )}
+                  <AllocationBreakdown />
+
                   <div className="rounded-lg bg-primary/10 p-4 text-center">
                     <p className="text-xs text-muted-foreground">{cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
                     <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
@@ -1122,6 +1198,10 @@ export function ClientTopUp() {
                   <p className="text-lg font-bold text-primary">${usdEquivalent}</p>
                 </div>
               </div>
+
+              <AllocationBreakdown compact />
+
+
 
               {/* Card Bill Due Warning */}
               {cardDueBdt > 0 && (

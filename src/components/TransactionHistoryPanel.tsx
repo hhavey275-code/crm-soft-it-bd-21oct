@@ -61,6 +61,8 @@ export function TransactionHistoryPanel({
   const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary">("all");
   const [month, setMonth] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const accountNameOf = (tx: any) => {
     const linked =
@@ -96,22 +98,32 @@ export function TransactionHistoryPanel({
   const rows = useMemo(
     () =>
       walletFiltered.filter((tx: any) => {
+        const day = format(new Date(tx.created_at), "yyyy-MM-dd");
         if (month !== "all" && format(new Date(tx.created_at), "yyyy-MM") !== month) return false;
+        if (dateFrom && day < dateFrom) return false;
+        if (dateTo && day > dateTo) return false;
         if (account !== "all" && accountNameOf(tx) !== account) return false;
         return true;
       }),
-    [walletFiltered, month, account, adAccounts],
+    [walletFiltered, month, account, dateFrom, dateTo, adAccounts],
   );
 
-  /** Per-account totals (spent = negative amounts) for the current filters. */
+  /** Per-account totals (spent = negative amounts) for the current filters, split per wallet. */
   const breakdown = useMemo(() => {
-    const map = new Map<string, { spent: number; added: number; count: number }>();
+    const map = new Map<
+      string,
+      { spent: number; added: number; count: number; spentMain: number; spentSecondary: number }
+    >();
     rows.forEach((tx: any) => {
       const key = accountNameOf(tx);
-      const cur = map.get(key) ?? { spent: 0, added: 0, count: 0 };
+      const cur =
+        map.get(key) ?? { spent: 0, added: 0, count: 0, spentMain: 0, spentSecondary: 0 };
       const amt = Number(tx.amount) || 0;
-      if (amt < 0) cur.spent += Math.abs(amt);
-      else cur.added += amt;
+      if (amt < 0) {
+        cur.spent += Math.abs(amt);
+        if (tx.wallet_kind === "secondary") cur.spentSecondary += Math.abs(amt);
+        else cur.spentMain += Math.abs(amt);
+      } else cur.added += amt;
       cur.count += 1;
       map.set(key, cur);
     });
@@ -121,13 +133,19 @@ export function TransactionHistoryPanel({
   const totals = useMemo(() => {
     let spent = 0;
     let added = 0;
+    let spentMain = 0;
+    let spentSecondary = 0;
     rows.forEach((tx: any) => {
       const amt = Number(tx.amount) || 0;
-      if (amt < 0) spent += Math.abs(amt);
-      else added += amt;
+      if (amt < 0) {
+        spent += Math.abs(amt);
+        if (tx.wallet_kind === "secondary") spentSecondary += Math.abs(amt);
+        else spentMain += Math.abs(amt);
+      } else added += amt;
     });
-    return { spent, added };
+    return { spent, added, spentMain, spentSecondary };
   }, [rows]);
+
 
   const counts = useMemo(() => {
     const list = transactions ?? [];
@@ -178,13 +196,32 @@ export function TransactionHistoryPanel({
           ))}
         </SelectContent>
       </Select>
-      {(month !== "all" || account !== "all") && (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+        />
+        <span className="text-xs text-muted-foreground">to</span>
+        <input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+        />
+      </div>
+      {(month !== "all" || account !== "all" || dateFrom || dateTo) && (
         <button
           type="button"
           className="text-xs text-primary hover:underline"
           onClick={() => {
             setMonth("all");
             setAccount("all");
+            setDateFrom("");
+            setDateTo("");
           }}
         >
           Reset
@@ -198,11 +235,22 @@ export function TransactionHistoryPanel({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
         <span className="font-semibold">
           {walletTab === "secondary" ? "Secondary" : walletTab === "primary" ? "Main" : "All"} ·{" "}
-          {month === "all" ? "All months" : months.find(([k]) => k === month)?.[1]}
+          {dateFrom || dateTo
+            ? `${dateFrom || "…"} → ${dateTo || "…"}`
+            : month === "all"
+              ? "All months"
+              : months.find(([k]) => k === month)?.[1]}
         </span>
         <span className="text-muted-foreground">
           Taken (spent): <span className="font-bold text-destructive">{money(totals.spent)}</span>
         </span>
+        {secondaryEnabled && (
+          <span className="text-muted-foreground">
+            Main: <span className="font-bold text-blue-600">{money(totals.spentMain)}</span>
+            <span className="mx-1.5">·</span>
+            Secondary: <span className="font-bold text-emerald-600">{money(totals.spentSecondary)}</span>
+          </span>
+        )}
         <span className="text-muted-foreground">
           Added: <span className="font-bold text-emerald-600">{money(totals.added)}</span>
         </span>
@@ -220,11 +268,19 @@ export function TransactionHistoryPanel({
             >
               <span className="font-medium">{name.length > 22 ? `${name.slice(0, 22)}…` : name}</span>
               <span className="ml-1.5 font-bold text-destructive">{money(v.spent)}</span>
+              {secondaryEnabled && v.spentSecondary > 0 && (
+                <span className="ml-1.5 text-[10px]">
+                  <span className="text-blue-600 font-semibold">M {money(v.spentMain)}</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="text-emerald-600 font-semibold">S {money(v.spentSecondary)}</span>
+                </span>
+              )}
             </button>
           ))}
         </div>
       )}
     </div>
+
   );
 
   const header = (
