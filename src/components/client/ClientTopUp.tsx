@@ -497,7 +497,10 @@ export function ClientTopUp() {
     const total = parseFloat(bdtAmount) || 0;
     const rate = depositRate || 1;
     let rem = total;
-    const mainDueBdt = Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
+    // Secondary deposits go straight to the secondary wallet — main wallet due
+    // is not touched, so it must not show up in the breakdown either.
+    const mainDueBdt = isSecondaryDeposit ? 0 : Math.max(0, -wallets.mainBalance) * (wallets.mainRate || rate);
+
     const mainDuePaid = Math.min(mainDueBdt, rem);
     rem -= mainDuePaid;
     const sheetPaid = Math.min(cardDueBdt, rem);
