@@ -27,7 +27,32 @@ function fmtUsd(n: number) {
 export const Route = createFileRoute("/api/public/whatsapp-notify")({
   server: {
     handlers: {
+      // Diagnostic: verifies the configured ID and lists phone numbers if it's a WABA id.
+      GET: async ({ request }) => {
+        const notifySecret = process.env["WHATSAPP_NOTIFY_SECRET"];
+        if (!notifySecret || request.headers.get("x-notify-secret") !== notifySecret) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        const token = process.env["WHATSAPP_ACCESS_TOKEN"] || "";
+        const id = process.env["WHATSAPP_PHONE_NUMBER_ID"] || "";
+        const g = async (p: string) => {
+          const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${p}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          return { status: r.status, body: await r.json().catch(() => ({})) };
+        };
+        return new Response(
+          JSON.stringify({
+            configured_id: id,
+            token_tail: token.slice(-6),
+            id_lookup: await g(id),
+            phone_numbers: await g(`${id}/phone_numbers`),
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      },
       POST: async ({ request }) => {
+
         const json = (body: unknown, status = 200) =>
           new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
