@@ -196,13 +196,32 @@ export function TransactionHistoryPanel({
           ))}
         </SelectContent>
       </Select>
-      {(month !== "all" || account !== "all") && (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+        />
+        <span className="text-xs text-muted-foreground">to</span>
+        <input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+        />
+      </div>
+      {(month !== "all" || account !== "all" || dateFrom || dateTo) && (
         <button
           type="button"
           className="text-xs text-primary hover:underline"
           onClick={() => {
             setMonth("all");
             setAccount("all");
+            setDateFrom("");
+            setDateTo("");
           }}
         >
           Reset
@@ -216,11 +235,22 @@ export function TransactionHistoryPanel({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
         <span className="font-semibold">
           {walletTab === "secondary" ? "Secondary" : walletTab === "primary" ? "Main" : "All"} ·{" "}
-          {month === "all" ? "All months" : months.find(([k]) => k === month)?.[1]}
+          {dateFrom || dateTo
+            ? `${dateFrom || "…"} → ${dateTo || "…"}`
+            : month === "all"
+              ? "All months"
+              : months.find(([k]) => k === month)?.[1]}
         </span>
         <span className="text-muted-foreground">
           Taken (spent): <span className="font-bold text-destructive">{money(totals.spent)}</span>
         </span>
+        {secondaryEnabled && (
+          <span className="text-muted-foreground">
+            Main: <span className="font-bold text-blue-600">{money(totals.spentMain)}</span>
+            <span className="mx-1.5">·</span>
+            Secondary: <span className="font-bold text-emerald-600">{money(totals.spentSecondary)}</span>
+          </span>
+        )}
         <span className="text-muted-foreground">
           Added: <span className="font-bold text-emerald-600">{money(totals.added)}</span>
         </span>
@@ -238,11 +268,19 @@ export function TransactionHistoryPanel({
             >
               <span className="font-medium">{name.length > 22 ? `${name.slice(0, 22)}…` : name}</span>
               <span className="ml-1.5 font-bold text-destructive">{money(v.spent)}</span>
+              {secondaryEnabled && v.spentSecondary > 0 && (
+                <span className="ml-1.5 text-[10px]">
+                  <span className="text-blue-600 font-semibold">M {money(v.spentMain)}</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="text-emerald-600 font-semibold">S {money(v.spentSecondary)}</span>
+                </span>
+              )}
             </button>
           ))}
         </div>
       )}
     </div>
+
   );
 
   const header = (
