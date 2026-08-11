@@ -131,31 +131,20 @@ Deno.serve(async (req)=>{
         });
       }
     }
-    // Refund the SAME wallet the failed top-up was charged to
-    const refundWalletKind = failedTopup.wallet_kind === "secondary" ? "secondary" : "primary";
-    const refundWalletTable = refundWalletKind === "secondary" ? "secondary_wallets" : "wallets";
-    const { data: wallet, error: walletErr } = await supabase.from(refundWalletTable).select("id, balance").eq("user_id", failedTopup.user_id).single();
-    if (walletErr || !wallet) return json({
-      error: "Wallet not found"
-    }, 404);
-    const newBalance = Number(wallet.balance) + Number(failedTopup.amount);
-    await supabase.from(refundWalletTable).update({
-      balance: newBalance
-    }).eq("id", wallet.id);
-    // Create refund transaction
-    await supabase.from("transactions").insert({
-      user_id: failedTopup.user_id,
-      amount: Number(failedTopup.amount),
-      balance_after: newBalance,
-      type: "refund",
-      description: `Refund: Failed top-up\n${accountName}\n${accountId}`,
-      reference_id: failedTopup.ad_account_id,
-      processed_by: isAdmin ? `admin:${userId}` : `client:${failedTopup.user_id}`,
-      wallet_kind: refundWalletKind
+    // Atomic refund: ledger row + wallet balance + clearing the failed record
+    // all happen inside ONE database transaction, so a "refunded" toast can
+    // never appear without the money actually landing in the wallet.
+    const { data: refundRes, error: refundErr } = await supabase.rpc("refund_failed_topup", {
+      p_failed_topup_id: failed_topup_id,
+      p_processed_by: isAdmin ? `admin:${userId}` : `client:${failedTopup.user_id}`
     });
+    if (refundErr) return json({ error: refundErr.message || "Refund failed" }, 500);
+    if (!refundRes || (refundRes as any).success === false) {
+      return json({ error: (refundRes as any)?.error || "Refund failed" }, 400);
+    }
+    const refundWalletKind = (refundRes as any).wallet_kind;
+    const newBalance = Number((refundRes as any).new_balance);
 
-    // Delete the failed topup record
-    await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
     // Log to system_logs
     await supabase.from("system_logs").insert({
       user_id: userId,
