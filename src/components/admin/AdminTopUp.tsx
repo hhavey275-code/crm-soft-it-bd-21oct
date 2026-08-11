@@ -665,8 +665,14 @@ export function AdminTopUp() {
             p_description: `Wallet top-up approved (Secondary wallet @ ৳${actionDialog?.usdRate ?? ""}/USD)`,
             p_processed_by: `admin:${user!.id}`,
           });
-          if (creditErr) throw creditErr;
-          if (creditRes && creditRes.success === false) throw new Error(creditRes.error || "Credit failed");
+          if (creditErr) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw creditErr;
+          }
+          if (creditRes && creditRes.success === false) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(creditRes.error || "Credit failed");
+          }
 
           const { data: invNumData2 } = await supabase.rpc("generate_invoice_number" as any);
           await (supabase as any).from("invoices").insert({
@@ -739,18 +745,30 @@ export function AdminTopUp() {
           }
         } catch (e) { console.error("Card bill check failed:", e); }
 
-        const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
-        const currentBalance = Number(wallet?.balance ?? 0);
-        const newBalance = currentBalance + finalAmount;
-        // CRITICAL: insert the ledger row FIRST. The DB trigger
-        // `prevent_duplicate_topup_credit` rejects a second row for the same
-        // reference_id, so a duplicate/double-click approval fails here BEFORE
-        // any money is added. Crediting the wallet first caused silent
-        // phantom balances when the insert was blocked.
-        const { error: txError } = await supabase.from("transactions").insert({ user_id: userId, type: "top_up", amount: finalAmount, balance_after: newBalance, reference_id: id, description: "Wallet top-up approved", processed_by: `admin:${user!.id}` } as any);
-        if (txError) throw new Error("This request was already credited (duplicate prevention). Refresh the page.");
-        const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
-        if (walletError) throw walletError;
+        // Atomic credit: the RPC writes the ledger row and the wallet balance in
+        // ONE transaction, so an approval can never end up with the money
+        // missing (and a duplicate is rejected by the DB trigger).
+        if (finalAmount > 0) {
+          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
+            p_user_id: userId,
+            p_amount: finalAmount,
+            p_wallet_kind: "primary",
+            p_reference_id: id,
+            p_description: "Wallet top-up approved",
+            p_processed_by: `admin:${user!.id}`,
+          });
+          if (creditErr) {
+            // Roll the request back to pending so it is never left "approved but
+            // not credited" — admin can safely retry.
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw creditErr;
+          }
+          if (creditRes && creditRes.success === false) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(creditRes.error || "Wallet credit failed");
+          }
+        }
+
         // Deposit settlement: once the main wallet due is cleared, the leftover
         // amount automatically pays down the secondary (sheet-rate) wallet due.
         try {
