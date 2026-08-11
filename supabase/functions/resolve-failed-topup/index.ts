@@ -164,7 +164,7 @@ Deno.serve(async (req)=>{
         sMap[s.key] = s.value;
       });
       if (sMap.is_tenant === "true" && sMap.master_url && sMap.tenant_api_key) {
-        const refundRes = await fetch(`${sMap.master_url}/functions/v1/tenant-webhook`, {
+        const tenantRefundRes = await fetch(`${sMap.master_url}/functions/v1/tenant-webhook`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -178,7 +178,7 @@ Deno.serve(async (req)=>{
             meta: { failed_topup_id, ad_account_id: failedTopup.ad_account_id, user_id: failedTopup.user_id }
           })
         });
-        const refundData = await refundRes.json();
+        const refundData = await tenantRefundRes.json();
         if (refundData.success) {
           // Update local cache
           const { data: existing } = await supabase.from("site_settings").select("id").eq("key", "license_total_used").single();
