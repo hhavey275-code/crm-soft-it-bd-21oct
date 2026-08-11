@@ -3987,6 +3987,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      credit_missing_approved_topup: {
+        Args: { p_processed_by: string; p_request_id: string }
+        Returns: Json
+      }
       credit_wallet_for_payment: {
         Args: {
           p_amount: number
@@ -4047,6 +4051,10 @@ export type Database = {
           p_reason?: string
           p_tenant_id: string
         }
+        Returns: Json
+      }
+      refund_failed_topup: {
+        Args: { p_failed_topup_id: string; p_processed_by: string }
         Returns: Json
       }
       refund_tenant_usage: {
