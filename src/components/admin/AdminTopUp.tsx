@@ -665,8 +665,14 @@ export function AdminTopUp() {
             p_description: `Wallet top-up approved (Secondary wallet @ ৳${actionDialog?.usdRate ?? ""}/USD)`,
             p_processed_by: `admin:${user!.id}`,
           });
-          if (creditErr) throw creditErr;
-          if (creditRes && creditRes.success === false) throw new Error(creditRes.error || "Credit failed");
+          if (creditErr) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw creditErr;
+          }
+          if (creditRes && creditRes.success === false) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(creditRes.error || "Credit failed");
+          }
 
           const { data: invNumData2 } = await supabase.rpc("generate_invoice_number" as any);
           await (supabase as any).from("invoices").insert({
