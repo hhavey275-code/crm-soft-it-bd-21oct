@@ -1321,7 +1321,6 @@ function CardBillingConfigSection() {
       </div>
       <Separator />
 
-      <ClientCardDueVisibilityCard />
 
       {/* Service Account JSON */}
       <Card>
