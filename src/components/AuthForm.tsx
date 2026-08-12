@@ -12,6 +12,34 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
+const LOGIN_TIMEOUT_MS = 20_000;
+
+function isTransientNetworkError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /failed to fetch|network|load failed|timed out|timeout|connection/i.test(message);
+}
+
+async function signInWithNetworkRecovery(email: string, password: string) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("Login request timed out")), LOGIN_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNetworkError(error) || attempt === 1) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+    }
+  }
+
+  throw lastError;
+}
+
 export function AuthForm() {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
@@ -69,7 +97,10 @@ export function AuthForm() {
     setLoading(true);
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!navigator.onLine) {
+          throw new Error("ইন্টারনেট সংযোগ নেই। Mobile data চালু করে আবার চেষ্টা করুন।");
+        }
+        const { data, error } = await signInWithNetworkRecovery(email.trim(), password);
         if (error) throw error;
         if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
         toast.success("Welcome back!");
@@ -95,7 +126,12 @@ export function AuthForm() {
         navigate({ to: "/signup-success" });
       }
     } catch (err: any) {
-      toast.error(err?.message || "Something went wrong");
+      const message = err?.message || "Something went wrong";
+      toast.error(
+        isTransientNetworkError(err)
+          ? "Network দুর্বল বা সংযোগ বিচ্ছিন্ন হয়েছে। একটু পরে আবার চেষ্টা করুন।"
+          : message,
+      );
     } finally {
       setLoading(false);
     }
