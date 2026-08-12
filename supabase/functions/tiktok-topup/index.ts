@@ -91,29 +91,30 @@ Deno.serve(async (req)=>{
     // STEP 1: Wallet deduction
     let newBalance = null;
     if (shouldDeductWallet) {
-      const { data: wallet, error: walletErr } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
-      if (walletErr || !wallet) return json({
-        error: "Wallet not found"
-      }, 404);
+      // Atomic deduction: the RPC locks the wallet, reconciles it against its
+      // own ledger, deducts and writes the transaction in ONE database
+      // transaction. Never read-then-write a balance here.
       const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
       const dueLimit = Number(prof?.due_limit ?? 0);
-      if (Number(wallet.balance) + dueLimit < amount) return json({
-        error: "Insufficient wallet balance"
-      }, 400);
-      newBalance = Number(wallet.balance) - amount;
-      await supabase.from("wallets").update({
-        balance: newBalance
-      }).eq("id", wallet.id);
-      await supabase.from("transactions").insert({
-        user_id: walletUserId,
-        amount: -amount,
-        balance_after: newBalance,
-        type: "ad_topup",
-        description: `${account.account_name}\n${account.account_id} (TikTok)`,
-        reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`
+      const { data: dedRes, error: dedErr } = await supabase.rpc("deduct_wallet_for_topup_v2", {
+        p_user_id: walletUserId,
+        p_amount: amount,
+        p_ad_account_id: ad_account_id,
+        p_description: `${account.account_name}\n${account.account_id} (TikTok)`,
+        p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+        p_wallet_kind: "primary",
+        p_allow_negative: false,
+        p_due_limit: dueLimit,
       });
+      if (dedErr) return json({ error: dedErr.message || "Wallet deduction failed" }, 500);
+      if (!dedRes?.ok) {
+        return json({
+          error: dedRes?.error === "insufficient_balance" ? "Insufficient wallet balance" : (dedRes?.error || "Wallet deduction failed"),
+        }, 400);
+      }
+      newBalance = Number(dedRes.balance_after);
     }
+
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
     if (isAdmin) {
