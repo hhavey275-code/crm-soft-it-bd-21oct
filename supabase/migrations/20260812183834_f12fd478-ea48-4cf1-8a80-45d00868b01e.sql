@@ -1,0 +1,1 @@
+COMMENT ON FUNCTION public.approve_client_topup_atomic(uuid, uuid) IS 'Atomically approves client top-ups and applies all wallet, bill, and invoice changes before committing approval status.';
