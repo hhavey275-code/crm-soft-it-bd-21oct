@@ -112,21 +112,30 @@ export function SellerTopUpApprovals() {
       if (!updatedRows?.length) throw new Error("Already processed. Please refresh.");
 
       if (action === "approved") {
-        // Idempotency guard
+        // Atomic credit: ledger row + wallet balance in ONE database
+        // transaction, with the duplicate-credit trigger as the second guard.
+        // Never read-then-write a balance here.
         const { data: existingTx } = await supabase
           .from("transactions").select("id").eq("reference_id", id).eq("type", "top_up").limit(1);
         if (!existingTx?.length) {
-          const { data: w } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
-          const newBalance = Number(w?.balance || 0) + Number(amount);
-          // Ledger row FIRST — the duplicate-credit trigger blocks a second
-          // insert, so a repeated approval can never inflate the wallet.
-          const { error: txErr } = await supabase.from("transactions").insert({
-            user_id: userId, type: "top_up", amount, balance_after: newBalance,
-            reference_id: id, description: "Top-up approved by seller", processed_by: `seller:${user!.id}`,
-          } as any);
-          if (txErr) throw new Error("Already credited (duplicate prevention). Please refresh.");
-          await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
+          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
+            p_user_id: userId,
+            p_amount: Number(amount),
+            p_wallet_kind: "primary",
+            p_reference_id: id,
+            p_description: "Top-up approved by seller",
+            p_processed_by: `seller:${user!.id}`,
+          });
+          if (creditErr) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(creditErr.message || "Wallet credit failed — approval rolled back.");
+          }
+          if (creditRes && creditRes.success === false) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(creditRes.error || "Wallet credit failed — approval rolled back.");
+          }
         }
+
 
         // Initialize forward flag only. Telegram forwarding is handled by the
         // database trigger on the status change, so we must not invoke it here
