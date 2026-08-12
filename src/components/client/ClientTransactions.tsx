@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWallets } from "@/hooks/useWallets";
 import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
+import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
 
 export function ClientTransactions() {
   const { user } = useAuth();
@@ -74,6 +75,11 @@ export function ClientTransactions() {
   return (
     <div className="space-y-4 md:space-y-6">
       <h1 className="text-xl md:text-2xl font-bold">Transaction History</h1>
+      <MonthlyUsageExport
+        transactions={transactions}
+        secondaryEnabled={secondaryEnabled}
+        clientName={user?.email ?? undefined}
+      />
       <TransactionHistoryPanel
         transactions={transactions}
         adAccounts={adAccounts}
