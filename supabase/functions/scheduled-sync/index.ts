@@ -151,17 +151,17 @@ async function processAutoTopups(supabase, serviceKey) {
         console.warn(`Auto top-up live read failed for ${actId}:`, e);
       }
       if (liveSpendCap === null) {
-        // Refund the wallet — we already deducted above
-        await supabase.from("wallets").update({ balance: Number(wallet.balance) }).eq("id", wallet.id);
-        await supabase.from("transactions").insert({
-          user_id: rule.user_id,
-          amount: rule.topup_amount,
-          balance_after: Number(wallet.balance),
-          type: "refund",
-          description: `Auto Top-Up Cancelled (could not read Meta)\n${account.account_name}`,
-          reference_id: rule.ad_account_id,
-          processed_by: `auto:${rule.user_id}`
+        // Refund atomically — we already deducted above
+        await supabase.rpc("adjust_wallet_atomic", {
+          p_user_id: rule.user_id,
+          p_amount: rule.topup_amount,
+          p_type: "refund",
+          p_description: `Auto Top-Up Cancelled (could not read Meta)\n${account.account_name}`,
+          p_processed_by: `auto:${rule.user_id}`,
+          p_wallet_kind: "primary",
+          p_reference_id: rule.ad_account_id
         });
+
         await supabase.from("system_logs").insert({
           user_id: rule.user_id,
           user_name: userName,
