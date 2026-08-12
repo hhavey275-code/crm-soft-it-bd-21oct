@@ -220,6 +220,13 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
             </div>
             <div className="flex items-center gap-0.5 ml-auto shrink-0">
               <button
+                className="h-6 w-6 rounded-md flex items-center justify-center text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors"
+                onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+                title="Convert main wallet balance to secondary (rate converted)"
+              >
+                <ArrowRightLeft className="h-3 w-3" />
+              </button>
+              <button
                 className="h-6 w-6 rounded-md flex items-center justify-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                 onClick={() => { setAdjustType("credit"); setAmount(""); setNote(""); }}
                 title="Add secondary balance"
@@ -241,6 +248,16 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
               {wallets.secondaryBalance < 0 ? "Due" : "Adv"}
             </span>
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full h-8 text-xs"
+            onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+            disabled={wallets.mainBalance <= 0}
+          >
+            <ArrowRightLeft className="h-3 w-3 mr-1" />
+            Convert Main → Secondary (rate adjusted)
+          </Button>
         </CardContent>
       </Card>
 
