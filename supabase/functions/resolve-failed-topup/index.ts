@@ -106,7 +106,7 @@ Deno.serve(async (req)=>{
           code: "META_UNREADABLE"
         }, 400);
       }
-      const expected = Number(failedTopup.old_spend_cap) + Number(failedTopup.amount);
+      const expected = Number(failedTopup.expected_spend_cap ?? (Number(failedTopup.old_spend_cap) + Number(failedTopup.amount)));
       if (isCapEffectivelyApplied(liveCap, expected)) {
         // Top-up actually succeeded — resolve without refunding.
         const spent = liveSpent ?? Number(account!.amount_spent ?? 0);
@@ -144,13 +144,17 @@ Deno.serve(async (req)=>{
     }
     const refundWalletKind = (refundRes as any).wallet_kind;
     const newBalance = Number((refundRes as any).new_balance);
+    const refundTransactionId = (refundRes as any).transaction_id;
+    if (!refundTransactionId || !Number.isFinite(newBalance)) {
+      return json({ error: "Refund verification failed: wallet transaction or new balance was not returned" }, 500);
+    }
 
     // Log to system_logs
     await supabase.from("system_logs").insert({
       user_id: userId,
       user_name: userName,
       action: "Failed Top-Up Refunded",
-      details: `${accountName} (${accountId}) — $${failedTopup.amount} refunded to wallet`
+      details: `${accountName} (${accountId}) — $${failedTopup.amount}\nStatus: Refund verified\nWallet: ${refundWalletKind}\nNew balance: $${newBalance.toFixed(2)}\nRefund transaction: ${refundTransactionId}\nOriginal debit transaction: ${failedTopup.wallet_transaction_id ?? "legacy record"}`
     });
     // Restore tenant system limit if in tenant mode
     try {
@@ -201,7 +205,9 @@ Deno.serve(async (req)=>{
     return json({
       success: true,
       refunded_amount: Number(failedTopup.amount),
-      new_balance: newBalance
+      new_balance: newBalance,
+      wallet_kind: refundWalletKind,
+      transaction_id: refundTransactionId
     });
   } catch (err) {
     console.error("resolve-failed-topup error:", err);

@@ -152,7 +152,16 @@ export function FailedTopUps() {
                 ${Number(ft.amount).toLocaleString()}
               </Badge>
             </div>
-            <p className="text-xs text-destructive line-clamp-2">{ft.error_message}</p>
+            <div className="space-y-1 text-xs">
+              <p className="font-medium text-destructive">
+                {ft.verification_status === "unknown" ? "Verification pending" : "Top-up failed"}
+                {ft.failure_code ? ` · ${ft.failure_code}` : ""}
+              </p>
+              <p className="text-muted-foreground">{ft.failure_reason || ft.error_message}</p>
+              {ft.recommended_action && (
+                <p className="text-foreground"><span className="font-semibold">What to do:</span> {ft.recommended_action}</p>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted-foreground">
                 {format(new Date(ft.created_at), "dd MMM yyyy, hh:mm a")}
@@ -162,7 +171,7 @@ export function FailedTopUps() {
                   size="sm"
                   variant="default"
                   className="h-7 text-xs gap-1"
-                  disabled={retryMutation.isPending}
+                  disabled={retryMutation.isPending || refundMutation.isPending || ft.verification_status === "unknown"}
                   onClick={() => retryMutation.mutate(ft.id)}
                 >
                   <RefreshCw className={`h-3 w-3 ${retryMutation.isPending ? "animate-spin" : ""}`} />
@@ -172,7 +181,7 @@ export function FailedTopUps() {
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
-                  disabled={refundMutation.isPending}
+                  disabled={refundMutation.isPending || retryMutation.isPending || ft.verification_status === "unknown"}
                   onClick={() => refundMutation.mutate(ft.id)}
                 >
                   <Trash2 className="h-3 w-3" />

@@ -132,8 +132,10 @@ Deno.serve(async (req)=>{
         error: "Cannot read live spend cap from Meta. Retry cancelled — verify the account in Ads Manager first."
       }, 400);
     }
-    const snapshotExpected = Number(failedTopup.old_spend_cap) + Number(failedTopup.amount);
-    const newSpendCapDollars = liveSpendCapDollars + Number(failedTopup.amount);
+    const snapshotExpected = Number(failedTopup.expected_spend_cap ?? (Number(failedTopup.old_spend_cap) + Number(failedTopup.amount)));
+    // Keep the same whole-unit rule as the original top-up path. Sending a
+    // fractional cap here recreates Meta error #100 on $0.01 accounts.
+    const newSpendCapDollars = Math.ceil(liveSpendCapDollars + Number(failedTopup.amount));
     console.log("Retry failed topup", {
       actId,
       liveSpendCapDollars,
@@ -186,6 +188,14 @@ Deno.serve(async (req)=>{
     }
     if (!metaRes.ok || metaData?.error) {
       const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+      const metaCode = metaData?.error?.code;
+      const metaSubcode = metaData?.error?.error_subcode;
+      const reason = metaCode === 100
+        ? "Meta rejected the spend cap parameter; account restriction, billing mode, or live cap rounding may be responsible."
+        : metaErrorMsg;
+      const action = metaCode === 100
+        ? "Check Ads Manager account status, payment method, current spend and live limit; then sync and retry."
+        : "Check the Meta account/token status and retry after a short wait.";
       console.warn("Retry Meta POST failed", {
         actId,
         message: metaErrorMsg,
@@ -195,6 +205,15 @@ Deno.serve(async (req)=>{
       // Update error message + last attempt route info
       await supabase.from("failed_topups").update({
         error_message: metaErrorMsg,
+        failure_code: `META_${metaCode ?? metaRes.status}${metaSubcode ? `_${metaSubcode}` : ""}`,
+        failure_category: metaCode === 100 ? "invalid_parameter" : "meta_rejected",
+        verification_status: "confirmed_not_applied",
+        failure_reason: reason,
+        recommended_action: action,
+        meta_error_code: metaCode !== undefined ? String(metaCode) : null,
+        meta_error_subcode: metaSubcode !== undefined ? String(metaSubcode) : null,
+        http_status: metaRes.status,
+        expected_spend_cap: newSpendCapDollars,
         last_attempt_via: postVia,
         last_attempt_ip: postIp
       }).eq("id", failed_topup_id);
@@ -202,7 +221,7 @@ Deno.serve(async (req)=>{
         user_id: userId,
         user_name: userName,
         action: "Failed Top-Up Retry Failed",
-        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount} — ${metaErrorMsg} — via ${postVia}${postIp ? ` (IP: ${postIp})` : ""}`
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${failedTopup.amount}\nStatus: Retry failed\nCode: META_${metaCode ?? metaRes.status}${metaSubcode ? `_${metaSubcode}` : ""}\nReason: ${reason}\nMeta response: ${metaErrorMsg}\nWhat to do: ${action}\nRoute: ${postVia}${postIp ? ` (IP: ${postIp})` : ""}`
       });
       return json({
         error: `Meta API error: ${metaErrorMsg}`,
