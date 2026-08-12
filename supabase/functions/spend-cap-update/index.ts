@@ -520,7 +520,14 @@ Deno.serve(async (req)=>{
         allowDirectFallback: true,
       });
       if (!metaRes.ok || metaData?.error) {
-        const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+        const mErr = metaData?.error ?? {};
+        const metaErrorMsg = [
+          mErr.message || `Meta HTTP ${metaRes.status}`,
+          mErr.error_user_title ? `— ${mErr.error_user_title}` : "",
+          mErr.error_user_msg ? `: ${mErr.error_user_msg}` : "",
+          mErr.code !== undefined ? ` (code ${mErr.code}${mErr.error_subcode ? `/${mErr.error_subcode}` : ""})` : "",
+        ].join("");
+
         const rateLimited = isMetaRateLimited(metaRes.status, metaData);
         console.warn("Meta POST failed", {
           actId,
