@@ -827,16 +827,7 @@ Deno.serve(async (req)=>{
     });
     // Record the cap movement on the wallet transaction so the client's
     // transaction history shows previous limit → new spend cap.
-    if (walletTxnId) {
-      try {
-        const txnAccountId = String(account.account_id || "").replace(/^act_/, "");
-        await supabase.from("transactions").update({
-          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
-          old_spend_cap: Number(oldSpendCapDollars),
-          new_spend_cap: Number(newSpendCapDollars),
-        }).eq("id", walletTxnId);
-      } catch (e) { console.warn("cap description update failed:", e); }
-    }
+    await recordCapOnTxn(oldSpendCapDollars, newSpendCapDollars);
 
 
     // ============================================
