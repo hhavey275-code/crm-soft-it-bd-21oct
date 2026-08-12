@@ -541,6 +541,33 @@ export function AdminTopUp() {
             throw new Error(`System limit exceeded! Remaining: $${remaining.toFixed(2)}, Requested: $${amount.toFixed(2)}`);
           }
         }
+
+        // Financial approval is one database transaction. The request status is
+        // changed only after wallet/card-bill distribution and invoice creation
+        // succeed, so a dropped mobile connection cannot leave an approved row
+        // without its wallet credit.
+        const { data: approvalResult, error: approvalError } = await (supabase as any).rpc(
+          "approve_client_topup_atomic",
+          { p_request_id: id, p_admin: user?.id },
+        );
+        if (approvalError) throw approvalError;
+        if (approvalResult?.success !== true) {
+          throw new Error(approvalResult?.error || "Top-up approval failed");
+        }
+
+        // These are informational side effects only. Do not hold the approval
+        // dialog open on slow mobile internet after the money is safely applied.
+        void supabase.from("notifications").insert({
+          user_id: userId,
+          type: "top_up_update",
+          title: "Top-Up Approved",
+          message: `Your top-up of $${amount} has been approved.`,
+          reference_id: id,
+        } as any);
+        const approvedProfile = requests?.find((r: any) => r.id === id)?.profile;
+        const approvedName = approvedProfile?.full_name || approvedProfile?.email || userId.slice(0, 8);
+        void logSystemAction("Top-Up Approved", `$${amount} for ${approvedName}`, user?.id, user?.email);
+        return;
       }
 
       let autoApprovedByVerify = false;
