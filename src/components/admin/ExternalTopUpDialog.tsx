@@ -61,25 +61,6 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
       }
       let newBalance: number | null = null;
 
-      // Deduct wallet immediately
-      {
-        const { data: wallet, error: wErr } = await supabase
-          .from("wallets")
-          .select("balance")
-          .eq("user_id", targetUserId)
-          .single();
-        if (wErr) throw wErr;
-        const currentBalance = Number(wallet?.balance ?? 0);
-        if (currentBalance < amt) throw new Error(`Insufficient wallet balance ($${currentBalance.toFixed(2)})`);
-        newBalance = currentBalance - amt;
-
-        const { error: uErr } = await supabase
-          .from("wallets")
-          .update({ balance: newBalance } as any)
-          .eq("user_id", targetUserId);
-        if (uErr) throw uErr;
-      }
-
       // Create the request as already completed (admin will perform the action manually in the partner CRM)
       const { data, error } = await (supabase as any)
         .from("external_topup_requests")
@@ -100,18 +81,30 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
         .single();
       if (error) throw error;
 
-      // Log transaction if wallet was deducted
-      if (targetUserId && newBalance !== null) {
-        await supabase.from("transactions").insert({
-          user_id: targetUserId,
-          type: "external_topup",
-          amount: amt,
-          balance_after: newBalance,
-          reference_id: data.id,
-          description: `External CRM top-up — ${crmName} (${account.account_name})`,
-          processed_by: `admin:${user!.id}`,
-        } as any);
+      // Deduct the wallet atomically: balance + ledger row in ONE transaction,
+      // with the amount signed negative so history and balance always agree.
+      {
+        const { data: res, error: dErr } = await (supabase as any).rpc("adjust_wallet_atomic", {
+          p_user_id: targetUserId,
+          p_amount: -amt,
+          p_type: "external_topup",
+          p_description: `External CRM top-up — ${crmName} (${account.account_name})`,
+          p_processed_by: `admin:${user!.id}`,
+          p_wallet_kind: "primary",
+          p_reference_id: data.id,
+          p_allow_negative: false,
+        });
+        if (dErr || (res && res.ok === false)) {
+          await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
+          throw new Error(
+            res?.error === "insufficient_balance"
+              ? `Insufficient wallet balance ($${Number(res.balance ?? 0).toFixed(2)})`
+              : dErr?.message || res?.error || "Wallet deduction failed",
+          );
+        }
+        newBalance = Number(res.balance_after);
       }
+
 
       // Copy account id + amount to clipboard
       try {

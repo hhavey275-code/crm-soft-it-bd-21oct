@@ -3996,6 +3996,19 @@ export type Database = {
         }
         Returns: Json
       }
+      adjust_wallet_atomic: {
+        Args: {
+          p_allow_negative?: boolean
+          p_amount: number
+          p_description: string
+          p_processed_by: string
+          p_reference_id?: string
+          p_type: string
+          p_user_id: string
+          p_wallet_kind?: string
+        }
+        Returns: Json
+      }
       admin_adjust_secondary_wallet: {
         Args: { p_amount: number; p_reason: string; p_user_id: string }
         Returns: Json

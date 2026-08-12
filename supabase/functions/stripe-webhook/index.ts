@@ -102,25 +102,22 @@ async function handleCompleted(supabase: any, session: Stripe.Checkout.Session) 
     return;
   }
 
-  // Credit wallet
-  const { data: wallet } = await supabase
-    .from("wallets")
-    .select("balance")
-    .eq("user_id", userId)
-    .single();
-  const newBalance = Number(wallet?.balance || 0) + amount;
-  await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
-
-  // Transaction record
-  await supabase.from("transactions").insert({
-    user_id: userId,
-    type: "top_up",
-    amount,
-    balance_after: newBalance,
-    reference_id: link.id,
-    description: `Stripe payment (session ${session.id})`,
-    processed_by: link.created_by,
+  // Credit wallet — atomic RPC writes the ledger row AND the balance in one
+  // transaction. Never read-then-write a balance: a stale read can inflate it.
+  const { data: creditRes, error: creditErr } = await supabase.rpc("credit_wallet_for_payment", {
+    p_user_id: userId,
+    p_amount: amount,
+    p_wallet_kind: "primary",
+    p_reference_id: link.id,
+    p_description: `Stripe payment (session ${session.id})`,
+    p_processed_by: link.created_by,
   });
+  if (creditErr || (creditRes as any)?.success === false) {
+    console.error("Stripe wallet credit failed", creditErr || creditRes);
+    throw new Error((creditErr as any)?.message || (creditRes as any)?.error || "wallet credit failed");
+  }
+
+
 
   console.log(`Credited $${amount} to user ${userId}`);
 }

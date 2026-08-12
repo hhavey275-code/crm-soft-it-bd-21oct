@@ -244,30 +244,21 @@ export default function AgencyDetailPage() {
       const amt = parseFloat(walletAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
 
-      // Always fetch LIVE balance from DB to avoid stale-cache races.
-      const { data: liveWallet, error: fetchErr } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", userId!)
-        .single();
-      if (fetchErr) throw fetchErr;
-
-      const currentBalance = Number(liveWallet?.balance ?? 0);
       const isCredit = walletDialogType === "credit";
-      const newBalance = isCredit ? currentBalance + amt : currentBalance - amt;
-      const txAmount = isCredit ? amt : -amt;
-      const { error: walletErr } = await supabase.from("wallets").update({ balance: newBalance } as any).eq("user_id", userId!);
-      if (walletErr) throw walletErr;
-      const { error: txErr } = await supabase.from("transactions").insert({
-        user_id: userId!,
-        amount: txAmount,
-        balance_after: newBalance,
-        type: isCredit ? "admin_credit" : "admin_debit",
-        description: walletNote.trim() || (isCredit ? "Admin added balance" : "Admin deducted balance"),
-        processed_by: `admin:${currentUser!.id}`,
-      } as any);
-      if (txErr) throw txErr;
+      // Atomic RPC: locks the wallet, re-derives the balance from the ledger,
+      // writes the transaction and the new balance together. No stale reads.
+      const { data: res, error } = await (supabase as any).rpc("adjust_wallet_atomic", {
+        p_user_id: userId!,
+        p_amount: isCredit ? amt : -amt,
+        p_type: isCredit ? "admin_credit" : "admin_debit",
+        p_description: walletNote.trim() || (isCredit ? "Admin added balance" : "Admin deducted balance"),
+        p_processed_by: `admin:${currentUser!.id}`,
+        p_wallet_kind: "primary",
+      });
+      if (error) throw error;
+      if (res && res.ok === false) throw new Error(res.error || "Adjustment failed");
     },
+
     onSuccess: () => {
       toast.success(walletDialogType === "credit" ? "Balance added!" : "Balance deducted!");
       setWalletDialogType(null); setWalletAmount(""); setWalletNote("");

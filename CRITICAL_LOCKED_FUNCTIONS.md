@@ -124,4 +124,56 @@ Telegram bot token + group IDs live in `site_settings` / `bank_accounts` rows.
 
 ---
 
-**Last reviewed:** 2026-08-06. Bump this date when you re-verify the flow.
+---
+
+## 9. Money Accuracy Guardrails (LOCKED — 2026-08-12)
+
+These exist so the three business-critical bugs can never silently return:
+top-up shown as failed after it actually succeeded, wallet balance moving the
+wrong way, and calculation drift between the balance and its history.
+
+**Database-enforced invariant**
+
+- Deferred constraint triggers `assert_primary_wallet_integrity` (`wallets`) and
+  `assert_secondary_wallet_integrity` (`secondary_wallets`) run at COMMIT.
+  A wallet balance MUST equal the sum of its own `transactions` rows for that
+  `wallet_kind` (or that sum plus the frozen legacy `drift_allowance`).
+  Any mismatch aborts the whole transaction. Never drop these triggers.
+- `drift_allowance` freezes the 6 pre-existing legacy mismatches so they cannot
+  grow. It is reset to 0 whenever the wallet is repaired or written atomically.
+
+**The ONLY allowed ways to change a wallet balance**
+
+| RPC | Use |
+|-----|-----|
+| `credit_wallet_for_payment` | Approved client payment (ledger row first, duplicate-credit trigger guards) |
+| `deduct_wallet_for_topup_v2` | Ad-account / spend-cap deduction (locks wallet, reconciles to ledger) |
+| `distribute_deposit_bdt` | Secondary-wallet clients: main due → secondary due → main deposit |
+| `admin_adjust_secondary_wallet` | Admin credit/debit on the secondary wallet |
+| `admin_convert_main_to_secondary` | Manual rate-converted move between wallets |
+| `adjust_wallet_atomic` | Everything else (admin credit/debit, refunds, external CRM top-up) |
+| `repair_wallet_balance` | Admin-only repair, snaps balance onto ledger, logged |
+
+**NEVER** write `wallets.balance` / `secondary_wallets.balance` directly from
+the client, an edge function, or a script. The read-then-write pattern
+(`select balance` → compute → `update balance`) is banned: it loses concurrent
+changes and is what previously inflated balances. Converted call sites:
+`stripe-webhook`, `tiktok-topup`, `scheduled-sync` (deduct + both refunds),
+`SellerTopUpApprovals`, `AgencyTopUp`, `AgencyDetailPage`, `ClientDetailPage`,
+`ExternalTopUpDialog`.
+
+**Failed top-ups**
+
+- `spend-cap-update` must keep the three-way outcome: confirmed success,
+  confirmed failure, and `unknown` (never auto-refund on unknown).
+- `refund_failed_topup` is idempotent and verifies the original debit before
+  refunding. Don't simplify it.
+
+**Monitoring (Audit → Money Health tab)**
+
+`money_health_report()` (admin-only) surfaces: wallet-vs-history mismatches,
+approved payments never credited, duplicate credits, and pending failed
+top-ups with their live spend cap. Check it after every incident and before
+month close.
+
+**Last reviewed:** 2026-08-12. Bump this date when you re-verify the flow.
