@@ -541,38 +541,39 @@ export function AdminTopUp() {
             throw new Error(`System limit exceeded! Remaining: $${remaining.toFixed(2)}, Requested: $${amount.toFixed(2)}`);
           }
         }
+
+        // Financial approval is one database transaction. The request status is
+        // changed only after wallet/card-bill distribution and invoice creation
+        // succeed, so a dropped mobile connection cannot leave an approved row
+        // without its wallet credit.
+        const { data: approvalResult, error: approvalError } = await (supabase as any).rpc(
+          "approve_client_topup_atomic",
+          { p_request_id: id, p_admin: user?.id },
+        );
+        if (approvalError) throw approvalError;
+        if (approvalResult?.success !== true) {
+          throw new Error(approvalResult?.error || "Top-up approval failed");
+        }
+
+        // These are informational side effects only. Do not hold the approval
+        // dialog open on slow mobile internet after the money is safely applied.
+        void supabase.from("notifications").insert({
+          user_id: userId,
+          type: "top_up_update",
+          title: "Top-Up Approved",
+          message: `Your top-up of $${amount} has been approved.`,
+          reference_id: id,
+        } as any);
+        const approvedProfile = requests?.find((r: any) => r.id === id)?.profile;
+        const approvedName = approvedProfile?.full_name || approvedProfile?.email || userId.slice(0, 8);
+        void logSystemAction("Top-Up Approved", `$${amount} for ${approvedName}`, user?.id, user?.email);
+        return;
       }
 
-      let autoApprovedByVerify = false;
-      if (action === "approved") {
-        const { data: reqData } = await supabase.from("top_up_requests").select("payment_reference").eq("id", id).single();
-        const ref = reqData?.payment_reference;
-        if (ref) {
-          const { data: existing } = await supabase.from("top_up_requests").select("id").eq("payment_reference", ref).eq("status", "approved").neq("id", id);
-          if (existing && existing.length > 0) throw new Error("This payment reference has already been used in an approved request!");
-        }
-        // Run verify-topup once to populate admin_note (Match Details).
-        // Auto-approval still requires strict matching (ref + amount + account + SMS).
-        // Manual admin approve is allowed even with mismatches — admin override.
-        try {
-          // Hard timeout: verify-topup can stall up to ~70s when the OCR provider
-          // rate-limits and retries. Manual approve must never wait on that.
-          const verifyPromise = supabase.functions
-            .invoke('verify-topup', { body: { request_id: id } })
-            .then((r: any) => r?.data);
-          const vData: any = await Promise.race([
-            verifyPromise,
-            new Promise((resolve) => setTimeout(() => resolve(null), 10000)),
-          ]);
-          if (vData?.auto_approved) autoApprovedByVerify = true;
-        } catch (e) {
-          // Don't block manual approve on verify-topup errors — just log
-          console.warn('verify-topup call failed (non-blocking for manual approve):', e);
-        }
-      }
-      const updateData: any = { status: action, reviewed_by: user!.id };
-      if ((action === "rejected" || action === "hold") && adminNote) updateData.admin_note = adminNote;
-      // Atomic guard: only update if still pending (prevents double-credit race with verify-topup auto-approval)
+      // Reject and hold remain simple guarded status changes. Approved requests
+      // return above after the atomic database operation succeeds.
+      const updateData: any = { status: action, reviewed_by: user?.id };
+      if (adminNote) updateData.admin_note = adminNote;
       const { data: updatedRows, error: updateError } = await supabase
         .from("top_up_requests")
         .update(updateData)
@@ -581,269 +582,21 @@ export function AdminTopUp() {
         .select("id");
       if (updateError) throw updateError;
       if (!updatedRows?.length) {
-        if (autoApprovedByVerify) return; // verify-topup already approved + credited; nothing more to do
-        throw new Error("This request was already processed (auto-verified or by another admin). Please refresh the page.");
-      }
-
-      // Fix B: Consume any matching Telegram SMS so it can never trigger a
-      // duplicate auto-approval on a different pending request later.
-      // Match by amount + bank last4 within ±2h of the request creation time.
-      if (action === "approved") {
-        try {
-          const reqRow = requests?.find((r: any) => r.id === id);
-          const bdtAmt = Number(reqRow?.bdt_amount || 0);
-          const last4 = reqRow?.bankAccount?.account_number?.replace(/\s+/g, "").slice(-4) || "";
-          const ref = (reqRow?.payment_reference || "").trim();
-          const createdAt = new Date(reqRow?.created_at || Date.now());
-          const fromIso = new Date(createdAt.getTime() - 2 * 60 * 60 * 1000).toISOString();
-          const toIso = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000).toISOString();
-          if (bdtAmt > 0 || ref) {
-            const { data: candidates } = await (supabase as any)
-              .from("telegram_messages")
-              .select("update_id, text, raw_update")
-              .is("matched_request_id", null)
-              .gte("created_at", fromIso)
-              .lte("created_at", toIso)
-              .order("created_at", { ascending: false })
-              .limit(100);
-            const getText = (m: any) => {
-              const raw = m?.raw_update || {};
-              const p = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
-              return (m?.text || p?.text || p?.caption || "") as string;
-            };
-            const target = (candidates || []).find((m: any) => {
-              const text = getText(m);
-              if (!text) return false;
-              if (ref && text.toLowerCase().includes(ref.toLowerCase())) return true;
-              if (bdtAmt > 0 && last4) {
-                const digits = text.replace(/[^\d]/g, "");
-                if (!digits.includes(last4)) return false;
-                const nums = text.match(/[\d,]+/g) || [];
-                return nums.some((n: string) => Math.abs(Number(n.replace(/,/g, "")) - bdtAmt) <= 15);
-              }
-              return false;
-            });
-            if (target) {
-              await (supabase as any)
-                .from("telegram_messages")
-                .update({ matched_request_id: id })
-                .eq("update_id", target.update_id)
-                .is("matched_request_id", null);
-            }
-          }
-        } catch (e) {
-          console.error("SMS consume on manual approval failed (non-blocking):", e);
-        }
-      }
-
-      if (action === "approved") {
-        let finalAmount = amount;
-        
-        // Idempotency guard (Fix A): never double-credit.
-        // If a top_up transaction already exists for this request_id, abort.
-        const { data: existingTx } = await supabase
-          .from("transactions")
-          .select("id")
-          .eq("reference_id", id)
-          .eq("type", "top_up")
-          .limit(1);
-        if (existingTx && existingTx.length > 0) {
-          throw new Error("This request was already credited to the wallet (duplicate prevention). Refresh the page.");
-        }
-
-        const reqRowForWallet = requests?.find((r: any) => r.id === id);
-        const targetWalletKind: "primary" | "secondary" =
-          (reqRowForWallet as any)?.target_wallet === "secondary" ? "secondary" : "primary";
-
-        if (targetWalletKind === "secondary") {
-          // Secondary (sheet-rate) wallet deposit — credited atomically by the
-          // RPC (ledger row first, then balance) so no phantom balance.
-          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
-            p_user_id: userId,
-            p_amount: finalAmount,
-            p_wallet_kind: "secondary",
-            p_reference_id: id,
-            p_description: `Wallet top-up approved (Secondary wallet @ ৳${actionDialog?.usdRate ?? ""}/USD)`,
-            p_processed_by: `admin:${user!.id}`,
-          });
-          if (creditErr) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw creditErr;
-          }
-          if (creditRes && creditRes.success === false) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw new Error(creditRes.error || "Credit failed");
-          }
-
-          const { data: invNumData2 } = await supabase.rpc("generate_invoice_number" as any);
-          await (supabase as any).from("invoices").insert({
-            top_up_request_id: id,
-            invoice_number: invNumData2 || `INV-${Date.now()}`,
-            user_id: userId,
-            amount: finalAmount,
-            bdt_amount: actionDialog?.bdtAmount,
-            usd_rate: actionDialog?.usdRate,
-          });
-        } else {
-
-
-        // Wallet-due first → Sheet/card bill → remainder to wallet (mirror of verify-topup logic).
-        // Kafela / Holy Gift style: if wallet balance is negative (CRM due), clear that BEFORE deducting sheet bill.
-        try {
-          const { data: cardBill } = await (supabase as any).from("card_bills").select("*").eq("user_id", userId).eq("status", "pending").limit(1);
-          const hasBill = cardBill && cardBill.length > 0 && Number(cardBill[0].due_amount_bdt) > 0;
-          const totalBdt = Number(actionDialog?.bdtAmount || 0);
-          const rate = Number(actionDialog?.usdRate || 1);
-          if (hasBill && totalBdt > 0) {
-            // Step 1: clear wallet due (negative balance) first
-            const { data: walletRow } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
-            const curBal = Number(walletRow?.balance ?? 0);
-            let remainingBdt = totalBdt;
-            let walletDuePaidBdt = 0;
-            if (curBal < 0) {
-              const dueBdtFull = Math.abs(curBal) * rate;
-              walletDuePaidBdt = Math.min(dueBdtFull, remainingBdt);
-              remainingBdt -= walletDuePaidBdt;
-            }
-
-            // Step 2: sheet/card bill from whatever BDT remains
-            const dueBdt = Number(cardBill[0].due_amount_bdt);
-            const deductBdt = Math.min(dueBdt, remainingBdt);
-            remainingBdt -= deductBdt;
-
-            // Step 3: wallet credit USD = (wallet-due portion + remainder) / rate
-            finalAmount = (remainingBdt + walletDuePaidBdt) / rate;
-
-            const newDue = dueBdt - deductBdt;
-            await (supabase as any).from("card_bills").update({
-              status: newDue <= 0 ? "paid" : "pending",
-              due_amount_bdt: newDue,
-              updated_at: new Date().toISOString(),
-            }).eq("id", cardBill[0].id);
-
-            // Persist BDT split on the top-up request for the invoice
-            try {
-              await (supabase as any).from("top_up_requests").update({
-                sheet_bill_bdt: deductBdt,
-                wallet_due_paid_bdt: walletDuePaidBdt,
-              }).eq("id", id);
-            } catch (persistErr) {
-              console.error("persist sheet_bill_bdt failed (non-blocking):", persistErr);
-            }
-
-            if (deductBdt > 0) {
-              try {
-                let clientName = "";
-                try {
-                  const { data: cp } = await supabase.from("profiles").select("full_name, email").eq("user_id", userId).single();
-                  clientName = cp?.full_name || cp?.email || "";
-                } catch {}
-                await supabase.functions.invoke("sync-card-bills", {
-                  body: { action: "write_payment", user_id: userId, amount_bdt: deductBdt, client_name: clientName },
-                });
-              } catch (e) { console.error("Sheet write failed:", e); }
-            }
-          }
-        } catch (e) { console.error("Card bill check failed:", e); }
-
-        // Does this client run a secondary (sheet-rate) wallet? If so the
-        // payment is split: main due → secondary due (at the secondary rate) →
-        // remainder deposited into the main wallet.
-        let secondaryEnabled = false;
-        try {
-          const { data: prof } = await (supabase as any)
-            .from("profiles").select("secondary_wallet_enabled").eq("user_id", userId).maybeSingle();
-          secondaryEnabled = !!prof?.secondary_wallet_enabled;
-        } catch {}
-
-        if (secondaryEnabled && finalAmount > 0) {
-          const rateForSplit = Number(actionDialog?.usdRate || 0);
-          const bdtForSplit = rateForSplit > 0 ? finalAmount * rateForSplit : Number(actionDialog?.bdtAmount || 0);
-          const { data: splitRes, error: splitErr } = await (supabase as any).rpc("distribute_deposit_bdt", {
-            p_user_id: userId,
-            p_bdt_amount: bdtForSplit,
-            p_reference_id: id,
-            p_processed_by: `admin:${user!.id}`,
-          });
-          if (splitErr) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw splitErr;
-          }
-          if (splitRes && splitRes.ok === false) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw new Error(splitRes.error || "Deposit split failed");
-          }
-        } else if (finalAmount > 0) {
-          // Atomic credit: the RPC writes the ledger row and the wallet balance in
-          // ONE transaction, so an approval can never end up with the money
-          // missing (and a duplicate is rejected by the DB trigger).
-          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
-            p_user_id: userId,
-            p_amount: finalAmount,
-            p_wallet_kind: "primary",
-            p_reference_id: id,
-            p_description: "Wallet top-up approved",
-            p_processed_by: `admin:${user!.id}`,
-          });
-          if (creditErr) {
-            // Roll the request back to pending so it is never left "approved but
-            // not credited" — admin can safely retry.
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw creditErr;
-          }
-          if (creditRes && creditRes.success === false) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw new Error(creditRes.error || "Wallet credit failed");
-          }
-        }
-
-        const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
-        await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
-        }
+        throw new Error("This request was already processed. Please refresh the page.");
       }
 
       await supabase.from("notifications").insert({
         user_id: userId, type: "top_up_update",
-        title: action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
-        message: action === "approved" ? `Your top-up of $${amount} has been approved.` : action === "rejected" ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}` : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
+        title: action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
+        message: action === "rejected" ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}` : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
         reference_id: id,
       } as any);
 
       // System log
-      const actionLabel = action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold";
+      const actionLabel = action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold";
       const clientProfile = requests?.find((r: any) => r.id === id)?.profile;
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
-
-      // Seller ledger sync + Telegram forward are now handled atomically by the
-      // database trigger `sync_seller_transaction_for_approved_topup_trigger` on
-      // `top_up_requests`. We mark telegram_forwarded=false up-front when the
-      // bank has a Telegram group — the forward-proof edge function flips it to
-      // true ONLY when Telegram actually accepts the message. This gives a
-      // truthful Forwarded / Not-Forwarded / "—" signal in the UI.
-      if (action === "approved") {
-        try {
-          const reqForSeller = requests?.find((r: any) => r.id === id);
-          if (reqForSeller?.bank_account_id) {
-            const { data: bankRow } = await (supabase as any)
-              .from("bank_accounts")
-              .select("telegram_group_id")
-              .eq("id", reqForSeller.bank_account_id)
-              .single();
-            if (bankRow?.telegram_group_id) {
-              // Only initialize to false if it's still null — never overwrite a
-              // true that forward-proof may already have set (race-safe).
-              await (supabase as any)
-                .from("top_up_requests")
-                .update({ telegram_forwarded: false })
-                .eq("id", id)
-                .is("telegram_forwarded", null);
-            }
-          }
-        } catch (e) {
-          console.error("Init telegram_forwarded=false failed (non-blocking):", e);
-        }
-      }
     },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);

@@ -4032,6 +4032,10 @@ export type Database = {
         }
         Returns: Json
       }
+      approve_client_topup_atomic: {
+        Args: { p_admin: string; p_request_id: string }
+        Returns: Json
+      }
       approve_tenant_limit_payment: {
         Args: { p_admin: string; p_payment_id: string }
         Returns: Json
