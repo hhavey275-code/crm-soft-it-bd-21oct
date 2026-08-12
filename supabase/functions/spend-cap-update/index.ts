@@ -560,6 +560,7 @@ Deno.serve(async (req)=>{
         // CRITICAL: POST may have succeeded despite error response.
         // Do a GET to check if spend cap was actually updated.
         let actuallySucceeded = false;
+        let verificationReadSucceeded = false;
         try {
           // Retry the confirmation read a few times — Meta can be slow or
           // rate-limited, and a missed confirmation creates a false "failed"
@@ -568,6 +569,7 @@ Deno.serve(async (req)=>{
             if (waitMs) await delay(waitMs);
             const verifyResult = await verifySpendCap(actId, bmToken);
             if (verifyResult.ok) {
+              verificationReadSucceeded = true;
               if (isCapEffectivelyApplied(verifyResult.dollars, newSpendCapDollars)) {
                 actuallySucceeded = true;
                 console.log(`POST returned error but GET confirms cap at $${verifyResult.dollars} (expected $${newSpendCapDollars}). Treating as success.`);
@@ -612,7 +614,16 @@ Deno.serve(async (req)=>{
             new_spend_cap: newSpendCapDollars
           });
         }
-        // Actually failed — insert into failed_topups
+        // If every confirmation read failed, Meta's write outcome is unknown.
+        // Never present that as a definitive failure or encourage an unsafe retry.
+        const outcomeUnknown = !verificationReadSucceeded;
+        const recordedFailure = outcomeUnknown ? {
+          category: "network_ambiguous",
+          code: "META_OUTCOME_UNKNOWN",
+          reason: `Meta response failed and the live cap could not be read to confirm the outcome: ${metaErrorMsg}`,
+          action: "এখনই Retry বা Refund করবেন না। Ads Manager-এ live spend cap যাচাই করুন; কয়েক মিনিট পরে action নিলে system আবার live check করবে।"
+        } : failure;
+        // Confirmed or ambiguous failure — insert into failed_topups
         const { data: failedRecord } = await supabase.from("failed_topups").insert({
           user_id: walletUserId,
           ad_account_id,
@@ -623,11 +634,11 @@ Deno.serve(async (req)=>{
           wallet_kind: walletKind,
           wallet_transaction_id: walletTxnId,
           expected_spend_cap: newSpendCapDollars,
-          failure_code: failure.code,
-          failure_category: failure.category,
-          verification_status: "confirmed_not_applied",
-          failure_reason: failure.reason,
-          recommended_action: failure.action,
+          failure_code: recordedFailure.code,
+          failure_category: recordedFailure.category,
+          verification_status: outcomeUnknown ? "unknown" : "confirmed_not_applied",
+          failure_reason: recordedFailure.reason,
+          recommended_action: recordedFailure.action,
           meta_error_code: mErr.code !== undefined ? String(mErr.code) : null,
           meta_error_subcode: mErr.error_subcode !== undefined ? String(mErr.error_subcode) : null,
           http_status: metaRes.status
@@ -635,8 +646,8 @@ Deno.serve(async (req)=>{
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
-          action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount}\nStatus: Confirmed failed (Meta did not apply the cap)\nCode: ${failure.code}\nReason: ${failure.reason}\nMeta response: ${metaErrorMsg}\nWhat to do: ${failure.action}\nWallet: ${walletKind}; debit transaction: ${walletTxnId ?? "not charged"}${metaCallSummary()}`
+          action: outcomeUnknown ? "Top-Up Verification Pending" : "Top-Up Failed",
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount}\nStatus: ${outcomeUnknown ? "Unknown — Meta may have applied the cap" : "Confirmed failed (Meta did not apply the cap)"}\nCode: ${recordedFailure.code}\nReason: ${recordedFailure.reason}\nMeta response: ${metaErrorMsg}\nWhat to do: ${recordedFailure.action}\nWallet: ${walletKind}; debit transaction: ${walletTxnId ?? "not charged"}${metaCallSummary()}`
         });
         const errorCode = rateLimited ? "META_RATE_LIMIT" : "META_API_ERROR";
         return json({
