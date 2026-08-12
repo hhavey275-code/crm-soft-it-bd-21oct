@@ -272,8 +272,8 @@ Deno.serve(async (req)=>{
       try {
         const txnAccountId = String(account.account_id || "").replace(/^act_/, "");
         await supabase.from("transactions").update({
-          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
-          old_spend_cap: Number(oldSpendCapDollars),
+          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(liveSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
+          old_spend_cap: Number(liveSpendCapDollars),
           new_spend_cap: Number(newSpendCapDollars),
         }).eq("id", failedTopup.wallet_transaction_id);
       } catch (e) { console.warn("cap description update failed:", e); }
