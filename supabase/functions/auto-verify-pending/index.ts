@@ -101,11 +101,62 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 4) SELF-HEAL: approved top-ups that never got a wallet credit.
+  // A manual approval credits the wallet from the admin's browser, so a closed
+  // tab / dropped connection could leave "approved but not credited". This
+  // repairs them idempotently (credit_missing_approved_topup is a no-op when a
+  // credit already exists).
+  let healed = 0;
+  try {
+    const healSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: approvedRows } = await supabase
+      .from('top_up_requests')
+      .select('id, user_id, amount, created_at, sheet_bill_bdt, wallet_due_paid_bdt, main_deposit_bdt, secondary_due_bdt')
+      .eq('status', 'approved')
+      .gte('created_at', healSince)
+      .lt('updated_at', new Date(Date.now() - 2 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    for (const row of approvedRows || []) {
+      // Skip split/bill-adjusted requests — their credit amount is not the raw amount.
+      const split =
+        Number(row.sheet_bill_bdt || 0) > 0 ||
+        Number(row.wallet_due_paid_bdt || 0) > 0 ||
+        Number(row.main_deposit_bdt || 0) > 0 ||
+        Number(row.secondary_due_bdt || 0) > 0;
+      if (split) continue;
+
+      const { count } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('reference_id', row.id);
+      if ((count || 0) > 0) continue;
+
+      const { data: fix, error: fixErr } = await supabase.rpc('credit_missing_approved_topup', {
+        p_request_id: row.id,
+        p_processed_by: 'auto-heal:auto-verify-pending',
+      });
+      if (fixErr) {
+        log.push(`heal ${row.id}: ${fixErr.message}`);
+      } else if ((fix as any)?.success) {
+        healed++;
+        log.push(`healed ${row.id} ($${row.amount})`);
+        await supabase.from('system_logs').insert({
+          action: 'Top-Up Credit Auto-Repaired',
+          details: `Approved top-up $${row.amount} had no wallet credit — credited automatically (request ${row.id})`,
+        } as any);
+      }
+    }
+  } catch (e: any) {
+    log.push(`heal err: ${e?.message || e}`);
+  }
+
   const ms = Date.now() - started;
-  console.log(`[auto-verify-pending] checked=${checked} approved=${approved} tenant_checked=${tenantChecked} tenant_approved=${tenantApproved} ms=${ms} ${log.join(' | ')}`);
+  console.log(`[auto-verify-pending] checked=${checked} approved=${approved} healed=${healed} tenant_checked=${tenantChecked} tenant_approved=${tenantApproved} ms=${ms} ${log.join(' | ')}`);
 
   return new Response(
-    JSON.stringify({ ok: true, checked, approved, tenant_checked: tenantChecked, tenant_approved: tenantApproved, ms, log }),
+    JSON.stringify({ ok: true, checked, approved, healed, tenant_checked: tenantChecked, tenant_approved: tenantApproved, ms, log }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   );
 });
