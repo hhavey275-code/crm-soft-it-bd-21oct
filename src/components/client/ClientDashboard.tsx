@@ -30,6 +30,7 @@ export function ClientDashboard() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
+  const { clientCardDueVisible: cardDueVisibleForClient } = useSiteSettings();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [dismissedInstall, setDismissedInstall] = useState(false);
   const isInactive = (profile as any)?.status === "inactive";
