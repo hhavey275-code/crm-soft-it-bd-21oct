@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -333,15 +333,15 @@ export function MonthlyUsageExport({
                   {detailRows.map((d, i) => {
                     const newMonth = i === 0 || detailRows[i - 1].monthKey !== d.monthKey;
                     return (
-                      <>
+                      <Fragment key={`${d.monthKey}-${i}`}>
                         {newMonth && (
-                          <TableRow key={`m-${d.monthKey}`} className="bg-muted/50">
+                          <TableRow className="bg-muted/50">
                             <TableCell colSpan={colCount} className="font-semibold">
                               {d.monthLabel}
                             </TableCell>
                           </TableRow>
                         )}
-                        <TableRow key={`${d.monthKey}-${i}`}>
+                        <TableRow>
                           <TableCell className="whitespace-nowrap">{d.date}</TableCell>
                           <TableCell className="font-medium">{d.account}</TableCell>
                           <TableCell className="text-right">
@@ -356,7 +356,7 @@ export function MonthlyUsageExport({
                             ${money(d.total)}
                           </TableCell>
                         </TableRow>
-                      </>
+                      </Fragment>
                     );
                   })}
                 </>
