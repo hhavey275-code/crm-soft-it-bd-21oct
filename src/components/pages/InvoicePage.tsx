@@ -417,6 +417,7 @@ export default function InvoicePage() {
                       });
                     }
                   }
+                  }
                   const padCount = Math.max(0, 4 - rows.length);
                   return (
                     <>
