@@ -2596,6 +2596,7 @@ export default function ClientDetailPage() {
           <TabsContent value="transactions" className="mt-0 space-y-4">
             <MonthlyUsageExport
               transactions={transactions}
+              adAccounts={adAccounts}
               secondaryEnabled={wallets.secondaryEnabled}
               clientName={profile?.full_name || profile?.email || undefined}
             />
