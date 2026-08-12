@@ -315,6 +315,44 @@ export default function InvoicePage() {
                   const rate = Number(invoice.usd_rate) || 0;
                   const bdtTotal = Number(invoice.bdt_amount) || usdQty * rate;
 
+                  const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
+
+                  // Dual-wallet split stored at approval time (main due →
+                  // secondary due at its own rate → main wallet deposit).
+                  const splitMainDue = Number((request as any)?.main_due_bdt ?? 0);
+                  const splitSecDue = Number((request as any)?.secondary_due_bdt ?? 0);
+                  const splitMainDep = Number((request as any)?.main_deposit_bdt ?? 0);
+                  const hasSplit = splitMainDue + splitSecDue + splitMainDep > 0.5;
+
+                  if (hasSplit) {
+                    const rateStr = rate > 0 ? `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—";
+                    const secRateStr = secondaryRate > 0 ? `৳${secondaryRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—";
+                    if (splitMainDue > 0.5) {
+                      rows.push({
+                        desc: "Main Wallet Due Adjustment",
+                        rate: rateStr,
+                        qty: (rate > 0 ? splitMainDue / rate : 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: splitMainDue,
+                      });
+                    }
+                    if (splitSecDue > 0.5) {
+                      rows.push({
+                        desc: "Secondary Wallet Due Adjustment",
+                        rate: secRateStr,
+                        qty: (secondaryRate > 0 ? splitSecDue / secondaryRate : 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: splitSecDue,
+                      });
+                    }
+                    if (splitMainDep > 0.5) {
+                      rows.push({
+                        desc: "Main Wallet Deposit",
+                        rate: rateStr,
+                        qty: (rate > 0 ? splitMainDep / rate : 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: splitMainDep,
+                      });
+                    }
+                  } else {
+
                   // Prefer stored split (kafela/holy gift after upgrade); fall back to derivation.
                   const storedSheet = Number((request as any)?.sheet_bill_bdt ?? 0);
                   const storedWalletDue = Number((request as any)?.wallet_due_paid_bdt ?? 0);
@@ -331,7 +369,7 @@ export default function InvoicePage() {
                   const remainderUsd = rate > 0 ? remainderBdt / rate : 0;
                   const walletDueUsd = rate > 0 ? walletDue / rate : 0;
 
-                  const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
+
                   if (hasWalletDue) {
                     rows.push({
                       desc: "Wallet Due Payment",
