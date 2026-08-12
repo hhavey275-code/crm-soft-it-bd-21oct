@@ -114,22 +114,25 @@ async function processAutoTopups(supabase, serviceKey) {
         console.log(`Auto top-up skipped for ${account.account_name}: insufficient wallet balance ($${wallet.balance} + $${dueLimit} < $${rule.topup_amount})`);
         continue;
       }
-      // Deduct wallet
-      const newBalance = Number(wallet.balance) - rule.topup_amount;
-      await supabase.from("wallets").update({
-        balance: newBalance
-      }).eq("id", wallet.id);
-      // Create transaction
+      // Deduct wallet — atomic RPC (balance + ledger row in one transaction)
       const cleanAccountId = account.account_id.replace(/^act_/, '');
-      const { data: walletTxn } = await supabase.from("transactions").insert({
-        user_id: rule.user_id,
-        amount: -rule.topup_amount,
-        balance_after: newBalance,
-        type: "ad_topup",
-        description: `Auto Top-Up\n${account.account_name}\n${cleanAccountId}`,
-        reference_id: rule.ad_account_id,
-        processed_by: `auto:${rule.user_id}`
-      }).select("id").maybeSingle();
+      const { data: dedRes, error: dedErr } = await supabase.rpc("deduct_wallet_for_topup_v2", {
+        p_user_id: rule.user_id,
+        p_amount: rule.topup_amount,
+        p_ad_account_id: rule.ad_account_id,
+        p_description: `Auto Top-Up\n${account.account_name}\n${cleanAccountId}`,
+        p_processed_by: `auto:${rule.user_id}`,
+        p_wallet_kind: "primary",
+        p_allow_negative: false,
+        p_due_limit: dueLimit
+      });
+      if (dedErr || !dedRes?.ok) {
+        console.log(`Auto top-up skipped for ${account.account_name}: ${dedErr?.message || dedRes?.error}`);
+        continue;
+      }
+      const newBalance = Number(dedRes.balance_after);
+      const walletTxn = { id: dedRes.transaction_id };
+
       // Call Meta API to update spend cap
       const bm = account.business_managers;
       const bmToken = await decryptToken(bm.access_token, serviceKey);
