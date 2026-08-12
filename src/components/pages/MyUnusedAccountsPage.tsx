@@ -1,3 +1,4 @@
+import { matchesSearch } from "@/lib/searchNormalize";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
@@ -61,8 +62,7 @@ export default function MyUnusedAccountsPage() {
       .filter((a: any) => {
         if (!q) return true;
         return (
-          a.account_name?.toLowerCase().includes(q) ||
-          a.account_id?.toLowerCase().includes(q)
+          matchesSearch(q, a.account_name, a.account_id)
         );
       })
       .sort((a: any, b: any) => b._info.days - a._info.days);

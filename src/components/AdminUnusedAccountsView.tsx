@@ -1,3 +1,4 @@
+import { matchesSearch } from "@/lib/searchNormalize";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -103,10 +104,7 @@ export function AdminUnusedAccountsView({ accounts, isLoading }: Props) {
       .filter((a) => {
         if (!q) return true;
         return (
-          a.account_name?.toLowerCase().includes(q) ||
-          a.account_id?.toLowerCase().includes(q) ||
-          a.client_name?.toLowerCase().includes(q) ||
-          a.client_email?.toLowerCase().includes(q)
+          matchesSearch(q, a.account_name, a.account_id, a.client_name, a.client_email)
         );
       });
 
