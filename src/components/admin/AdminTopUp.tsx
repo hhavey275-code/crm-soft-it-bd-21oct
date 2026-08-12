@@ -587,46 +587,16 @@ export function AdminTopUp() {
 
       await supabase.from("notifications").insert({
         user_id: userId, type: "top_up_update",
-        title: action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
-        message: action === "approved" ? `Your top-up of $${amount} has been approved.` : action === "rejected" ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}` : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
+        title: action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
+        message: action === "rejected" ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}` : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
         reference_id: id,
       } as any);
 
       // System log
-      const actionLabel = action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold";
+      const actionLabel = action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold";
       const clientProfile = requests?.find((r: any) => r.id === id)?.profile;
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
-
-      // Seller ledger sync + Telegram forward are now handled atomically by the
-      // database trigger `sync_seller_transaction_for_approved_topup_trigger` on
-      // `top_up_requests`. We mark telegram_forwarded=false up-front when the
-      // bank has a Telegram group — the forward-proof edge function flips it to
-      // true ONLY when Telegram actually accepts the message. This gives a
-      // truthful Forwarded / Not-Forwarded / "—" signal in the UI.
-      if (action === "approved") {
-        try {
-          const reqForSeller = requests?.find((r: any) => r.id === id);
-          if (reqForSeller?.bank_account_id) {
-            const { data: bankRow } = await (supabase as any)
-              .from("bank_accounts")
-              .select("telegram_group_id")
-              .eq("id", reqForSeller.bank_account_id)
-              .single();
-            if (bankRow?.telegram_group_id) {
-              // Only initialize to false if it's still null — never overwrite a
-              // true that forward-proof may already have set (race-safe).
-              await (supabase as any)
-                .from("top_up_requests")
-                .update({ telegram_forwarded: false })
-                .eq("id", id)
-                .is("telegram_forwarded", null);
-            }
-          }
-        } catch (e) {
-          console.error("Init telegram_forwarded=false failed (non-blocking):", e);
-        }
-      }
     },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);
