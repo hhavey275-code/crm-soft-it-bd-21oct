@@ -1,3 +1,4 @@
+import { matchesSearch } from "@/lib/searchNormalize";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
@@ -291,7 +292,7 @@ export function AdminTikTokAccounts() {
     const q = search.toLowerCase();
     return [...accounts]
       .filter((a: any) => {
-        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (q && !matchesSearch(q, a.account_name, a.account_id)) return false;
         if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
         return true;
       })

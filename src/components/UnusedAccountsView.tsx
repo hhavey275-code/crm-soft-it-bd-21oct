@@ -1,3 +1,4 @@
+import { matchesSearch } from "@/lib/searchNormalize";
 import { useMemo, useState } from "react";
 import { useNavigate } from "@/lib/router-compat";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,8 +55,7 @@ export function UnusedAccountsView({ accounts, isLoading, showSearch = true, emp
       .filter((a) => {
         if (!q) return true;
         return (
-          a.account_name?.toLowerCase().includes(q) ||
-          a.account_id?.toLowerCase().includes(q)
+          matchesSearch(q, a.account_name, a.account_id)
         );
       })
       .sort((a, b) => b._info.days - a._info.days);

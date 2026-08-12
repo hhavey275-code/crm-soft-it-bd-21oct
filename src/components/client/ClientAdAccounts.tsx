@@ -1,3 +1,4 @@
+import { matchesSearch } from "@/lib/searchNormalize";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { friendlyEdgeError } from "@/lib/utils";
@@ -526,10 +527,10 @@ export function ClientAdAccounts() {
 
   const sortedAccounts = useMemo(() => {
     if (!accounts) return [];
-    const q = search.toLowerCase();
+    const q = search;
     return [...accounts]
       .filter((a: any) => {
-        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (q && !matchesSearch(q, a.account_name, a.account_id)) return false;
         if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
         if (cardFilter !== "all") {
           const ins = insights[a.id];
