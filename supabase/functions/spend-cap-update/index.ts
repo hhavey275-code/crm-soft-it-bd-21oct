@@ -188,6 +188,28 @@ function isMetaRateLimited(status, data) {
   const message = String(data?.error?.message ?? "").toLowerCase();
   return status === 429 || data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4 || message.includes("user request limit reached") || message.includes("request limit");
 }
+function explainMetaFailure(status, data, fallbackMessage) {
+  const err = data?.error ?? {};
+  const message = String(err.message || fallbackMessage || `Meta HTTP ${status}`);
+  const code = String(err.code ?? "");
+  const subcode = String(err.error_subcode ?? "");
+  const lower = `${message} ${err.error_user_title || ""} ${err.error_user_msg || ""}`.toLowerCase();
+  if (isMetaRateLimited(status, data)) return {
+    category: "rate_limit", code: "META_RATE_LIMIT", reason: "Meta সাময়িকভাবে এই access token/IP থেকে অতিরিক্ত request পেয়েছে।", action: "কয়েক মিনিট অপেক্ষা করে Retry করুন; বারবার ক্লিক করবেন না।"
+  };
+  if (code === "190" || lower.includes("access token") || lower.includes("session has expired")) return {
+    category: "authentication", code: `META_${code || "AUTH"}${subcode ? `_${subcode}` : ""}`, reason: "Business Manager access token মেয়াদোত্তীর্ণ বা বাতিল হয়েছে।", action: "BM token পুনরায় সংযুক্ত/আপডেট করে তারপর Retry করুন।"
+  };
+  if (code === "100" || lower.includes("invalid parameter")) return {
+    category: "invalid_parameter", code: `META_100${subcode ? `_${subcode}` : ""}`, reason: "Meta প্রস্তাবিত spend cap গ্রহণ করেনি। সাধারণত account restriction, billing/prepaid mode, currency rounding, বা বর্তমান spend-এর চেয়ে cap কম হলে এটি হয়।", action: "Ads Manager-এ account status, payment method, current spend ও spend limit যাচাই করুন; live cap sync করে তারপর Retry করুন।"
+  };
+  if (lower.includes("permission") || code === "10" || code === "200") return {
+    category: "permission", code: `META_${code || "PERMISSION"}${subcode ? `_${subcode}` : ""}`, reason: "সংযুক্ত token-এর এই ad account-এর spend cap পরিবর্তনের permission নেই।", action: "BM-তে token user-কে Finance/Admin access দিন অথবা সঠিক BM token সংযুক্ত করুন।"
+  };
+  return {
+    category: "meta_rejected", code: `META_${code || status || "ERROR"}${subcode ? `_${subcode}` : ""}`, reason: message, action: "Ads Manager-এ account ও billing status যাচাই করুন; সমস্যা সাময়িক হলে কিছুক্ষণ পরে Retry করুন।"
+  };
+}
 function getRetryDelayMs(attempt, retryAfterHeader) {
   const retryAfterSeconds = Number(retryAfterHeader);
   if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
@@ -529,6 +551,7 @@ Deno.serve(async (req)=>{
         ].join("");
 
         const rateLimited = isMetaRateLimited(metaRes.status, metaData);
+        const failure = explainMetaFailure(metaRes.status, metaData, metaErrorMsg);
         console.warn("Meta POST failed", {
           actId,
           status: metaRes.status,
@@ -597,13 +620,23 @@ Deno.serve(async (req)=>{
           old_spend_cap: oldSpendCapDollars,
           error_message: metaErrorMsg,
           status: "pending",
-          wallet_kind: walletKind
+          wallet_kind: walletKind,
+          wallet_transaction_id: walletTxnId,
+          expected_spend_cap: newSpendCapDollars,
+          failure_code: failure.code,
+          failure_category: failure.category,
+          verification_status: "confirmed_not_applied",
+          failure_reason: failure.reason,
+          recommended_action: failure.action,
+          meta_error_code: mErr.code !== undefined ? String(mErr.code) : null,
+          meta_error_subcode: mErr.error_subcode !== undefined ? String(mErr.error_subcode) : null,
+          http_status: metaRes.status
         }).select("id").single();
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
           action: "Top-Up Failed",
-          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}${metaCallSummary()}`
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount}\nStatus: Confirmed failed (Meta did not apply the cap)\nCode: ${failure.code}\nReason: ${failure.reason}\nMeta response: ${metaErrorMsg}\nWhat to do: ${failure.action}\nWallet: ${walletKind}; debit transaction: ${walletTxnId ?? "not charged"}${metaCallSummary()}`
         });
         const errorCode = rateLimited ? "META_RATE_LIMIT" : "META_API_ERROR";
         return json({
@@ -661,13 +694,20 @@ Deno.serve(async (req)=>{
             old_spend_cap: oldSpendCapDollars,
             error_message: mismatchMsg,
             status: "pending",
-          wallet_kind: walletKind
+            wallet_kind: walletKind,
+            wallet_transaction_id: walletTxnId,
+            expected_spend_cap: newSpendCapDollars,
+            failure_code: "META_VERIFY_MISMATCH",
+            failure_category: "verification_mismatch",
+            verification_status: "confirmed_not_applied",
+            failure_reason: `Meta accepted the request but returned spend cap $${verifiedDollars}; expected $${newSpendCapDollars}.`,
+            recommended_action: "Ads Manager-এ live spend cap যাচাই করুন; cap না বাড়লে Retry করুন, বাড়লে Refund চাপবেন না।"
           }).select("id").single();
           await supabase.from("system_logs").insert({
             user_id: userId,
             user_name: userName,
             action: "Top-Up Failed",
-            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}${metaCallSummary()}`
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount}\nStatus: Verification mismatch\nCode: META_VERIFY_MISMATCH\nReason: ${mismatchMsg}\nWhat to do: Ads Manager-এ live spend cap যাচাই করুন; cap না বাড়লে Retry করুন, বাড়লে Refund চাপবেন না।\nWallet: ${walletKind}; debit transaction: ${walletTxnId ?? "not charged"}${metaCallSummary()}`
           });
           return json({
             error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
@@ -713,6 +753,7 @@ Deno.serve(async (req)=>{
         console.warn("Recovery verify after network error also failed", verifyErr);
       }
       const safeMsg = `${metaErrorMsg}. POST may have succeeded — please verify cap in Meta before retry.`;
+      const networkAction = "এখনই Retry বা Refund করবেন না। Ads Manager-এ live spend cap যাচাই করুন; কয়েক মিনিট পরে Failed Top-Ups থেকে action নিলে system আবার live check করবে।";
       // Insert into failed_topups
       const { data: failedRecord } = await supabase.from("failed_topups").insert({
         user_id: walletUserId,
@@ -721,13 +762,20 @@ Deno.serve(async (req)=>{
         old_spend_cap: oldSpendCapDollars,
         error_message: safeMsg,
         status: "pending",
-          wallet_kind: walletKind
+        wallet_kind: walletKind,
+        wallet_transaction_id: walletTxnId,
+        expected_spend_cap: newSpendCapDollars,
+        failure_code: "META_OUTCOME_UNKNOWN",
+        failure_category: "network_ambiguous",
+        verification_status: "unknown",
+        failure_reason: `Meta response পাওয়া যায়নি এবং confirmation read-ও নির্ভরযোগ্য ছিল না: ${metaErrorMsg}`,
+        recommended_action: networkAction
       }).select("id").single();
       await supabase.from("system_logs").insert({
         user_id: userId,
         user_name: userName,
-        action: "Top-Up Failed",
-        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}${metaCallSummary()}`
+        action: "Top-Up Verification Pending",
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount}\nStatus: Unknown — Meta may have applied the cap\nCode: META_OUTCOME_UNKNOWN\nReason: Network/response error: ${metaErrorMsg}\nWhat to do: ${networkAction}\nWallet: ${walletKind}; debit transaction: ${walletTxnId ?? "not charged"}${metaCallSummary()}`
       });
       return json({
         error: `Meta API error: ${metaErrorMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
