@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MoneyHealthPanel } from "@/components/admin/MoneyHealthPanel";
 import { AlertCircle, CheckCircle2, Download, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { runSellerAudit, backfillOrphan, type AuditReport, type OrphanTopup } from "@/lib/sellerAudit";
@@ -177,8 +178,9 @@ export function AdminAudit() {
         </Card>
       )}
 
-      <Tabs defaultValue="forwards">
+      <Tabs defaultValue="money-health">
         <TabsList>
+          <TabsTrigger value="money-health">Money Health</TabsTrigger>
           <TabsTrigger value="forwards">Telegram Forwards</TabsTrigger>
           <TabsTrigger value="orphans">
             Orphan Top-ups ({report.orphans.length})
@@ -191,9 +193,14 @@ export function AdminAudit() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="money-health">
+          <MoneyHealthPanel />
+        </TabsContent>
+
         <TabsContent value="forwards">
           <ForwardAudit />
         </TabsContent>
+
 
         {/* Orphans */}
         <TabsContent value="orphans">

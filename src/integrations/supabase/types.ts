@@ -2213,6 +2213,7 @@ export type Database = {
           balance: number
           created_at: string
           currency: string
+          drift_allowance: number
           id: string
           updated_at: string
           user_id: string
@@ -2221,6 +2222,7 @@ export type Database = {
           balance?: number
           created_at?: string
           currency?: string
+          drift_allowance?: number
           id?: string
           updated_at?: string
           user_id: string
@@ -2229,6 +2231,7 @@ export type Database = {
           balance?: number
           created_at?: string
           currency?: string
+          drift_allowance?: number
           id?: string
           updated_at?: string
           user_id?: string
@@ -3892,6 +3895,7 @@ export type Database = {
           balance: number
           created_at: string
           currency: string
+          drift_allowance: number
           id: string
           updated_at: string
           user_id: string
@@ -3900,6 +3904,7 @@ export type Database = {
           balance?: number
           created_at?: string
           currency?: string
+          drift_allowance?: number
           id?: string
           updated_at?: string
           user_id: string
@@ -3908,6 +3913,7 @@ export type Database = {
           balance?: number
           created_at?: string
           currency?: string
+          drift_allowance?: number
           id?: string
           updated_at?: string
           user_id?: string
@@ -4091,6 +4097,7 @@ export type Database = {
         Returns: boolean
       }
       is_vault_owner: { Args: { _user_id: string }; Returns: boolean }
+      money_health_report: { Args: never; Returns: Json }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
       recalculate_tenant_ledger: {
@@ -4121,6 +4128,10 @@ export type Database = {
       release_forward_slot: {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
+      }
+      repair_wallet_balance: {
+        Args: { p_reason: string; p_user_id: string; p_wallet_kind: string }
+        Returns: Json
       }
       settle_secondary_from_main: { Args: { p_user_id: string }; Returns: Json }
       topup_requests_mirrored: {
