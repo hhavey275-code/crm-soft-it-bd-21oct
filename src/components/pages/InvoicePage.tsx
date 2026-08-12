@@ -153,6 +153,7 @@ export default function InvoicePage() {
 
   const { invoice, request, profile } = data;
   const secondaryUsd = Number((data as any)?.secondaryUsd ?? 0);
+  const secondaryRate = Number((profile as any)?.secondary_usd_rate ?? 0);
 
   const accent = "#0066CC";
   const accentLight = "#E8F0FE";
