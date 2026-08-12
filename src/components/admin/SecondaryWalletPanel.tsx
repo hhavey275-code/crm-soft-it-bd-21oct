@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Wallet, Scale, DollarSign, Save, XCircle } from "lucide-react";
+import { Plus, Minus, Wallet, Scale, DollarSign, Save, XCircle, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 
@@ -148,6 +148,9 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
   const [adjustType, setAdjustType] = useState<"credit" | "debit" | null>(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertNote, setConvertNote] = useState("");
 
   const adjustMutation = useMutation({
     mutationFn: async () => {
@@ -172,7 +175,36 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
     onError: (e: any) => toast.error(e.message ?? "Adjustment failed"),
   });
 
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(convertAmount);
+      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
+      const { data, error } = await (supabase as any).rpc("admin_convert_main_to_secondary", {
+        p_user_id: userId,
+        p_usd_amount: amt,
+        p_reason: convertNote.trim() || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Main wallet balance converted to Secondary wallet");
+      setConvertOpen(false);
+      setConvertAmount("");
+      setConvertNote("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Conversion failed"),
+  });
+
   if (!wallets.secondaryEnabled) return null;
+
+  const convertUsd = parseFloat(convertAmount) > 0 ? parseFloat(convertAmount) : 0;
+  const convertedCredit =
+    convertUsd > 0 && wallets.secondaryRate > 0
+      ? (convertUsd * wallets.mainRate) / wallets.secondaryRate
+      : 0;
+
 
   return (
     <>
@@ -187,6 +219,13 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
               <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">৳{wallets.secondaryRate}/USD</p>
             </div>
             <div className="flex items-center gap-0.5 ml-auto shrink-0">
+              <button
+                className="h-6 w-6 rounded-md flex items-center justify-center text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors"
+                onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+                title="Convert main wallet balance to secondary (rate converted)"
+              >
+                <ArrowRightLeft className="h-3 w-3" />
+              </button>
               <button
                 className="h-6 w-6 rounded-md flex items-center justify-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                 onClick={() => { setAdjustType("credit"); setAmount(""); setNote(""); }}
@@ -209,6 +248,16 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
               {wallets.secondaryBalance < 0 ? "Due" : "Adv"}
             </span>
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full h-8 text-xs"
+            onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+            disabled={wallets.mainBalance <= 0}
+          >
+            <ArrowRightLeft className="h-3 w-3 mr-1" />
+            Convert Main → Secondary (rate adjusted)
+          </Button>
         </CardContent>
       </Card>
 
@@ -251,7 +300,65 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert Main → Secondary Wallet</DialogTitle>
+            <DialogDescription>
+              Moves main wallet balance into the secondary wallet, converted from ৳{wallets.mainRate}/USD to ৳{wallets.secondaryRate}/USD so the BDT value stays the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Main wallet balance</span>
+              <span className="font-semibold">${wallets.mainBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount to move from Main (USD)</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={convertAmount}
+                onChange={(e) => setConvertAmount(e.target.value)}
+                placeholder={String(Math.max(0, wallets.mainBalance))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input value={convertNote} onChange={(e) => setConvertNote(e.target.value)} placeholder="Reason (optional)" />
+            </div>
+            {convertUsd > 0 && (
+              <div className="rounded-lg border p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Deducted from Main</span>
+                  <span className="font-semibold">${convertUsd.toFixed(2)} ({formatBdt(convertUsd * wallets.mainRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credited to Secondary</span>
+                  <span className="font-semibold text-emerald-600">${convertedCredit.toFixed(2)} ({formatBdt(convertedCredit * wallets.secondaryRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Secondary after</span>
+                  <span className="font-semibold">${(wallets.secondaryBalance + convertedCredit).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => convertMutation.mutate()}
+              disabled={convertMutation.isPending || !(convertUsd > 0) || convertUsd > wallets.mainBalance}
+            >
+              {convertMutation.isPending ? "Converting..." : "Convert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
+
   );
 }
 

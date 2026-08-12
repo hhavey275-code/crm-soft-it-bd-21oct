@@ -631,7 +631,24 @@ Deno.serve(async (req) => {
       console.log('Card bill check skipped:', billErr?.message);
     }
 
-    // Wallet credit
+    // Wallet credit — clients with a secondary (sheet-rate) wallet get the
+    // payment split: main due → secondary due (secondary rate) → main deposit.
+    const { data: profSec } = await supabase
+      .from('profiles').select('secondary_wallet_enabled').eq('user_id', user_id).maybeSingle();
+    const secondaryEnabled = !!(profSec as any)?.secondary_wallet_enabled;
+
+    if (secondaryEnabled && finalUsdAmount > 0) {
+      const usdRate = Number(request.usd_rate) || 0;
+      const bdtForSplit = usdRate > 0 ? finalUsdAmount * usdRate : bdtNum;
+      const { data: splitRes, error: splitErr } = await supabase.rpc('distribute_deposit_bdt', {
+        p_user_id: user_id,
+        p_bdt_amount: bdtForSplit,
+        p_reference_id: request_id,
+        p_processed_by: 'system',
+      });
+      if (splitErr) throw splitErr;
+      if (splitRes && (splitRes as any).ok === false) throw new Error((splitRes as any).error || 'Deposit split failed');
+    } else {
     const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user_id).single();
     const currentBalance = Number(wallet?.balance ?? 0);
     const newBalance = currentBalance + finalUsdAmount;
@@ -655,15 +672,9 @@ Deno.serve(async (req) => {
     const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
     if (walletErr) throw walletErr;
     }
-
-
-    // Deposit settlement: leftover after the main wallet due is cleared pays
-    // down the secondary (sheet-rate) wallet due.
-    try {
-      await supabase.rpc('settle_secondary_from_main', { p_user_id: user_id });
-    } catch (e) {
-      console.error('secondary settlement failed (non-blocking):', e);
     }
+
+
 
 
     // Agency wallet deduction
