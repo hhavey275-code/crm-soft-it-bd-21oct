@@ -1830,48 +1830,78 @@ export type Database = {
           amount: number
           created_at: string
           error_message: string | null
+          expected_spend_cap: number | null
+          failure_category: string
+          failure_code: string | null
+          failure_reason: string | null
+          http_status: number | null
           id: string
           last_attempt_ip: string | null
           last_attempt_via: string | null
+          meta_error_code: string | null
+          meta_error_subcode: string | null
           old_spend_cap: number | null
+          recommended_action: string | null
           resolved_at: string | null
           resolved_ip: string | null
           resolved_via: string | null
           status: string
           user_id: string
+          verification_status: string
           wallet_kind: string
+          wallet_transaction_id: string | null
         }
         Insert: {
           ad_account_id: string
           amount: number
           created_at?: string
           error_message?: string | null
+          expected_spend_cap?: number | null
+          failure_category?: string
+          failure_code?: string | null
+          failure_reason?: string | null
+          http_status?: number | null
           id?: string
           last_attempt_ip?: string | null
           last_attempt_via?: string | null
+          meta_error_code?: string | null
+          meta_error_subcode?: string | null
           old_spend_cap?: number | null
+          recommended_action?: string | null
           resolved_at?: string | null
           resolved_ip?: string | null
           resolved_via?: string | null
           status?: string
           user_id: string
+          verification_status?: string
           wallet_kind?: string
+          wallet_transaction_id?: string | null
         }
         Update: {
           ad_account_id?: string
           amount?: number
           created_at?: string
           error_message?: string | null
+          expected_spend_cap?: number | null
+          failure_category?: string
+          failure_code?: string | null
+          failure_reason?: string | null
+          http_status?: number | null
           id?: string
           last_attempt_ip?: string | null
           last_attempt_via?: string | null
+          meta_error_code?: string | null
+          meta_error_subcode?: string | null
           old_spend_cap?: number | null
+          recommended_action?: string | null
           resolved_at?: string | null
           resolved_ip?: string | null
           resolved_via?: string | null
           status?: string
           user_id?: string
+          verification_status?: string
           wallet_kind?: string
+          wallet_transaction_id?: string | null
         }
         Relationships: [
           {
