@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
 import { CardDueBox } from "@/components/CardDueBox";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
@@ -29,6 +30,7 @@ export function ClientDashboard() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
+  const { clientCardDueVisible: cardDueVisibleForClient } = useSiteSettings();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [dismissedInstall, setDismissedInstall] = useState(false);
   const isInactive = (profile as any)?.status === "inactive";
@@ -410,7 +412,7 @@ export function ClientDashboard() {
       )}
 
       {/* Card Due Box — only shows if configured */}
-      {user && <CardDueBox userId={user.id} size="sm" />}
+      {user && cardDueVisibleForClient && <CardDueBox userId={user.id} size="sm" />}
 
       {/* Secondary wallet + combined BDT total — only when enabled for this client */}
       {clientWallets.secondaryEnabled && (

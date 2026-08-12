@@ -9,6 +9,7 @@ interface SiteSettings {
   welcomeNote: string | null;
   announcementColor: string | null;
   announcementSize: string | null;
+  clientCardDueVisible: boolean;
 }
 
 async function fetchSettings(): Promise<SiteSettings> {
@@ -23,6 +24,7 @@ async function fetchSettings(): Promise<SiteSettings> {
       "welcome_note",
       "announcement_color",
       "announcement_size",
+      "client_card_due_visible",
     ]);
 
   const settings: SiteSettings = {
@@ -33,6 +35,7 @@ async function fetchSettings(): Promise<SiteSettings> {
     welcomeNote: null,
     announcementColor: null,
     announcementSize: null,
+    clientCardDueVisible: true,
   };
 
   if (data) {
@@ -44,6 +47,7 @@ async function fetchSettings(): Promise<SiteSettings> {
       if (row.key === "welcome_note") settings.welcomeNote = row.value;
       if (row.key === "announcement_color") settings.announcementColor = row.value;
       if (row.key === "announcement_size") settings.announcementSize = row.value;
+      if (row.key === "client_card_due_visible") settings.clientCardDueVisible = row.value !== "off";
     }
   }
 
@@ -69,6 +73,7 @@ export function useSiteSettings() {
     welcomeNote: data?.welcomeNote ?? null,
     announcementColor: data?.announcementColor ?? null,
     announcementSize: data?.announcementSize ?? null,
+    clientCardDueVisible: data?.clientCardDueVisible ?? true,
     loading: isLoading,
     refetch: () => queryClient.invalidateQueries({ queryKey: ["site-settings"] }),
   };
