@@ -236,19 +236,17 @@ async function processAutoTopups(supabase, serviceKey) {
         }
       }
       if (!actuallySucceeded) {
-        // Meta failed — refund wallet
-        await supabase.from("wallets").update({
-          balance: Number(wallet.balance)
-        }).eq("id", wallet.id);
-        await supabase.from("transactions").insert({
-          user_id: rule.user_id,
-          amount: rule.topup_amount,
-          balance_after: Number(wallet.balance),
-          type: "refund",
-          description: `Auto Top-Up Failed Refund\n${account.account_name}`,
-          reference_id: rule.ad_account_id,
-          processed_by: `auto:${rule.user_id}`
+        // Meta failed — refund atomically (balance + ledger in one transaction)
+        await supabase.rpc("adjust_wallet_atomic", {
+          p_user_id: rule.user_id,
+          p_amount: rule.topup_amount,
+          p_type: "refund",
+          p_description: `Auto Top-Up Failed Refund\n${account.account_name}`,
+          p_processed_by: `auto:${rule.user_id}`,
+          p_wallet_kind: "primary",
+          p_reference_id: rule.ad_account_id
         });
+
         console.error(`Auto top-up Meta API failed for ${actId}: ${metaData?.error?.message || 'Verification failed'}`);
         // Notify admins
         const { data: adminUsers } = await supabase.from("user_roles").select("user_id").in("role", [
