@@ -266,6 +266,18 @@ Deno.serve(async (req)=>{
       amount_spent: currentAmountSpent,
       balance_after_topup: remainingAfterTopup
     }).eq("id", failedTopup.ad_account_id);
+    // Record the cap movement on the original wallet debit row so the client's
+    // transaction history shows previous limit → new spend cap after a retry.
+    if (failedTopup.wallet_transaction_id) {
+      try {
+        const txnAccountId = String(account.account_id || "").replace(/^act_/, "");
+        await supabase.from("transactions").update({
+          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(oldSpendCapDollars).toFixed(2)} → $${Number(newSpendCapDollars).toFixed(2)}`,
+          old_spend_cap: Number(oldSpendCapDollars),
+          new_spend_cap: Number(newSpendCapDollars),
+        }).eq("id", failedTopup.wallet_transaction_id);
+      } catch (e) { console.warn("cap description update failed:", e); }
+    }
     await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
     // Log API calls
     const bmDbId = account.business_manager_id;
