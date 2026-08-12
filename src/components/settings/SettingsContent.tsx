@@ -1207,6 +1207,43 @@ function InstallAppSection() {
   );
 }
 
+function ClientCardDueVisibilityCard() {
+  const { data: visible, refetch } = useQuery({
+    queryKey: ["client-card-due-visible"],
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "client_card_due_visible").maybeSingle();
+      return data?.value !== "off";
+    },
+  });
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async (next: boolean) => {
+    setSaving(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "client_card_due_visible", value: next ? "on" : "off" }, { onConflict: "key" });
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(next ? "Client এর কাছে Card Due দেখানো হবে" : "Client এর কাছে Card Due লুকানো হলো");
+    refetch();
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Client Visibility</CardTitle>
+        <CardDescription>Google Sheet থেকে আসা "Card Due Bill" কার্ডটি client dashboard-এ দেখাবে কিনা</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-center justify-between gap-4">
+        <div className="text-sm text-muted-foreground">
+          {visible === false ? "এখন client দেখতে পাচ্ছে না (admin এখনও দেখবে)" : "এখন client দেখতে পাচ্ছে"}
+        </div>
+        <Switch checked={visible !== false} disabled={saving} onCheckedChange={toggle} />
+      </CardContent>
+    </Card>
+  );
+}
+
 function CardBillingConfigSection() {
   const { data: saJson, refetch: refetchSa } = useQuery({
     queryKey: ["google-sa-json"],
@@ -1280,6 +1317,8 @@ function CardBillingConfigSection() {
         <h2 className="text-lg font-semibold">Card Billing — Google Sheet Sync</h2>
       </div>
       <Separator />
+
+      <ClientCardDueVisibilityCard />
 
       {/* Service Account JSON */}
       <Card>

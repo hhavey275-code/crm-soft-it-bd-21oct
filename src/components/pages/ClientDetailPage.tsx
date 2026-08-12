@@ -98,6 +98,7 @@ import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
 import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
 import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
+import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
 
 
 export default function ClientDetailPage() {
@@ -2592,7 +2593,12 @@ export default function ClientDetailPage() {
           </TabsContent>
 
           {/* Transactions Tab */}
-          <TabsContent value="transactions" className="mt-0">
+          <TabsContent value="transactions" className="mt-0 space-y-4">
+            <MonthlyUsageExport
+              transactions={transactions}
+              secondaryEnabled={wallets.secondaryEnabled}
+              clientName={profile?.full_name || profile?.email || undefined}
+            />
             <TransactionHistoryPanel
               transactions={transactions}
               adAccounts={adAccounts}
