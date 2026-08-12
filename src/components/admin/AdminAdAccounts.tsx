@@ -25,6 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { matchesSearch } from "@/lib/searchNormalize";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -539,10 +540,10 @@ export function AdminAdAccounts() {
     const base = statusFilter === "invalid_or_expired"
       ? (accounts || [])
       : viewTab === "inventory" ? unassignedAccounts : assignedAccounts;
-    const q = search.toLowerCase();
+    const q = search;
     return [...base]
       .filter((a: any) => {
-        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (q && !matchesSearch(q, a.account_name, a.account_id)) return false;
         if (statusFilter !== "all") {
           if (statusFilter === "invalid_or_expired") {
             if (!isInvalidOrExpiredAccount(a)) return false;
