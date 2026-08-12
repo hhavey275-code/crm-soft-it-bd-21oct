@@ -171,7 +171,7 @@ export function FailedTopUps() {
                   size="sm"
                   variant="default"
                   className="h-7 text-xs gap-1"
-                  disabled={retryMutation.isPending || refundMutation.isPending}
+                  disabled={retryMutation.isPending || refundMutation.isPending || ft.verification_status === "unknown"}
                   onClick={() => retryMutation.mutate(ft.id)}
                 >
                   <RefreshCw className={`h-3 w-3 ${retryMutation.isPending ? "animate-spin" : ""}`} />
@@ -181,7 +181,7 @@ export function FailedTopUps() {
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
-                  disabled={refundMutation.isPending || retryMutation.isPending}
+                  disabled={refundMutation.isPending || retryMutation.isPending || ft.verification_status === "unknown"}
                   onClick={() => refundMutation.mutate(ft.id)}
                 >
                   <Trash2 className="h-3 w-3" />
