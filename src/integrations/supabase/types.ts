@@ -3676,10 +3676,13 @@ export type Database = {
           forward_dismissed_by: string | null
           id: string
           last_verify_at: string | null
+          main_deposit_bdt: number
+          main_due_bdt: number
           payment_method: string
           payment_reference: string | null
           proof_url: string | null
           reviewed_by: string | null
+          secondary_due_bdt: number
           sheet_bill_bdt: number | null
           status: string
           target_wallet: string
@@ -3704,10 +3707,13 @@ export type Database = {
           forward_dismissed_by?: string | null
           id?: string
           last_verify_at?: string | null
+          main_deposit_bdt?: number
+          main_due_bdt?: number
           payment_method?: string
           payment_reference?: string | null
           proof_url?: string | null
           reviewed_by?: string | null
+          secondary_due_bdt?: number
           sheet_bill_bdt?: number | null
           status?: string
           target_wallet?: string
@@ -3732,10 +3738,13 @@ export type Database = {
           forward_dismissed_by?: string | null
           id?: string
           last_verify_at?: string | null
+          main_deposit_bdt?: number
+          main_due_bdt?: number
           payment_method?: string
           payment_reference?: string | null
           proof_url?: string | null
           reviewed_by?: string | null
+          secondary_due_bdt?: number
           sheet_bill_bdt?: number | null
           status?: string
           target_wallet?: string
@@ -3985,6 +3994,10 @@ export type Database = {
         Args: { p_amount: number; p_reason: string; p_user_id: string }
         Returns: Json
       }
+      admin_convert_main_to_secondary: {
+        Args: { p_reason?: string; p_usd_amount: number; p_user_id: string }
+        Returns: Json
+      }
       apply_global_rate_delta: {
         Args: { p_new_delta: number; p_reason?: string }
         Returns: Json
@@ -4058,6 +4071,15 @@ export type Database = {
         Returns: Json
       }
       delete_ledger_entry: { Args: { p_id: string }; Returns: Json }
+      distribute_deposit_bdt: {
+        Args: {
+          p_bdt_amount: number
+          p_processed_by: string
+          p_reference_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
       get_user_agency_id: { Args: { _user_id: string }; Returns: string }
