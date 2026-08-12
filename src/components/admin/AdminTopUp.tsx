@@ -980,6 +980,8 @@ export function AdminTopUp() {
       </div>
       </div>
 
+      <MissingCreditsCard />
+
       <div className="flex justify-end">
         <TelegramPollStatus />
       </div>
