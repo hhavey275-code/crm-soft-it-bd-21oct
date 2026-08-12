@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download } from "lucide-react";
+import { ChevronDown, ChevronUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -83,6 +83,7 @@ export function MonthlyUsageExport({
 }) {
   const [range, setRange] = useState(() => defaultRange(6));
   const [view, setView] = useState<"detail" | "summary">("detail");
+  const [expanded, setExpanded] = useState(false);
 
   const accountNameOf = (tx: Tx) => {
     const linked = tx.reference_id
@@ -247,19 +248,25 @@ export function MonthlyUsageExport({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
         <CardTitle className="text-base md:text-lg">Spend Report</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          {[1, 2, 3, 6, 12].map((m) => (
-            <Button
-              key={m}
-              size="sm"
-              variant="outline"
-              onClick={() => setRange(defaultRange(m))}
-            >
-              {m}M
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {expanded &&
+            [1, 2, 3, 6, 12].map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                variant="outline"
+                onClick={() => setRange(defaultRange(m))}
+              >
+                {m}M
+              </Button>
+            ))}
+          <Button size="sm" variant="secondary" onClick={() => setExpanded((v) => !v)} className="gap-1">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? "Hide report" : "Show report"}
+          </Button>
         </div>
       </CardHeader>
+      {expanded && (
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
@@ -386,6 +393,7 @@ export function MonthlyUsageExport({
           </Table>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
