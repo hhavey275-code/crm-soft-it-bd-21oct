@@ -247,19 +247,25 @@ export function MonthlyUsageExport({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
         <CardTitle className="text-base md:text-lg">Spend Report</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          {[1, 2, 3, 6, 12].map((m) => (
-            <Button
-              key={m}
-              size="sm"
-              variant="outline"
-              onClick={() => setRange(defaultRange(m))}
-            >
-              {m}M
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {open &&
+            [1, 2, 3, 6, 12].map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                variant="outline"
+                onClick={() => setRange(defaultRange(m))}
+              >
+                {m}M
+              </Button>
+            ))}
+          <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} className="gap-1">
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {open ? "Hide report" : "Show report"}
+          </Button>
         </div>
       </CardHeader>
+      {open && (
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
