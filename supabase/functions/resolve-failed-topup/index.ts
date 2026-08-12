@@ -106,7 +106,7 @@ Deno.serve(async (req)=>{
           code: "META_UNREADABLE"
         }, 400);
       }
-      const expected = Number(failedTopup.old_spend_cap) + Number(failedTopup.amount);
+      const expected = Number(failedTopup.expected_spend_cap ?? (Number(failedTopup.old_spend_cap) + Number(failedTopup.amount)));
       if (isCapEffectivelyApplied(liveCap, expected)) {
         // Top-up actually succeeded — resolve without refunding.
         const spent = liveSpent ?? Number(account!.amount_spent ?? 0);
