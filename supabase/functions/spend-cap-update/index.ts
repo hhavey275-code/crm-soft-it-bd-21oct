@@ -489,7 +489,12 @@ Deno.serve(async (req)=>{
     }
     // Use LIVE value as base — this is the fix
     const oldSpendCapDollars = liveSpendCapDollars;
-    const newSpendCapDollars = liveSpendCapDollars + amount;
+    // Meta rejects fractional spend_cap values with a generic "Invalid parameter"
+    // (error code 100). Accounts whose cap sits at the $0.01 minimum would make
+    // every new cap fractional, so round UP to the next whole currency unit —
+    // the client never loses money that way.
+    const newSpendCapDollars = Math.ceil(liveSpendCapDollars + amount);
+
     console.log("Spend cap update attempt", {
       actId,
       bmId: bm.bm_id,
@@ -515,7 +520,14 @@ Deno.serve(async (req)=>{
         allowDirectFallback: true,
       });
       if (!metaRes.ok || metaData?.error) {
-        const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+        const mErr = metaData?.error ?? {};
+        const metaErrorMsg = [
+          mErr.message || `Meta HTTP ${metaRes.status}`,
+          mErr.error_user_title ? `— ${mErr.error_user_title}` : "",
+          mErr.error_user_msg ? `: ${mErr.error_user_msg}` : "",
+          mErr.code !== undefined ? ` (code ${mErr.code}${mErr.error_subcode ? `/${mErr.error_subcode}` : ""})` : "",
+        ].join("");
+
         const rateLimited = isMetaRateLimited(metaRes.status, metaData);
         console.warn("Meta POST failed", {
           actId,
