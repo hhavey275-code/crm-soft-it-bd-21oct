@@ -148,6 +148,9 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
   const [adjustType, setAdjustType] = useState<"credit" | "debit" | null>(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertNote, setConvertNote] = useState("");
 
   const adjustMutation = useMutation({
     mutationFn: async () => {
@@ -172,7 +175,36 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
     onError: (e: any) => toast.error(e.message ?? "Adjustment failed"),
   });
 
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(convertAmount);
+      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
+      const { data, error } = await (supabase as any).rpc("admin_convert_main_to_secondary", {
+        p_user_id: userId,
+        p_usd_amount: amt,
+        p_reason: convertNote.trim() || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Main wallet balance converted to Secondary wallet");
+      setConvertOpen(false);
+      setConvertAmount("");
+      setConvertNote("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Conversion failed"),
+  });
+
   if (!wallets.secondaryEnabled) return null;
+
+  const convertUsd = parseFloat(convertAmount) > 0 ? parseFloat(convertAmount) : 0;
+  const convertedCredit =
+    convertUsd > 0 && wallets.secondaryRate > 0
+      ? (convertUsd * wallets.mainRate) / wallets.secondaryRate
+      : 0;
+
 
   return (
     <>
