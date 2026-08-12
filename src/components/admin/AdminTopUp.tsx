@@ -745,10 +745,37 @@ export function AdminTopUp() {
           }
         } catch (e) { console.error("Card bill check failed:", e); }
 
-        // Atomic credit: the RPC writes the ledger row and the wallet balance in
-        // ONE transaction, so an approval can never end up with the money
-        // missing (and a duplicate is rejected by the DB trigger).
-        if (finalAmount > 0) {
+        // Does this client run a secondary (sheet-rate) wallet? If so the
+        // payment is split: main due → secondary due (at the secondary rate) →
+        // remainder deposited into the main wallet.
+        let secondaryEnabled = false;
+        try {
+          const { data: prof } = await (supabase as any)
+            .from("profiles").select("secondary_wallet_enabled").eq("user_id", userId).maybeSingle();
+          secondaryEnabled = !!prof?.secondary_wallet_enabled;
+        } catch {}
+
+        if (secondaryEnabled && finalAmount > 0) {
+          const rateForSplit = Number(actionDialog?.usdRate || 0);
+          const bdtForSplit = rateForSplit > 0 ? finalAmount * rateForSplit : Number(actionDialog?.bdtAmount || 0);
+          const { data: splitRes, error: splitErr } = await (supabase as any).rpc("distribute_deposit_bdt", {
+            p_user_id: userId,
+            p_bdt_amount: bdtForSplit,
+            p_reference_id: id,
+            p_processed_by: `admin:${user!.id}`,
+          });
+          if (splitErr) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw splitErr;
+          }
+          if (splitRes && splitRes.ok === false) {
+            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
+            throw new Error(splitRes.error || "Deposit split failed");
+          }
+        } else if (finalAmount > 0) {
+          // Atomic credit: the RPC writes the ledger row and the wallet balance in
+          // ONE transaction, so an approval can never end up with the money
+          // missing (and a duplicate is rejected by the DB trigger).
           const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
             p_user_id: userId,
             p_amount: finalAmount,
@@ -768,12 +795,6 @@ export function AdminTopUp() {
             throw new Error(creditRes.error || "Wallet credit failed");
           }
         }
-
-        // Deposit settlement: once the main wallet due is cleared, the leftover
-        // amount automatically pays down the secondary (sheet-rate) wallet due.
-        try {
-          await (supabase as any).rpc("settle_secondary_from_main", { p_user_id: userId });
-        } catch (e) { console.error("secondary settlement failed (non-blocking):", e); }
 
         const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
         await (supabase as any).from("invoices").insert({ top_up_request_id: id, invoice_number: invNumData || `INV-${Date.now()}`, user_id: userId, amount: finalAmount, bdt_amount: actionDialog?.bdtAmount, usd_rate: actionDialog?.usdRate });
