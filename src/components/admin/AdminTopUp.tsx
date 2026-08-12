@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MissingCreditsCard } from "@/components/admin/MissingCreditsCard";
 import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
@@ -979,6 +980,8 @@ export function AdminTopUp() {
           />
       </div>
       </div>
+
+      <MissingCreditsCard />
 
       <div className="flex justify-end">
         <TelegramPollStatus />
