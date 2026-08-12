@@ -73,20 +73,25 @@ export function AgencyTopUp() {
       return;
     }
 
-    // Add to client wallet
-    const { data: clientWallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
-    const newBalance = Number(clientWallet?.balance || 0) + amount;
-    await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
+    // Add to client wallet — atomic RPC (ledger + balance in one transaction).
+    const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
+      p_user_id: userId,
+      p_amount: amount,
+      p_wallet_kind: "primary",
+      p_reference_id: requestId,
+      p_description: "Top-up approved by agency",
+      p_processed_by: user!.id,
+    });
+    if (creditErr || (creditRes && creditRes.success === false)) {
+      await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", requestId).eq("status", "approved");
+      toast.error(creditErr?.message || creditRes?.error || "Wallet credit failed — approval rolled back");
+      return;
+    }
 
     // Deduct from agency wallet
     const newAgencyBalance = Number(agencyWallet.balance) - amount;
     await supabase.from("agency_wallets").update({ balance: newAgencyBalance }).eq("agency_id", agency!.id);
 
-    // Create transaction
-    await supabase.from("transactions").insert({
-      user_id: userId, type: "top_up", amount, balance_after: newBalance,
-      reference_id: requestId, description: "Top-up approved by agency", processed_by: user!.id,
-    });
 
     toast.success("Top-up approved");
     qc.invalidateQueries({ queryKey: ["agency-topup-requests"] });
