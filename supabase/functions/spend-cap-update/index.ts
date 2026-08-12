@@ -517,6 +517,20 @@ Deno.serve(async (req)=>{
     // the client never loses money that way.
     const newSpendCapDollars = Math.ceil(liveSpendCapDollars + amount);
 
+    // Records previous → new spend cap on the wallet debit row so the client's
+    // transaction history always shows the limit movement, on every success path.
+    const recordCapOnTxn = async (capOld: number, capNew: number) => {
+      if (!walletTxnId) return;
+      try {
+        const txnAccountId = String(account.account_id || "").replace(/^act_/, "");
+        await supabase.from("transactions").update({
+          description: `${account.account_name}\n${txnAccountId}\nCap: $${Number(capOld).toFixed(2)} → $${Number(capNew).toFixed(2)}`,
+          old_spend_cap: Number(capOld),
+          new_spend_cap: Number(capNew),
+        }).eq("id", walletTxnId);
+      } catch (e) { console.warn("cap description update failed:", e); }
+    };
+
     console.log("Spend cap update attempt", {
       actId,
       bmId: bm.bm_id,
