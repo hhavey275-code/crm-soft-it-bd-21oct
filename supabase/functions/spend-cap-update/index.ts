@@ -608,6 +608,7 @@ Deno.serve(async (req)=>{
           if (isTenantMode) {
             await reportUsageToMaster(licenseMap, amount, usageIdempotencyKey, supabase, "spend-cap-update", { ad_account_id, account_name: account.account_name, account_external_id: actId.replace(/^act_/, ""), wallet_txn_id: walletTxnId, wallet_user_id: walletUserId });
           }
+          await recordCapOnTxn(oldSpendCapDollars, newSpendCapDollars);
           return json({
             success: true,
             old_spend_cap: oldSpendCapDollars,
