@@ -779,6 +779,9 @@ export default function SettingsPage() {
           </Card>
         </div>
 
+        {/* ─── Google Sheet Card Due visibility (Admin only) ─── */}
+        {isAdmin && <ClientCardDueVisibilityCard />}
+
         {/* ─── Card Billing / Google Sheet Config (Admin only) ─── */}
         {isAdmin && <CardBillingConfigSection />}
 
@@ -1318,7 +1321,6 @@ function CardBillingConfigSection() {
       </div>
       <Separator />
 
-      <ClientCardDueVisibilityCard />
 
       {/* Service Account JSON */}
       <Card>

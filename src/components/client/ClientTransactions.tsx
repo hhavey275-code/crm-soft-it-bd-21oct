@@ -77,6 +77,7 @@ export function ClientTransactions() {
       <h1 className="text-xl md:text-2xl font-bold">Transaction History</h1>
       <MonthlyUsageExport
         transactions={transactions}
+        adAccounts={adAccounts}
         secondaryEnabled={secondaryEnabled}
         clientName={user?.email ?? undefined}
       />
