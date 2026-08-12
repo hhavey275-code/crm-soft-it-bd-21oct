@@ -300,7 +300,65 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert Main → Secondary Wallet</DialogTitle>
+            <DialogDescription>
+              Moves main wallet balance into the secondary wallet, converted from ৳{wallets.mainRate}/USD to ৳{wallets.secondaryRate}/USD so the BDT value stays the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Main wallet balance</span>
+              <span className="font-semibold">${wallets.mainBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount to move from Main (USD)</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={convertAmount}
+                onChange={(e) => setConvertAmount(e.target.value)}
+                placeholder={String(Math.max(0, wallets.mainBalance))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input value={convertNote} onChange={(e) => setConvertNote(e.target.value)} placeholder="Reason (optional)" />
+            </div>
+            {convertUsd > 0 && (
+              <div className="rounded-lg border p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Deducted from Main</span>
+                  <span className="font-semibold">${convertUsd.toFixed(2)} ({formatBdt(convertUsd * wallets.mainRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credited to Secondary</span>
+                  <span className="font-semibold text-emerald-600">${convertedCredit.toFixed(2)} ({formatBdt(convertedCredit * wallets.secondaryRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Secondary after</span>
+                  <span className="font-semibold">${(wallets.secondaryBalance + convertedCredit).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => convertMutation.mutate()}
+              disabled={convertMutation.isPending || !(convertUsd > 0) || convertUsd > wallets.mainBalance}
+            >
+              {convertMutation.isPending ? "Converting..." : "Convert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
+
   );
 }
 
