@@ -673,6 +673,7 @@ Deno.serve(async (req)=>{
       if (!verifyResult.ok) {
         const verifyErrorMsg = verifyResult.error || "Meta verify failed";
         console.warn("Verification unreadable — POST was accepted, treating as success", { actId, message: verifyErrorMsg });
+        await recordCapOnTxn(oldSpendCapDollars, newSpendCapDollars);
         await supabase.from("system_logs").insert({
           user_id: userId,
           user_name: userName,
