@@ -458,6 +458,7 @@ export function AdminDashboard() {
       }
       const total = result.total;
       setDateSpend(total);
+      setDateSpendRange({ from: fromStr, to: toStr });
       setDateSpendCalls(result.meta_calls ?? null);
       setDateSpendProxyIp(result.proxy_ip ?? null);
       setDateSpendCached(false);
