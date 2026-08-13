@@ -103,15 +103,6 @@ export function ClientDashboard() {
   };
 
   // --- Queries ---
-  const { data: wallet } = useQuery({
-    queryKey: ["client-wallet", user?.id],
-    queryFn: async () => { const { data } = await supabase.from("wallets").select("balance").eq("user_id", user!.id).single(); return data; },
-    enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
   const { data: adAccounts } = useQuery({
     queryKey: ["client-dashboard-ad-accounts", user?.id],
     queryFn: async () => {
