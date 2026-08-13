@@ -89,6 +89,18 @@ export function AdminDashboard() {
       return parsed.spend ?? null;
     } catch { return null; }
   });
+  const [dateSpendRange, setDateSpendRange] = useState<{ from: string; to: string } | null>(() => {
+    try {
+      const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      if (!parsed.dateFrom || !parsed.dateTo) return null;
+      return {
+        from: format(new Date(parsed.dateFrom), "yyyy-MM-dd"),
+        to: format(new Date(parsed.dateTo), "yyyy-MM-dd"),
+      };
+    } catch { return null; }
+  });
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
   const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
