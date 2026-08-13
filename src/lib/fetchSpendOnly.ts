@@ -34,7 +34,11 @@ export async function fetchSpendOnly(
 }> {
   if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], rate_limited_details: [], total: 0, meta_calls: 0, proxy_ip: null };
 
-  const CHUNK = 500;
+  // Keep the complete CRM account set in one function invocation. The edge
+  // function already splits Meta requests into batches of 50; splitting here
+  // caused each invocation to overwrite the same daily snapshot, so the final
+  // 27-account chunk replaced the total from the first 500 accounts.
+  const CHUNK = 2_000;
   const merged: Record<string, number> = {};
   const mergedDaily: Record<string, { date: string; spend: number }[]> = {};
   const allRate: string[] = [];
