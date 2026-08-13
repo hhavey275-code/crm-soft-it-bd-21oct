@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +48,6 @@ const CHART_COLORS = [
 ];
 
 const SPEND_SESSION_KEY = "admin-dashboard-spend-v2";
-const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend-v2";
 
 export function AdminDashboard() {
   const queryClient = useQueryClient();
@@ -62,11 +61,8 @@ export function AdminDashboard() {
   const [monthSyncCalls, setMonthSyncCalls] = useState<number | null>(null);
   const [dateSpendCalls, setDateSpendCalls] = useState<number | null>(null);
   const [dateSpendProxyIp, setDateSpendProxyIp] = useState<string | null>(null);
-  const [dateSpendCached, setDateSpendCached] = useState<boolean>(() => {
-    try {
-      return !!sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
-    } catch { return false; }
-  });
+  const [dateSpendCached] = useState<boolean>(false);
+
   const [tenantTestMode, setTenantTestMode] = useState(() => {
     try { return localStorage.getItem("tenant_test_mode") === "true"; } catch { return false; }
   });
@@ -84,43 +80,13 @@ export function AdminDashboard() {
   });
   const [selectedPreset, setSelectedPreset] = useState<string>("Yesterday");
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [dateSpend, setDateSpend] = useState<number | null>(() => {
-    try {
-      const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
-      if (!stored) return null;
-      const parsed = JSON.parse(stored);
-      return parsed.spend ?? null;
-    } catch { return null; }
-  });
-  const [dateSpendRange, setDateSpendRange] = useState<{ from: string; to: string } | null>(() => {
-    try {
-      const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
-      if (!stored) return null;
-      const parsed = JSON.parse(stored);
-      if (!parsed.dateFrom || !parsed.dateTo) return null;
-      return {
-        from: format(new Date(parsed.dateFrom), "yyyy-MM-dd"),
-        to: format(new Date(parsed.dateTo), "yyyy-MM-dd"),
-      };
-    } catch { return null; }
-  });
+  const [dateSpend, setDateSpend] = useState<number | null>(null);
+  const [dateSpendRange, setDateSpendRange] = useState<{ from: string; to: string } | null>(null);
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
   const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
   const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
-  const autoLoadedYesterday = useRef(false);
 
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.dateFrom && parsed.dateTo) {
-          setDateRange({ from: new Date(parsed.dateFrom), to: new Date(parsed.dateTo) });
-        }
-      }
-    } catch { /* ignore */ }
-  }, []);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -465,12 +431,9 @@ export function AdminDashboard() {
       setDateSpendRange({ from: fromStr, to: toStr });
       setDateSpendCalls(result.meta_calls ?? null);
       setDateSpendProxyIp(result.proxy_ip ?? null);
-      setDateSpendCached(false);
-      sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
-        spend: total,
-        dateFrom: dateRange.from.toISOString(),
-        dateTo: dateRange.to.toISOString(),
-      }));
+      // Intentionally not cached in sessionStorage: a reload must never show
+      // stale spend numbers — the admin re-clicks "Update" for live data.
+
 
       // Daily snapshots are now persisted server-side inside get-spend-only
       // (service role bypasses RLS, so writes always succeed). We just need
@@ -498,11 +461,8 @@ export function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    if (autoLoadedYesterday.current || !adAccounts?.length) return;
-    autoLoadedYesterday.current = true;
-    void handleFetchDateRangeSpend();
-  }, [adAccounts]);
+  // No auto-fetch on mount/reload — spend loads only when "Update" is clicked.
+
 
   const handleSyncMonthSpend = async () => {
     if (!adAccounts?.length) return;
