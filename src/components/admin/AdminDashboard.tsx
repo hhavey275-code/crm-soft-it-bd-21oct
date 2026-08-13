@@ -426,7 +426,24 @@ export function AdminDashboard() {
       } else {
         setRateLimitedDetails([]);
       }
-      const total = result.total;
+      // Meta reports spend in each ad account's own currency. This card is a
+      // USD total, so adding BDT (or another currency) as if it were USD makes
+      // the result massively incorrect. Include USD accounts only and clearly
+      // flag any non-USD accounts instead of displaying a false dollar total.
+      let total = 0;
+      const nonUsdCurrencies = new Set<string>();
+      Object.entries(result.spend).forEach(([id, amount]) => {
+        const currency = result.currencies[id];
+        if (!currency || currency === "USD") {
+          total += Number(amount) || 0;
+        } else {
+          nonUsdCurrencies.add(currency);
+        }
+      });
+      total = Math.round(total * 100) / 100;
+      if (nonUsdCurrencies.size) {
+        toast.info(`USD total shown. ${Array.from(nonUsdCurrencies).join(", ")} account spend is excluded to prevent mixed-currency calculation.`);
+      }
       setDateSpend(total);
       setDateSpendRange({ from: fromStr, to: toStr });
       setDateSpendCalls(result.meta_calls ?? null);

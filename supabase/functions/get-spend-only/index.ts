@@ -78,14 +78,16 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-function parseSpendFromBatchBody(body: string): { total: number; daily: { date: string; spend: number }[] } {
+function parseSpendFromBatchBody(body: string): { total: number; daily: { date: string; spend: number }[]; currency: string | null } {
   try {
     const parsed = JSON.parse(body);
     const rows = parsed?.data;
-    if (!Array.isArray(rows)) return { total: 0, daily: [] };
+    if (!Array.isArray(rows)) return { total: 0, daily: [], currency: null };
     let total = 0;
+    let currency: string | null = null;
     const daily: { date: string; spend: number }[] = [];
     for (const r of rows) {
+      if (!currency && typeof r?.account_currency === "string") currency = r.account_currency.toUpperCase();
       const s = Number(r?.spend);
       if (Number.isFinite(s)) {
         total += s;
@@ -93,9 +95,9 @@ function parseSpendFromBatchBody(body: string): { total: number; daily: { date: 
         if (date) daily.push({ date, spend: Math.round(s * 100) / 100 });
       }
     }
-    return { total: Math.round(total * 100) / 100, daily };
+    return { total: Math.round(total * 100) / 100, daily, currency };
   } catch {
-    return { total: 0, daily: [] };
+    return { total: 0, daily: [], currency: null };
   }
 }
 
@@ -173,6 +175,7 @@ Deno.serve(async (req) => {
 
     const spendMap: Record<string, number> = {};
     const dailyMap: Record<string, { date: string; spend: number }[]> = {};
+    const currencyMap: Record<string, string | null> = {};
     const rateLimited: string[] = [];
     type RLDetail = {
       id: string;
@@ -233,7 +236,7 @@ Deno.serve(async (req) => {
     }
 
     // Initialise zero so caller always gets every requested id back
-    for (const a of accounts) { spendMap[a.id] = 0; dailyMap[a.id] = []; }
+    for (const a of accounts) { spendMap[a.id] = 0; dailyMap[a.id] = []; currencyMap[a.id] = null; }
     for (const a of noToken) {
       spendMap[a.id] = 0;
       dailyMap[a.id] = [];
@@ -265,7 +268,7 @@ Deno.serve(async (req) => {
             method: "GET",
             relative_url:
               `${acc.account_id}/insights` +
-              `?fields=spend` +
+              `?fields=spend,account_currency` +
               `&time_range=${encodeURIComponent(timeRange)}` +
               `&time_increment=1`,
           }));
@@ -307,6 +310,7 @@ Deno.serve(async (req) => {
                 const parsed = parseSpendFromBatchBody(item.body);
                 spendMap[c[i].id] = parsed.total;
                 dailyMap[c[i].id] = parsed.daily;
+                currencyMap[c[i].id] = parsed.currency;
               } else {
                 pushFail(c[i].id, item.code ?? null, item.body);
               }
@@ -399,6 +403,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         spend: spendMap,
         daily: dailyMap,
+        currencies: currencyMap,
         rate_limited: rateLimited,
         rate_limited_details: rateLimitedDetails,
         meta_calls: {
