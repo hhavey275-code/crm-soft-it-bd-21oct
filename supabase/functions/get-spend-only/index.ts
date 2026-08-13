@@ -346,7 +346,10 @@ Deno.serve(async (req) => {
     // silently dropped by RLS in some sessions, leaving stale graph values).
     try {
       const dayTotals: Record<string, number> = {};
-      for (const days of Object.values(dailyMap)) {
+      for (const [accountId, days] of Object.entries(dailyMap)) {
+        // Snapshot totals are displayed as USD. Never add a BDT (or other
+        // currency) account's numeric spend directly to the USD chart.
+        if (currencyMap[accountId] && currencyMap[accountId] !== "USD") continue;
         for (const d of days || []) {
           if (!d?.date) continue;
           const s = Number(d.spend) || 0;

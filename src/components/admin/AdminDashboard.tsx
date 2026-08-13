@@ -505,7 +505,9 @@ export function AdminDashboard() {
 
       // Aggregate per-day spend across all accounts for the chart bars
       const dailyMap: Record<string, number> = {};
-      Object.values(result.daily).forEach((days) => {
+      Object.entries(result.daily).forEach(([accountId, days]) => {
+        const currency = result.currencies[accountId];
+        if (currency && currency !== "USD") return;
         for (const d of days) {
           if (d?.date) dailyMap[d.date] = (dailyMap[d.date] || 0) + (Number(d.spend) || 0);
         }
