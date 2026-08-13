@@ -99,41 +99,14 @@ export function SellerTopUpApprovals() {
     mutationFn: async ({ id, action, userId, amount }: { id: string; action: ActionType; userId: string; amount: number }) => {
       if (!canApprove) throw new Error("Approval not enabled for your account");
 
-      const updateData: any = { status: action, reviewed_by: user!.id };
-      if ((action === "rejected" || action === "hold") && note) updateData.admin_note = note;
-
-      const { data: updatedRows, error: updateErr } = await supabase
-        .from("top_up_requests")
-        .update(updateData)
-        .eq("id", id)
-        .in("status", ["pending", "hold"])
-        .select("id");
-      if (updateErr) throw updateErr;
-      if (!updatedRows?.length) throw new Error("Already processed. Please refresh.");
-
       if (action === "approved") {
-        // Atomic credit: ledger row + wallet balance in ONE database
-        // transaction, with the duplicate-credit trigger as the second guard.
-        // Never read-then-write a balance here.
-        const { data: existingTx } = await supabase
-          .from("transactions").select("id").eq("reference_id", id).eq("type", "top_up").limit(1);
-        if (!existingTx?.length) {
-          const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
-            p_user_id: userId,
-            p_amount: Number(amount),
-            p_wallet_kind: "primary",
-            p_reference_id: id,
-            p_description: "Top-up approved by seller",
-            p_processed_by: `seller:${user!.id}`,
-          });
-          if (creditErr) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw new Error(creditErr.message || "Wallet credit failed — approval rolled back.");
-          }
-          if (creditRes && creditRes.success === false) {
-            await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", id).eq("status", "approved");
-            throw new Error(creditRes.error || "Wallet credit failed — approval rolled back.");
-          }
+        const { data: approvalResult, error: approvalError } = await (supabase as any).rpc(
+          "approve_client_topup_atomic",
+          { p_request_id: id, p_admin: user!.id },
+        );
+        if (approvalError) throw approvalError;
+        if (approvalResult?.success !== true) {
+          throw new Error(approvalResult?.error || "Top-up approval failed");
         }
 
 
@@ -152,6 +125,17 @@ export function SellerTopUpApprovals() {
         } catch (e) {
           console.warn("telegram_forwarded init failed (non-blocking):", e);
         }
+      } else {
+        const updateData: any = { status: action, reviewed_by: user!.id };
+        if (note) updateData.admin_note = note;
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from("top_up_requests")
+          .update(updateData)
+          .eq("id", id)
+          .in("status", ["pending", "hold"])
+          .select("id");
+        if (updateErr) throw updateErr;
+        if (!updatedRows?.length) throw new Error("Already processed. Please refresh.");
       }
 
       // Notify client
