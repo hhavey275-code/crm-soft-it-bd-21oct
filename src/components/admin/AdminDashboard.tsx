@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,8 +47,8 @@ const CHART_COLORS = [
   "hsl(var(--primary) / 0.4)",
 ];
 
-const SPEND_SESSION_KEY = "admin-dashboard-spend";
-const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend";
+const SPEND_SESSION_KEY = "admin-dashboard-spend-v2";
+const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend-v2";
 
 export function AdminDashboard() {
   const queryClient = useQueryClient();
@@ -78,8 +78,11 @@ export function AdminDashboard() {
     } catch { return null; }
   });
 
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [selectedPreset, setSelectedPreset] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const yesterday = subDays(new Date(), 1);
+    return { from: yesterday, to: yesterday };
+  });
+  const [selectedPreset, setSelectedPreset] = useState<string>("Yesterday");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dateSpend, setDateSpend] = useState<number | null>(() => {
     try {
@@ -105,6 +108,7 @@ export function AdminDashboard() {
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
   const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
   const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
+  const autoLoadedYesterday = useRef(false);
 
   useEffect(() => {
     try {
@@ -493,6 +497,12 @@ export function AdminDashboard() {
       setDateSpendLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (autoLoadedYesterday.current || !adAccounts?.length) return;
+    autoLoadedYesterday.current = true;
+    void handleFetchDateRangeSpend();
+  }, [adAccounts]);
 
   const handleSyncMonthSpend = async () => {
     if (!adAccounts?.length) return;
