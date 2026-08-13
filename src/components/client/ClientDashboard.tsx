@@ -103,15 +103,6 @@ export function ClientDashboard() {
   };
 
   // --- Queries ---
-  const { data: wallet } = useQuery({
-    queryKey: ["client-wallet", user?.id],
-    queryFn: async () => { const { data } = await supabase.from("wallets").select("balance").eq("user_id", user!.id).single(); return data; },
-    enabled: !!user,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
   const { data: adAccounts } = useQuery({
     queryKey: ["client-dashboard-ad-accounts", user?.id],
     queryFn: async () => {
@@ -290,7 +281,7 @@ export function ClientDashboard() {
     if (!topUpAccount || !topUpAmount) return;
     const amount = Number(topUpAmount);
     if (isNaN(amount) || amount <= 0) { toast.error("Enter a valid amount"); return; }
-    const walletBalance = Number(wallet?.balance ?? 0);
+    const walletBalance = clientWallets.mainBalance;
     const dueLimit = Number((profile as any)?.due_limit ?? 0);
     if (walletBalance + dueLimit < amount) { toast.error("Insufficient wallet balance"); return; }
     setTopUpLoading(true);
@@ -453,7 +444,7 @@ export function ClientDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Wallet Balance</p>
-                <p className="text-3xl font-bold tracking-tight mt-1">{fmt(Number(wallet?.balance ?? 0))}</p>
+                <p className="text-3xl font-bold tracking-tight mt-1">{fmt(clientWallets.mainBalance)}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center"><Wallet className="h-6 w-6" /></div>
             </div>
@@ -515,7 +506,7 @@ export function ClientDashboard() {
                 <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center"><Wallet className="h-5 w-5" /></div>
                 <div>
                   <p className="text-xs opacity-80">Wallet Balance</p>
-                  <p className="text-2xl font-bold tracking-tight">{fmt(Number(wallet?.balance ?? 0))}</p>
+                  <p className="text-2xl font-bold tracking-tight">{fmt(clientWallets.mainBalance)}</p>
                 </div>
               </div>
             </CardContent>
@@ -787,7 +778,7 @@ export function ClientDashboard() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Increase Spend Cap</DialogTitle><DialogDescription>Top up <span className="font-medium text-foreground">{topUpAccount?.account_name}</span></DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted"><span className="text-muted-foreground">Wallet</span><span className="font-semibold">{fmt(Number(wallet?.balance ?? 0))}</span></div>
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted"><span className="text-muted-foreground">Wallet</span><span className="font-semibold">{fmt(clientWallets.mainBalance)}</span></div>
             {Number((profile as any)?.due_limit ?? 0) > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-warning/10 border border-warning/30">
                 <span className="text-warning">Due Limit</span><span className="font-semibold text-warning">{fmt(Number((profile as any)?.due_limit ?? 0))}</span>

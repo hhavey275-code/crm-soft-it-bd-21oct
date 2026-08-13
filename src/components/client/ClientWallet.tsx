@@ -15,15 +15,6 @@ export function ClientWallet() {
   const wallets = useWallets(user?.id);
 
 
-  const { data: wallet } = useQuery({
-    queryKey: ["client-wallet", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase.from("wallets").select("*").eq("user_id", user!.id).single();
-      return data;
-    },
-    enabled: !!user,
-  });
-
   const { data: profile } = useQuery({
     queryKey: ["client-wallet-profile", user?.id],
     queryFn: async () => {
@@ -56,9 +47,9 @@ export function ClientWallet() {
             <div>
               <p className="text-sm opacity-90">{wallets.secondaryEnabled ? "Main Wallet Balance" : "Available Balance"}</p>
               <p className="text-3xl font-bold tracking-tight mt-1">
-                ${Number(wallet?.balance ?? 0).toLocaleString()}
+                ${wallets.mainBalance.toLocaleString()}
               </p>
-              <p className="text-xs opacity-70 mt-1">{wallet?.currency ?? "USD"}</p>
+              <p className="text-xs opacity-70 mt-1">{wallets.currency}</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
               <Wallet className="h-6 w-6" />
@@ -69,8 +60,8 @@ export function ClientWallet() {
         <Card data-tutorial="wallet-balance" className="bg-primary text-primary-foreground">
           <CardContent className="p-8">
             <p className="text-sm opacity-80">{wallets.secondaryEnabled ? "Main Wallet Balance" : "Available Balance"}</p>
-            <p className="text-4xl font-bold mt-1">${Number(wallet?.balance ?? 0).toLocaleString()}</p>
-            <p className="text-sm mt-2 opacity-70">{wallet?.currency ?? "USD"}</p>
+            <p className="text-4xl font-bold mt-1">${wallets.mainBalance.toLocaleString()}</p>
+            <p className="text-sm mt-2 opacity-70">{wallets.currency}</p>
           </CardContent>
         </Card>
       )}
