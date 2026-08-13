@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +48,6 @@ const CHART_COLORS = [
 ];
 
 const SPEND_SESSION_KEY = "admin-dashboard-spend-v2";
-const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend-v2";
 
 export function AdminDashboard() {
   const queryClient = useQueryClient();
@@ -432,7 +431,6 @@ export function AdminDashboard() {
       setDateSpendRange({ from: fromStr, to: toStr });
       setDateSpendCalls(result.meta_calls ?? null);
       setDateSpendProxyIp(result.proxy_ip ?? null);
-      setDateSpendCached(false);
       // Intentionally not cached in sessionStorage: a reload must never show
       // stale spend numbers — the admin re-clicks "Update" for live data.
 
