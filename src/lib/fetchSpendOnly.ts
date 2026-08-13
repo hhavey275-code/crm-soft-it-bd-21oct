@@ -26,13 +26,14 @@ export async function fetchSpendOnly(
 ): Promise<{
   spend: Record<string, number>;
   daily: Record<string, { date: string; spend: number }[]>;
+  currencies: Record<string, string | null>;
   rate_limited: string[];
   rate_limited_details: RateLimitedDetail[];
   total: number;
   meta_calls: number;
   proxy_ip: string | null;
 }> {
-  if (!ids.length) return { spend: {}, daily: {}, rate_limited: [], rate_limited_details: [], total: 0, meta_calls: 0, proxy_ip: null };
+  if (!ids.length) return { spend: {}, daily: {}, currencies: {}, rate_limited: [], rate_limited_details: [], total: 0, meta_calls: 0, proxy_ip: null };
 
   // Keep the complete CRM account set in one function invocation. The edge
   // function already splits Meta requests into batches of 50; splitting here
@@ -41,6 +42,7 @@ export async function fetchSpendOnly(
   const CHUNK = 2_000;
   const merged: Record<string, number> = {};
   const mergedDaily: Record<string, { date: string; spend: number }[]> = {};
+  const mergedCurrencies: Record<string, string | null> = {};
   const allRate: string[] = [];
   const allRateDetails: RateLimitedDetail[] = [];
   let metaCalls = 0;
@@ -56,6 +58,7 @@ export async function fetchSpendOnly(
     if (error) throw error;
     if (data?.spend) Object.assign(merged, data.spend);
     if (data?.daily) Object.assign(mergedDaily, data.daily);
+    if (data?.currencies) Object.assign(mergedCurrencies, data.currencies);
     if (Array.isArray(data?.rate_limited)) allRate.push(...data.rate_limited);
     if (Array.isArray(data?.rate_limited_details)) allRateDetails.push(...data.rate_limited_details);
     if (data?.meta_calls?.total) metaCalls += Number(data.meta_calls.total) || 0;
@@ -65,5 +68,5 @@ export async function fetchSpendOnly(
   const total =
     Math.round(Object.values(merged).reduce((s, v) => s + (Number(v) || 0), 0) * 100) / 100;
 
-  return { spend: merged, daily: mergedDaily, rate_limited: allRate, rate_limited_details: allRateDetails, total, meta_calls: metaCalls, proxy_ip: proxyIp };
+  return { spend: merged, daily: mergedDaily, currencies: mergedCurrencies, rate_limited: allRate, rate_limited_details: allRateDetails, total, meta_calls: metaCalls, proxy_ip: proxyIp };
 }
