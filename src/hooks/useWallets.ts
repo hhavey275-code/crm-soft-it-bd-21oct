@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type WalletKind = "primary" | "secondary";
@@ -22,13 +21,15 @@ export interface WalletsInfo {
  * client, everything behaves exactly like the single-wallet setup.
  */
 export function useWallets(userId?: string | null): WalletsInfo {
-  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["dual-wallets", userId],
     enabled: !!userId,
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       const [walletRes, secondaryRes, profileRes, siteRateRes] = await Promise.all([
         supabase.from("wallets").select("balance, currency").eq("user_id", userId!).maybeSingle(),
@@ -60,38 +61,6 @@ export function useWallets(userId?: string | null): WalletsInfo {
       };
     },
   });
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const refreshWallets = () => {
-      void queryClient.invalidateQueries({ queryKey: ["dual-wallets", userId] });
-      void queryClient.invalidateQueries({ queryKey: ["client-wallet", userId] });
-    };
-
-    const channel = supabase
-      .channel(`wallet-live-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${userId}` },
-        refreshWallets,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "secondary_wallets", filter: `user_id=eq.${userId}` },
-        refreshWallets,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "transactions", filter: `user_id=eq.${userId}` },
-        refreshWallets,
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [queryClient, userId]);
 
   const mainBalance = data?.mainBalance ?? 0;
   const secondaryBalance = data?.secondaryBalance ?? 0;
