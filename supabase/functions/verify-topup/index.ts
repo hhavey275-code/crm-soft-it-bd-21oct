@@ -522,156 +522,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: approvedRows, error: updateErr } = await supabase
-      .from('top_up_requests')
-      .update({ status: 'approved', admin_note: logText, reviewed_by: null })
-      .eq('id', request_id)
-      .eq('status', 'pending')
-      .select('id');
-    if (updateErr) throw updateErr;
-    if (!approvedRows?.length) {
+    // Status, wallet ledger/balance, bill allocation, and invoice must commit
+    // together. A timeout can no longer leave an approved request uncredited.
+    const { data: approvalResult, error: approvalError } = await supabase.rpc(
+      'approve_client_topup_atomic',
+      { p_request_id: request_id, p_admin: null },
+    );
+    if (approvalError) throw approvalError;
+    if ((approvalResult as any)?.success !== true) {
+      throw new Error((approvalResult as any)?.error || 'Atomic auto-approval failed');
+    }
+    if ((approvalResult as any)?.already_approved === true) {
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'Request already processed by another verifier' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-    }
-
-    // Which wallet did the client target? Secondary (sheet-rate) deposits are
-    // credited in full to the secondary wallet — no card bill / main-due pass.
-    const { data: targetRow } = await supabase
-      .from('top_up_requests')
-      .select('target_wallet')
-      .eq('id', request_id)
-      .maybeSingle();
-    const isSecondaryDeposit = (targetRow as any)?.target_wallet === 'secondary';
-
-    // Card bill + wallet-due deduction (Kafela / Holy Gift style clients with a sheet due row)
-    // Order: wallet due (negative balance) cleared first → then sheet/card bill → remainder to wallet as USD
-    let finalUsdAmount = Number(amount);
-    let cardBillDeducted = 0;
-    let walletDuePaidBdt = 0;
-    if (isSecondaryDeposit) {
-      const { data: creditRes, error: creditErr } = await supabase.rpc('credit_wallet_for_payment', {
-        p_user_id: user_id,
-        p_amount: finalUsdAmount,
-        p_wallet_kind: 'secondary',
-        p_reference_id: request_id,
-        p_description: 'Wallet top-up auto-approved (Secondary wallet)',
-        p_processed_by: 'system',
-      });
-      if (creditErr) throw creditErr;
-      if (creditRes && (creditRes as any).success === false) throw new Error((creditRes as any).error || 'Credit failed');
-    } else {
-
-
-    try {
-      const { data: pendingBill } = await supabase
-        .from('card_bills')
-        .select('id, due_amount_bdt')
-        .eq('user_id', user_id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (pendingBill && pendingBill.due_amount_bdt > 0 && bdtNum > 0) {
-        const usdRate = Number(request.usd_rate) || 1;
-
-        // Step 1: clear wallet due (negative balance) first
-        const { data: walletRow } = await supabase
-          .from('wallets').select('balance').eq('user_id', user_id).single();
-        const curBal = Number(walletRow?.balance ?? 0);
-        let remainingBdt = bdtNum;
-        if (curBal < 0) {
-          const dueBdtFull = Math.abs(curBal) * usdRate;
-          walletDuePaidBdt = Math.min(dueBdtFull, remainingBdt);
-          remainingBdt -= walletDuePaidBdt;
-        }
-
-        // Step 2: sheet/card bill from whatever BDT remains
-        const dueBdt = Number(pendingBill.due_amount_bdt);
-        const deductBdt = Math.min(dueBdt, remainingBdt);
-        cardBillDeducted = deductBdt;
-        remainingBdt -= deductBdt;
-
-        // Step 3: wallet credit in USD = (wallet-due portion + remainder) / rate
-        // Wallet-due portion still credited as USD so the wallet add naturally clears the negative balance.
-        finalUsdAmount = (remainingBdt + walletDuePaidBdt) / usdRate;
-
-        const newDue = dueBdt - deductBdt;
-        await supabase.from('card_bills').update({ due_amount_bdt: newDue, status: newDue <= 0 ? 'paid' : 'pending', updated_at: new Date().toISOString() }).eq('id', pendingBill.id);
-
-        // Persist the BDT split on the top-up request for the invoice
-        try {
-          await supabase.from('top_up_requests').update({
-            sheet_bill_bdt: cardBillDeducted,
-            wallet_due_paid_bdt: walletDuePaidBdt,
-          } as any).eq('id', request_id);
-        } catch (persistErr) {
-          console.error('persist sheet_bill_bdt failed (non-blocking):', persistErr);
-        }
-
-        if (deductBdt > 0) {
-          try {
-            let clientName = '';
-            try {
-              const { data: cp } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
-              clientName = cp?.full_name || cp?.email || '';
-            } catch {}
-            const syncUrl = `${supabaseUrl}/functions/v1/sync-card-bills`;
-            await fetch(syncUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'write_payment', user_id, amount_bdt: deductBdt, client_name: clientName }),
-            });
-          } catch (sheetErr) {
-            console.error('sync-card-bills call failed (non-blocking):', sheetErr);
-          }
-        }
-      }
-    } catch (billErr: any) {
-      console.log('Card bill check skipped:', billErr?.message);
-    }
-
-    // Wallet credit — clients with a secondary (sheet-rate) wallet get the
-    // payment split: main due → secondary due (secondary rate) → main deposit.
-    const { data: profSec } = await supabase
-      .from('profiles').select('secondary_wallet_enabled').eq('user_id', user_id).maybeSingle();
-    const secondaryEnabled = !!(profSec as any)?.secondary_wallet_enabled;
-
-    if (secondaryEnabled && finalUsdAmount > 0) {
-      const usdRate = Number(request.usd_rate) || 0;
-      const bdtForSplit = usdRate > 0 ? finalUsdAmount * usdRate : bdtNum;
-      const { data: splitRes, error: splitErr } = await supabase.rpc('distribute_deposit_bdt', {
-        p_user_id: user_id,
-        p_bdt_amount: bdtForSplit,
-        p_reference_id: request_id,
-        p_processed_by: 'system',
-      });
-      if (splitErr) throw splitErr;
-      if (splitRes && (splitRes as any).ok === false) throw new Error((splitRes as any).error || 'Deposit split failed');
-    } else {
-    const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user_id).single();
-    const currentBalance = Number(wallet?.balance ?? 0);
-    const newBalance = currentBalance + finalUsdAmount;
-
-    // CRITICAL: write the ledger row BEFORE touching the wallet. The
-    // `prevent_duplicate_topup_credit` trigger rejects a second top_up row for
-    // the same reference_id, so any duplicate/retry approval fails here with no
-    // money moved. Crediting first left phantom balances when the insert failed.
-    const txDescription = cardBillDeducted > 0 ? `Wallet top-up auto-approved (Card bill ৳${cardBillDeducted.toLocaleString()} deducted)` : 'Wallet top-up auto-approved';
-    const { error: txErr } = await supabase.from('transactions').insert({
-      user_id,
-      type: 'top_up',
-      amount: finalUsdAmount,
-      balance_after: newBalance,
-      reference_id: request_id,
-      description: txDescription,
-      processed_by: 'system',
-    });
-    if (txErr) throw txErr;
-
-    const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
-    if (walletErr) throw walletErr;
-    }
     }
 
 
@@ -687,17 +551,6 @@ Deno.serve(async (req) => {
         await supabase.from('agency_wallets').update({ balance: newAgencyBalance }).eq('agency_id', userProfile.agency_id);
       }
     }
-
-    // Invoice
-    const { data: invNum } = await supabase.rpc('generate_invoice_number');
-    await supabase.from('invoices').insert({
-      top_up_request_id: request_id,
-      invoice_number: invNum || `INV-${Date.now()}`,
-      user_id,
-      amount: Number(amount),
-      bdt_amount: bdtNum,
-      usd_rate: Number(request.usd_rate || 0),
-    });
 
     await supabase.from('notifications').insert({
       user_id,
