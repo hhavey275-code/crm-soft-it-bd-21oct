@@ -743,6 +743,14 @@ export function AdminDashboard() {
               </PopoverContent>
             </Popover>
 
+            {(() => {
+              const selFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
+              const selTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
+              const rangeMatches =
+                !!dateSpendRange && !!selFrom && !!selTo &&
+                dateSpendRange.from === selFrom && dateSpendRange.to === selTo;
+              const showValue = dateSpend !== null && rangeMatches;
+              return (
             <div className="flex items-center gap-2">
               {!isMobile && <div className="h-8 w-px bg-border" />}
               <div>
@@ -752,22 +760,30 @@ export function AdminDashboard() {
                 <p className={cn("font-bold", isMobile ? "text-base" : "text-lg")}>
                   {dateSpendLoading
                     ? "Loading..."
-                    : dateSpend !== null
-                      ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : showValue
+                      ? `$${dateSpend!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                 </p>
-                {dateSpendCalls !== null && !dateSpendLoading && (
+                {dateSpendCalls !== null && !dateSpendLoading && showValue && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
                     {dateSpendProxyIp && <> · via {dateSpendProxyIp}</>}
                   </p>
                 )}
-                {dateSpendCached && dateSpend !== null && !dateSpendLoading && dateSpendCalls === null && (
+                {!dateSpendLoading && !showValue && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Click "Update" to load spend for this range
+                  </p>
+                )}
+                {dateSpendCached && showValue && !dateSpendLoading && dateSpendCalls === null && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     cached — click "Update" for live data
                   </p>
                 )}
               </div>
+            </div>
+              );
+            })()}
             </div>
           </div>
         </CardContent>
