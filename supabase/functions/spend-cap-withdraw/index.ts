@@ -221,32 +221,33 @@ Deno.serve(async (req) => {
     let creditedUserId: string | null = assignedRow?.user_id ?? null;
     let newBalance: number | null = null;
 
+    let creditError: string | null = null;
     if (creditedUserId) {
-      const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
-      let { data: wallet } = await supabase.from(walletTable).select("id, balance").eq("user_id", creditedUserId).maybeSingle();
-      if (!wallet && walletKind === "secondary") {
-        const { data: created } = await supabase
-          .from("secondary_wallets")
-          .insert({ user_id: creditedUserId, balance: 0 })
-          .select("id, balance")
-          .maybeSingle();
-        wallet = created;
-      }
-      if (wallet) {
-        newBalance = Number(wallet.balance) + withdrawAmount;
-        await supabase.from(walletTable).update({ balance: newBalance }).eq("id", wallet.id);
-        await supabase.from("transactions").insert({
-          user_id: creditedUserId,
-          amount: withdrawAmount,
-          balance_after: newBalance,
-          type: "refund",
-          wallet_kind: walletKind,
-          description: `Withdraw credit (${walletKind === "secondary" ? "Secondary" : "Main"} wallet)\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
-          reference_id: ad_account_id,
-          processed_by: isAdmin ? `admin:${userId}` : `client:${userId}`,
-          via: getLastMetaVia(),
-          source_ip: getLastMetaIp(),
+      // ATOMIC: wallet balance + transaction in one guarded RPC. A raw wallet
+      // UPDATE is rejected by the wallet-integrity trigger and would silently
+      // leave the client uncredited after the spend cap was already lowered.
+      const { data: adj, error: adjErr } = await supabase.rpc("adjust_wallet_atomic", {
+        p_user_id: creditedUserId,
+        p_amount: withdrawAmount,
+        p_type: "refund",
+        p_description: `Withdraw credit (${walletKind === "secondary" ? "Secondary" : "Main"} wallet)\n${account.account_name}\n${account.account_id.replace(/^act_/, "")}`,
+        p_processed_by: isAdmin ? `admin:${userId}` : `client:${userId}`,
+        p_wallet_kind: walletKind,
+        p_reference_id: ad_account_id,
+        p_allow_negative: true,
+      });
+      const res = adj as any;
+      if (adjErr || !res?.ok) {
+        creditError = adjErr?.message || res?.error || "wallet credit failed";
+        console.error("spend-cap-withdraw wallet credit failed:", creditError);
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Withdraw Credit Failed",
+          details: `${account.account_name} (${actId.replace(/^act_/, "")}) — $${withdrawAmount} spend cap reduced but wallet credit FAILED: ${creditError}. Fix the wallet ledger, then credit manually.`,
         });
+      } else {
+        newBalance = Number(res.balance_after);
         creditedWallet = true;
       }
     }
