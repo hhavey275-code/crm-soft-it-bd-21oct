@@ -287,6 +287,7 @@ Deno.serve(async (req) => {
       real_amount_spent: realAmountSpent,
       max_withdrawable: Number(maxWithdrawable.toFixed(2)),
       wallet_credited: creditedWallet,
+      wallet_credit_error: creditError,
       wallet_kind: walletKind,
 
       credited_user_id: creditedUserId,
