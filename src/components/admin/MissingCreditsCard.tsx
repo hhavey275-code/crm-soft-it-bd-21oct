@@ -29,6 +29,9 @@ export function MissingCreditsCard() {
     refetchInterval: 60_000,
     queryFn: async (): Promise<Row[]> => {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      // Ignore very recent approvals: the credit row may not be visible yet,
+      // which would otherwise raise a false "approved but not credited" alert.
+      const until = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: reqs } = await supabase
         .from("top_up_requests")
         .select(
@@ -36,8 +39,10 @@ export function MissingCreditsCard() {
         )
         .eq("status", "approved")
         .gte("created_at", since)
+        .lte("created_at", until)
         .order("created_at", { ascending: false })
         .limit(300);
+
 
       const candidates = (reqs ?? []).filter(
         (r: any) =>
