@@ -146,8 +146,12 @@ function providerRetryAfterMs(provider: Provider, status: number, headers: Heade
   if ([500, 502, 503, 504, 529].includes(status)) return 5_000;
   if (status !== 429) return undefined;
 
+  // Exhausted billing/quota is not a temporary rate limit — don't waste a minute waiting.
+  if (/credits are depleted|RESOURCE_EXHAUSTED.*billing|insufficient_quota|billing details|check your plan|exceeded your current quota/i.test(body)) return undefined;
+
   // Gemini often omits RetryInfo on per-minute quota bursts; try again after the next minute once.
   if (provider === "gemini") return 65_000;
+
 
   // OpenAI 429 can be either temporary rate limit or exhausted billing quota. Don't wait for billing failures.
   if (provider === "openai" && /insufficient_quota|billing details|check your plan/i.test(body)) return undefined;
