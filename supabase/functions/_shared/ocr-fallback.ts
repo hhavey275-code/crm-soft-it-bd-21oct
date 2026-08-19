@@ -233,7 +233,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
       generationConfig: {
         responseMimeType: "application/json",
         maxOutputTokens: 512,
-        thinkingConfig: { thinkingBudget: 0 },
+        
         responseSchema: {
           type: "object",
           properties: {
