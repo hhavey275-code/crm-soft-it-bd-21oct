@@ -206,8 +206,8 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
 }
 
 async function callGemini(imageUrl: string): Promise<OcrResult> {
-  const apiKey = Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY not configured");
+  const apiKey = Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY/GOOGLE_API_KEY not configured");
   // Fetch image and base64 it (Gemini accepts inline_data)
   const imgResp = await fetch(imageUrl);
   if (!imgResp.ok) throw new Error(`failed to fetch image: ${imgResp.status}`);
