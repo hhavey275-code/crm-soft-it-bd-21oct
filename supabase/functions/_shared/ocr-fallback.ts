@@ -206,8 +206,8 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
 }
 
 async function callGemini(imageUrl: string): Promise<OcrResult> {
-  const apiKey = Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY not configured");
+  const apiKey = Deno.env.get("GOOGLE_API_KEY") || Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY/GOOGLE_API_KEY not configured");
   // Fetch image and base64 it (Gemini accepts inline_data)
   const imgResp = await fetch(imageUrl);
   if (!imgResp.ok) throw new Error(`failed to fetch image: ${imgResp.status}`);
@@ -217,7 +217,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
   const b64 = btoa(bin);
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -233,7 +233,7 @@ async function callGemini(imageUrl: string): Promise<OcrResult> {
       generationConfig: {
         responseMimeType: "application/json",
         maxOutputTokens: 512,
-        thinkingConfig: { thinkingBudget: 0 },
+        
         responseSchema: {
           type: "object",
           properties: {
