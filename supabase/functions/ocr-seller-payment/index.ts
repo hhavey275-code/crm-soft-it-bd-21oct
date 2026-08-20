@@ -72,9 +72,23 @@ serve(async (req) => {
     });
   } catch (e: any) {
     console.error("ocr-seller-payment error:", e?.message);
-    return new Response(JSON.stringify({ error: e?.message || "OCR failed" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Return 200 with an error field: the callers (client/seller/tenant proof
+    // upload) only need to fall back to manual entry. A non-2xx here surfaces
+    // as a scary "Edge Function returned a non-2xx status code" toast.
+    return new Response(
+      JSON.stringify({
+        error: e?.message || "OCR failed",
+        ocr_failed: true,
+        account_verified: null,
+        bdt_amount: "",
+        date: "",
+        reference: "",
+        bank_name: "",
+        account_number: "",
+        account_holder_name: "",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
+
