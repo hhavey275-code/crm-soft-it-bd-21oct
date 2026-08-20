@@ -205,17 +205,33 @@ async function callLovable(imageUrl: string): Promise<OcrResult> {
   return normalize(safeJsonParse(content));
 }
 
-async function callGemini(imageUrl: string): Promise<OcrResult> {
-  const apiKey = Deno.env.get("GOOGLE_API_KEY") || Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY/GOOGLE_API_KEY not configured");
-  // Fetch image and base64 it (Gemini accepts inline_data)
+// Convert an image reference (data: URL or http URL) to inline base64 for Gemini.
+// NOTE: big mobile screenshots (3-8MB) used to be encoded with a per-byte string
+// concat loop which burned the edge CPU budget → the whole request died with a
+// non-2xx error. Keep this fast path (direct data-URL reuse + chunked encode).
+async function toInlineImage(imageUrl: string): Promise<{ b64: string; mime: string }> {
+  if (imageUrl.startsWith("data:")) {
+    const m = imageUrl.match(/^data:([^;,]*)(;base64)?,([\s\S]*)$/);
+    if (m && m[2]) return { b64: m[3], mime: m[1] || "image/jpeg" };
+  }
   const imgResp = await fetch(imageUrl);
   if (!imgResp.ok) throw new Error(`failed to fetch image: ${imgResp.status}`);
   const mime = imgResp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
   const buf = new Uint8Array(await imgResp.arrayBuffer());
+  if (buf.length > 12 * 1024 * 1024) throw new Error("image too large for OCR (>12MB)");
   let bin = "";
-  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-  const b64 = btoa(bin);
+  const CHUNK = 0x8000;
+  for (let i = 0; i < buf.length; i += CHUNK) {
+    bin += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+  }
+  return { b64: btoa(bin), mime };
+}
+
+async function callGemini(imageUrl: string): Promise<OcrResult> {
+  const apiKey = Deno.env.get("GOOGLE_API_KEY") || Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY/GOOGLE_API_KEY not configured");
+  const { b64, mime } = await toInlineImage(imageUrl);
+
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
   const resp = await fetch(url, {
