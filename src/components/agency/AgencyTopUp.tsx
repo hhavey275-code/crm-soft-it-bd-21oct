@@ -59,21 +59,22 @@ export function AgencyTopUp() {
       return;
     }
 
-    // Atomic guard: only approve if still pending (prevents double-credit with auto-verify)
-    const { data: updatedRows, error: updateErr } = await supabase
+    // Claim the request first (status stays pending until the credit lands).
+    const { data: claimedRows, error: claimErr } = await supabase
       .from("top_up_requests")
-      .update({ status: "approved", reviewed_by: user!.id })
+      .update({ reviewed_by: user!.id })
       .eq("id", requestId)
       .eq("status", "pending")
       .select("id");
-    if (updateErr) { toast.error(updateErr.message); return; }
-    if (!updatedRows?.length) {
+    if (claimErr) { toast.error(claimErr.message); return; }
+    if (!claimedRows?.length) {
       toast.error("Already processed (auto-verified or by another admin). Refresh the page.");
       qc.invalidateQueries({ queryKey: ["agency-topup-requests"] });
       return;
     }
 
-    // Add to client wallet — atomic RPC (ledger + balance in one transaction).
+    // Credit the wallet BEFORE marking approved. A database guard rejects any
+    // approval that has no matching wallet credit, so money can never go missing.
     const { data: creditRes, error: creditErr } = await (supabase as any).rpc("credit_wallet_for_payment", {
       p_user_id: userId,
       p_amount: amount,
@@ -83,10 +84,17 @@ export function AgencyTopUp() {
       p_processed_by: user!.id,
     });
     if (creditErr || (creditRes && creditRes.success === false)) {
-      await supabase.from("top_up_requests").update({ status: "pending" }).eq("id", requestId).eq("status", "approved");
-      toast.error(creditErr?.message || creditRes?.error || "Wallet credit failed — approval rolled back");
+      toast.error(creditErr?.message || creditRes?.error || "Wallet credit failed — request left pending");
       return;
     }
+
+    const { error: approveErr } = await supabase
+      .from("top_up_requests")
+      .update({ status: "approved", reviewed_by: user!.id })
+      .eq("id", requestId)
+      .eq("status", "pending");
+    if (approveErr) { toast.error(approveErr.message); return; }
+
 
     // Deduct from agency wallet
     const newAgencyBalance = Number(agencyWallet.balance) - amount;
