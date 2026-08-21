@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.enforce_topup_credit_on_approval() FROM PUBLIC, anon, authenticated;
