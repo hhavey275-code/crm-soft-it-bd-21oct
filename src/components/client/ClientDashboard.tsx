@@ -482,7 +482,7 @@ export function ClientDashboard() {
           <div className="grid grid-cols-3 gap-2">
             {[
               { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
-              { label: "Remaining", value: fmt(totalRemaining), key: "remaining" },
+              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining" },
               { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
               { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
               { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
