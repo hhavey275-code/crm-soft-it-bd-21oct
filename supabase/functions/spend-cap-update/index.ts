@@ -471,21 +471,28 @@ Deno.serve(async (req)=>{
     if (!live.ok) {
       // Refund the SAME wallet the amount was deducted from
       if (shouldDeductWallet && walletId !== null) {
-        const walletTable = walletKind === "secondary" ? "secondary_wallets" : "wallets";
-        const { data: walletNow } = await supabase.from(walletTable).select("balance").eq("id", walletId).single();
-        const refundedBalance = Number(walletNow?.balance ?? newBalance) + amount;
-        await supabase.from(walletTable).update({ balance: refundedBalance }).eq("id", walletId);
-        await supabase.from("transactions").insert({
-          user_id: walletUserId,
-          amount: amount,
-          balance_after: refundedBalance,
-          type: "refund",
-          description: `Auto-refund: could not read live spend cap from Meta (${live.error})`,
-          reference_id: ad_account_id,
-          processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
-          wallet_kind: walletKind,
+        // Atomic refund: keeps wallet balance and the ledger row in sync so the
+        // "Balance" column in transaction history is always the real balance.
+        const { data: refundRes, error: refundErr } = await supabase.rpc("adjust_wallet_atomic", {
+          p_user_id: walletUserId,
+          p_amount: amount,
+          p_type: "refund",
+          p_description: `Auto-refund: could not read live spend cap from Meta (${live.error})`,
+          p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+          p_wallet_kind: walletKind,
+          p_reference_id: ad_account_id,
+          p_allow_negative: true,
         });
+        if (refundErr || !refundRes?.ok) {
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Refund Failed",
+            details: `Auto-refund of $${amount} failed for user ${walletUserId}: ${refundErr?.message ?? refundRes?.error ?? "unknown"}`,
+          });
+        }
       }
+
 
       await supabase.from("system_logs").insert({
         user_id: userId,
