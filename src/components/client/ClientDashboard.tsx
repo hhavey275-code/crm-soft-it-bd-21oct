@@ -120,6 +120,35 @@ export function ClientDashboard() {
     refetchOnWindowFocus: true,
   });
 
+  // Live Meta sync when the client opens the dashboard: refresh spend cap /
+  // amount spent once per session (same session key as Ad Accounts page so
+  // both pages share one sync), then re-read the DB numbers.
+  const hasDashboardSynced = useRef(false);
+  const [dashboardSyncing, setDashboardSyncing] = useState(false);
+  useEffect(() => {
+    if (!adAccounts || adAccounts.length === 0 || hasDashboardSynced.current) return;
+    hasDashboardSynced.current = true;
+    try {
+      const last = Number(sessionStorage.getItem("metaSyncTimestamp") || 0);
+      if (last && Date.now() - last < 10 * 60_000) return; // synced recently
+    } catch { /* sessionStorage unavailable */ }
+
+    const ids = adAccounts.map((a: any) => a.id);
+    setDashboardSyncing(true);
+    import("@/lib/chunkedMetaSync")
+      .then(({ chunkedMetaSync }) => chunkedMetaSync(ids))
+      .then((result) => {
+        try { sessionStorage.setItem("metaSyncTimestamp", String(Date.now())); } catch { /* ignore */ }
+        if (result?.insights) {
+          queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+        }
+      })
+      .catch((err) => console.log("dashboard meta sync skipped:", err))
+      .finally(() => setDashboardSyncing(false));
+  }, [adAccounts, queryClient]);
+
 
   const { data: allInsights } = useQuery({
     queryKey: ["client-all-insights", user?.id],
