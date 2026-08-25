@@ -345,7 +345,12 @@ export async function metaFetch(
       const msg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
       recordProxyFail(`proxy_throw:${msg}`);
       console.warn("Proxy failed, falling back to direct call:", msg);
-      if (strictMode) {
+      // DNS / connection failures mean the proxy host is gone — no proxy IP to
+      // preserve, so allow the direct call even in strict mode. Timeouts
+      // (aborts) still block, because the proxy may be alive but slow.
+      const proxyGone = /dns|error sending request|connection|refused|unreachable|failed to lookup/i.test(msg)
+        && !/abort/i.test(msg);
+      if (strictMode && !proxyGone) {
         lastMetaVia = "proxy";
         metaProxyCount += 1;
         return new Response(
