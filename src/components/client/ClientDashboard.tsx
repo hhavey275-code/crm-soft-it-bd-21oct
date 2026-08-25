@@ -545,7 +545,7 @@ export function ClientDashboard() {
 
           {[
             { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone, key: "ad-accounts" },
-            { title: "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
+            { title: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
             { title: "Today Spend", value: fmt(todaySpend), icon: DollarSign, key: "today-spend" },
             { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart, key: "today-orders" },
             { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: ArrowUpCircle, key: "total-topup" },
