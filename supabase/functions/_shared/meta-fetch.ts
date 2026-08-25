@@ -272,6 +272,9 @@ export async function metaFetch(
       const text = await proxyRes.text();
       const trimmed = text.trimStart();
       const looksLikeHtml = trimmed.startsWith("<!") || trimmed.startsWith("<html");
+      const vercelDeploymentMissing =
+        proxyRes.status === 404 &&
+        (proxyRes.headers.has("x-vercel-error") || trimmed.includes("DEPLOYMENT_NOT_FOUND"));
 
       // Detect proxy-level errors. The proxy reports its own failures as
       // {"error":"string"}; Meta errors are {"error":{"message":...,"code":...}}.
@@ -295,6 +298,7 @@ export async function metaFetch(
       // the account for sudden IP rotation on writes).
       const shouldFallback =
         looksLikeHtml ||
+        vercelDeploymentMissing ||
         isProxyOwnError ||
         proxyRes.status >= 500 ||
         proxyRes.status === 0;
@@ -312,6 +316,7 @@ export async function metaFetch(
       }
 
       if (looksLikeHtml) recordProxyFail(`proxy_html(status=${proxyRes.status})`);
+      if (vercelDeploymentMissing) recordProxyFail("proxy_deployment_not_found");
       if (!isProxyOwnError && proxyRes.status >= 500) {
         recordProxyFail(`proxy_5xx(status=${proxyRes.status})`);
       }
@@ -321,7 +326,11 @@ export async function metaFetch(
       if (strictMode) {
         // Return a synthetic 502 so the caller treats it like a Meta error and
         // never silently uses the worker's direct IP for sensitive accounts.
-        const reason = looksLikeHtml ? "proxy_html" : (isProxyOwnError ? "proxy_own_error" : `proxy_${proxyRes.status}`);
+        const reason = looksLikeHtml
+          ? "proxy_html"
+          : vercelDeploymentMissing
+            ? "proxy_deployment_not_found"
+            : (isProxyOwnError ? "proxy_own_error" : `proxy_${proxyRes.status}`);
         lastMetaVia = "proxy";
         metaProxyCount += 1;
         return new Response(
