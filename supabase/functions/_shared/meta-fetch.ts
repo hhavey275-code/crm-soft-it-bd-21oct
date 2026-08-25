@@ -323,7 +323,10 @@ export async function metaFetch(
       console.warn(
         `Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`,
       );
-      if (strictMode) {
+      // A missing proxy deployment means there is no proxy IP at all, so
+      // strict mode has nothing to protect — fall back to a direct call so
+      // hourly sync / auto top-up keep working while the proxy is down.
+      if (strictMode && !vercelDeploymentMissing) {
         // Return a synthetic 502 so the caller treats it like a Meta error and
         // never silently uses the worker's direct IP for sensitive accounts.
         const reason = looksLikeHtml
@@ -342,7 +345,12 @@ export async function metaFetch(
       const msg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
       recordProxyFail(`proxy_throw:${msg}`);
       console.warn("Proxy failed, falling back to direct call:", msg);
-      if (strictMode) {
+      // DNS / connection failures mean the proxy host is gone — no proxy IP to
+      // preserve, so allow the direct call even in strict mode. Timeouts
+      // (aborts) still block, because the proxy may be alive but slow.
+      const proxyGone = /dns|error sending request|connection|refused|unreachable|failed to lookup/i.test(msg)
+        && !/abort/i.test(msg);
+      if (strictMode && !proxyGone) {
         lastMetaVia = "proxy";
         metaProxyCount += 1;
         return new Response(
