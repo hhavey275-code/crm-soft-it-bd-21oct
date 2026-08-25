@@ -323,7 +323,10 @@ export async function metaFetch(
       console.warn(
         `Proxy unhealthy (status=${proxyRes.status}, html=${looksLikeHtml}, proxyErr=${isProxyOwnError}) — direct fallback`,
       );
-      if (strictMode) {
+      // A missing proxy deployment means there is no proxy IP at all, so
+      // strict mode has nothing to protect — fall back to a direct call so
+      // hourly sync / auto top-up keep working while the proxy is down.
+      if (strictMode && !vercelDeploymentMissing) {
         // Return a synthetic 502 so the caller treats it like a Meta error and
         // never silently uses the worker's direct IP for sensitive accounts.
         const reason = looksLikeHtml
