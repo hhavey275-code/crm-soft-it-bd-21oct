@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -119,6 +119,35 @@ export function ClientDashboard() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+
+  // Live Meta sync when the client opens the dashboard: refresh spend cap /
+  // amount spent once per session (same session key as Ad Accounts page so
+  // both pages share one sync), then re-read the DB numbers.
+  const hasDashboardSynced = useRef(false);
+  const [dashboardSyncing, setDashboardSyncing] = useState(false);
+  useEffect(() => {
+    if (!adAccounts || adAccounts.length === 0 || hasDashboardSynced.current) return;
+    hasDashboardSynced.current = true;
+    try {
+      const last = Number(sessionStorage.getItem("metaSyncTimestamp") || 0);
+      if (last && Date.now() - last < 10 * 60_000) return; // synced recently
+    } catch { /* sessionStorage unavailable */ }
+
+    const ids = adAccounts.map((a: any) => a.id);
+    setDashboardSyncing(true);
+    import("@/lib/chunkedMetaSync")
+      .then(({ chunkedMetaSync }) => chunkedMetaSync(ids))
+      .then((result) => {
+        try { sessionStorage.setItem("metaSyncTimestamp", String(Date.now())); } catch { /* ignore */ }
+        if (result?.insights) {
+          queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+        }
+      })
+      .catch((err) => console.log("dashboard meta sync skipped:", err))
+      .finally(() => setDashboardSyncing(false));
+  }, [adAccounts, queryClient]);
 
 
   const { data: allInsights } = useQuery({
@@ -453,7 +482,7 @@ export function ClientDashboard() {
           <div className="grid grid-cols-3 gap-2">
             {[
               { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
-              { label: "Remaining", value: fmt(totalRemaining), key: "remaining" },
+              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining" },
               { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
               { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
               { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
@@ -516,7 +545,7 @@ export function ClientDashboard() {
 
           {[
             { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone, key: "ad-accounts" },
-            { title: "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
+            { title: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
             { title: "Today Spend", value: fmt(todaySpend), icon: DollarSign, key: "today-spend" },
             { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart, key: "today-orders" },
             { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: ArrowUpCircle, key: "total-topup" },
