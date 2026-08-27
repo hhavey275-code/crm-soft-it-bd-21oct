@@ -135,7 +135,11 @@ Deno.serve(async (req)=>{
     const snapshotExpected = Number(failedTopup.expected_spend_cap ?? (Number(failedTopup.old_spend_cap) + Number(failedTopup.amount)));
     // Keep the same whole-unit rule as the original top-up path. Sending a
     // fractional cap here recreates Meta error #100 on $0.01 accounts.
-    const newSpendCapDollars = Math.ceil(liveSpendCapDollars + Number(failedTopup.amount));
+    // Round to NEAREST whole unit (not up) so a $0.01 base doesn't add $1 extra.
+    const baseCapDollars = Math.floor(liveSpendCapDollars * 100) / 100;
+    let newSpendCapDollars = Math.round(baseCapDollars + Number(failedTopup.amount));
+    const minCapDollars = Math.ceil(Number(liveAmountSpentDollars ?? 0)) + 1;
+    if (newSpendCapDollars < minCapDollars) newSpendCapDollars = minCapDollars;
     console.log("Retry failed topup", {
       actId,
       liveSpendCapDollars,
