@@ -402,8 +402,14 @@ export function SellerDashboard() {
               {dueAdvance >= 0 ? "+" : "−"}৳{Math.abs(dueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              After all transactions · {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
+              {monthView ? `As of ${monthLabel(activeBucket)} end` : "After all transactions"} · {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
             </p>
+            {showFilteredNet && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Filtered rows net: {formatSignedBdt(filteredNet)}
+              </p>
+            )}
+
           </div>
         </div>
 
