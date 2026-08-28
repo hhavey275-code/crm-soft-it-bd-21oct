@@ -557,7 +557,7 @@ Deno.serve(async (req)=>{
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: new URLSearchParams({
-          spend_cap: String(newSpendCapDollars),
+          spend_cap: newSpendCapDollars.toFixed(2),
           access_token: bmToken
         }),
         // Spend cap update is a critical write — if the proxy is down, allow a
