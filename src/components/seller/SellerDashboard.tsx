@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
-import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import {
   getMonthBucket,
   isSameMonth,
