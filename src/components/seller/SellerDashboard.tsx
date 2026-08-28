@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 // v2026.04.22-balance-display — cache-bust: ensure new TOTAL footer renders
-import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt } from "@/lib/sellerRunningTotal";
+import { computeDueAdvanceRunning, formatDueAdvance, computeTransactionDelta, formatSignedBdt, isCountedSellerTransaction } from "@/lib/sellerRunningTotal";
 import {
   getMonthBucket,
   isSameMonth,
@@ -206,9 +206,10 @@ export function SellerDashboard() {
   const totals = useMemo(() => {
     return filtered.reduce(
       (acc: any, t: any) => {
-        // Only count approved (or legacy null/empty) entries — exclude pending and rejected
-        const status = t.status || "approved";
-        if (status !== "approved") return acc;
+        // Only count entries that actually move the ledger (approved + valid amounts),
+        // exactly like the running Due/Advance balance does — otherwise the cards
+        // and the balance disagree.
+        if (!isCountedSellerTransaction(t)) return acc;
         if (t.type === "bdt_payment" || t.type === "tenant_payment") acc.totalBdtPaid += Number(t.bdt_amount || 0);
         if (t.type === "usdt_received") {
           acc.totalUsdt += Math.abs(Number(t.usdt_amount || 0));
@@ -222,8 +223,13 @@ export function SellerDashboard() {
     );
   }, [filtered]);
 
-  const filteredDueAdvance = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
-  const dueAdvance = monthView ? monthDueAdvance : (typeFilter === "all" && !bankFilter && datePreset === "all" ? lifetimeDueAdvance : filteredDueAdvance);
+  // Net movement of the currently filtered rows only (NOT a balance).
+  const filteredNet = totals.totalBdtPaid + totals.totalClientBdt - totals.totalConvertedBdt - totals.totalWithdrawn;
+  // The hero card must always show a real balance: month closing balance in month
+  // view, otherwise the true lifetime Due/Advance. Filters never change it.
+  const dueAdvance = monthView ? monthDueAdvance : lifetimeDueAdvance;
+  const showFilteredNet = !monthView && (typeFilter !== "all" || !!bankFilter || datePreset !== "all");
+
 
   // Running Due/Advance balance per row — computed from ALL transactions (not just filtered),
   // so each filtered row still shows its true historical balance up to that point.
@@ -396,8 +402,14 @@ export function SellerDashboard() {
               {dueAdvance >= 0 ? "+" : "−"}৳{Math.abs(dueAdvance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              After all transactions · {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
+              {monthView ? `As of ${monthLabel(activeBucket)} end` : "After all transactions"} · {dueAdvance >= 0 ? "আপনি বেশি পেয়েছেন" : "আপনাকে দিতে হবে"}
             </p>
+            {showFilteredNet && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Filtered rows net: {formatSignedBdt(filteredNet)}
+              </p>
+            )}
+
           </div>
         </div>
 
