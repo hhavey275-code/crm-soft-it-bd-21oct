@@ -518,16 +518,12 @@ Deno.serve(async (req)=>{
     }
     // Use LIVE value as base — this is the fix
     const oldSpendCapDollars = liveSpendCapDollars;
-    // Meta rejects fractional spend_cap values with a generic "Invalid parameter"
-    // (error code 100), so the final cap must be a whole currency unit.
-    // Previously we rounded UP, which turned a $0.01 base + $200 into $201
-    // (a full extra dollar of limit). Instead drop the sub-cent remainder of
-    // the live cap and round to the NEAREST whole unit, never going below the
-    // amount already spent.
-    const baseCapDollars = Math.floor(liveSpendCapDollars * 100) / 100;
-    let newSpendCapDollars = Math.round(baseCapDollars + amount);
-    const minCapDollars = Math.ceil(liveAmountSpentDollars) + 1;
+    // Exact math: keep any fraction on the live cap. $0.01 + $200 => $200.01.
+    const baseCapDollars = Math.round(liveSpendCapDollars * 100) / 100;
+    let newSpendCapDollars = Math.round((baseCapDollars + Number(amount)) * 100) / 100;
+    const minCapDollars = Math.round((Number(liveAmountSpentDollars) + 0.01) * 100) / 100;
     if (newSpendCapDollars < minCapDollars) newSpendCapDollars = minCapDollars;
+
 
 
     // Records previous → new spend cap on the wallet debit row so the client's
@@ -561,7 +557,7 @@ Deno.serve(async (req)=>{
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: new URLSearchParams({
-          spend_cap: String(newSpendCapDollars),
+          spend_cap: newSpendCapDollars.toFixed(2),
           access_token: bmToken
         }),
         // Spend cap update is a critical write — if the proxy is down, allow a
