@@ -11,7 +11,7 @@ type Row = {
   user_id: string;
   amount: number;
   created_at: string;
-  name?: string | null;
+  full_name?: string | null;
   email?: string | null;
 };
 
@@ -65,18 +65,25 @@ export function MissingCreditsCard() {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, name, email")
-        .in("id", Array.from(new Set(missing.map((r: any) => r.user_id))));
-      const pmap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+        .select("user_id, full_name, email")
+        .in("user_id", Array.from(new Set(missing.map((r: any) => r.user_id))));
+      const pmap = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
 
-      return missing.map((r: any) => ({
-        id: r.id,
-        user_id: r.user_id,
-        amount: Number(r.amount || 0),
-        created_at: r.created_at,
-        name: pmap.get(r.user_id)?.name,
-        email: pmap.get(r.user_id)?.email,
-      }));
+      // Imported/deleted users can leave historical approved requests behind
+      // without their old transaction ledger. They are not safe to repair and
+      // must not be presented as current missing credits.
+      return missing.flatMap((r: any) => {
+        const profile = pmap.get(r.user_id);
+        if (!profile) return [];
+        return [{
+          id: r.id,
+          user_id: r.user_id,
+          amount: Number(r.amount || 0),
+          created_at: r.created_at,
+          full_name: profile.full_name,
+          email: profile.email,
+        }];
+      });
     },
   });
 
@@ -89,7 +96,7 @@ export function MissingCreditsCard() {
       });
       if (error) throw error;
       if ((data as any)?.success === false) throw new Error((data as any)?.error || "Repair failed");
-      toast.success(`Credited $${row.amount} to ${row.name || row.email || "client"}`);
+      toast.success(`Credited $${row.amount} to ${row.full_name || row.email || "client"}`);
       queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
       refetch();
@@ -130,7 +137,7 @@ export function MissingCreditsCard() {
             className="flex items-center justify-between gap-2 rounded-md border border-border/60 p-2"
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{r.name || r.email || r.user_id}</p>
+              <p className="text-sm font-medium truncate">{r.full_name || r.email || r.user_id}</p>
               <p className="text-xs text-muted-foreground">
                 ${r.amount} · {new Date(r.created_at).toLocaleString()}
               </p>
