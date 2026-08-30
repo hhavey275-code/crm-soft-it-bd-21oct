@@ -25,7 +25,11 @@ export function MissingCreditsCard() {
   const [fixing, setFixing] = useState<string | null>(null);
 
   const { data: rows = [], isFetching, refetch } = useQuery({
-    queryKey: ["missing-topup-credits"],
+    // Version the key when detection rules change so HMR/browser caches cannot
+    // keep showing rows that the latest safety filters now exclude.
+    queryKey: ["missing-topup-credits", "active-clients-v2"],
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchInterval: 60_000,
     queryFn: async (): Promise<Row[]> => {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -63,18 +67,26 @@ export function MissingCreditsCard() {
       const missing = candidates.filter((r: any) => !credited.has(r.id));
       if (missing.length === 0) return [];
 
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, full_name, email")
-        .in("user_id", Array.from(new Set(missing.map((r: any) => r.user_id))));
+      const missingUserIds = Array.from(new Set(missing.map((r: any) => r.user_id)));
+      const [{ data: profiles }, { data: wallets }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id, full_name, email")
+          .in("user_id", missingUserIds),
+        supabase
+          .from("wallets")
+          .select("user_id")
+          .in("user_id", missingUserIds),
+      ]);
       const pmap = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+      const activeWalletUsers = new Set((wallets ?? []).map((wallet: any) => wallet.user_id));
 
       // Imported/deleted users can leave historical approved requests behind
       // without their old transaction ledger. They are not safe to repair and
       // must not be presented as current missing credits.
       return missing.flatMap((r: any) => {
         const profile = pmap.get(r.user_id);
-        if (!profile) return [];
+        if (!profile || !activeWalletUsers.has(r.user_id)) return [];
         return [{
           id: r.id,
           user_id: r.user_id,
