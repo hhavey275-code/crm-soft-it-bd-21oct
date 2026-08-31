@@ -1211,6 +1211,78 @@ function InstallAppSection() {
   );
 }
 
+function MaintenanceModeCard() {
+  const { data, refetch } = useQuery({
+    queryKey: ["maintenance-mode-admin"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("key, value")
+        .in("key", ["maintenance_mode", "maintenance_message"]);
+      const rows = data || [];
+      return {
+        enabled: rows.find((r) => r.key === "maintenance_mode")?.value === "on",
+        message: rows.find((r) => r.key === "maintenance_message")?.value || "",
+      };
+    },
+  });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const enabled = data?.enabled ?? false;
+  const message = msg ?? data?.message ?? "";
+
+  const save = async (nextEnabled: boolean, nextMessage: string) => {
+    setSaving(true);
+    const { error } = await supabase.from("site_settings").upsert(
+      [
+        { key: "maintenance_mode", value: nextEnabled ? "on" : "off" },
+        { key: "maintenance_message", value: nextMessage },
+      ],
+      { onConflict: "key" },
+    );
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(nextEnabled ? "Maintenance mode ON — client রা ঢুকতে পারবে না" : "Maintenance mode OFF — CRM live");
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["maintenance-mode"] });
+  };
+
+  return (
+    <Card className={enabled ? "border-destructive/60" : undefined}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Maintenance Mode (Update চলাকালীন CRM বন্ধ)</CardTitle>
+        <CardDescription>
+          ON করলে client / seller / agency কেউ CRM ব্যবহার করতে পারবে না — শুধু admin ঢুকতে পারবে। Update শেষ হলে OFF করুন।
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm text-muted-foreground">
+            {enabled ? "এখন CRM বন্ধ (শুধু admin access)" : "এখন CRM live"}
+          </div>
+          <Switch checked={enabled} disabled={saving} onCheckedChange={(v) => void save(v, message)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Client কে দেখানো message (optional)</Label>
+          <Textarea
+            value={message}
+            onChange={(e) => setMsg(e.target.value)}
+            placeholder="আমরা system update করছি, ১০ মিনিট পর আবার চেষ্টা করুন।"
+            rows={2}
+          />
+          <Button size="sm" variant="outline" disabled={saving} onClick={() => void save(enabled, message)}>
+            Save message
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ClientCardDueVisibilityCard() {
   const { data: visible, refetch } = useQuery({
     queryKey: ["client-card-due-visible"],
