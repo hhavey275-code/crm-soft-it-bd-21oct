@@ -780,6 +780,7 @@ export default function SettingsPage() {
         </div>
 
         {/* ─── Google Sheet Card Due visibility (Admin only) ─── */}
+        {isAdmin && <MaintenanceModeCard />}
         {isAdmin && <ClientCardDueVisibilityCard />}
 
         {/* ─── Card Billing / Google Sheet Config (Admin only) ─── */}
