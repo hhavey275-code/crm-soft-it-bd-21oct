@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { Clock } from "lucide-react";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
@@ -56,5 +57,5 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <MaintenanceGate>{children}</MaintenanceGate>;
 }
