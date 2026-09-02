@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect } from "react";
 import { useTheme } from "next-themes";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { captureReferralCodeFromUrl } from "@/lib/referral";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgencyBranding } from "@/contexts/AgencyBrandingContext";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,12 @@ export function AuthForm() {
     setTheme("light");
     return () => { if (prev && prev !== "light") setTheme(prev); };
   }, []); // eslint-disable-line
+
+  // Remember ?ref=CODE so the referrer can be attached after signup/OAuth.
+  const [refCode, setRefCode] = useState<string | null>(null);
+  useEffect(() => {
+    setRefCode(captureReferralCodeFromUrl());
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -172,6 +179,11 @@ export function AuthForm() {
           </div>
 
           <div className="px-8 pb-8">
+            {refCode && !isLogin ? (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
+              </div>
+            ) : null}
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <>

@@ -25,6 +25,7 @@ import { Route as SellersRouteImport } from './routes/sellers'
 import { Route as SellerTopupsRouteImport } from './routes/seller-topups'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
+import { Route as ReferralRouteImport } from './routes/referral'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OldSellerRouteImport } from './routes/old-seller'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
@@ -142,6 +143,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RequestsRoute = RequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferralRoute = ReferralRouteImport.update({
+  id: '/referral',
+  path: '/referral',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -360,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seller-topups': typeof SellerTopupsRoute
@@ -416,6 +423,7 @@ export interface FileRoutesByTo {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seller-topups': typeof SellerTopupsRoute
@@ -472,6 +480,7 @@ export interface FileRoutesById {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seller-topups': typeof SellerTopupsRoute
@@ -530,6 +539,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/referral'
     | '/requests'
     | '/reset-password'
     | '/seller-topups'
@@ -586,6 +596,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/referral'
     | '/requests'
     | '/reset-password'
     | '/seller-topups'
@@ -641,6 +652,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/referral'
     | '/requests'
     | '/reset-password'
     | '/seller-topups'
@@ -698,6 +710,7 @@ export interface RootRouteChildren {
   MyUnusedRoute: typeof MyUnusedRoute
   OldSellerRoute: typeof OldSellerRoute
   PrivacyRoute: typeof PrivacyRoute
+  ReferralRoute: typeof ReferralRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SellerTopupsRoute: typeof SellerTopupsRoute
@@ -838,6 +851,13 @@ declare module '@tanstack/react-router' {
       path: '/requests'
       fullPath: '/requests'
       preLoaderRoute: typeof RequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referral': {
+      id: '/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof ReferralRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -1171,6 +1191,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyUnusedRoute: MyUnusedRoute,
   OldSellerRoute: OldSellerRoute,
   PrivacyRoute: PrivacyRoute,
+  ReferralRoute: ReferralRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SellerTopupsRoute: SellerTopupsRoute,

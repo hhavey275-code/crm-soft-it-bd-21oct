@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { CompleteProfileGate } from "@/components/CompleteProfileGate";
 import { Clock } from "lucide-react";
+import { attachPendingReferral } from "@/lib/referral";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, profile } = useAuth();
@@ -26,6 +27,11 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [user, loading, navigate]);
+
+  // Bind a pending ?ref= code (captured at signup) to this account once.
+  useEffect(() => {
+    if (user) void attachPendingReferral();
+  }, [user]);
 
   // Profile/role hydration may be slow even after the auth session is known.
   // Only block the route while we still do not know whether a user exists;
