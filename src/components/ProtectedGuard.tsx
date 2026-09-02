@@ -58,5 +58,9 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <MaintenanceGate>{children}</MaintenanceGate>;
+  return (
+    <MaintenanceGate>
+      <CompleteProfileGate>{children}</CompleteProfileGate>
+    </MaintenanceGate>
+  );
 }
