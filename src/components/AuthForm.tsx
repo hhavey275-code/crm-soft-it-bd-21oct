@@ -179,6 +179,11 @@ export function AuthForm() {
           </div>
 
           <div className="px-8 pb-8">
+            {refCode && !isLogin ? (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
+              </div>
+            ) : null}
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <>
