@@ -13,7 +13,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     if (isAdminUser) {
-      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes, sellerUsdtRes, withdrawReqRes] = await Promise.all([
+      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes, sellerUsdtRes, withdrawReqRes, referralPayoutRes] = await Promise.all([
         (supabase as any)
           .from("top_up_requests")
           .select("*", { count: "exact", head: true })
