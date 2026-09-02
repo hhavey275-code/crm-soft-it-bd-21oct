@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import { Check, X, Search, Loader2 } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AdminWithdrawRequests } from "@/components/admin/AdminWithdrawRequests";
+
 
 export function AdminRequests() {
   const { user } = useAuth();
