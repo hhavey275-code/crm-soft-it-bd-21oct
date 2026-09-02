@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,7 +53,7 @@ export function ClientReferral() {
     queryKey: ["referral-earnings", user?.id],
     queryFn: async () => {
       // Refresh the running month before reading.
-      await supabase.rpc("recalc_referral_earnings", { p_month: null });
+      await supabase.rpc("recalc_referral_earnings", {});
       const { data } = await supabase
         .from("referral_monthly_earnings")
         .select("*")
@@ -262,7 +262,7 @@ export function ClientReferral() {
               </TableHeader>
               <TableBody>
                 {byMonth.map((m) => (
-                  <>
+                  <Fragment key={m.month}>
                     {m.rows.map((e: any) => (
                       <TableRow key={e.id}>
                         <TableCell className="whitespace-nowrap">{monthLabel(e.period_month)}</TableCell>
@@ -280,14 +280,14 @@ export function ClientReferral() {
                         <TableCell className="capitalize">{e.status}</TableCell>
                       </TableRow>
                     ))}
-                    <TableRow key={`${m.month}-total`} className="bg-muted/50">
+                    <TableRow className="bg-muted/50">
                       <TableCell colSpan={5} className="font-semibold">
                         {monthLabel(m.month)} total
                       </TableCell>
                       <TableCell className="text-right font-bold">{money(m.commission)}</TableCell>
                       <TableCell />
                     </TableRow>
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect } from "react";
 import { useTheme } from "next-themes";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { captureReferralCodeFromUrl } from "@/lib/referral";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgencyBranding } from "@/contexts/AgencyBrandingContext";
 import { Button } from "@/components/ui/button";
