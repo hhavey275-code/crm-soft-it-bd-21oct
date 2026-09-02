@@ -1,0 +1,1 @@
+UPDATE public.spend_cap_withdraw_requests SET status = 'rejected', admin_note = COALESCE(admin_note, 'Legacy request — cleared during panel cleanup'), resolved_at = now(), updated_at = now() WHERE status = 'pending';
