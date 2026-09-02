@@ -119,6 +119,10 @@ export default function ClientDetailPage() {
   const [companyInput, setCompanyInput] = useState("");
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
+  const [editingSpend, setEditingSpend] = useState(false);
+  const [spendInput, setSpendInput] = useState("");
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressInput, setAddressInput] = useState("");
   const [editingDueLimit, setEditingDueLimit] = useState(false);
   const [dueLimitInput, setDueLimitInput] = useState("");
   const [dueLimitExpiry, setDueLimitExpiry] = useState<string>("never");
