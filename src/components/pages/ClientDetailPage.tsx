@@ -1507,6 +1507,36 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
 
+                  {/* Monthly Spend */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10">
+                      <TrendingUp className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Monthly Spend
+                      </p>
+                      <p className="font-semibold text-sm">
+                        {(profile as any)?.monthly_spend || "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Business Address */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/10">
+                      <Building2 className="h-4 w-4 text-rose-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Business Address
+                      </p>
+                      <p className="font-semibold text-sm break-words">
+                        {(profile as any)?.business_address || "—"}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Onboarding Date */}
                   <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
