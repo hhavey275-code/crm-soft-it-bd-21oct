@@ -65,6 +65,12 @@ export function AuthForm() {
     return () => { if (prev && prev !== "light") setTheme(prev); };
   }, []); // eslint-disable-line
 
+  // Remember ?ref=CODE so the referrer can be attached after signup/OAuth.
+  const [refCode, setRefCode] = useState<string | null>(null);
+  useEffect(() => {
+    setRefCode(captureReferralCodeFromUrl());
+  }, []);
+
   useEffect(() => {
     if (!authLoading && user) {
       navigate({ to: "/dashboard" });
