@@ -1569,9 +1569,38 @@ export default function ClientDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Business Address
                       </p>
-                      <p className="font-semibold text-sm break-words">
-                        {(profile as any)?.business_address || "—"}
-                      </p>
+                      {editingAddress ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            className="h-7 text-sm"
+                            value={addressInput}
+                            onChange={(e) => setAddressInput(e.target.value)}
+                          />
+                          <Button
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => {
+                              saveProfileMutation.mutate({ business_address: addressInput } as any);
+                              setEditingAddress(false);
+                            }}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingAddress(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p
+                          className="font-semibold text-sm break-words cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setAddressInput((profile as any)?.business_address ?? "");
+                            setEditingAddress(true);
+                          }}
+                        >
+                          {(profile as any)?.business_address || "—"}
+                        </p>
+                      )}
                     </div>
                   </div>
 
