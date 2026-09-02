@@ -2099,6 +2099,10 @@ export type Database = {
           monthly_spend: string | null
           others_telegram_group_id: string | null
           phone: string | null
+          referral_code: string | null
+          referral_code_at: string | null
+          referral_rate_usd: number | null
+          referred_by: string | null
           secondary_deposit_enabled: boolean
           secondary_usd_rate: number | null
           secondary_wallet_enabled: boolean
@@ -2130,6 +2134,10 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          referral_code?: string | null
+          referral_code_at?: string | null
+          referral_rate_usd?: number | null
+          referred_by?: string | null
           secondary_deposit_enabled?: boolean
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
@@ -2161,6 +2169,10 @@ export type Database = {
           monthly_spend?: string | null
           others_telegram_group_id?: string | null
           phone?: string | null
+          referral_code?: string | null
+          referral_code_at?: string | null
+          referral_rate_usd?: number | null
+          referred_by?: string | null
           secondary_deposit_enabled?: boolean
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
@@ -2205,6 +2217,96 @@ export type Database = {
           id?: string
           p256dh?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      referral_monthly_earnings: {
+        Row: {
+          commission_usd: number
+          created_at: string
+          eligible: boolean
+          id: string
+          locked_at: string | null
+          min_spend_usd: number
+          period_month: string
+          rate_used: number
+          referred_name: string | null
+          referred_user_id: string
+          referrer_id: string
+          spend_usd: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commission_usd?: number
+          created_at?: string
+          eligible?: boolean
+          id?: string
+          locked_at?: string | null
+          min_spend_usd?: number
+          period_month: string
+          rate_used?: number
+          referred_name?: string | null
+          referred_user_id: string
+          referrer_id: string
+          spend_usd?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_usd?: number
+          created_at?: string
+          eligible?: boolean
+          id?: string
+          locked_at?: string | null
+          min_spend_usd?: number
+          period_month?: string
+          rate_used?: number
+          referred_name?: string | null
+          referred_user_id?: string
+          referrer_id?: string
+          spend_usd?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      referral_payout_requests: {
+        Row: {
+          admin_note: string | null
+          amount_usd: number
+          created_at: string
+          id: string
+          referrer_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          wallet_txn_id: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          amount_usd: number
+          created_at?: string
+          id?: string
+          referrer_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          wallet_txn_id?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          referrer_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          wallet_txn_id?: string | null
         }
         Relationships: []
       }
@@ -4040,6 +4142,7 @@ export type Database = {
         Args: { p_admin: string; p_payment_id: string }
         Returns: Json
       }
+      attach_referral: { Args: { p_code: string }; Returns: Json }
       claim_forward_slot: {
         Args: { p_group_id: string; p_source_id: string; p_source_type: string }
         Returns: boolean
@@ -4103,6 +4206,7 @@ export type Database = {
         }
         Returns: Json
       }
+      gen_referral_code: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
       get_user_agency_id: { Args: { _user_id: string }; Returns: string }
@@ -4117,6 +4221,7 @@ export type Database = {
       money_health_report: { Args: never; Returns: Json }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      recalc_referral_earnings: { Args: { p_month?: string }; Returns: Json }
       recalculate_tenant_ledger: {
         Args: { p_tenant_id: string }
         Returns: Json
@@ -4128,6 +4233,10 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      referral_available_balance: {
+        Args: { p_referrer: string }
+        Returns: number
       }
       refund_failed_topup: {
         Args: { p_failed_topup_id: string; p_processed_by: string }
@@ -4148,6 +4257,11 @@ export type Database = {
       }
       repair_wallet_balance: {
         Args: { p_reason: string; p_user_id: string; p_wallet_kind: string }
+        Returns: Json
+      }
+      request_referral_payout: { Args: { p_amount: number }; Returns: Json }
+      review_referral_payout: {
+        Args: { p_approve: boolean; p_id: string; p_note?: string }
         Returns: Json
       }
       settle_secondary_from_main: { Args: { p_user_id: string }; Returns: Json }
