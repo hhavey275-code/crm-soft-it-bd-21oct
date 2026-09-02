@@ -119,6 +119,10 @@ export default function ClientDetailPage() {
   const [companyInput, setCompanyInput] = useState("");
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
+  const [editingSpend, setEditingSpend] = useState(false);
+  const [spendInput, setSpendInput] = useState("");
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressInput, setAddressInput] = useState("");
   const [editingDueLimit, setEditingDueLimit] = useState(false);
   const [dueLimitInput, setDueLimitInput] = useState("");
   const [dueLimitExpiry, setDueLimitExpiry] = useState<string>("never");
@@ -1516,9 +1520,43 @@ export default function ClientDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Monthly Spend
                       </p>
-                      <p className="font-semibold text-sm">
-                        {(profile as any)?.monthly_spend || "—"}
-                      </p>
+                      {editingSpend ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Select value={spendInput} onValueChange={setSpendInput}>
+                            <SelectTrigger className="h-7 w-36 text-xs">
+                              <SelectValue placeholder="Select range" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["$0 - $500", "$500 - $2,000", "$2,000 - $5,000", "$5,000 - $10,000", "$10,000+"].map((r) => (
+                                <SelectItem key={r} value={r}>{r}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              saveProfileMutation.mutate({ monthly_spend: spendInput } as any);
+                              setEditingSpend(false);
+                            }}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingSpend(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p
+                          className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setSpendInput((profile as any)?.monthly_spend ?? "");
+                            setEditingSpend(true);
+                          }}
+                        >
+                          {(profile as any)?.monthly_spend || "—"}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1531,9 +1569,38 @@ export default function ClientDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Business Address
                       </p>
-                      <p className="font-semibold text-sm break-words">
-                        {(profile as any)?.business_address || "—"}
-                      </p>
+                      {editingAddress ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            className="h-7 text-sm"
+                            value={addressInput}
+                            onChange={(e) => setAddressInput(e.target.value)}
+                          />
+                          <Button
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => {
+                              saveProfileMutation.mutate({ business_address: addressInput } as any);
+                              setEditingAddress(false);
+                            }}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingAddress(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p
+                          className="font-semibold text-sm break-words cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setAddressInput((profile as any)?.business_address ?? "");
+                            setEditingAddress(true);
+                          }}
+                        >
+                          {(profile as any)?.business_address || "—"}
+                        </p>
+                      )}
                     </div>
                   </div>
 
