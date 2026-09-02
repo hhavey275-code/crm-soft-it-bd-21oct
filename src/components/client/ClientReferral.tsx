@@ -113,7 +113,7 @@ export function ClientReferral() {
       cur.spend += Number(e.spend_usd || 0);
       if (e.eligible) cur.eligibleSpend += Number(e.spend_usd || 0);
       cur.commission += Number(e.commission_usd || 0);
-      cur.rows.push(e);
+      (cur.rows as any[]).push(e);
       map.set(key, cur);
     }
     return [...map.values()].sort((a, b) => (a.month < b.month ? 1 : -1));

@@ -151,7 +151,7 @@ export function AdminReferrals() {
     const { data, error } = await supabase.rpc("review_referral_payout", {
       p_id: id,
       p_approve: approve,
-      p_note: note || null,
+      p_note: note || undefined,
     });
     setBusy(null);
     if (error) {
