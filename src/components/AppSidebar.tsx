@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Archive,
   FolderLock,
+  Gift,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -63,6 +64,7 @@ const adminNavItems = [
   { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
+  { title: "Referral", url: "/referral", icon: Gift, key: "referral" },
   { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
   { title: "Old Seller", url: "/old-seller", icon: Archive, key: "old-seller" },
   { title: "Accounts Audit", url: "/audit", icon: Shield, key: "audit" },
@@ -88,6 +90,7 @@ const clientNavItems = [
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
+  { title: "Referral", url: "/referral", icon: Gift, key: "referral" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
