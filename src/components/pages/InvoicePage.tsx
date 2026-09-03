@@ -25,24 +25,32 @@ export default function InvoicePage() {
       ]);
       const el = invoiceRef.current;
       const canvas = await html2canvas(el, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         backgroundColor: "#ffffff",
         windowWidth: el.scrollWidth,
       });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      // JPEG + PDF compression keeps the file well under 1 MB (PNG was ~10 MB)
+      let quality = 0.82;
+      let imgData = canvas.toDataURL("image/jpeg", quality);
+      const MAX_BYTES = 900 * 1024;
+      // Rough base64 -> byte size; step quality down if still too large
+      while (imgData.length * 0.75 > MAX_BYTES && quality > 0.4) {
+        quality -= 0.12;
+        imgData = canvas.toDataURL("image/jpeg", quality);
+      }
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const imgH = (canvas.height * pageW) / canvas.width;
       let heightLeft = imgH;
       let position = 0;
-      pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
+      pdf.addImage(imgData, "JPEG", 0, position, pageW, imgH, undefined, "FAST");
       heightLeft -= pageH;
       while (heightLeft > 0) {
         position = heightLeft - imgH;
         pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
+        pdf.addImage(imgData, "JPEG", 0, position, pageW, imgH, undefined, "FAST");
         heightLeft -= pageH;
       }
       pdf.save(`Invoice-${data?.invoice?.invoice_number || requestId}.pdf`);
