@@ -99,6 +99,7 @@ import { logSystemAction } from "@/lib/systemLog";
 import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
 import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
 import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
+import { openProof } from "@/lib/proofUrl";
 
 
 export default function ClientDetailPage() {
@@ -2910,6 +2911,7 @@ export default function ClientDetailPage() {
                               {r.proof_url ? (
                                 <a
                                   href={r.proof_url}
+                                  onClick={(e) => { e.preventDefault(); openProof(r.proof_url); }}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-primary hover:underline text-xs flex items-center gap-1"

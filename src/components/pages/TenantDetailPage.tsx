@@ -20,6 +20,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
+import { openProof } from "@/lib/proofUrl";
   ArrowLeft, Copy, Ban, CheckCircle, Trash2, Landmark, Edit, DollarSign,
   CalendarDays, Globe, Key, BarChart3, CreditCard, Building2, TrendingUp, TrendingDown, Wallet, SlidersHorizontal,
   Users, ShoppingCart, Activity, MonitorSmartphone, RefreshCw, Search, Circle, ExternalLink, Filter, Download,
@@ -696,7 +697,7 @@ export default function TenantDetailPage() {
                             <StatusBadge status={p.status} />
                             <span className="text-xs text-muted-foreground">{format(new Date(p.created_at), "dd MMM yyyy, hh:mm a")}</span>
                             {p.proof_url && (
-                              <a href={p.proof_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Proof</a>
+                              <a href={p.proof_url} onClick={(e) => { e.preventDefault(); openProof(p.proof_url); }} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Proof</a>
                             )}
                           </div>
                         </div>

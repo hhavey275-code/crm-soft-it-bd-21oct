@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { openProof } from "@/lib/proofUrl";
 
 type Props = { sellerId: string };
 
@@ -131,7 +132,7 @@ export function SellerNotInSheetCard({ sellerId }: Props) {
                 </div>
                 {r.proof_url && (
                   <Button size="sm" variant="ghost" className="h-7 px-2" asChild>
-                    <a href={r.proof_url} target="_blank" rel="noreferrer"><ImageIcon className="h-3.5 w-3.5" /></a>
+                    <a href={r.proof_url} onClick={(e) => { e.preventDefault(); openProof(r.proof_url); }} target="_blank" rel="noreferrer"><ImageIcon className="h-3.5 w-3.5" /></a>
                   </Button>
                 )}
               </div>
