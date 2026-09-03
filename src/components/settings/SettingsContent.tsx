@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { useColorTheme, type ColorTheme } from "@/contexts/ColorThemeContext";
 import { OcrFallbackSection } from "@/components/settings/OcrFallbackSection";
 import { GlobalRateControl } from "@/components/admin/GlobalRateControl";
+import { createProofUrl } from "@/lib/proofUrl";
 
 const COLOR_THEMES: { id: ColorTheme; name: string; swatch: string; ring: string }[] = [
   { id: "blue",   name: "Ocean Blue",   swatch: "bg-[hsl(214,100%,44%)]", ring: "ring-[hsl(214,100%,44%)]" },
@@ -935,8 +936,7 @@ function LicenseConfigSection() {
         const filePath = `tenant-proof-${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage.from("payment-proofs").upload(filePath, proofFile, { upsert: true });
         if (upErr) throw new Error("Failed to upload proof");
-        const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(filePath);
-        proofUrl = urlData.publicUrl;
+        proofUrl = await createProofUrl(filePath);
       }
 
       const res = await fetch(`${licenseData.master_url}/functions/v1/tenant-webhook`, {

@@ -18,6 +18,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 import { TelegramPollStatus } from "@/components/TelegramPollStatus";
+import { createProofUrl } from "@/lib/proofUrl";
 
 type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
@@ -649,8 +650,7 @@ export function ClientTopUp() {
         const filePath = `${user!.id}/${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage.from("payment-proofs").upload(filePath, proofFile);
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(filePath);
-        proofUrl = urlData.publicUrl;
+        proofUrl = await createProofUrl(filePath);
       }
       const { data: inserted, error } = await supabase.from("top_up_requests").insert({
         user_id: user!.id,

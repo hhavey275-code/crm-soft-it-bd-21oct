@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ArrowUpCircle, ImageIcon, X, DollarSign, Shield, Loader2, Building2 } from "lucide-react";
+import { createProofUrl } from "@/lib/proofUrl";
 
 export function TenantSystemTopUp() {
   const { user, isAdmin } = useAuth();
@@ -171,8 +172,7 @@ export function TenantSystemTopUp() {
       const filePath = `tenant/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("payment-proofs").upload(filePath, proofFile);
       if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(filePath);
-      proofUrl = urlData.publicUrl;
+      proofUrl = await createProofUrl(filePath);
 
       const res = await fetch(`${masterUrl}/functions/v1/tenant-webhook`, {
         method: "POST",

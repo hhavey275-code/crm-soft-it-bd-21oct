@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { format, differenceInDays } from "date-fns";
 import { Wallet, Clock, CreditCard, Upload } from "lucide-react";
+import { createProofUrl } from "@/lib/proofUrl";
 
 export function AgencyPayment() {
   const { user } = useAuth();
@@ -85,8 +86,7 @@ export function AgencyPayment() {
         const path = `agency-topup/${user!.id}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from("payment-proofs").upload(path, proofFile);
         if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(path);
-        proofUrl = urlData.publicUrl;
+        proofUrl = await createProofUrl(path);
       }
 
       const { error } = await supabase.from("top_up_requests").insert({
