@@ -8,6 +8,7 @@ import { Send, AlertTriangle, Loader2, CheckCircle2, XCircle, ImageIcon, Trash2 
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { openProof } from "@/lib/proofUrl";
 
 type Props = { sellerId: string; sellerName: string };
 
@@ -217,7 +218,7 @@ export function SellerNotForwardedCard({ sellerId, sellerName }: Props) {
               <div className="flex items-center gap-1.5">
                 {r.proof_url && (
                   <Button size="sm" variant="ghost" className="h-7 px-2" asChild>
-                    <a href={r.proof_url} target="_blank" rel="noreferrer"><ImageIcon className="h-3.5 w-3.5" /></a>
+                    <a href={r.proof_url} onClick={(e) => { e.preventDefault(); openProof(r.proof_url); }} target="_blank" rel="noreferrer"><ImageIcon className="h-3.5 w-3.5" /></a>
                   </Button>
                 )}
                 <Button

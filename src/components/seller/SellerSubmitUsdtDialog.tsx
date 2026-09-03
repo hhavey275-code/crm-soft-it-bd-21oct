@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Upload, Loader2, X, Landmark } from "lucide-react";
+import { createProofUrl } from "@/lib/proofUrl";
 
 interface Props {
   open: boolean;
@@ -84,8 +85,7 @@ export function SellerSubmitUsdtDialog({ open, onOpenChange, sellerId, invalidat
       const path = `${currentUserId}/seller-usdt-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path, file);
       if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(path);
-      setProofUrl(urlData.publicUrl);
+      setProofUrl(await createProofUrl(path));
       setPreviewUrl(URL.createObjectURL(file));
     } catch (e: any) {
       toast.error(e.message || "Upload failed");

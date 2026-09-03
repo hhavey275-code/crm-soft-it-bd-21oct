@@ -26,6 +26,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { DateRange } from "react-day-picker";
 import { logSystemAction } from "@/lib/systemLog";
+import { ProofImage } from "@/components/ProofImage";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -1081,7 +1082,7 @@ export function AdminTopUp() {
           <DialogHeader><DialogTitle>Payment Proof</DialogTitle></DialogHeader>
           {proofDialog && (
             <a href={proofDialog} target="_blank" rel="noopener noreferrer">
-              <img src={proofDialog} alt="Payment proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain cursor-pointer hover:opacity-90 transition-opacity" />
+              <ProofImage src={proofDialog} alt="Payment proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain cursor-pointer hover:opacity-90 transition-opacity" />
             </a>
           )}
         </DialogContent>

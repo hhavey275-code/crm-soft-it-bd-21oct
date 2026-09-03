@@ -46,6 +46,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Lock, Unlock } from "lucide-react";
+import { createProofUrl } from "@/lib/proofUrl";
+import { ProofImage } from "@/components/ProofImage";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -255,8 +257,7 @@ export function AdminSellers() {
       const path = `ocr-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path, file);
       if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(path);
-      const publicUrl = urlData.publicUrl;
+      const publicUrl = await createProofUrl(path);
       setOcrImageUrl(publicUrl);
       setOcrPreviewUrl(URL.createObjectURL(file));
 
@@ -2128,7 +2129,7 @@ export function AdminSellers() {
       {/* Proof Dialog */}
       <Dialog open={!!proofUrl} onOpenChange={() => setProofUrl(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
-          {proofUrl && <img src={proofUrl} alt="Proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain" />}
+          {proofUrl && <ProofImage src={proofUrl} alt="Proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain" />}
         </DialogContent>
       </Dialog>
 

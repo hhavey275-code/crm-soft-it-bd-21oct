@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, addMonths } from "date-fns";
 import { CreditCard, ImageIcon, X, Loader2, Building2, Shield, CalendarDays, Check } from "lucide-react";
+import { createProofUrl } from "@/lib/proofUrl";
 
 const DURATION_OPTIONS = [
   { months: 1, label: "1 Month" },
@@ -166,8 +167,7 @@ export function TenantSubscriptions() {
       const filePath = `tenant/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("payment-proofs").upload(filePath, proofFile);
       if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(filePath);
-      proofUrl = urlData.publicUrl;
+      proofUrl = await createProofUrl(filePath);
 
       const res = await fetch(`${masterUrl}/functions/v1/tenant-webhook`, {
         method: "POST",

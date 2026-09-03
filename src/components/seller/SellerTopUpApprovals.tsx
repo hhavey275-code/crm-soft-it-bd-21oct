@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Check, X, Pause, ImageIcon, FileText, Send } from "lucide-react";
+import { ProofImage } from "@/components/ProofImage";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -400,7 +401,7 @@ export function SellerTopUpApprovals() {
       <Dialog open={!!proofUrl} onOpenChange={(o) => !o && setProofUrl(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Payment Proof</DialogTitle></DialogHeader>
-          {proofUrl && <img src={proofUrl} alt="Proof" className="w-full rounded" />}
+          {proofUrl && <ProofImage src={proofUrl} alt="Proof" className="w-full rounded" />}
         </DialogContent>
       </Dialog>
 
