@@ -31,6 +31,7 @@ import {
 import { formatBdt, formatDueAdvance } from "@/lib/sellerRunningTotal";
 import { MigrateForwardedButton } from "./MigrateForwardedButton";
 import { AddForwardedEntryDialog } from "./AddForwardedEntryDialog";
+import { ProofImage } from "@/components/ProofImage";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -681,7 +682,7 @@ function PaymentsTable({ rows, forwarded, csvName, duplicateIds, onDelete, withd
                       <TableCell>
                         {r.proof_url ? (
                           <a href={r.proof_url} target="_blank" rel="noopener noreferrer" title="Open payment proof">
-                            <img src={r.proof_url} alt="proof" className="h-10 w-10 rounded border object-cover hover:scale-150 hover:z-10 transition-transform" />
+                            <ProofImage src={r.proof_url} alt="proof" className="h-10 w-10 rounded border object-cover hover:scale-150 hover:z-10 transition-transform" />
                           </a>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>

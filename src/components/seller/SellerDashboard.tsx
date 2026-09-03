@@ -30,6 +30,7 @@ import { exportAllColumnsTotal, exportColorfulMonthly, buildAvailableMonths, slu
 import { SellerNotInSheetCard } from "./SellerNotInSheetCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ProofImage } from "@/components/ProofImage";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -933,7 +934,7 @@ export function SellerDashboard() {
       {/* Proof Dialog */}
       <Dialog open={!!proofUrl} onOpenChange={() => setProofUrl(null)}>
         <DialogContent className="max-w-lg p-1">
-          {proofUrl && <img src={proofUrl} alt="Proof" className="w-full rounded-lg" />}
+          {proofUrl && <ProofImage src={proofUrl} alt="Proof" className="w-full rounded-lg" />}
         </DialogContent>
       </Dialog>
 

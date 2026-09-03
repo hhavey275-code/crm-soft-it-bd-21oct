@@ -47,6 +47,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Lock, Unlock } from "lucide-react";
 import { createProofUrl } from "@/lib/proofUrl";
+import { ProofImage } from "@/components/ProofImage";
 
 type DatePreset = "all" | "today" | "yesterday" | "last7" | "thisMonth" | "lastMonth" | "custom";
 type TypeFilter = "all" | "bdt_payment" | "usdt_received" | "withdraw" | "client_topup";
@@ -2128,7 +2129,7 @@ export function AdminSellers() {
       {/* Proof Dialog */}
       <Dialog open={!!proofUrl} onOpenChange={() => setProofUrl(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
-          {proofUrl && <img src={proofUrl} alt="Proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain" />}
+          {proofUrl && <ProofImage src={proofUrl} alt="Proof" className="max-h-[75vh] w-auto mx-auto rounded-md object-contain" />}
         </DialogContent>
       </Dialog>
 

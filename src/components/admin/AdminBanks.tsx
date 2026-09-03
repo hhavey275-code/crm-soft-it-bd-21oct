@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
+import { ProofImage } from "@/components/ProofImage";
 
 const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "", logo_url: "" };
 
@@ -187,7 +188,7 @@ function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; 
                             <div key={tx.id} className="px-3 py-2 flex items-center gap-2 text-xs">
                               {tx.proof_url && (
                                 <button onClick={() => setProofPreview(tx.proof_url)} className="shrink-0">
-                                  <img src={tx.proof_url} alt="proof" className="h-10 w-10 rounded object-cover border" />
+                                  <ProofImage src={tx.proof_url} alt="proof" className="h-10 w-10 rounded object-cover border" />
                                 </button>
                               )}
                               <div className="flex-1 min-w-0">
@@ -216,7 +217,7 @@ function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; 
     {proofPreview && (
       <Dialog open={!!proofPreview} onOpenChange={() => setProofPreview(null)}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 sm:p-4 flex items-center justify-center">
-          <img src={proofPreview} alt="Payment Proof" className="max-w-full max-h-[85vh] object-contain rounded" />
+          <ProofImage src={proofPreview} alt="Payment Proof" className="max-w-full max-h-[85vh] object-contain rounded" />
         </DialogContent>
       </Dialog>
     )}
