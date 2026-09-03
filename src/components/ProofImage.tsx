@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { resolveProofUrl } from "@/lib/proofUrl";
 
-interface ProofImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface ProofImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> {
   src: string | null | undefined;
 }
 
