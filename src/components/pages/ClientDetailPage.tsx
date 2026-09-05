@@ -2342,30 +2342,139 @@ export default function ClientDetailPage() {
                   Ad Accounts ({adAccounts?.length ?? 0})
                 </h2>
                 <div className="flex items-center gap-1.5">
-                  {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
+                  {showUnassignCheckboxes && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="rounded-full text-xs h-7"
-                      onClick={async () => {
-                        const ids = Array.from(unassignSelectedIds);
-                        for (const adAccountId of ids) {
-                          await (supabase as any)
-                            .from("user_ad_accounts")
-                            .delete()
-                            .eq("user_id", userId!)
-                            .eq("ad_account_id", adAccountId);
-                        }
-                        toast.success(`${ids.length} account(s) unassigned`);
-                        setUnassignSelectedIds(new Set());
-                        setShowUnassignCheckboxes(false);
-                        refetchAdAccounts();
-                        queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+                      onClick={() => {
+                        const all = filteredAdAccounts ?? [];
+                        if (all.length > 0 && all.every((a: any) => unassignSelectedIds.has(a.id)))
+                          setUnassignSelectedIds(new Set());
+                        else setUnassignSelectedIds(new Set(all.map((a: any) => a.id)));
                       }}
                     >
-                      Unassign {unassignSelectedIds.size}
+                      {(filteredAdAccounts?.length ?? 0) > 0 &&
+                      filteredAdAccounts?.every((a: any) => unassignSelectedIds.has(a.id))
+                        ? "Clear all"
+                        : "Select all"}
                     </Button>
                   )}
+                  {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full text-xs h-7"
+                        disabled={bulkBusy}
+                        onClick={async () => {
+                          const ids = Array.from(unassignSelectedIds);
+                          setBulkBusy(true);
+                          try {
+                            const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+                            const res = await chunkedMetaSync(ids);
+                            const failed = res?.failed_account_ids?.length ?? 0;
+                            if (failed > 0)
+                              toast.warning(`${ids.length - failed}/${ids.length} updated · ${failed} failed`);
+                            else toast.success(`${ids.length} account(s) updated from Meta`);
+                            refetchAdAccounts();
+                            queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+                          } catch (err: any) {
+                            toast.error(err?.message || "Update failed");
+                          } finally {
+                            setBulkBusy(false);
+                          }
+                        }}
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5 mr-1", bulkBusy && "animate-spin")} />
+                        Update {unassignSelectedIds.size}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full text-xs h-7"
+                        disabled={bulkBusy}
+                        onClick={async () => {
+                          const ids = Array.from(unassignSelectedIds);
+                          setBulkBusy(true);
+                          try {
+                            const { error } = await (supabase as any)
+                              .from("user_ad_accounts")
+                              .delete()
+                              .eq("user_id", userId!)
+                              .in("ad_account_id", ids);
+                            if (error) throw error;
+                            toast.success(`${ids.length} account(s) unassigned`);
+                            setUnassignSelectedIds(new Set());
+                            setShowUnassignCheckboxes(false);
+                            refetchAdAccounts();
+                            queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+                          } catch (err: any) {
+                            toast.error(err?.message || "Unassign failed");
+                          } finally {
+                            setBulkBusy(false);
+                          }
+                        }}
+                      >
+                        Unassign {unassignSelectedIds.size}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="rounded-full text-xs h-7"
+                        disabled={bulkBusy}
+                        onClick={async () => {
+                          const ids = Array.from(unassignSelectedIds);
+                          if (
+                            !window.confirm(
+                              `Delete ${ids.length} ad account(s) permanently? This removes all associated data.`,
+                            )
+                          )
+                            return;
+                          setBulkBusy(true);
+                          try {
+                            try {
+                              await Promise.all([
+                                (supabase as any).from("bm_access_requests").delete().in("ad_account_id", ids),
+                                (supabase as any).from("top_up_requests").delete().in("ad_account_id", ids),
+                                (supabase as any)
+                                  .from("ad_account_requests")
+                                  .update({ assigned_ad_account_id: null })
+                                  .in("assigned_ad_account_id", ids),
+                                supabase.from("ad_account_insights").delete().in("ad_account_id", ids),
+                              ]);
+                            } catch (cleanupErr: any) {
+                              console.warn("Pre-delete cleanup warning:", cleanupErr?.message || cleanupErr);
+                            }
+                            const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
+                            if (error) throw error;
+                            const names = ids
+                              .map(
+                                (id) =>
+                                  adAccounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8),
+                              )
+                              .join(", ");
+                            void logSystemAction("Ad Account Deleted", names);
+                            toast.success(`${ids.length} ad account(s) deleted`);
+                            setUnassignSelectedIds(new Set());
+                            setShowUnassignCheckboxes(false);
+                            refetchAdAccounts();
+                            queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+                            queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+                            queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+                          } catch (err: any) {
+                            toast.error(err?.message || "Delete failed");
+                          } finally {
+                            setBulkBusy(false);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                        Delete {unassignSelectedIds.size}
+                      </Button>
+                    </>
+                  )}
+
                   <Button
                     variant={showUnassignCheckboxes ? "secondary" : "ghost"}
                     size="icon"
