@@ -157,6 +157,8 @@ export default function ClientDetailPage() {
   const [assignSelectedIds, setAssignSelectedIds] = useState<Set<string>>(new Set());
   const [unassignSelectedIds, setUnassignSelectedIds] = useState<Set<string>>(new Set());
   const [showUnassignCheckboxes, setShowUnassignCheckboxes] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const [assignSearch, setAssignSearch] = useState("");
   const [passwordDialog, setPasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState("");
