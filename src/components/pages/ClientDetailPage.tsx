@@ -2339,11 +2339,11 @@ export default function ClientDetailPage() {
 
             {/* Ad Accounts */}
             <div>
-              <div className={cn("flex items-center justify-between mb-3", isMobile && "mb-2")}>
+              <div className={cn("flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between", isMobile && "mb-2")}>
                 <h2 className="text-base font-semibold text-foreground">
                   Ad Accounts ({adAccounts?.length ?? 0})
                 </h2>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {showUnassignCheckboxes && (
                     <Button
                       variant="outline"
