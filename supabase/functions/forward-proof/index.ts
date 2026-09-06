@@ -8,6 +8,7 @@ import {
   completeForwardSlot,
   releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
+import { resolveProofUrlForTelegram } from '../_shared/proof-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
