@@ -9,6 +9,7 @@ import {
   completeForwardSlot,
   releaseForwardSlot,
 } from '../_shared/seller-balance.ts';
+import { resolveProofUrlForTelegram } from '../_shared/proof-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -309,10 +310,12 @@ Deno.serve(async (req) => {
     // Send: photo if proof, text-only otherwise
     let tgResult: any;
     if (proof_url) {
+      // payment-proofs bucket is private → Telegram needs a signed URL.
+      const photoUrl = await resolveProofUrlForTelegram(supabase, proof_url);
       const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: groupId, photo: proof_url, caption, parse_mode: 'HTML' }),
+        body: JSON.stringify({ chat_id: groupId, photo: photoUrl, caption, parse_mode: 'HTML' }),
       });
       tgResult = await tgResp.json();
     } else {
