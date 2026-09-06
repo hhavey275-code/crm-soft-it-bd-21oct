@@ -234,12 +234,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // payment-proofs bucket is private → Telegram needs a signed URL.
+    const photoUrl = await resolveProofUrlForTelegram(supabase, reqData.proof_url);
     const tgResp = await fetch(`https://api.telegram.org/bot${tokenRow.value}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: targetGroupId,
-        photo: reqData.proof_url,
+        photo: photoUrl,
         caption,
         parse_mode: 'HTML',
       }),
