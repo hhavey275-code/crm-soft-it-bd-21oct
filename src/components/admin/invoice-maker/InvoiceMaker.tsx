@@ -21,7 +21,6 @@ import {
   InvoiceTemplate,
   TEMPLATES,
   PAYMENT_STATUSES,
-  PAYMENT_STATUSES,
   money,
   totals,
   type InvoiceDraft,
