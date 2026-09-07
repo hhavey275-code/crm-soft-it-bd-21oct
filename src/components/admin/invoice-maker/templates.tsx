@@ -8,6 +8,44 @@ export type InvoiceItem = {
 
 export type PaymentStatus = "none" | "unpaid" | "paid" | "partial";
 
+export type InvoiceDraft = {
+  invoice_number: string;
+  template: string;
+  currency: string;
+  issue_date: string;
+  due_date: string;
+  logo_url: string;
+  from_name: string;
+  from_address: string;
+  from_email: string;
+  from_phone: string;
+  from_extra: string;
+  bank_details: string;
+  to_name: string;
+  to_address: string;
+  to_email: string;
+  to_phone: string;
+  items: InvoiceItem[];
+  tax_percent: number;
+  discount: number;
+  notes: string;
+  terms: string;
+  payment_status: PaymentStatus;
+  amount_paid: number;
+};
+
+export const PAYMENT_STATUSES = [
+  { id: "none", label: "No seal (hide)" },
+  { id: "unpaid", label: "Unpaid" },
+  { id: "partial", label: "Partially Paid" },
+  { id: "paid", label: "Paid" },
+] as const;
+
+const SEAL_STYLES: Record<string, { color: string; label: string }> = {
+  paid: { color: "#15803d", label: "PAID" },
+  partial: { color: "#b45309", label: "PARTIALLY PAID" },
+  unpaid: { color: "#b91c1c", label: "UNPAID" },
+};
 
 
 export const TEMPLATES = [
