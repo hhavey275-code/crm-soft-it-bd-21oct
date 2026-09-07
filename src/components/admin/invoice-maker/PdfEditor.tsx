@@ -704,7 +704,7 @@ export function PdfEditor() {
                             : it.serif
                               ? "Times, serif"
                               : "Helvetica, Arial, sans-serif",
-                          fontWeight: it.bold ? 700 : 400,
+                          fontWeight: it.bold ? ((it.weight ?? 1) >= 3 ? 900 : 800) : 400,
                           fontStyle: it.italic ? "italic" : "normal",
                           fontSize: it.size * 0.95 * scale,
                           color: "#111",
