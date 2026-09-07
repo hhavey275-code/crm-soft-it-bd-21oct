@@ -107,6 +107,7 @@ export function PdfEditor() {
       const doc = await pdfjs.getDocument({ data: buf.slice() }).promise;
 
       const rendered: PageInfo[] = [];
+      const found: TextItem[] = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const base = page.getViewport({ scale: 1 });
@@ -117,8 +118,38 @@ export function PdfEditor() {
         const ctx = canvas.getContext("2d")!;
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
+
+        // Collect the real text of the page so it can be retyped in place.
+        try {
+          const tc: any = await page.getTextContent();
+          const styles: any = tc.styles || {};
+          (tc.items as any[]).forEach((it, i) => {
+            const str: string = it.str ?? "";
+            if (!str.trim()) return;
+            const tr: number[] = it.transform || [1, 0, 0, 1, 0, 0];
+            const size = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 10;
+            const family = String(styles[it.fontName]?.fontFamily || it.fontName || "").toLowerCase();
+            found.push({
+              key: `${p - 1}:${i}`,
+              page: p - 1,
+              original: str,
+              value: str,
+              x: tr[4],
+              baseline: tr[5],
+              w: it.width || size * str.length * 0.5,
+              size,
+              bold: /bold|black|heavy|semibold/.test(family),
+              italic: /italic|oblique/.test(family),
+              serif: /times|serif|georgia|roman|garamond|book/.test(family) && !/sans/.test(family),
+              mono: /mono|courier|consol/.test(family),
+            });
+          });
+        } catch {
+          /* text layer unavailable for this page */
+        }
       }
       setPages(rendered);
+      setItems(found);
 
       const { PDFDocument } = await import("pdf-lib");
       const lib = await PDFDocument.load(buf.slice(), { updateMetadata: false });
