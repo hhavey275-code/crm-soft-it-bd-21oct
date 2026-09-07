@@ -24,8 +24,11 @@ type TextItem = {
   italic: boolean;
   serif: boolean;
   mono: boolean;
+  /** extra bold thickness: 1 = normal bold, 2/3 = heavier (faux bold passes) */
+  weight?: number;
   /** true when the look (bold/italic/serif/size) was changed by hand */
   dirty?: boolean;
+
 };
 
 type PdfMeta = {
