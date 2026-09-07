@@ -168,6 +168,8 @@ export function PdfEditor() {
               w: it.width || size * str.length * 0.5,
               size,
               bold: weight >= 600 || /bold|black|heavy|semibold|[-,]bd\b|extrab/.test(family),
+              weight: /black|heavy|extrab|bold900|800/.test(family) || weight >= 800 ? 3 : 2,
+
               italic: st.italic === true || /italic|oblique/.test(family),
               serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
