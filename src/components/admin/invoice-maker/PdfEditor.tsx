@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Download, Eraser, Image as ImageIcon, Trash2, Type, Upload } from "lucide-react";
+import { Download, Eraser, Image as ImageIcon, Pencil, RotateCcw, Trash2, Type, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
