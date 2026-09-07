@@ -30,6 +30,8 @@ type TextItem = {
   dirty?: boolean;
   /** paper colour sampled right around the line, used for the on-screen preview */
   bg?: string;
+  /** rebuilt paper behind the line, so previews do not show a flat box */
+  bgPatch?: string;
 
 
 };
@@ -53,6 +55,8 @@ type Obj = {
   text?: string;
   size?: number;
   color?: string;
+  bg?: string;
+  bgPatch?: string;
   w?: number;
   h?: number;
   dataUrl?: string;
@@ -114,7 +118,7 @@ function buildBackgroundPatch(
       const si = x * 4;
       const di = (y * pw + x) * 4;
       for (let c = 0; c < 3; c++) {
-        img.data[di + c] = Math.round(above[si + c]! * (1 - t) + below[si + c]! * t);
+        img.data[di + c] = Math.round((above[si + c] ?? 255) * (1 - t) + (below[si + c] ?? 255) * t);
       }
       img.data[di + 3] = 255;
     }
@@ -144,9 +148,9 @@ function sampleBackground(
     for (const y of rows) {
       const d = ctx.getImageData(px, y, Math.min(pw, ctx.canvas.width - px), 1).data;
       for (let i = 0; i < d.length; i += 4) {
-        r += d[i]!;
-        g += d[i + 1]!;
-        b += d[i + 2]!;
+        r += d[i] ?? 255;
+        g += d[i + 1] ?? 255;
+        b += d[i + 2] ?? 255;
         n++;
       }
     }
@@ -224,7 +228,8 @@ export function PdfEditor() {
         const canvas = document.createElement("canvas");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
         pageCanvases.current[p - 1] = canvas;
@@ -254,6 +259,13 @@ export function PdfEditor() {
             const st = styles[it.fontName] || {};
             const family = [realName(it.fontName), st.fontFamily, it.fontName].filter(Boolean).join(" ").toLowerCase();
             const weight = Number(st.fontWeight) || 0;
+            const width = Math.max(it.width || size * str.length * 0.5, 2);
+            const rect = {
+              x: tr[4],
+              y: tr[5] - size * 0.26,
+              w: width,
+              h: size * 1.18,
+            };
             found.push({
               key: `${p - 1}:${i}`,
               page: p - 1,
@@ -261,7 +273,7 @@ export function PdfEditor() {
               value: str,
               x: tr[4],
               baseline: tr[5],
-              w: it.width || size * str.length * 0.5,
+              w: width,
               size,
               bold: weight >= 600 || /bold|black|heavy|semibold|[-,]bd\b|extrab/.test(family),
               weight: /black|heavy|extrab|bold900|800/.test(family) || weight >= 800 ? 3 : 2,
@@ -269,12 +281,8 @@ export function PdfEditor() {
               italic: st.italic === true || /italic|oblique/.test(family),
               serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
-              bg: sampleBackground(ctx, base.height, viewport.scale, {
-                x: tr[4],
-                y: tr[5] - size * 0.26,
-                w: Math.max(it.width || size * str.length * 0.5, 2),
-                h: size * 1.18,
-              }),
+              bg: sampleBackground(ctx, base.height, viewport.scale, rect),
+              bgPatch: buildBackgroundPatch(canvas, rect, base.height) ?? undefined,
             });
 
           });
@@ -312,15 +320,35 @@ export function PdfEditor() {
         { id, page: pageIdx, type: "text", x: xPt, y: yPt, text: textValue || "Text", size: fontSize, color },
       ]);
     } else if (tool === "whiteout") {
-      setObjs((o) => [...o, { id, page: pageIdx, type: "whiteout", x: xPt, y: yPt, w: 160, h: 24 }]);
+      const width = 160;
+      const height = 24;
+      const page = pages[pageIdx];
+      const canvas = pageCanvases.current[pageIdx];
+      const ctx = canvas?.getContext("2d") ?? null;
+      const rect = page ? { x: xPt, y: page.height - yPt - height, w: width, h: height } : null;
+      setObjs((o) => [
+        ...o,
+        {
+          id,
+          page: pageIdx,
+          type: "whiteout",
+          x: xPt,
+          y: yPt,
+          w: width,
+          h: height,
+          bg: page && ctx && rect ? sampleBackground(ctx, page.height, canvas.height / page.height, rect) : "#ffffff",
+          bgPatch: page && rect ? buildBackgroundPatch(canvas, rect, page.height) ?? undefined : undefined,
+        },
+      ]);
     } else if (tool === "image") {
-      if (!pendingImage.current) {
+      const imageDataUrl = pendingImage.current;
+      if (!imageDataUrl) {
         toast.error("Pick an image file first");
         return;
       }
       setObjs((o) => [
         ...o,
-        { id, page: pageIdx, type: "image", x: xPt, y: yPt, w: 120, h: 120, dataUrl: pendingImage.current! },
+        { id, page: pageIdx, type: "image", x: xPt, y: yPt, w: 120, h: 120, dataUrl: imageDataUrl },
       ]);
     }
     setSelected(id);
@@ -396,9 +424,12 @@ export function PdfEditor() {
         // instead of stamping a white box over it.
         const patch = buildBackgroundPatch(pageCanvases.current[it.page], rect, pgH);
         if (patch) {
-          const raw = Uint8Array.from(atob(patch.split(",")[1]!), (ch) => ch.charCodeAt(0));
-          const img = await doc.embedPng(raw);
-          page.drawImage(img, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+          const encoded = patch.split(",")[1];
+          if (encoded) {
+            const raw = Uint8Array.from(atob(encoded), (ch) => ch.charCodeAt(0));
+            const img = await doc.embedPng(raw);
+            page.drawImage(img, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+          }
         } else {
           page.drawRectangle({ ...rect, width: rect.w, height: rect.h, color: rgb(1, 1, 1) });
         }
@@ -416,7 +447,7 @@ export function PdfEditor() {
             [step * 0.5, -step * 0.35],
           ];
           for (let p = 0; p < (strength >= 2 ? passes.length : 1); p++) {
-            const [dx, dy] = passes[p]!;
+            const [dx, dy] = passes[p] ?? [0, 0];
             page.drawText(it.value, { x: it.x + dx, y: it.baseline + dy, size, font: f, color: ink });
           }
         }
@@ -438,13 +469,21 @@ export function PdfEditor() {
             color: rgb(c.r, c.g, c.b),
           });
         } else if (o.type === "whiteout") {
-          page.drawRectangle({
+          const rect = {
             x: o.x,
             y: height - o.y - (o.h || 24),
-            width: o.w || 160,
-            height: o.h || 24,
-            color: rgb(1, 1, 1),
-          });
+            w: o.w || 160,
+            h: o.h || 24,
+          };
+          const patch = buildBackgroundPatch(pageCanvases.current[o.page], rect, height);
+          const encoded = patch?.split(",")[1];
+          if (encoded) {
+            const raw = Uint8Array.from(atob(encoded), (ch) => ch.charCodeAt(0));
+            const img = await doc.embedPng(raw);
+            page.drawImage(img, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+          } else {
+            page.drawRectangle({ x: rect.x, y: rect.y, width: rect.w, height: rect.h, color: rgb(1, 1, 1) });
+          }
         } else if (o.type === "image" && o.dataUrl) {
           const isPng = o.dataUrl.startsWith("data:image/png");
           const b64 = o.dataUrl.split(",")[1];
@@ -822,13 +861,11 @@ export function PdfEditor() {
                           fontStyle: it.italic ? "italic" : "normal",
                           fontSize: it.size * 0.95 * scale,
                           color: "#111",
-                          background: changed ? it.bg || "#fff" : "transparent",
-                          outline:
-                            editingKey === it.key
-                              ? "2px solid #2563eb"
-                              : tool === "edit"
-                                ? "1px dashed rgba(37,99,235,0.35)"
-                                : "none",
+                          backgroundColor: changed ? it.bg || "transparent" : "transparent",
+                          backgroundImage: changed && it.bgPatch ? `url("${it.bgPatch}")` : undefined,
+                          backgroundRepeat: "no-repeat",
+                          backgroundSize: "100% 100%",
+                          outline: "none",
                         }}
                       >
                         {changed ? it.value : ""}
@@ -857,7 +894,12 @@ export function PdfEditor() {
                         left: o.x * scale,
                         top: o.y * scale,
                         cursor: "move",
-                        outline: selected === o.id ? "2px solid #2563eb" : "1px dashed rgba(0,0,0,0.25)",
+                        outline:
+                          o.type === "whiteout"
+                            ? "none"
+                            : selected === o.id
+                              ? "2px solid #2563eb"
+                              : "1px dashed rgba(0,0,0,0.25)",
                         ...(o.type === "text"
                           ? {
                               fontFamily: "Helvetica, Arial, sans-serif",
@@ -870,7 +912,11 @@ export function PdfEditor() {
                           : {
                               width: (o.w || 100) * scale,
                               height: (o.h || 100) * scale,
-                              background: o.type === "whiteout" ? "#fff" : undefined,
+                              backgroundColor: o.type === "whiteout" ? o.bg || "#ffffff" : undefined,
+                              backgroundImage:
+                                o.type === "whiteout" && o.bgPatch ? `url("${o.bgPatch}")` : undefined,
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "100% 100%",
                             }),
                       }}
                     >
