@@ -483,29 +483,40 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function Footer({ data, compact }: { data: InvoiceDraft; compact?: boolean }) {
   const hasBank = !!data.bank_details && !compact;
-  if (!hasBank && !data.notes && !data.terms) return null;
+  const hasBlocks = hasBank || !!data.notes || !!data.terms;
   return (
-    <div className={`mt-8 grid ${hasBank ? "grid-cols-2" : "grid-cols-1"} gap-6 text-xs text-[#444]`}>
-      {hasBank && (
-        <div>
-          <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Bank details</div>
-          <Lines text={data.bank_details} />
+    <>
+      {hasBlocks && (
+        <div className={`mt-8 grid ${hasBank ? "grid-cols-2" : "grid-cols-1"} gap-6 text-xs text-[#444]`}>
+          {hasBank && (
+            <div>
+              <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Bank details</div>
+              <Lines text={data.bank_details} />
+            </div>
+          )}
+          <div>
+            {data.notes && (
+              <div className="mb-3">
+                <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Notes</div>
+                <Lines text={data.notes} />
+              </div>
+            )}
+            {data.terms && (
+              <div>
+                <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Payment terms</div>
+                <Lines text={data.terms} />
+              </div>
+            )}
+          </div>
         </div>
       )}
-      <div>
-        {data.notes && (
-          <div className="mb-3">
-            <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Notes</div>
-            <Lines text={data.notes} />
-          </div>
-        )}
-        {data.terms && (
-          <div>
-            <div className="font-bold uppercase tracking-widest text-[10px] mb-1">Terms</div>
-            <Lines text={data.terms} />
-          </div>
-        )}
+      <div
+        className="mt-8 pt-3 text-center text-[10px] text-[#666]"
+        style={{ borderTop: "1px solid #ddd" }}
+      >
+        This is a system generated invoice — no signature is required.
       </div>
-    </div>
+    </>
   );
 }
+
