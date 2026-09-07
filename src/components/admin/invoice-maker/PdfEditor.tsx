@@ -96,6 +96,10 @@ export function PdfEditor() {
     setItems((list) => list.map((i) => (i.key === key ? { ...i, value } : i)));
   }
 
+  function patchItem(key: string, patch: Partial<TextItem>) {
+    setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch } : i)));
+  }
+
   const openPdf = useCallback(async (file: File) => {
     setBusy(true);
     try {
