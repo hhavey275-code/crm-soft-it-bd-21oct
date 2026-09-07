@@ -24,8 +24,11 @@ type TextItem = {
   italic: boolean;
   serif: boolean;
   mono: boolean;
+  /** extra bold thickness: 1 = normal bold, 2/3 = heavier (faux bold passes) */
+  weight?: number;
   /** true when the look (bold/italic/serif/size) was changed by hand */
   dirty?: boolean;
+
 };
 
 type PdfMeta = {
@@ -165,6 +168,8 @@ export function PdfEditor() {
               w: it.width || size * str.length * 0.5,
               size,
               bold: weight >= 600 || /bold|black|heavy|semibold|[-,]bd\b|extrab/.test(family),
+              weight: /black|heavy|extrab|bold900|800/.test(family) || weight >= 800 ? 3 : 2,
+
               italic: st.italic === true || /italic|oblique/.test(family),
               serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
@@ -285,8 +290,24 @@ export function PdfEditor() {
           color: rgb(1, 1, 1),
         });
         if (!f) continue;
-        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
+        const ink = it.bold ? rgb(0, 0, 0) : rgb(0.07, 0.07, 0.07);
+        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: ink });
+        if (it.bold) {
+          // Faux-bold: redraw with tiny offsets so the stroke matches the PDF's own heavy fonts.
+          const strength = Math.max(1, Math.min(3, it.weight ?? 1));
+          const step = size * 0.022 * strength;
+          const passes: Array<[number, number]> = [
+            [step, 0],
+            [step * 0.5, step * 0.35],
+            [step * 0.5, -step * 0.35],
+          ];
+          for (let p = 0; p < (strength >= 2 ? passes.length : 1); p++) {
+            const [dx, dy] = passes[p]!;
+            page.drawText(it.value, { x: it.x + dx, y: it.baseline + dy, size, font: f, color: ink });
+          }
+        }
       }
+
 
 
       for (const o of objs) {
@@ -421,10 +442,28 @@ export function PdfEditor() {
                       <Button
                         size="sm"
                         variant={editItem.bold ? "default" : "outline"}
-                        onClick={() => patchItem(editItem.key, { bold: !editItem.bold })}
+                        onClick={() =>
+                          patchItem(editItem.key, { bold: !editItem.bold, weight: editItem.bold ? 1 : 2 })
+                        }
                       >
                         <span className="font-bold">B</span>
                       </Button>
+                      {editItem.bold && (
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3].map((w) => (
+                            <Button
+                              key={w}
+                              size="sm"
+                              variant={(editItem.weight ?? 1) === w ? "default" : "outline"}
+                              onClick={() => patchItem(editItem.key, { weight: w })}
+                              title={`Bold thickness ${w}`}
+                            >
+                              <span style={{ fontWeight: 500 + w * 100 }}>B{w}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+
                       <Button
                         size="sm"
                         variant={editItem.italic ? "default" : "outline"}
@@ -665,7 +704,7 @@ export function PdfEditor() {
                             : it.serif
                               ? "Times, serif"
                               : "Helvetica, Arial, sans-serif",
-                          fontWeight: it.bold ? 700 : 400,
+                          fontWeight: it.bold ? ((it.weight ?? 1) >= 3 ? 900 : 800) : 400,
                           fontStyle: it.italic ? "italic" : "normal",
                           fontSize: it.size * 0.95 * scale,
                           color: "#111",
