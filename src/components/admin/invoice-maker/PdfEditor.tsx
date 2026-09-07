@@ -144,6 +144,9 @@ export function PdfEditor() {
   const [color, setColor] = useState("#111111");
   const pendingImage = useRef<string | null>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; scale: number } | null>(null);
+  /** rendered page bitmaps, kept so replaced text can reuse the real background */
+  const pageCanvases = useRef<HTMLCanvasElement[]>([]);
+
 
   const sel = objs.find((o) => o.id === selected) ?? null;
   const editItem = items.find((i) => i.key === editingKey) ?? null;
