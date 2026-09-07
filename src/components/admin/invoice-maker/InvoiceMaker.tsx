@@ -51,6 +51,8 @@ function blankDraft(): InvoiceDraft {
     discount: 0,
     notes: "",
     terms: "",
+    payment_status: "unpaid",
+    amount_paid: 0,
   };
 }
 
@@ -160,6 +162,8 @@ export function InvoiceMaker() {
         discount: Number(draft.discount) || 0,
         notes: draft.notes,
         terms: draft.terms,
+        payment_status: draft.payment_status,
+        amount_paid: Number(draft.amount_paid) || 0,
       };
       if (editingId) {
         const { error } = await (supabase as any)
@@ -241,6 +245,8 @@ export function InvoiceMaker() {
       discount: Number(row.discount) || 0,
       notes: row.notes ?? "",
       terms: row.terms ?? "",
+      payment_status: (row.payment_status ?? "unpaid") as InvoiceDraft["payment_status"],
+      amount_paid: Number(row.amount_paid) || 0,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -490,12 +496,29 @@ export function InvoiceMaker() {
                 <Field label="Discount amount">
                   <Input type="number" step="0.01" value={draft.discount} onChange={(e) => set("discount", Number(e.target.value))} />
                 </Field>
+                <Field label="Payment status (seal)">
+                  <Select value={draft.payment_status} onValueChange={(v) => set("payment_status", v as InvoiceDraft["payment_status"])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_STATUSES.map((ps) => (
+                        <SelectItem key={ps.id} value={ps.id}>{ps.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {draft.payment_status === "partial" && (
+                  <Field label="Amount already paid">
+                    <Input type="number" step="0.01" value={draft.amount_paid} onChange={(e) => set("amount_paid", Number(e.target.value))} />
+                  </Field>
+                )}
               </div>
               <div className="rounded-md bg-muted p-3 text-sm">
                 <div className="flex justify-between"><span>Subtotal</span><span>{money(draft.currency, t.subtotal)}</span></div>
                 <div className="flex justify-between"><span>Tax</span><span>{money(draft.currency, t.tax)}</span></div>
                 <div className="flex justify-between"><span>Discount</span><span>- {money(draft.currency, t.discount)}</span></div>
                 <div className="mt-1 flex justify-between border-t pt-1 font-semibold"><span>Total</span><span>{money(draft.currency, t.total)}</span></div>
+                <div className="flex justify-between"><span>Paid</span><span>{money(draft.currency, t.paid)}</span></div>
+                <div className="flex justify-between font-semibold"><span>Balance due</span><span>{money(draft.currency, t.balance)}</span></div>
               </div>
             </CardContent>
           </Card>
