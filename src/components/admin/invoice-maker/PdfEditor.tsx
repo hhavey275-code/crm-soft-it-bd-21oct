@@ -440,10 +440,28 @@ export function PdfEditor() {
                       <Button
                         size="sm"
                         variant={editItem.bold ? "default" : "outline"}
-                        onClick={() => patchItem(editItem.key, { bold: !editItem.bold })}
+                        onClick={() =>
+                          patchItem(editItem.key, { bold: !editItem.bold, weight: editItem.bold ? 1 : 2 })
+                        }
                       >
                         <span className="font-bold">B</span>
                       </Button>
+                      {editItem.bold && (
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3].map((w) => (
+                            <Button
+                              key={w}
+                              size="sm"
+                              variant={(editItem.weight ?? 1) === w ? "default" : "outline"}
+                              onClick={() => patchItem(editItem.key, { weight: w })}
+                              title={`Bold thickness ${w}`}
+                            >
+                              <span style={{ fontWeight: 500 + w * 100 }}>B{w}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+
                       <Button
                         size="sm"
                         variant={editItem.italic ? "default" : "outline"}
