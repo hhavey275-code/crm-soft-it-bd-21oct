@@ -97,6 +97,8 @@ export function PdfEditor() {
       setBytes(buf);
       setFileName(file.name);
       setObjs([]);
+      setItems([]);
+      setEditingKey(null);
       setSelected(null);
 
       const pdfjs: any = await import("pdfjs-dist");
