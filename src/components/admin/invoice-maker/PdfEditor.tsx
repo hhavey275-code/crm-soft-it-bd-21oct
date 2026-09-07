@@ -89,6 +89,12 @@ export function PdfEditor() {
   const drag = useRef<{ id: string; dx: number; dy: number; scale: number } | null>(null);
 
   const sel = objs.find((o) => o.id === selected) ?? null;
+  const editItem = items.find((i) => i.key === editingKey) ?? null;
+  const changedCount = items.filter((i) => i.value !== i.original).length;
+
+  function updateItem(key: string, value: string) {
+    setItems((list) => list.map((i) => (i.key === key ? { ...i, value } : i)));
+  }
 
   const openPdf = useCallback(async (file: File) => {
     setBusy(true);
