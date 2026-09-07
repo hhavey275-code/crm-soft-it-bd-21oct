@@ -69,7 +69,9 @@ export function PdfEditor() {
   const [fileName, setFileName] = useState("");
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [objs, setObjs] = useState<Obj[]>([]);
-  const [tool, setTool] = useState<Tool>("text");
+  const [items, setItems] = useState<TextItem[]>([]);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>("edit");
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [meta, setMeta] = useState<PdfMeta>({
