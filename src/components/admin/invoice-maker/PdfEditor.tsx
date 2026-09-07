@@ -341,13 +341,14 @@ export function PdfEditor() {
         },
       ]);
     } else if (tool === "image") {
-      if (!pendingImage.current) {
+      const imageDataUrl = pendingImage.current;
+      if (!imageDataUrl) {
         toast.error("Pick an image file first");
         return;
       }
       setObjs((o) => [
         ...o,
-        { id, page: pageIdx, type: "image", x: xPt, y: yPt, w: 120, h: 120, dataUrl: pendingImage.current },
+        { id, page: pageIdx, type: "image", x: xPt, y: yPt, w: 120, h: 120, dataUrl: imageDataUrl },
       ]);
     }
     setSelected(id);
