@@ -449,7 +449,8 @@ function Summary({
   mono?: boolean;
 }) {
   return (
-    <div className={`mt-5 flex ${align === "right" ? "justify-end" : "justify-start"}`}>
+    <div className={`mt-5 flex items-center ${align === "right" ? "justify-between" : "justify-start"}`}>
+      <PaymentSeal status={t.status} />
       <div className={`w-72 text-sm ${mono ? "text-xs" : ""}`}>
         <Row label="Subtotal" value={money(c, t.subtotal)} />
         {Number(data.tax_percent) > 0 && <Row label={`Tax (${data.tax_percent}%)`} value={money(c, t.tax)} />}
@@ -458,9 +459,17 @@ function Summary({
           <span>Total</span>
           <span>{money(c, t.total)}</span>
         </div>
+        {t.status !== "unpaid" && <Row label="Amount paid" value={money(c, t.paid)} />}
+        {t.status !== "paid" && (
+          <div className="flex justify-between py-1 font-semibold">
+            <span>Balance due</span>
+            <span>{money(c, t.balance)}</span>
+          </div>
+        )}
       </div>
     </div>
   );
+
 }
 
 function Row({ label, value }: { label: string; value: string }) {
