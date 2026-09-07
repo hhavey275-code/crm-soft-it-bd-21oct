@@ -462,13 +462,14 @@ function Summary({
           <span>Total</span>
           <span>{money(c, t.total)}</span>
         </div>
-        {t.status !== "unpaid" && <Row label="Amount paid" value={money(c, t.paid)} />}
-        {t.status !== "paid" && (
+        {t.status !== "unpaid" && t.status !== "none" && <Row label="Amount paid" value={money(c, t.paid)} />}
+        {t.status !== "paid" && t.status !== "none" && (
           <div className="flex justify-between py-1 font-semibold">
             <span>Balance due</span>
             <span>{money(c, t.balance)}</span>
           </div>
         )}
+
       </div>
     </div>
   );
