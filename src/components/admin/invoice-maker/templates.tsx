@@ -79,8 +79,10 @@ export function totals(d: InvoiceDraft) {
 
 /** Rubber-stamp style payment seal shown on the invoice sheet. */
 export function PaymentSeal({ status, size = 150 }: { status: PaymentStatus; size?: number }) {
-  const s = SEAL_STYLES[status] ?? SEAL_STYLES.unpaid;
+  const s = SEAL_STYLES[status];
+  if (!s) return null;
   const long = s.label.length > 5;
+
   return (
     <div
       style={{
