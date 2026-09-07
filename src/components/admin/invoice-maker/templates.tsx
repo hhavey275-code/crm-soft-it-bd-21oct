@@ -6,7 +6,7 @@ export type InvoiceItem = {
   rate: number;
 };
 
-export type PaymentStatus = "unpaid" | "paid" | "partial";
+export type PaymentStatus = "none" | "unpaid" | "paid" | "partial";
 
 export type InvoiceDraft = {
   invoice_number: string;
@@ -35,12 +35,13 @@ export type InvoiceDraft = {
 };
 
 export const PAYMENT_STATUSES = [
+  { id: "none", label: "No seal (hide)" },
   { id: "unpaid", label: "Unpaid" },
   { id: "partial", label: "Partially Paid" },
   { id: "paid", label: "Paid" },
 ] as const;
 
-const SEAL_STYLES: Record<PaymentStatus, { color: string; label: string }> = {
+const SEAL_STYLES: Record<string, { color: string; label: string }> = {
   paid: { color: "#15803d", label: "PAID" },
   partial: { color: "#b45309", label: "PARTIALLY PAID" },
   unpaid: { color: "#b91c1c", label: "UNPAID" },
@@ -78,8 +79,10 @@ export function totals(d: InvoiceDraft) {
 
 /** Rubber-stamp style payment seal shown on the invoice sheet. */
 export function PaymentSeal({ status, size = 150 }: { status: PaymentStatus; size?: number }) {
-  const s = SEAL_STYLES[status] ?? SEAL_STYLES.unpaid;
+  const s = SEAL_STYLES[status];
+  if (!s) return null;
   const long = s.label.length > 5;
+
   return (
     <div
       style={{
@@ -459,13 +462,14 @@ function Summary({
           <span>Total</span>
           <span>{money(c, t.total)}</span>
         </div>
-        {t.status !== "unpaid" && <Row label="Amount paid" value={money(c, t.paid)} />}
-        {t.status !== "paid" && (
+        {t.status !== "unpaid" && t.status !== "none" && <Row label="Amount paid" value={money(c, t.paid)} />}
+        {t.status !== "paid" && t.status !== "none" && (
           <div className="flex justify-between py-1 font-semibold">
             <span>Balance due</span>
             <span>{money(c, t.balance)}</span>
           </div>
         )}
+
       </div>
     </div>
   );

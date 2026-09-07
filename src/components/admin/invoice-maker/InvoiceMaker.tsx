@@ -73,6 +73,7 @@ export function InvoiceMaker() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [draft, setDraft] = useState<InvoiceDraft>(blankDraft);
+  const [pdfMeta, setPdfMeta] = useState({ title: "", author: "", subject: "", keywords: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -89,6 +90,7 @@ export function InvoiceMaker() {
         if (parsed?.draft) {
           setDraft({ ...blankDraft(), ...parsed.draft });
           setEditingId(parsed.editingId ?? null);
+          if (parsed.pdfMeta) setPdfMeta((m) => ({ ...m, ...parsed.pdfMeta }));
           setRestored(true);
           return;
         }
@@ -109,11 +111,12 @@ export function InvoiceMaker() {
   useEffect(() => {
     if (!restored) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, editingId }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, editingId, pdfMeta }));
     } catch {
       /* ignore */
     }
-  }, [draft, editingId, restored]);
+  }, [draft, editingId, pdfMeta, restored]);
+
 
   const set = <K extends keyof InvoiceDraft>(k: K, v: InvoiceDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -312,6 +315,14 @@ export function InvoiceMaker() {
         imgData = canvas.toDataURL("image/jpeg", quality);
       }
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      pdf.setProperties({
+        title: pdfMeta.title || `Invoice ${draft.invoice_number}`,
+        author: pdfMeta.author || draft.from_name || "",
+        subject: pdfMeta.subject || `Invoice for ${draft.to_name || "client"}`,
+        keywords: pdfMeta.keywords || "",
+        creator: pdfMeta.author || draft.from_name || "",
+      });
+
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const imgH = (canvas.height * pageW) / canvas.width;
@@ -594,8 +605,40 @@ export function InvoiceMaker() {
                   </Button>
                 ))}
               </div>
+              <div className="grid gap-2 border-t pt-3 sm:grid-cols-2">
+                <div className="sm:col-span-2 text-xs font-medium text-muted-foreground">
+                  PDF file information (metadata)
+                </div>
+                <Field label="Title">
+                  <Input
+                    placeholder={`Invoice ${draft.invoice_number}`}
+                    value={pdfMeta.title}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, title: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Author">
+                  <Input
+                    placeholder={draft.from_name || "Your company"}
+                    value={pdfMeta.author}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, author: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Subject">
+                  <Input
+                    value={pdfMeta.subject}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, subject: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Keywords">
+                  <Input
+                    value={pdfMeta.keywords}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, keywords: e.target.value }))}
+                  />
+                </Field>
+              </div>
             </CardContent>
           </Card>
+
 
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
