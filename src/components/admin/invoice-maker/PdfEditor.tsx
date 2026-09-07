@@ -288,8 +288,24 @@ export function PdfEditor() {
           color: rgb(1, 1, 1),
         });
         if (!f) continue;
-        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
+        const ink = it.bold ? rgb(0, 0, 0) : rgb(0.07, 0.07, 0.07);
+        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: ink });
+        if (it.bold) {
+          // Faux-bold: redraw with tiny offsets so the stroke matches the PDF's own heavy fonts.
+          const strength = Math.max(1, Math.min(3, it.weight ?? 1));
+          const step = size * 0.022 * strength;
+          const passes: Array<[number, number]> = [
+            [step, 0],
+            [step * 0.5, step * 0.35],
+            [step * 0.5, -step * 0.35],
+          ];
+          for (let p = 0; p < (strength >= 2 ? passes.length : 1); p++) {
+            const [dx, dy] = passes[p]!;
+            page.drawText(it.value, { x: it.x + dx, y: it.baseline + dy, size, font: f, color: ink });
+          }
+        }
       }
+
 
 
       for (const o of objs) {
