@@ -352,6 +352,9 @@ export function PdfEditor() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tool === "edit" ? "default" : "outline"} onClick={() => setTool("edit")}>
+                <Pencil className="mr-2 h-4 w-4" /> Edit text
+              </Button>
               <Button size="sm" variant={tool === "text" ? "default" : "outline"} onClick={() => setTool("text")}>
                 <Type className="mr-2 h-4 w-4" /> Text
               </Button>
@@ -363,8 +366,44 @@ export function PdfEditor() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Pick a tool, then click on the page to place it. Drag anything to move it.
+              {tool === "edit"
+                ? "Click any existing line on the page and retype it — the look and place stay the same."
+                : "Pick a tool, then click on the page to place it. Drag anything to move it."}
             </p>
+
+            {tool === "edit" && (
+              <div className="grid gap-2">
+                {!items.length ? (
+                  <p className="text-xs text-muted-foreground">
+                    This PDF has no selectable text (it may be a scan), so use the Text and Cover tools instead.
+                  </p>
+                ) : editItem ? (
+                  <>
+                    <Label className="text-xs text-muted-foreground">Selected line</Label>
+                    <Input
+                      autoFocus
+                      value={editItem.value}
+                      onChange={(e) => updateItem(editItem.key, e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Was: {editItem.original}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => updateItem(editItem.key, editItem.original)}>
+                        <RotateCcw className="mr-2 h-4 w-4" /> Undo this line
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingKey(null)}>
+                        Done
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Click a line on the page to change it.</p>
+                )}
+                {changedCount > 0 && (
+                  <p className="text-xs text-muted-foreground">{changedCount} line(s) changed</p>
+                )}
+              </div>
+            )}
+
 
             {tool === "text" && (
               <div className="grid gap-2">
