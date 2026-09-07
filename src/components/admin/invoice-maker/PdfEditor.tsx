@@ -129,12 +129,26 @@ export function PdfEditor() {
         try {
           const tc: any = await page.getTextContent();
           const styles: any = tc.styles || {};
+          const anyPage: any = page;
+          const realName = (fontName: string) => {
+            try {
+              const fo =
+                anyPage.commonObjs?.get?.(fontName) ??
+                anyPage.objs?.get?.(fontName) ??
+                anyPage._transport?.commonObjs?.get?.(fontName);
+              return String(fo?.name || fo?.loadedName || fo?.fallbackName || "");
+            } catch {
+              return "";
+            }
+          };
           (tc.items as any[]).forEach((it, i) => {
             const str: string = it.str ?? "";
             if (!str.trim()) return;
             const tr: number[] = it.transform || [1, 0, 0, 1, 0, 0];
             const size = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 10;
-            const family = String(styles[it.fontName]?.fontFamily || it.fontName || "").toLowerCase();
+            const st = styles[it.fontName] || {};
+            const family = [realName(it.fontName), st.fontFamily, it.fontName].filter(Boolean).join(" ").toLowerCase();
+            const weight = Number(st.fontWeight) || 0;
             found.push({
               key: `${p - 1}:${i}`,
               page: p - 1,
