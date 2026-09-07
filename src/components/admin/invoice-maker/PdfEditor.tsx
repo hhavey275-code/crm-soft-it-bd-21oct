@@ -28,6 +28,9 @@ type TextItem = {
   weight?: number;
   /** true when the look (bold/italic/serif/size) was changed by hand */
   dirty?: boolean;
+  /** paper colour sampled right around the line, used for the on-screen preview */
+  bg?: string;
+
 
 };
 
