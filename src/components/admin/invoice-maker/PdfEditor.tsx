@@ -263,21 +263,26 @@ export function PdfEditor() {
 
       // Retype changed text in place: cover the old line, draw the new one at the same spot.
       for (const it of items) {
-        if (it.value === it.original) continue;
+        if (it.value === it.original && !it.dirty) continue;
         const page = docPages[it.page];
         if (!page) continue;
+        const f = it.value ? await fontFor(it) : null;
+        let size = it.size;
+        const maxW = Math.max(it.w, 1);
+        if (f) {
+          // Only shrink a little, so bold/serif text keeps its weight instead of turning tiny.
+          const minSize = it.size * 0.82;
+          while (size > minSize && f.widthOfTextAtSize(it.value, size) > maxW * 1.15) size -= 0.25;
+        }
+        const drawnW = f ? f.widthOfTextAtSize(it.value, size) : 0;
         page.drawRectangle({
           x: it.x - 0.5,
           y: it.baseline - it.size * 0.26,
-          width: Math.max(it.w, 1) + 1.5,
-          height: it.size * 1.18,
+          width: Math.max(maxW, drawnW) + 1.5,
+          height: Math.max(it.size, size) * 1.18,
           color: rgb(1, 1, 1),
         });
-        if (!it.value) continue;
-        const f = await fontFor(it);
-        let size = it.size;
-        const maxW = Math.max(it.w, 1);
-        while (size > 3 && f.widthOfTextAtSize(it.value, size) > maxW * 1.02) size -= 0.25;
+        if (!f) continue;
         page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
       }
 
