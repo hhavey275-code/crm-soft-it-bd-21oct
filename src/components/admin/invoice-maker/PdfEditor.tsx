@@ -188,6 +188,8 @@ export function PdfEditor() {
         const ctx = canvas.getContext("2d")!;
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
+        pageCanvases.current[p - 1] = canvas;
+
 
         // Collect the real text of the page so it can be retyped in place.
         try {
