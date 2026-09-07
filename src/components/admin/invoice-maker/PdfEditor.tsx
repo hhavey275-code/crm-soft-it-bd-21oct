@@ -577,6 +577,54 @@ export function PdfEditor() {
                 }}
               >
                 <img src={p.png} alt={`Page ${idx + 1}`} className="pointer-events-none block w-full" />
+                {items
+                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original))
+                  .map((it) => {
+                    const changed = it.value !== it.original;
+                    return (
+                      <div
+                        key={it.key}
+                        data-obj="1"
+                        title={it.original}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          if (tool !== "edit") return;
+                          setEditingKey(it.key);
+                          setSelected(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: it.x * scale,
+                          top: (p.height - it.baseline - it.size * 0.78) * scale,
+                          width: Math.max(it.w, 2) * scale,
+                          height: it.size * 1.05 * scale,
+                          cursor: tool === "edit" ? "text" : "default",
+                          display: "flex",
+                          alignItems: "center",
+                          overflow: "hidden",
+                          whiteSpace: "pre",
+                          fontFamily: it.mono
+                            ? "Courier, monospace"
+                            : it.serif
+                              ? "Times, serif"
+                              : "Helvetica, Arial, sans-serif",
+                          fontWeight: it.bold ? 700 : 400,
+                          fontStyle: it.italic ? "italic" : "normal",
+                          fontSize: it.size * 0.95 * scale,
+                          color: "#111",
+                          background: changed ? "#fff" : "transparent",
+                          outline:
+                            editingKey === it.key
+                              ? "2px solid #2563eb"
+                              : tool === "edit"
+                                ? "1px dashed rgba(37,99,235,0.35)"
+                                : "none",
+                        }}
+                      >
+                        {changed ? it.value : ""}
+                      </div>
+                    );
+                  })}
                 {objs
                   .filter((o) => o.page === idx)
                   .map((o) => (
