@@ -170,6 +170,7 @@ export function PdfEditor() {
   }, []);
 
   function addObject(pageIdx: number, xPt: number, yPt: number) {
+    if (tool === "edit") return;
     const id = Math.random().toString(36).slice(2);
     if (tool === "text") {
       setObjs((o) => [
