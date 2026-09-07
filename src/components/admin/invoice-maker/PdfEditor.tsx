@@ -282,13 +282,24 @@ export function PdfEditor() {
           while (size > minSize && f.widthOfTextAtSize(it.value, size) > maxW * 1.15) size -= 0.25;
         }
         const drawnW = f ? f.widthOfTextAtSize(it.value, size) : 0;
-        page.drawRectangle({
+        const { height: pgH } = page.getSize();
+        const rect = {
           x: it.x - 0.5,
           y: it.baseline - it.size * 0.26,
-          width: Math.max(maxW, drawnW) + 1.5,
-          height: Math.max(it.size, size) * 1.18,
-          color: rgb(1, 1, 1),
-        });
+          w: Math.max(maxW, drawnW) + 1.5,
+          h: Math.max(it.size, size) * 1.18,
+        };
+        // Rebuild the background behind the old line (watermarks, tints, colours)
+        // instead of stamping a white box over it.
+        const patch = buildBackgroundPatch(pageCanvases.current[it.page], rect, pgH);
+        if (patch) {
+          const raw = Uint8Array.from(atob(patch.split(",")[1]!), (ch) => ch.charCodeAt(0));
+          const img = await doc.embedPng(raw);
+          page.drawImage(img, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+        } else {
+          page.drawRectangle({ ...rect, width: rect.w, height: rect.h, color: rgb(1, 1, 1) });
+        }
+
         if (!f) continue;
         const ink = it.bold ? rgb(0, 0, 0) : rgb(0.07, 0.07, 0.07);
         page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: ink });
