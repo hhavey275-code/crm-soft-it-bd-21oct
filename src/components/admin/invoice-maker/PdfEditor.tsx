@@ -158,9 +158,9 @@ export function PdfEditor() {
               baseline: tr[5],
               w: it.width || size * str.length * 0.5,
               size,
-              bold: /bold|black|heavy|semibold/.test(family),
-              italic: /italic|oblique/.test(family),
-              serif: /times|serif|georgia|roman|garamond|book/.test(family) && !/sans/.test(family),
+              bold: weight >= 600 || /bold|black|heavy|semibold|[-,]bd\b|extrab/.test(family),
+              italic: st.italic === true || /italic|oblique/.test(family),
+              serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
             });
           });
