@@ -410,6 +410,38 @@ export function PdfEditor() {
                       onChange={(e) => updateItem(editItem.key, e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">Was: {editItem.original}</p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <Button
+                        size="sm"
+                        variant={editItem.bold ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { bold: !editItem.bold })}
+                      >
+                        <span className="font-bold">B</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editItem.italic ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { italic: !editItem.italic })}
+                      >
+                        <span className="italic">I</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editItem.serif ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { serif: !editItem.serif, mono: false })}
+                      >
+                        <span style={{ fontFamily: "Times, serif" }}>Serif</span>
+                      </Button>
+                      <div className="w-20">
+                        <Label className="text-xs text-muted-foreground">Size</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          value={Math.round(editItem.size * 10) / 10}
+                          onChange={(e) => patchItem(editItem.key, { size: Number(e.target.value) || editItem.size })}
+                        />
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => updateItem(editItem.key, editItem.original)}>
                         <RotateCcw className="mr-2 h-4 w-4" /> Undo this line
