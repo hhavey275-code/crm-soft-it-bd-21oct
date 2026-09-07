@@ -29,6 +29,15 @@ import {
 
 const emptyItem: InvoiceItem = { description: "", qty: 1, rate: 0 };
 
+const DEFAULT_TERMS = [
+  "Payment is due on or before the due date shown above.",
+  "Please use the invoice number as the payment reference.",
+  "Bank charges or transfer fees, if any, are payable by the client.",
+  "Services may be paused on invoices left unpaid for more than 7 days after the due date.",
+].join("\n");
+
+
+
 function blankDraft(): InvoiceDraft {
   return {
     invoice_number: `INV-${format(new Date(), "yyyyMM")}-${Math.floor(Math.random() * 9000 + 1000)}`,
