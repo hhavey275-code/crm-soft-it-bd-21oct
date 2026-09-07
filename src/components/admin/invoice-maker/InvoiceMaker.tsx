@@ -605,8 +605,40 @@ export function InvoiceMaker() {
                   </Button>
                 ))}
               </div>
+              <div className="grid gap-2 border-t pt-3 sm:grid-cols-2">
+                <div className="sm:col-span-2 text-xs font-medium text-muted-foreground">
+                  PDF file information (metadata)
+                </div>
+                <Field label="Title">
+                  <Input
+                    placeholder={`Invoice ${draft.invoice_number}`}
+                    value={pdfMeta.title}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, title: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Author">
+                  <Input
+                    placeholder={draft.from_name || "Your company"}
+                    value={pdfMeta.author}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, author: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Subject">
+                  <Input
+                    value={pdfMeta.subject}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, subject: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Keywords">
+                  <Input
+                    value={pdfMeta.keywords}
+                    onChange={(e) => setPdfMeta((m) => ({ ...m, keywords: e.target.value }))}
+                  />
+                </Field>
+              </div>
             </CardContent>
           </Card>
+
 
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
