@@ -11,12 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, RotateCcw, MinusCircle, ImageIcon, X, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, RotateCcw, MinusCircle, ImageIcon, X, ChevronDown, ChevronRight, ExternalLink, Users } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
 import { ProofImage } from "@/components/ProofImage";
+import { BankClientsDialog } from "@/components/admin/BankClientsDialog";
+import { Badge } from "@/components/ui/badge";
 
 const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "", logo_url: "" };
 
@@ -229,10 +231,9 @@ export function AdminBanks() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [showAdd, setShowAdd] = useState(false);
-  const [showAssign, setShowAssign] = useState<string | null>(null);
+  const [clientsBank, setClientsBank] = useState<{ id: string; name: string } | null>(null);
   const [editingBank, setEditingBank] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
-  const [selectedClient, setSelectedClient] = useState("");
   const [statsBank, setStatsBank] = useState<{ id: string; name: string } | null>(null);
   const [bankTab, setBankTab] = useState("active");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -300,6 +301,16 @@ export function AdminBanks() {
     },
   });
 
+  const { data: bankClientCounts } = useQuery({
+    queryKey: ["bank-client-counts"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("client_banks").select("bank_account_id");
+      const map: Record<string, number> = {};
+      for (const r of ((data as any[]) ?? [])) map[r.bank_account_id] = (map[r.bank_account_id] || 0) + 1;
+      return map;
+    },
+  });
+
   const addMutation = useMutation({
     mutationFn: async () => {
       const logoUrl = await uploadLogo();
@@ -347,21 +358,12 @@ export function AdminBanks() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const assignMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await (supabase as any).from("client_banks").upsert({ user_id: selectedClient, bank_account_id: showAssign }, { onConflict: "user_id,bank_account_id" });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Bank assigned to client!"); queryClient.invalidateQueries({ queryKey: ["admin-client-banks"] }); setShowAssign(null); setSelectedClient(""); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const unassignMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await (supabase as any).from("client_banks").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Assignment removed"); queryClient.invalidateQueries({ queryKey: ["admin-client-banks"] }); },
+    onSuccess: () => { toast.success("Assignment removed"); queryClient.invalidateQueries({ queryKey: ["admin-client-banks"] }); queryClient.invalidateQueries({ queryKey: ["bank-client-counts"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -430,7 +432,10 @@ export function AdminBanks() {
                   <BankLogo url={b.logo_url} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold truncate">{b.bank_name}</p>
+                      <button className="text-sm font-semibold truncate text-left hover:underline flex items-center gap-1.5" onClick={() => setClientsBank({ id: b.id, name: b.bank_name })}>
+                        {b.bank_name}
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{bankClientCounts?.[b.id] ?? 0}</Badge>
+                      </button>
                       <StatusBadge status={b.status} />
                     </div>
                     <p className="text-xs text-muted-foreground">{b.account_name}</p>
@@ -445,7 +450,7 @@ export function AdminBanks() {
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditBank(b)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAssign(b.id)}>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setClientsBank({ id: b.id, name: b.bank_name })}>
                             <UserPlus className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
@@ -479,6 +484,7 @@ export function AdminBanks() {
                   <TableHead>Account Name</TableHead>
                   <TableHead>Account Number</TableHead>
                   <TableHead>Branch</TableHead>
+                  <TableHead>Clients</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -487,10 +493,18 @@ export function AdminBanks() {
                 {banks?.map((b: any) => (
                   <TableRow key={b.id}>
                     <TableCell><BankLogo url={b.logo_url} /></TableCell>
-                    <TableCell className="font-medium">{b.bank_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <button className="hover:underline text-left" onClick={() => setClientsBank({ id: b.id, name: b.bank_name })}>{b.bank_name}</button>
+                    </TableCell>
                     <TableCell>{b.account_name}</TableCell>
                     <TableCell>{b.account_number}</TableCell>
                     <TableCell>{b.branch || "—"}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2" onClick={() => setClientsBank({ id: b.id, name: b.bank_name })}>
+                        <Users className="h-3.5 w-3.5" />
+                        {bankClientCounts?.[b.id] ?? 0}
+                      </Button>
+                    </TableCell>
                     <TableCell><StatusBadge status={b.status} /></TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -500,7 +514,7 @@ export function AdminBanks() {
                         {isActive ? (
                           <>
                             <Button size="sm" variant="ghost" onClick={() => openEditBank(b)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}><UserPlus className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => setClientsBank({ id: b.id, name: b.bank_name })}><UserPlus className="h-4 w-4" /></Button>
                             <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}><Trash2 className="h-4 w-4" /></Button>
                           </>
                         ) : (
@@ -513,7 +527,7 @@ export function AdminBanks() {
                   </TableRow>
                 ))}
                 {(!banks || banks.length === 0) && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{isActive ? "No active banks" : "No inactive banks"}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">{isActive ? "No active banks" : "No inactive banks"}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -577,6 +591,11 @@ export function AdminBanks() {
         </Card>
       )}
 
+      {/* Bank Clients Dialog */}
+      {clientsBank && (
+        <BankClientsDialog bankId={clientsBank.id} bankName={clientsBank.name} open={!!clientsBank} onClose={() => setClientsBank(null)} />
+      )}
+
       {/* Bank Stats Dialog */}
       {statsBank && (
         <BankStatsDialog bankId={statsBank.id} bankName={statsBank.name} open={!!statsBank} onClose={() => setStatsBank(null)} />
@@ -611,30 +630,6 @@ export function AdminBanks() {
             <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
             <Button onClick={() => addMutation.mutate()} disabled={!form.bank_name || !form.account_name || !form.account_number || addMutation.isPending}>
               {addMutation.isPending ? "Adding..." : "Add Bank"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Bank Dialog */}
-      <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Assign Bank to Client</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>Select Client</Label>
-            <Select value={selectedClient} onValueChange={setSelectedClient}>
-              <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
-              <SelectContent>
-                {profiles?.map((p: any) => (
-                  <SelectItem key={p.user_id} value={p.user_id}>{p.full_name || p.email}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssign(null)}>Cancel</Button>
-            <Button onClick={() => assignMutation.mutate()} disabled={!selectedClient || assignMutation.isPending}>
-              {assignMutation.isPending ? "Assigning..." : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>
