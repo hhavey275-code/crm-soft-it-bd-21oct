@@ -7,7 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 
-type Tool = "text" | "image" | "whiteout";
+type Tool = "edit" | "text" | "image" | "whiteout";
+
+/** A real piece of text found inside the PDF, with its position and font look. */
+type TextItem = {
+  key: string;
+  page: number;
+  original: string;
+  value: string;
+  x: number;
+  /** baseline y in page points, origin bottom-left (as PDF stores it) */
+  baseline: number;
+  w: number;
+  size: number;
+  bold: boolean;
+  italic: boolean;
+  serif: boolean;
+  mono: boolean;
+};
 
 type PdfMeta = {
   title: string;
