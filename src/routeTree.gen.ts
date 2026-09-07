@@ -30,6 +30,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OldSellerRouteImport } from './routes/old-seller'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
+import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
 import { Route as DocumentsRouteImport } from './routes/documents'
@@ -168,6 +169,11 @@ const MyUnusedRoute = MyUnusedRouteImport.update({
 const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
   id: '/meta-oauth-callback',
   path: '/meta-oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceMakerRoute = InvoiceMakerRouteImport.update({
+  id: '/invoice-maker',
+  path: '/invoice-maker',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeedbackRoute = FeedbackRouteImport.update({
@@ -362,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
+  '/invoice-maker': typeof InvoiceMakerRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -419,6 +426,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
+  '/invoice-maker': typeof InvoiceMakerRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -476,6 +484,7 @@ export interface FileRoutesById {
   '/documents': typeof DocumentsRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
+  '/invoice-maker': typeof InvoiceMakerRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -535,6 +544,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/failed-topups'
     | '/feedback'
+    | '/invoice-maker'
     | '/meta-oauth-callback'
     | '/my-unused'
     | '/old-seller'
@@ -592,6 +602,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/failed-topups'
     | '/feedback'
+    | '/invoice-maker'
     | '/meta-oauth-callback'
     | '/my-unused'
     | '/old-seller'
@@ -648,6 +659,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/failed-topups'
     | '/feedback'
+    | '/invoice-maker'
     | '/meta-oauth-callback'
     | '/my-unused'
     | '/old-seller'
@@ -706,6 +718,7 @@ export interface RootRouteChildren {
   DocumentsRoute: typeof DocumentsRoute
   FailedTopupsRoute: typeof FailedTopupsRoute
   FeedbackRoute: typeof FeedbackRoute
+  InvoiceMakerRoute: typeof InvoiceMakerRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
   MyUnusedRoute: typeof MyUnusedRoute
   OldSellerRoute: typeof OldSellerRoute
@@ -886,6 +899,13 @@ declare module '@tanstack/react-router' {
       path: '/meta-oauth-callback'
       fullPath: '/meta-oauth-callback'
       preLoaderRoute: typeof MetaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoice-maker': {
+      id: '/invoice-maker'
+      path: '/invoice-maker'
+      fullPath: '/invoice-maker'
+      preLoaderRoute: typeof InvoiceMakerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/feedback': {
@@ -1187,6 +1207,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocumentsRoute: DocumentsRoute,
   FailedTopupsRoute: FailedTopupsRoute,
   FeedbackRoute: FeedbackRoute,
+  InvoiceMakerRoute: InvoiceMakerRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,
   MyUnusedRoute: MyUnusedRoute,
   OldSellerRoute: OldSellerRoute,

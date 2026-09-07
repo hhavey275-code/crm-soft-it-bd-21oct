@@ -78,6 +78,7 @@ const adminNavItems = [
   { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
   { title: "Stripe Links", url: "/admin/stripe-links", icon: CreditCard, key: "stripe-links" },
   { title: "Documents Vault", url: "/documents", icon: FolderLock, key: "documents-vault" },
+  { title: "Invoice Maker", url: "/invoice-maker", icon: FileText, key: "invoice-maker" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
