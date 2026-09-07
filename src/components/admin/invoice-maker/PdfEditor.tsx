@@ -1,13 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Download, Eraser, Image as ImageIcon, Trash2, Type, Upload } from "lucide-react";
+import { Download, Eraser, Image as ImageIcon, Pencil, RotateCcw, Trash2, Type, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 
-type Tool = "text" | "image" | "whiteout";
+type Tool = "edit" | "text" | "image" | "whiteout";
+
+/** A real piece of text found inside the PDF, with its position and font look. */
+type TextItem = {
+  key: string;
+  page: number;
+  original: string;
+  value: string;
+  x: number;
+  /** baseline y in page points, origin bottom-left (as PDF stores it) */
+  baseline: number;
+  w: number;
+  size: number;
+  bold: boolean;
+  italic: boolean;
+  serif: boolean;
+  mono: boolean;
+};
 
 type PdfMeta = {
   title: string;
@@ -52,7 +69,9 @@ export function PdfEditor() {
   const [fileName, setFileName] = useState("");
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [objs, setObjs] = useState<Obj[]>([]);
-  const [tool, setTool] = useState<Tool>("text");
+  const [items, setItems] = useState<TextItem[]>([]);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>("edit");
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [meta, setMeta] = useState<PdfMeta>({
@@ -70,6 +89,12 @@ export function PdfEditor() {
   const drag = useRef<{ id: string; dx: number; dy: number; scale: number } | null>(null);
 
   const sel = objs.find((o) => o.id === selected) ?? null;
+  const editItem = items.find((i) => i.key === editingKey) ?? null;
+  const changedCount = items.filter((i) => i.value !== i.original).length;
+
+  function updateItem(key: string, value: string) {
+    setItems((list) => list.map((i) => (i.key === key ? { ...i, value } : i)));
+  }
 
   const openPdf = useCallback(async (file: File) => {
     setBusy(true);
@@ -78,6 +103,8 @@ export function PdfEditor() {
       setBytes(buf);
       setFileName(file.name);
       setObjs([]);
+      setItems([]);
+      setEditingKey(null);
       setSelected(null);
 
       const pdfjs: any = await import("pdfjs-dist");
@@ -86,6 +113,7 @@ export function PdfEditor() {
       const doc = await pdfjs.getDocument({ data: buf.slice() }).promise;
 
       const rendered: PageInfo[] = [];
+      const found: TextItem[] = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const base = page.getViewport({ scale: 1 });
@@ -96,8 +124,38 @@ export function PdfEditor() {
         const ctx = canvas.getContext("2d")!;
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
+
+        // Collect the real text of the page so it can be retyped in place.
+        try {
+          const tc: any = await page.getTextContent();
+          const styles: any = tc.styles || {};
+          (tc.items as any[]).forEach((it, i) => {
+            const str: string = it.str ?? "";
+            if (!str.trim()) return;
+            const tr: number[] = it.transform || [1, 0, 0, 1, 0, 0];
+            const size = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 10;
+            const family = String(styles[it.fontName]?.fontFamily || it.fontName || "").toLowerCase();
+            found.push({
+              key: `${p - 1}:${i}`,
+              page: p - 1,
+              original: str,
+              value: str,
+              x: tr[4],
+              baseline: tr[5],
+              w: it.width || size * str.length * 0.5,
+              size,
+              bold: /bold|black|heavy|semibold/.test(family),
+              italic: /italic|oblique/.test(family),
+              serif: /times|serif|georgia|roman|garamond|book/.test(family) && !/sans/.test(family),
+              mono: /mono|courier|consol/.test(family),
+            });
+          });
+        } catch {
+          /* text layer unavailable for this page */
+        }
       }
       setPages(rendered);
+      setItems(found);
 
       const { PDFDocument } = await import("pdf-lib");
       const lib = await PDFDocument.load(buf.slice(), { updateMetadata: false });
@@ -118,6 +176,7 @@ export function PdfEditor() {
   }, []);
 
   function addObject(pageIdx: number, xPt: number, yPt: number) {
+    if (tool === "edit") return;
     const id = Math.random().toString(36).slice(2);
     if (tool === "text") {
       setObjs((o) => [
@@ -151,7 +210,59 @@ export function PdfEditor() {
       const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
       const doc = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
       const font = await doc.embedFont(StandardFonts.Helvetica);
+      const fontCache = new Map<string, any>();
+      async function fontFor(it: TextItem) {
+        const key = `${it.serif ? "s" : it.mono ? "m" : "h"}${it.bold ? "b" : ""}${it.italic ? "i" : ""}`;
+        if (fontCache.has(key)) return fontCache.get(key);
+        const pick = it.mono
+          ? it.bold && it.italic
+            ? StandardFonts.CourierBoldOblique
+            : it.bold
+              ? StandardFonts.CourierBold
+              : it.italic
+                ? StandardFonts.CourierOblique
+                : StandardFonts.Courier
+          : it.serif
+            ? it.bold && it.italic
+              ? StandardFonts.TimesRomanBoldItalic
+              : it.bold
+                ? StandardFonts.TimesRomanBold
+                : it.italic
+                  ? StandardFonts.TimesRomanItalic
+                  : StandardFonts.TimesRoman
+            : it.bold && it.italic
+              ? StandardFonts.HelveticaBoldOblique
+              : it.bold
+                ? StandardFonts.HelveticaBold
+                : it.italic
+                  ? StandardFonts.HelveticaOblique
+                  : StandardFonts.Helvetica;
+        const f = await doc.embedFont(pick);
+        fontCache.set(key, f);
+        return f;
+      }
       const docPages = doc.getPages();
+
+      // Retype changed text in place: cover the old line, draw the new one at the same spot.
+      for (const it of items) {
+        if (it.value === it.original) continue;
+        const page = docPages[it.page];
+        if (!page) continue;
+        page.drawRectangle({
+          x: it.x - 0.5,
+          y: it.baseline - it.size * 0.26,
+          width: Math.max(it.w, 1) + 1.5,
+          height: it.size * 1.18,
+          color: rgb(1, 1, 1),
+        });
+        if (!it.value) continue;
+        const f = await fontFor(it);
+        let size = it.size;
+        const maxW = Math.max(it.w, 1);
+        while (size > 3 && f.widthOfTextAtSize(it.value, size) > maxW * 1.02) size -= 0.25;
+        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
+      }
+
 
       for (const o of objs) {
         const page = docPages[o.page];
@@ -247,6 +358,9 @@ export function PdfEditor() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tool === "edit" ? "default" : "outline"} onClick={() => setTool("edit")}>
+                <Pencil className="mr-2 h-4 w-4" /> Edit text
+              </Button>
               <Button size="sm" variant={tool === "text" ? "default" : "outline"} onClick={() => setTool("text")}>
                 <Type className="mr-2 h-4 w-4" /> Text
               </Button>
@@ -258,8 +372,44 @@ export function PdfEditor() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Pick a tool, then click on the page to place it. Drag anything to move it.
+              {tool === "edit"
+                ? "Click any existing line on the page and retype it — the look and place stay the same."
+                : "Pick a tool, then click on the page to place it. Drag anything to move it."}
             </p>
+
+            {tool === "edit" && (
+              <div className="grid gap-2">
+                {!items.length ? (
+                  <p className="text-xs text-muted-foreground">
+                    This PDF has no selectable text (it may be a scan), so use the Text and Cover tools instead.
+                  </p>
+                ) : editItem ? (
+                  <>
+                    <Label className="text-xs text-muted-foreground">Selected line</Label>
+                    <Input
+                      autoFocus
+                      value={editItem.value}
+                      onChange={(e) => updateItem(editItem.key, e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Was: {editItem.original}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => updateItem(editItem.key, editItem.original)}>
+                        <RotateCcw className="mr-2 h-4 w-4" /> Undo this line
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingKey(null)}>
+                        Done
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Click a line on the page to change it.</p>
+                )}
+                {changedCount > 0 && (
+                  <p className="text-xs text-muted-foreground">{changedCount} line(s) changed</p>
+                )}
+              </div>
+            )}
+
 
             {tool === "text" && (
               <div className="grid gap-2">
@@ -427,6 +577,54 @@ export function PdfEditor() {
                 }}
               >
                 <img src={p.png} alt={`Page ${idx + 1}`} className="pointer-events-none block w-full" />
+                {items
+                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original))
+                  .map((it) => {
+                    const changed = it.value !== it.original;
+                    return (
+                      <div
+                        key={it.key}
+                        data-obj="1"
+                        title={it.original}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          if (tool !== "edit") return;
+                          setEditingKey(it.key);
+                          setSelected(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: it.x * scale,
+                          top: (p.height - it.baseline - it.size * 0.78) * scale,
+                          width: Math.max(it.w, 2) * scale,
+                          height: it.size * 1.05 * scale,
+                          cursor: tool === "edit" ? "text" : "default",
+                          display: "flex",
+                          alignItems: "center",
+                          overflow: "hidden",
+                          whiteSpace: "pre",
+                          fontFamily: it.mono
+                            ? "Courier, monospace"
+                            : it.serif
+                              ? "Times, serif"
+                              : "Helvetica, Arial, sans-serif",
+                          fontWeight: it.bold ? 700 : 400,
+                          fontStyle: it.italic ? "italic" : "normal",
+                          fontSize: it.size * 0.95 * scale,
+                          color: "#111",
+                          background: changed ? "#fff" : "transparent",
+                          outline:
+                            editingKey === it.key
+                              ? "2px solid #2563eb"
+                              : tool === "edit"
+                                ? "1px dashed rgba(37,99,235,0.35)"
+                                : "none",
+                        }}
+                      >
+                        {changed ? it.value : ""}
+                      </div>
+                    );
+                  })}
                 {objs
                   .filter((o) => o.page === idx)
                   .map((o) => (
