@@ -28,6 +28,9 @@ type TextItem = {
   weight?: number;
   /** true when the look (bold/italic/serif/size) was changed by hand */
   dirty?: boolean;
+  /** paper colour sampled right around the line, used for the on-screen preview */
+  bg?: string;
+
 
 };
 
@@ -69,6 +72,93 @@ function hexToRgb(hex: string) {
   };
 }
 
+/**
+ * Recreate what sits behind a line of text (paper tint, watermark, coloured band)
+ * by blending the pixel strips just above and below it, so replaced text does not
+ * end up inside a white box.
+ */
+function buildBackgroundPatch(
+  src: HTMLCanvasElement | undefined,
+  rect: { x: number; y: number; w: number; h: number },
+  pageHeightPt: number,
+): string | null {
+  if (!src) return null;
+  const scale = src.height / pageHeightPt;
+  const px = Math.max(0, Math.round(rect.x * scale));
+  const pw = Math.max(1, Math.round(rect.w * scale));
+  const pTop = Math.max(0, Math.round((pageHeightPt - rect.y - rect.h) * scale));
+  const ph = Math.max(1, Math.round(rect.h * scale));
+  if (px + pw > src.width || pTop + ph > src.height) return null;
+  const sctx = src.getContext("2d");
+  if (!sctx) return null;
+  const gap = Math.max(2, Math.round(scale));
+  const rowAbove = Math.max(0, pTop - gap);
+  const rowBelow = Math.min(src.height - 1, pTop + ph + gap);
+  let above: Uint8ClampedArray;
+  let below: Uint8ClampedArray;
+  try {
+    above = sctx.getImageData(px, rowAbove, pw, 1).data;
+    below = sctx.getImageData(px, rowBelow, pw, 1).data;
+  } catch {
+    return null;
+  }
+  const out = document.createElement("canvas");
+  out.width = pw;
+  out.height = ph;
+  const octx = out.getContext("2d");
+  if (!octx) return null;
+  const img = octx.createImageData(pw, ph);
+  for (let y = 0; y < ph; y++) {
+    const t = ph === 1 ? 0 : y / (ph - 1);
+    for (let x = 0; x < pw; x++) {
+      const si = x * 4;
+      const di = (y * pw + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        img.data[di + c] = Math.round(above[si + c]! * (1 - t) + below[si + c]! * t);
+      }
+      img.data[di + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  return out.toDataURL("image/png");
+}
+
+/** Average paper colour just above and below a line, as a CSS colour. */
+function sampleBackground(
+  ctx: CanvasRenderingContext2D,
+  pageHeightPt: number,
+  scale: number,
+  rect: { x: number; y: number; w: number; h: number },
+): string {
+  try {
+    const px = Math.max(0, Math.round(rect.x * scale));
+    const pw = Math.max(1, Math.round(rect.w * scale));
+    const pTop = Math.max(0, Math.round((pageHeightPt - rect.y - rect.h) * scale));
+    const ph = Math.max(1, Math.round(rect.h * scale));
+    const gap = Math.max(2, Math.round(scale));
+    const rows = [Math.max(0, pTop - gap), Math.min(ctx.canvas.height - 1, pTop + ph + gap)];
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let n = 0;
+    for (const y of rows) {
+      const d = ctx.getImageData(px, y, Math.min(pw, ctx.canvas.width - px), 1).data;
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i]!;
+        g += d[i + 1]!;
+        b += d[i + 2]!;
+        n++;
+      }
+    }
+    if (!n) return "#ffffff";
+    return `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`;
+  } catch {
+    return "#ffffff";
+  }
+}
+
+
+
 export function PdfEditor() {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState("");
@@ -92,6 +182,9 @@ export function PdfEditor() {
   const [color, setColor] = useState("#111111");
   const pendingImage = useRef<string | null>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; scale: number } | null>(null);
+  /** rendered page bitmaps, kept so replaced text can reuse the real background */
+  const pageCanvases = useRef<HTMLCanvasElement[]>([]);
+
 
   const sel = objs.find((o) => o.id === selected) ?? null;
   const editItem = items.find((i) => i.key === editingKey) ?? null;
@@ -113,6 +206,7 @@ export function PdfEditor() {
       setFileName(file.name);
       setObjs([]);
       setItems([]);
+      pageCanvases.current = [];
       setEditingKey(null);
       setSelected(null);
 
@@ -133,6 +227,8 @@ export function PdfEditor() {
         const ctx = canvas.getContext("2d")!;
         await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
+        pageCanvases.current[p - 1] = canvas;
+
 
         // Collect the real text of the page so it can be retyped in place.
         try {
@@ -173,7 +269,14 @@ export function PdfEditor() {
               italic: st.italic === true || /italic|oblique/.test(family),
               serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
+              bg: sampleBackground(ctx, base.height, viewport.scale, {
+                x: tr[4],
+                y: tr[5] - size * 0.26,
+                w: Math.max(it.width || size * str.length * 0.5, 2),
+                h: size * 1.18,
+              }),
             });
+
           });
         } catch {
           /* text layer unavailable for this page */
@@ -282,13 +385,24 @@ export function PdfEditor() {
           while (size > minSize && f.widthOfTextAtSize(it.value, size) > maxW * 1.15) size -= 0.25;
         }
         const drawnW = f ? f.widthOfTextAtSize(it.value, size) : 0;
-        page.drawRectangle({
+        const { height: pgH } = page.getSize();
+        const rect = {
           x: it.x - 0.5,
           y: it.baseline - it.size * 0.26,
-          width: Math.max(maxW, drawnW) + 1.5,
-          height: Math.max(it.size, size) * 1.18,
-          color: rgb(1, 1, 1),
-        });
+          w: Math.max(maxW, drawnW) + 1.5,
+          h: Math.max(it.size, size) * 1.18,
+        };
+        // Rebuild the background behind the old line (watermarks, tints, colours)
+        // instead of stamping a white box over it.
+        const patch = buildBackgroundPatch(pageCanvases.current[it.page], rect, pgH);
+        if (patch) {
+          const raw = Uint8Array.from(atob(patch.split(",")[1]!), (ch) => ch.charCodeAt(0));
+          const img = await doc.embedPng(raw);
+          page.drawImage(img, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+        } else {
+          page.drawRectangle({ ...rect, width: rect.w, height: rect.h, color: rgb(1, 1, 1) });
+        }
+
         if (!f) continue;
         const ink = it.bold ? rgb(0, 0, 0) : rgb(0.07, 0.07, 0.07);
         page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: ink });
@@ -708,7 +822,7 @@ export function PdfEditor() {
                           fontStyle: it.italic ? "italic" : "normal",
                           fontSize: it.size * 0.95 * scale,
                           color: "#111",
-                          background: changed ? "#fff" : "transparent",
+                          background: changed ? it.bg || "#fff" : "transparent",
                           outline:
                             editingKey === it.key
                               ? "2px solid #2563eb"
