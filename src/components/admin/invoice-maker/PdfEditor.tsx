@@ -206,6 +206,7 @@ export function PdfEditor() {
       setFileName(file.name);
       setObjs([]);
       setItems([]);
+      pageCanvases.current = [];
       setEditingKey(null);
       setSelected(null);
 
@@ -821,7 +822,7 @@ export function PdfEditor() {
                           fontStyle: it.italic ? "italic" : "normal",
                           fontSize: it.size * 0.95 * scale,
                           color: "#111",
-                          background: changed ? "#fff" : "transparent",
+                          background: changed ? it.bg || "#fff" : "transparent",
                           outline:
                             editingKey === it.key
                               ? "2px solid #2563eb"
