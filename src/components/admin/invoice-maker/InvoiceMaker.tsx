@@ -315,6 +315,14 @@ export function InvoiceMaker() {
         imgData = canvas.toDataURL("image/jpeg", quality);
       }
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      pdf.setProperties({
+        title: pdfMeta.title || `Invoice ${draft.invoice_number}`,
+        author: pdfMeta.author || draft.from_name || "",
+        subject: pdfMeta.subject || `Invoice for ${draft.to_name || "client"}`,
+        keywords: pdfMeta.keywords || "",
+        creator: pdfMeta.author || draft.from_name || "",
+      });
+
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const imgH = (canvas.height * pageW) / canvas.width;
