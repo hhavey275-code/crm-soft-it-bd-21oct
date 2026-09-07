@@ -32,7 +32,7 @@ export function AdminWithdrawRequests() {
     queryFn: async () => {
       let q = (supabase as any)
         .from("spend_cap_withdraw_requests")
-        .select("*, ad_accounts(account_name, account_id)")
+        .select("*")
         .order("created_at", { ascending: false });
       if (!showResolved) q = q.eq("status", "pending");
       const { data, error } = await q;
@@ -55,6 +55,20 @@ export function AdminWithdrawRequests() {
     },
   });
   const getProfile = (id: string) => profiles.find((p: any) => p.user_id === id);
+
+  const accountIds = [...new Set(rows.map((r) => r.ad_account_id).filter(Boolean))];
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["withdraw-req-accounts", accountIds.join(",")],
+    enabled: accountIds.length > 0,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("ad_accounts")
+        .select("id, account_name, account_id")
+        .in("id", accountIds as string[]);
+      return data ?? [];
+    },
+  });
+  const getAccount = (id: string) => (accounts as any[]).find((a) => a.id === id);
 
   const resolve = async () => {
     if (!active) return;
@@ -91,14 +105,14 @@ export function AdminWithdrawRequests() {
         title: decision === "approved" ? "Withdraw Request Approved" : "Withdraw Request Rejected",
         message:
           decision === "approved"
-            ? `$${Number(row.amount_usd).toFixed(2)} has been moved back to your wallet from ${row.ad_accounts?.account_name ?? "your ad account"}.`
+            ? `$${Number(row.amount_usd).toFixed(2)} has been moved back to your wallet from ${getAccount(row.ad_account_id)?.account_name ?? "your ad account"}.`
             : `Your $${Number(row.amount_usd).toFixed(2)} withdraw request was rejected.${adminNote ? ` Note: ${adminNote}` : ""}`,
         reference_id: row.id,
       });
 
       await logSystemAction(
         decision === "approved" ? "Withdraw Request Approved" : "Withdraw Request Rejected",
-        `$${Number(row.amount_usd).toFixed(2)} — ${row.ad_accounts?.account_name ?? row.ad_account_id}`,
+        `$${Number(row.amount_usd).toFixed(2)} — ${getAccount(row.ad_account_id)?.account_name ?? row.ad_account_id}`,
         user!.id,
         user!.email
       );
@@ -155,9 +169,9 @@ export function AdminWithdrawRequests() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="col-span-2">
                       <p className="text-[10px] uppercase text-muted-foreground">Ad Account</p>
-                      <p className="font-medium truncate">{r.ad_accounts?.account_name || "—"}</p>
-                      {r.ad_accounts?.account_id && (
-                        <p className="font-mono text-[11px] text-muted-foreground">{String(r.ad_accounts.account_id).replace(/^act_/, "")}</p>
+                      <p className="font-medium truncate">{getAccount(r.ad_account_id)?.account_name || "—"}</p>
+                      {getAccount(r.ad_account_id)?.account_id && (
+                        <p className="font-mono text-[11px] text-muted-foreground">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</p>
                       )}
                     </div>
                     <div>
@@ -208,9 +222,9 @@ export function AdminWithdrawRequests() {
                         <p className="text-xs text-muted-foreground">{p?.email || "—"}</p>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{r.ad_accounts?.account_name || "—"}</div>
-                        {r.ad_accounts?.account_id && (
-                          <div className="text-xs text-muted-foreground font-mono">{String(r.ad_accounts.account_id).replace(/^act_/, "")}</div>
+                        <div className="font-medium">{getAccount(r.ad_account_id)?.account_name || "—"}</div>
+                        {getAccount(r.ad_account_id)?.account_id && (
+                          <div className="text-xs text-muted-foreground font-mono">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</div>
                         )}
                       </TableCell>
                       <TableCell className="font-semibold">${Number(r.amount_usd).toFixed(2)}</TableCell>
