@@ -24,6 +24,8 @@ type TextItem = {
   italic: boolean;
   serif: boolean;
   mono: boolean;
+  /** true when the look (bold/italic/serif/size) was changed by hand */
+  dirty?: boolean;
 };
 
 type PdfMeta = {
@@ -90,14 +92,14 @@ export function PdfEditor() {
 
   const sel = objs.find((o) => o.id === selected) ?? null;
   const editItem = items.find((i) => i.key === editingKey) ?? null;
-  const changedCount = items.filter((i) => i.value !== i.original).length;
+  const changedCount = items.filter((i) => i.value !== i.original || i.dirty).length;
 
   function updateItem(key: string, value: string) {
     setItems((list) => list.map((i) => (i.key === key ? { ...i, value } : i)));
   }
 
   function patchItem(key: string, patch: Partial<TextItem>) {
-    setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch } : i)));
+    setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch, dirty: true } : i)));
   }
 
   const openPdf = useCallback(async (file: File) => {
@@ -633,9 +635,9 @@ export function PdfEditor() {
               >
                 <img src={p.png} alt={`Page ${idx + 1}`} className="pointer-events-none block w-full" />
                 {items
-                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original))
+                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original || it.dirty))
                   .map((it) => {
-                    const changed = it.value !== it.original;
+                    const changed = it.value !== it.original || !!it.dirty;
                     return (
                       <div
                         key={it.key}
