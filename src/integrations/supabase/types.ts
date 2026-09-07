@@ -1737,6 +1737,7 @@ export type Database = {
       }
       custom_invoices: {
         Row: {
+          amount_paid: number
           bank_details: string | null
           created_at: string
           created_by: string
@@ -1754,6 +1755,7 @@ export type Database = {
           items: Json
           logo_url: string | null
           notes: string | null
+          payment_status: string
           status: string
           tax_percent: number
           template: string
@@ -1765,6 +1767,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amount_paid?: number
           bank_details?: string | null
           created_at?: string
           created_by: string
@@ -1782,6 +1785,7 @@ export type Database = {
           items?: Json
           logo_url?: string | null
           notes?: string | null
+          payment_status?: string
           status?: string
           tax_percent?: number
           template?: string
@@ -1793,6 +1797,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amount_paid?: number
           bank_details?: string | null
           created_at?: string
           created_by?: string
@@ -1810,6 +1815,7 @@ export type Database = {
           items?: Json
           logo_url?: string | null
           notes?: string | null
+          payment_status?: string
           status?: string
           tax_percent?: number
           template?: string

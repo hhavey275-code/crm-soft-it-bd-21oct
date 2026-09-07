@@ -6,6 +6,8 @@ export type InvoiceItem = {
   rate: number;
 };
 
+export type PaymentStatus = "unpaid" | "paid" | "partial";
+
 export type InvoiceDraft = {
   invoice_number: string;
   template: string;
@@ -28,7 +30,22 @@ export type InvoiceDraft = {
   discount: number;
   notes: string;
   terms: string;
+  payment_status: PaymentStatus;
+  amount_paid: number;
 };
+
+export const PAYMENT_STATUSES = [
+  { id: "unpaid", label: "Unpaid" },
+  { id: "partial", label: "Partially Paid" },
+  { id: "paid", label: "Paid" },
+] as const;
+
+const SEAL_STYLES: Record<PaymentStatus, { color: string; label: string }> = {
+  paid: { color: "#15803d", label: "PAID" },
+  partial: { color: "#b45309", label: "PARTIALLY PAID" },
+  unpaid: { color: "#b91c1c", label: "UNPAID" },
+};
+
 
 export const TEMPLATES = [
   { id: "classic", label: "Classic Ledger" },
@@ -53,8 +70,54 @@ export function totals(d: InvoiceDraft) {
   const subtotal = d.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.rate) || 0), 0);
   const tax = (subtotal * (Number(d.tax_percent) || 0)) / 100;
   const discount = Number(d.discount) || 0;
-  return { subtotal, tax, discount, total: subtotal + tax - discount };
+  const total = subtotal + tax - discount;
+  const status: PaymentStatus = (d.payment_status as PaymentStatus) || "unpaid";
+  const paid = status === "paid" ? total : status === "partial" ? Number(d.amount_paid) || 0 : 0;
+  return { subtotal, tax, discount, total, paid, balance: total - paid, status };
 }
+
+/** Rubber-stamp style payment seal shown on the invoice sheet. */
+export function PaymentSeal({ status, size = 150 }: { status: PaymentStatus; size?: number }) {
+  const s = SEAL_STYLES[status] ?? SEAL_STYLES.unpaid;
+  const long = s.label.length > 5;
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        transform: "rotate(-14deg)",
+        border: `4px double ${s.color}`,
+        color: s.color,
+        borderRadius: "50%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        opacity: 0.85,
+        fontFamily: "Arial, Helvetica, sans-serif",
+        lineHeight: 1.05,
+        padding: 8,
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ fontSize: 8, letterSpacing: 2, fontWeight: 700 }}>PAYMENT</div>
+      <div style={{ fontSize: long ? size * 0.13 : size * 0.2, fontWeight: 800, letterSpacing: 1 }}>{s.label}</div>
+      <div
+        style={{
+          marginTop: 4,
+          borderTop: `1px solid ${s.color}`,
+          paddingTop: 3,
+          fontSize: 7,
+          letterSpacing: 1,
+        }}
+      >
+        VERIFIED
+      </div>
+    </div>
+  );
+}
+
 
 function fmtDate(v: string) {
   if (!v) return "—";
@@ -386,7 +449,8 @@ function Summary({
   mono?: boolean;
 }) {
   return (
-    <div className={`mt-5 flex ${align === "right" ? "justify-end" : "justify-start"}`}>
+    <div className={`mt-5 flex items-center ${align === "right" ? "justify-between" : "justify-start"}`}>
+      <PaymentSeal status={t.status} />
       <div className={`w-72 text-sm ${mono ? "text-xs" : ""}`}>
         <Row label="Subtotal" value={money(c, t.subtotal)} />
         {Number(data.tax_percent) > 0 && <Row label={`Tax (${data.tax_percent}%)`} value={money(c, t.tax)} />}
@@ -395,9 +459,17 @@ function Summary({
           <span>Total</span>
           <span>{money(c, t.total)}</span>
         </div>
+        {t.status !== "unpaid" && <Row label="Amount paid" value={money(c, t.paid)} />}
+        {t.status !== "paid" && (
+          <div className="flex justify-between py-1 font-semibold">
+            <span>Balance due</span>
+            <span>{money(c, t.balance)}</span>
+          </div>
+        )}
       </div>
     </div>
   );
+
 }
 
 function Row({ label, value }: { label: string; value: string }) {
