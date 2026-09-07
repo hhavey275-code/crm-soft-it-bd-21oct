@@ -233,7 +233,14 @@ export function PdfEditor() {
               italic: st.italic === true || /italic|oblique/.test(family),
               serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
+              bg: sampleBackground(ctx, base.height, viewport.scale, {
+                x: tr[4],
+                y: tr[5] - size * 0.26,
+                w: Math.max(it.width || size * str.length * 0.5, 2),
+                h: size * 1.18,
+              }),
             });
+
           });
         } catch {
           /* text layer unavailable for this page */
