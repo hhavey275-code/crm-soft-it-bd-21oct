@@ -6,6 +6,8 @@ export type InvoiceItem = {
   rate: number;
 };
 
+export type PaymentStatus = "unpaid" | "paid" | "partial";
+
 export type InvoiceDraft = {
   invoice_number: string;
   template: string;
@@ -28,7 +30,22 @@ export type InvoiceDraft = {
   discount: number;
   notes: string;
   terms: string;
+  payment_status: PaymentStatus;
+  amount_paid: number;
 };
+
+export const PAYMENT_STATUSES = [
+  { id: "unpaid", label: "Unpaid" },
+  { id: "partial", label: "Partially Paid" },
+  { id: "paid", label: "Paid" },
+] as const;
+
+const SEAL_STYLES: Record<PaymentStatus, { color: string; label: string }> = {
+  paid: { color: "#15803d", label: "PAID" },
+  partial: { color: "#b45309", label: "PARTIALLY PAID" },
+  unpaid: { color: "#b91c1c", label: "UNPAID" },
+};
+
 
 export const TEMPLATES = [
   { id: "classic", label: "Classic Ledger" },
