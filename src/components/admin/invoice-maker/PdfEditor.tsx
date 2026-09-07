@@ -1,0 +1,489 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Download, Eraser, Image as ImageIcon, Trash2, Type, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type Tool = "text" | "image" | "whiteout";
+
+type PdfMeta = {
+  title: string;
+  author: string;
+  subject: string;
+  keywords: string;
+  creator: string;
+  producer: string;
+};
+
+type Obj = {
+  id: string;
+  page: number;
+  type: Tool;
+  /** page-point coordinates, origin top-left */
+  x: number;
+  y: number;
+  text?: string;
+  size?: number;
+  color?: string;
+  w?: number;
+  h?: number;
+  dataUrl?: string;
+};
+
+type PageInfo = { png: string; width: number; height: number };
+
+const DISPLAY_W = 700;
+
+function hexToRgb(hex: string) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "#111111");
+  if (!m) return { r: 0.07, g: 0.07, b: 0.07 };
+  return {
+    r: parseInt(m[1], 16) / 255,
+    g: parseInt(m[2], 16) / 255,
+    b: parseInt(m[3], 16) / 255,
+  };
+}
+
+export function PdfEditor() {
+  const [bytes, setBytes] = useState<Uint8Array | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [pages, setPages] = useState<PageInfo[]>([]);
+  const [objs, setObjs] = useState<Obj[]>([]);
+  const [tool, setTool] = useState<Tool>("text");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [meta, setMeta] = useState<PdfMeta>({
+    title: "",
+    author: "",
+    subject: "",
+    keywords: "",
+    creator: "",
+    producer: "",
+  });
+  const [textValue, setTextValue] = useState("Sample text");
+  const [fontSize, setFontSize] = useState(14);
+  const [color, setColor] = useState("#111111");
+  const pendingImage = useRef<string | null>(null);
+  const drag = useRef<{ id: string; dx: number; dy: number; scale: number } | null>(null);
+
+  const sel = objs.find((o) => o.id === selected) ?? null;
+
+  const openPdf = useCallback(async (file: File) => {
+    setBusy(true);
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      setBytes(buf);
+      setFileName(file.name);
+      setObjs([]);
+      setSelected(null);
+
+      const pdfjs: any = await import("pdfjs-dist");
+      const workerUrl = (await import("pdfjs-dist/build/pdf.worker.mjs?url")).default;
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+      const doc = await pdfjs.getDocument({ data: buf.slice() }).promise;
+
+      const rendered: PageInfo[] = [];
+      for (let p = 1; p <= doc.numPages; p++) {
+        const page = await doc.getPage(p);
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        rendered.push({ png: canvas.toDataURL("image/png"), width: base.width, height: base.height });
+      }
+      setPages(rendered);
+
+      const { PDFDocument } = await import("pdf-lib");
+      const lib = await PDFDocument.load(buf.slice(), { updateMetadata: false });
+      setMeta({
+        title: lib.getTitle() ?? "",
+        author: lib.getAuthor() ?? "",
+        subject: lib.getSubject() ?? "",
+        keywords: (lib.getKeywords() ?? "") as string,
+        creator: lib.getCreator() ?? "",
+        producer: lib.getProducer() ?? "",
+      });
+      toast.success(`Loaded ${doc.numPages} page${doc.numPages > 1 ? "s" : ""}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Could not open this PDF");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  function addObject(pageIdx: number, xPt: number, yPt: number) {
+    const id = Math.random().toString(36).slice(2);
+    if (tool === "text") {
+      setObjs((o) => [
+        ...o,
+        { id, page: pageIdx, type: "text", x: xPt, y: yPt, text: textValue || "Text", size: fontSize, color },
+      ]);
+    } else if (tool === "whiteout") {
+      setObjs((o) => [...o, { id, page: pageIdx, type: "whiteout", x: xPt, y: yPt, w: 160, h: 24 }]);
+    } else if (tool === "image") {
+      if (!pendingImage.current) {
+        toast.error("Pick an image file first");
+        return;
+      }
+      setObjs((o) => [
+        ...o,
+        { id, page: pageIdx, type: "image", x: xPt, y: yPt, w: 120, h: 120, dataUrl: pendingImage.current! },
+      ]);
+    }
+    setSelected(id);
+  }
+
+  function updateSel(patch: Partial<Obj>) {
+    if (!sel) return;
+    setObjs((o) => o.map((x) => (x.id === sel.id ? { ...x, ...patch } : x)));
+  }
+
+  async function exportPdf() {
+    if (!bytes) return;
+    setBusy(true);
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+      const doc = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const docPages = doc.getPages();
+
+      for (const o of objs) {
+        const page = docPages[o.page];
+        if (!page) continue;
+        const { height } = page.getSize();
+        if (o.type === "text") {
+          const c = hexToRgb(o.color || "#111111");
+          page.drawText(o.text || "", {
+            x: o.x,
+            y: height - o.y - (o.size || 14),
+            size: o.size || 14,
+            font,
+            color: rgb(c.r, c.g, c.b),
+          });
+        } else if (o.type === "whiteout") {
+          page.drawRectangle({
+            x: o.x,
+            y: height - o.y - (o.h || 24),
+            width: o.w || 160,
+            height: o.h || 24,
+            color: rgb(1, 1, 1),
+          });
+        } else if (o.type === "image" && o.dataUrl) {
+          const isPng = o.dataUrl.startsWith("data:image/png");
+          const b64 = o.dataUrl.split(",")[1];
+          const raw = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+          const img = isPng ? await doc.embedPng(raw) : await doc.embedJpg(raw);
+          page.drawImage(img, {
+            x: o.x,
+            y: height - o.y - (o.h || 120),
+            width: o.w || 120,
+            height: o.h || 120,
+          });
+        }
+      }
+
+      doc.setTitle(meta.title || "");
+      doc.setAuthor(meta.author || "");
+      doc.setSubject(meta.subject || "");
+      doc.setKeywords(meta.keywords ? meta.keywords.split(",").map((k) => k.trim()) : []);
+      doc.setCreator(meta.creator || "");
+      doc.setProducer(meta.producer || "");
+      doc.setModificationDate(new Date());
+
+      const out = await doc.save();
+      const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName.replace(/\.pdf$/i, "") + "-edited.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error(err?.message || "Could not save the PDF");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    function onUp() {
+      drag.current = null;
+    }
+    window.addEventListener("pointerup", onUp);
+    return () => window.removeEventListener("pointerup", onUp);
+  }, []);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+      <div className="space-y-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Open a PDF</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Input
+              type="file"
+              accept="application/pdf"
+              className="cursor-pointer"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void openPdf(f);
+              }}
+            />
+            {fileName && <p className="truncate text-xs text-muted-foreground">{fileName}</p>}
+            {busy && <p className="text-xs text-muted-foreground">Working…</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tool === "text" ? "default" : "outline"} onClick={() => setTool("text")}>
+                <Type className="mr-2 h-4 w-4" /> Text
+              </Button>
+              <Button size="sm" variant={tool === "whiteout" ? "default" : "outline"} onClick={() => setTool("whiteout")}>
+                <Eraser className="mr-2 h-4 w-4" /> Cover
+              </Button>
+              <Button size="sm" variant={tool === "image" ? "default" : "outline"} onClick={() => setTool("image")}>
+                <ImageIcon className="mr-2 h-4 w-4" /> Image
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pick a tool, then click on the page to place it. Drag anything to move it.
+            </p>
+
+            {tool === "text" && (
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Text to place</Label>
+                <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Size</Label>
+                    <Input type="number" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value) || 14)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Colour</Label>
+                    <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 p-1" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tool === "image" && (
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Image (PNG or JPG)</Label>
+                <Input
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="cursor-pointer"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const fr = new FileReader();
+                    fr.onload = () => {
+                      pendingImage.current = String(fr.result);
+                      toast.success("Image ready — click on the page to place it");
+                    };
+                    fr.readAsDataURL(f);
+                  }}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {sel && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Selected item</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {sel.type === "text" && (
+                <>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Text</Label>
+                    <Input value={sel.text ?? ""} onChange={(e) => updateSel({ text: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Size</Label>
+                      <Input
+                        type="number"
+                        value={sel.size ?? 14}
+                        onChange={(e) => updateSel({ size: Number(e.target.value) || 14 })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Colour</Label>
+                      <Input
+                        type="color"
+                        className="h-9 p-1"
+                        value={sel.color ?? "#111111"}
+                        onChange={(e) => updateSel({ color: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              {(sel.type === "whiteout" || sel.type === "image") && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Width</Label>
+                    <Input
+                      type="number"
+                      value={sel.w ?? 100}
+                      onChange={(e) => updateSel({ w: Number(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Height</Label>
+                    <Input
+                      type="number"
+                      value={sel.h ?? 100}
+                      onChange={(e) => updateSel({ h: Number(e.target.value) || 1 })}
+                    />
+                  </div>
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setObjs((o) => o.filter((x) => x.id !== sel.id));
+                  setSelected(null);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Remove item
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">File information (metadata)</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {(
+              [
+                ["title", "Title"],
+                ["author", "Author"],
+                ["subject", "Subject"],
+                ["keywords", "Keywords (comma separated)"],
+                ["creator", "Created with"],
+                ["producer", "Producer"],
+              ] as [keyof PdfMeta, string][]
+            ).map(([k, label]) => (
+              <div key={k}>
+                <Label className="text-xs text-muted-foreground">{label}</Label>
+                <Input value={meta[k]} onChange={(e) => setMeta((m) => ({ ...m, [k]: e.target.value }))} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Button className="w-full" disabled={!bytes || busy} onClick={() => void exportPdf()}>
+          <Download className="mr-2 h-4 w-4" /> Download edited PDF
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {!pages.length ? (
+          <Card>
+            <CardContent className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Upload className="h-6 w-6" />
+              Open a PDF to start editing.
+            </CardContent>
+          </Card>
+        ) : (
+          pages.map((p, idx) => {
+            const scale = DISPLAY_W / p.width;
+            return (
+              <div
+                key={idx}
+                className="relative mx-auto select-none overflow-hidden rounded border bg-white shadow-sm"
+                style={{ width: DISPLAY_W, height: p.height * scale }}
+                onPointerMove={(e) => {
+                  const d = drag.current;
+                  if (!d) return;
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const x = (e.clientX - box.left) / scale - d.dx;
+                  const y = (e.clientY - box.top) / scale - d.dy;
+                  setObjs((o) => o.map((x2) => (x2.id === d.id ? { ...x2, x, y } : x2)));
+                }}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).dataset.obj) return;
+                  const box = e.currentTarget.getBoundingClientRect();
+                  addObject(idx, (e.clientX - box.left) / scale, (e.clientY - box.top) / scale);
+                }}
+              >
+                <img src={p.png} alt={`Page ${idx + 1}`} className="pointer-events-none block w-full" />
+                {objs
+                  .filter((o) => o.page === idx)
+                  .map((o) => (
+                    <div
+                      key={o.id}
+                      data-obj="1"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setSelected(o.id);
+                        const box = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+                        drag.current = {
+                          id: o.id,
+                          dx: (e.clientX - box.left) / scale - o.x,
+                          dy: (e.clientY - box.top) / scale - o.y,
+                          scale,
+                        };
+                      }}
+                      style={{
+                        position: "absolute",
+                        left: o.x * scale,
+                        top: o.y * scale,
+                        cursor: "move",
+                        outline: selected === o.id ? "2px solid #2563eb" : "1px dashed rgba(0,0,0,0.25)",
+                        ...(o.type === "text"
+                          ? {
+                              fontFamily: "Helvetica, Arial, sans-serif",
+                              fontSize: (o.size || 14) * scale,
+                              color: o.color || "#111",
+                              lineHeight: 1,
+                              whiteSpace: "pre",
+                              padding: 1,
+                            }
+                          : {
+                              width: (o.w || 100) * scale,
+                              height: (o.h || 100) * scale,
+                              background: o.type === "whiteout" ? "#fff" : undefined,
+                            }),
+                      }}
+                    >
+                      {o.type === "text" ? (
+                        o.text
+                      ) : o.type === "image" ? (
+                        <img src={o.dataUrl} alt="" className="pointer-events-none h-full w-full object-contain" />
+                      ) : null}
+                    </div>
+                  ))}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
