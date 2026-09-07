@@ -123,6 +123,41 @@ function buildBackgroundPatch(
   return out.toDataURL("image/png");
 }
 
+/** Average paper colour just above and below a line, as a CSS colour. */
+function sampleBackground(
+  ctx: CanvasRenderingContext2D,
+  pageHeightPt: number,
+  scale: number,
+  rect: { x: number; y: number; w: number; h: number },
+): string {
+  try {
+    const px = Math.max(0, Math.round(rect.x * scale));
+    const pw = Math.max(1, Math.round(rect.w * scale));
+    const pTop = Math.max(0, Math.round((pageHeightPt - rect.y - rect.h) * scale));
+    const ph = Math.max(1, Math.round(rect.h * scale));
+    const gap = Math.max(2, Math.round(scale));
+    const rows = [Math.max(0, pTop - gap), Math.min(ctx.canvas.height - 1, pTop + ph + gap)];
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let n = 0;
+    for (const y of rows) {
+      const d = ctx.getImageData(px, y, Math.min(pw, ctx.canvas.width - px), 1).data;
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i]!;
+        g += d[i + 1]!;
+        b += d[i + 2]!;
+        n++;
+      }
+    }
+    if (!n) return "#ffffff";
+    return `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`;
+  } catch {
+    return "#ffffff";
+  }
+}
+
+
 
 export function PdfEditor() {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
