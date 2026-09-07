@@ -29,6 +29,15 @@ import {
 
 const emptyItem: InvoiceItem = { description: "", qty: 1, rate: 0 };
 
+const DEFAULT_TERMS = [
+  "Payment is due on or before the due date shown above.",
+  "Please use the invoice number as the payment reference.",
+  "Bank charges or transfer fees, if any, are payable by the client.",
+  "Services may be paused on invoices left unpaid for more than 7 days after the due date.",
+].join("\n");
+
+
+
 function blankDraft(): InvoiceDraft {
   return {
     invoice_number: `INV-${format(new Date(), "yyyyMM")}-${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -51,13 +60,14 @@ function blankDraft(): InvoiceDraft {
     tax_percent: 0,
     discount: 0,
     notes: "",
-    terms: "",
+    terms: DEFAULT_TERMS,
     payment_status: "unpaid",
     amount_paid: 0,
   };
 }
 
 const LS_KEY = "invoice_maker_company_profile";
+const DRAFT_KEY = "invoice_maker_open_draft";
 
 export function InvoiceMaker() {
   const { user } = useAuth();
@@ -67,23 +77,47 @@ export function InvoiceMaker() {
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [captureTemplate, setCaptureTemplate] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
 
-  // Remember company/bank details locally so every new invoice is pre-filled
+  // Restore the in-progress draft first, else pre-fill company/bank details
   useEffect(() => {
     try {
+      const d = localStorage.getItem(DRAFT_KEY);
+      if (d) {
+        const parsed = JSON.parse(d);
+        if (parsed?.draft) {
+          setDraft({ ...blankDraft(), ...parsed.draft });
+          setEditingId(parsed.editingId ?? null);
+          setRestored(true);
+          return;
+        }
+      }
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const p = JSON.parse(raw);
-        setDraft((d) => ({ ...d, ...p }));
+        setDraft((d2) => ({ ...d2, ...p }));
       }
     } catch {
       /* ignore */
+    } finally {
+      setRestored(true);
     }
   }, []);
 
+  // Keep the current draft so a page reload never loses the work
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, editingId }));
+    } catch {
+      /* ignore */
+    }
+  }, [draft, editingId, restored]);
+
   const set = <K extends keyof InvoiceDraft>(k: K, v: InvoiceDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
 
   const t = useMemo(() => totals(draft), [draft]);
 
@@ -318,6 +352,7 @@ export function InvoiceMaker() {
               setEditingId(null);
               const b = blankDraft();
               try {
+                localStorage.removeItem(DRAFT_KEY);
                 const raw = localStorage.getItem(LS_KEY);
                 setDraft(raw ? { ...b, ...JSON.parse(raw) } : b);
               } catch {
