@@ -204,7 +204,59 @@ export function PdfEditor() {
       const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
       const doc = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
       const font = await doc.embedFont(StandardFonts.Helvetica);
+      const fontCache = new Map<string, any>();
+      async function fontFor(it: TextItem) {
+        const key = `${it.serif ? "s" : it.mono ? "m" : "h"}${it.bold ? "b" : ""}${it.italic ? "i" : ""}`;
+        if (fontCache.has(key)) return fontCache.get(key);
+        const pick = it.mono
+          ? it.bold && it.italic
+            ? StandardFonts.CourierBoldOblique
+            : it.bold
+              ? StandardFonts.CourierBold
+              : it.italic
+                ? StandardFonts.CourierOblique
+                : StandardFonts.Courier
+          : it.serif
+            ? it.bold && it.italic
+              ? StandardFonts.TimesRomanBoldItalic
+              : it.bold
+                ? StandardFonts.TimesRomanBold
+                : it.italic
+                  ? StandardFonts.TimesRomanItalic
+                  : StandardFonts.TimesRoman
+            : it.bold && it.italic
+              ? StandardFonts.HelveticaBoldOblique
+              : it.bold
+                ? StandardFonts.HelveticaBold
+                : it.italic
+                  ? StandardFonts.HelveticaOblique
+                  : StandardFonts.Helvetica;
+        const f = await doc.embedFont(pick);
+        fontCache.set(key, f);
+        return f;
+      }
       const docPages = doc.getPages();
+
+      // Retype changed text in place: cover the old line, draw the new one at the same spot.
+      for (const it of items) {
+        if (it.value === it.original) continue;
+        const page = docPages[it.page];
+        if (!page) continue;
+        page.drawRectangle({
+          x: it.x - 0.5,
+          y: it.baseline - it.size * 0.26,
+          width: Math.max(it.w, 1) + 1.5,
+          height: it.size * 1.18,
+          color: rgb(1, 1, 1),
+        });
+        if (!it.value) continue;
+        const f = await fontFor(it);
+        let size = it.size;
+        const maxW = Math.max(it.w, 1);
+        while (size > 3 && f.widthOfTextAtSize(it.value, size) > maxW * 1.02) size -= 0.25;
+        page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
+      }
+
 
       for (const o of objs) {
         const page = docPages[o.page];
