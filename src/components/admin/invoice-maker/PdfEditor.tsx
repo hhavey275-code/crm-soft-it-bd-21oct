@@ -24,6 +24,8 @@ type TextItem = {
   italic: boolean;
   serif: boolean;
   mono: boolean;
+  /** true when the look (bold/italic/serif/size) was changed by hand */
+  dirty?: boolean;
 };
 
 type PdfMeta = {
@@ -90,10 +92,14 @@ export function PdfEditor() {
 
   const sel = objs.find((o) => o.id === selected) ?? null;
   const editItem = items.find((i) => i.key === editingKey) ?? null;
-  const changedCount = items.filter((i) => i.value !== i.original).length;
+  const changedCount = items.filter((i) => i.value !== i.original || i.dirty).length;
 
   function updateItem(key: string, value: string) {
     setItems((list) => list.map((i) => (i.key === key ? { ...i, value } : i)));
+  }
+
+  function patchItem(key: string, patch: Partial<TextItem>) {
+    setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch, dirty: true } : i)));
   }
 
   const openPdf = useCallback(async (file: File) => {
@@ -129,12 +135,26 @@ export function PdfEditor() {
         try {
           const tc: any = await page.getTextContent();
           const styles: any = tc.styles || {};
+          const anyPage: any = page;
+          const realName = (fontName: string) => {
+            try {
+              const fo =
+                anyPage.commonObjs?.get?.(fontName) ??
+                anyPage.objs?.get?.(fontName) ??
+                anyPage._transport?.commonObjs?.get?.(fontName);
+              return String(fo?.name || fo?.loadedName || fo?.fallbackName || "");
+            } catch {
+              return "";
+            }
+          };
           (tc.items as any[]).forEach((it, i) => {
             const str: string = it.str ?? "";
             if (!str.trim()) return;
             const tr: number[] = it.transform || [1, 0, 0, 1, 0, 0];
             const size = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 10;
-            const family = String(styles[it.fontName]?.fontFamily || it.fontName || "").toLowerCase();
+            const st = styles[it.fontName] || {};
+            const family = [realName(it.fontName), st.fontFamily, it.fontName].filter(Boolean).join(" ").toLowerCase();
+            const weight = Number(st.fontWeight) || 0;
             found.push({
               key: `${p - 1}:${i}`,
               page: p - 1,
@@ -144,9 +164,9 @@ export function PdfEditor() {
               baseline: tr[5],
               w: it.width || size * str.length * 0.5,
               size,
-              bold: /bold|black|heavy|semibold/.test(family),
-              italic: /italic|oblique/.test(family),
-              serif: /times|serif|georgia|roman|garamond|book/.test(family) && !/sans/.test(family),
+              bold: weight >= 600 || /bold|black|heavy|semibold|[-,]bd\b|extrab/.test(family),
+              italic: st.italic === true || /italic|oblique/.test(family),
+              serif: /times|georgia|garamond|book|minion|cambria|(^|[^s])serif/.test(family) && !/sans/.test(family),
               mono: /mono|courier|consol/.test(family),
             });
           });
@@ -245,21 +265,26 @@ export function PdfEditor() {
 
       // Retype changed text in place: cover the old line, draw the new one at the same spot.
       for (const it of items) {
-        if (it.value === it.original) continue;
+        if (it.value === it.original && !it.dirty) continue;
         const page = docPages[it.page];
         if (!page) continue;
+        const f = it.value ? await fontFor(it) : null;
+        let size = it.size;
+        const maxW = Math.max(it.w, 1);
+        if (f) {
+          // Only shrink a little, so bold/serif text keeps its weight instead of turning tiny.
+          const minSize = it.size * 0.82;
+          while (size > minSize && f.widthOfTextAtSize(it.value, size) > maxW * 1.15) size -= 0.25;
+        }
+        const drawnW = f ? f.widthOfTextAtSize(it.value, size) : 0;
         page.drawRectangle({
           x: it.x - 0.5,
           y: it.baseline - it.size * 0.26,
-          width: Math.max(it.w, 1) + 1.5,
-          height: it.size * 1.18,
+          width: Math.max(maxW, drawnW) + 1.5,
+          height: Math.max(it.size, size) * 1.18,
           color: rgb(1, 1, 1),
         });
-        if (!it.value) continue;
-        const f = await fontFor(it);
-        let size = it.size;
-        const maxW = Math.max(it.w, 1);
-        while (size > 3 && f.widthOfTextAtSize(it.value, size) > maxW * 1.02) size -= 0.25;
+        if (!f) continue;
         page.drawText(it.value, { x: it.x, y: it.baseline, size, font: f, color: rgb(0.07, 0.07, 0.07) });
       }
 
@@ -392,6 +417,38 @@ export function PdfEditor() {
                       onChange={(e) => updateItem(editItem.key, e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">Was: {editItem.original}</p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <Button
+                        size="sm"
+                        variant={editItem.bold ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { bold: !editItem.bold })}
+                      >
+                        <span className="font-bold">B</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editItem.italic ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { italic: !editItem.italic })}
+                      >
+                        <span className="italic">I</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editItem.serif ? "default" : "outline"}
+                        onClick={() => patchItem(editItem.key, { serif: !editItem.serif, mono: false })}
+                      >
+                        <span style={{ fontFamily: "Times, serif" }}>Serif</span>
+                      </Button>
+                      <div className="w-20">
+                        <Label className="text-xs text-muted-foreground">Size</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          value={Math.round(editItem.size * 10) / 10}
+                          onChange={(e) => patchItem(editItem.key, { size: Number(e.target.value) || editItem.size })}
+                        />
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => updateItem(editItem.key, editItem.original)}>
                         <RotateCcw className="mr-2 h-4 w-4" /> Undo this line
@@ -578,9 +635,9 @@ export function PdfEditor() {
               >
                 <img src={p.png} alt={`Page ${idx + 1}`} className="pointer-events-none block w-full" />
                 {items
-                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original))
+                  .filter((it) => it.page === idx && (tool === "edit" || it.value !== it.original || it.dirty))
                   .map((it) => {
-                    const changed = it.value !== it.original;
+                    const changed = it.value !== it.original || !!it.dirty;
                     return (
                       <div
                         key={it.key}
