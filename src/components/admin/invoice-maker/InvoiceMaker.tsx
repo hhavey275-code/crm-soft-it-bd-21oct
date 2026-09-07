@@ -352,6 +352,7 @@ export function InvoiceMaker() {
               setEditingId(null);
               const b = blankDraft();
               try {
+                localStorage.removeItem(DRAFT_KEY);
                 const raw = localStorage.getItem(LS_KEY);
                 setDraft(raw ? { ...b, ...JSON.parse(raw) } : b);
               } catch {
