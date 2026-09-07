@@ -1,0 +1,2 @@
+ALTER TABLE public.custom_invoices DROP CONSTRAINT IF EXISTS custom_invoices_payment_status_check;
+ALTER TABLE public.custom_invoices ADD CONSTRAINT custom_invoices_payment_status_check CHECK (payment_status IN ('none','unpaid','paid','partial'));
