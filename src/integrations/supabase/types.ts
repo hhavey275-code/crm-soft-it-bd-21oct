@@ -1735,6 +1735,93 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_invoices: {
+        Row: {
+          bank_details: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          discount: number
+          due_date: string | null
+          from_address: string | null
+          from_email: string | null
+          from_extra: string | null
+          from_name: string | null
+          from_phone: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          items: Json
+          logo_url: string | null
+          notes: string | null
+          status: string
+          tax_percent: number
+          template: string
+          terms: string | null
+          to_address: string | null
+          to_email: string | null
+          to_name: string | null
+          to_phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          bank_details?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          discount?: number
+          due_date?: string | null
+          from_address?: string | null
+          from_email?: string | null
+          from_extra?: string | null
+          from_name?: string | null
+          from_phone?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          items?: Json
+          logo_url?: string | null
+          notes?: string | null
+          status?: string
+          tax_percent?: number
+          template?: string
+          terms?: string | null
+          to_address?: string | null
+          to_email?: string | null
+          to_name?: string | null
+          to_phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bank_details?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          discount?: number
+          due_date?: string | null
+          from_address?: string | null
+          from_email?: string | null
+          from_extra?: string | null
+          from_name?: string | null
+          from_phone?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          items?: Json
+          logo_url?: string | null
+          notes?: string | null
+          status?: string
+          tax_percent?: number
+          template?: string
+          terms?: string | null
+          to_address?: string | null
+          to_email?: string | null
+          to_name?: string | null
+          to_phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_spend_snapshots: {
         Row: {
           account_count: number
