@@ -69,6 +69,58 @@ function hexToRgb(hex: string) {
   };
 }
 
+/**
+ * Recreate what sits behind a line of text (paper tint, watermark, coloured band)
+ * by blending the pixel strips just above and below it, so replaced text does not
+ * end up inside a white box.
+ */
+function buildBackgroundPatch(
+  src: HTMLCanvasElement | undefined,
+  rect: { x: number; y: number; w: number; h: number },
+  pageHeightPt: number,
+): string | null {
+  if (!src) return null;
+  const scale = src.height / pageHeightPt;
+  const px = Math.max(0, Math.round(rect.x * scale));
+  const pw = Math.max(1, Math.round(rect.w * scale));
+  const pTop = Math.max(0, Math.round((pageHeightPt - rect.y - rect.h) * scale));
+  const ph = Math.max(1, Math.round(rect.h * scale));
+  if (px + pw > src.width || pTop + ph > src.height) return null;
+  const sctx = src.getContext("2d");
+  if (!sctx) return null;
+  const gap = Math.max(2, Math.round(scale));
+  const rowAbove = Math.max(0, pTop - gap);
+  const rowBelow = Math.min(src.height - 1, pTop + ph + gap);
+  let above: Uint8ClampedArray;
+  let below: Uint8ClampedArray;
+  try {
+    above = sctx.getImageData(px, rowAbove, pw, 1).data;
+    below = sctx.getImageData(px, rowBelow, pw, 1).data;
+  } catch {
+    return null;
+  }
+  const out = document.createElement("canvas");
+  out.width = pw;
+  out.height = ph;
+  const octx = out.getContext("2d");
+  if (!octx) return null;
+  const img = octx.createImageData(pw, ph);
+  for (let y = 0; y < ph; y++) {
+    const t = ph === 1 ? 0 : y / (ph - 1);
+    for (let x = 0; x < pw; x++) {
+      const si = x * 4;
+      const di = (y * pw + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        img.data[di + c] = Math.round(above[si + c]! * (1 - t) + below[si + c]! * t);
+      }
+      img.data[di + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  return out.toDataURL("image/png");
+}
+
+
 export function PdfEditor() {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState("");
