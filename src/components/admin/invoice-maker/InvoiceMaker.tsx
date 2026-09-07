@@ -73,6 +73,7 @@ export function InvoiceMaker() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [draft, setDraft] = useState<InvoiceDraft>(blankDraft);
+  const [pdfMeta, setPdfMeta] = useState({ title: "", author: "", subject: "", keywords: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -89,6 +90,7 @@ export function InvoiceMaker() {
         if (parsed?.draft) {
           setDraft({ ...blankDraft(), ...parsed.draft });
           setEditingId(parsed.editingId ?? null);
+          if (parsed.pdfMeta) setPdfMeta((m) => ({ ...m, ...parsed.pdfMeta }));
           setRestored(true);
           return;
         }
@@ -109,11 +111,12 @@ export function InvoiceMaker() {
   useEffect(() => {
     if (!restored) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, editingId }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, editingId, pdfMeta }));
     } catch {
       /* ignore */
     }
-  }, [draft, editingId, restored]);
+  }, [draft, editingId, pdfMeta, restored]);
+
 
   const set = <K extends keyof InvoiceDraft>(k: K, v: InvoiceDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
