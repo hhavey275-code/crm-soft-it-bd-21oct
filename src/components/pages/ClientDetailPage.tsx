@@ -7,6 +7,7 @@ import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
+import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
 
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -137,6 +138,8 @@ export default function ClientDetailPage() {
   const [mainTab, setMainTab] = useState<string>("overview");
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+  // External CRM top-up (per ad account, per wallet)
+  const [extTopUp, setExtTopUp] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
 
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -788,6 +791,10 @@ export default function ClientDetailPage() {
                     size="sm"
                     className="w-full min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
                     onClick={() => {
+                      if (acc.external_topup_required) {
+                        setExtTopUp({ account: acc, wallet: "primary" });
+                        return;
+                      }
                       setSelectedAccountId(acc.id);
                       setTopUpWallet("primary");
                       setTopUpDialogOpen(true);
@@ -796,7 +803,7 @@ export default function ClientDetailPage() {
                     }}
                   >
                     <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Top Up</span>
+                    <span className="truncate">{acc.external_topup_required ? "Ext. Top Up" : "Top Up"}</span>
                   </Button>
                   {wallets.secondaryEnabled && (
                     <Button
@@ -804,6 +811,10 @@ export default function ClientDetailPage() {
                       className="w-full min-w-0 gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
+                        if (acc.external_topup_required) {
+                          setExtTopUp({ account: acc, wallet: "secondary" });
+                          return;
+                        }
                         setSelectedAccountId(acc.id);
                         setTopUpWallet("secondary");
                         setTopUpDialogOpen(true);
@@ -812,7 +823,7 @@ export default function ClientDetailPage() {
                       }}
                     >
                       <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Secondary</span>
+                      <span className="truncate">{acc.external_topup_required ? "Ext. Secondary" : "Secondary"}</span>
                     </Button>
                   )}
                   <Button
@@ -2742,13 +2753,17 @@ export default function ClientDetailPage() {
                                         variant="default"
                                         className="h-8 w-8"
                                         onClick={() => {
+                                          if (acc.external_topup_required) {
+                                            setExtTopUp({ account: acc, wallet: "primary" });
+                                            return;
+                                          }
                                           setSelectedAccountId(acc.id);
                                           setTopUpWallet("primary");
                                           setTopUpDialogOpen(true);
                                           setTopUpAmount("");
                                           setDialogTab("topup");
                                         }}
-                                        title="Top Up (Main Wallet)"
+                                        title={acc.external_topup_required ? "Top Up via External CRM (Main Wallet)" : "Top Up (Main Wallet)"}
                                       >
                                         <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
@@ -2757,13 +2772,17 @@ export default function ClientDetailPage() {
                                           size="icon"
                                           className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                           onClick={() => {
+                                            if (acc.external_topup_required) {
+                                              setExtTopUp({ account: acc, wallet: "secondary" });
+                                              return;
+                                            }
                                             setSelectedAccountId(acc.id);
                                             setTopUpWallet("secondary");
                                             setTopUpDialogOpen(true);
                                             setTopUpAmount("");
                                             setDialogTab("topup");
                                           }}
-                                          title="Top Up (Secondary Wallet)"
+                                          title={acc.external_topup_required ? "Top Up via External CRM (Secondary Wallet)" : "Top Up (Secondary Wallet)"}
                                         >
                                           <ArrowUpCircle className="h-4 w-4" />
                                         </Button>
@@ -3255,6 +3274,16 @@ export default function ClientDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* External CRM Top-Up Dialog */}
+      {extTopUp && (
+        <ExternalTopUpDialog
+          open={!!extTopUp}
+          onOpenChange={(open) => { if (!open) setExtTopUp(null); }}
+          account={extTopUp.account}
+          walletKind={extTopUp.wallet}
+        />
+      )}
 
       {/* Top Up / Withdraw Tabbed Dialog */}
       <Dialog
