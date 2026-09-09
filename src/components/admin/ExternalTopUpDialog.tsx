@@ -100,15 +100,13 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
           p_processed_by: `admin:${user!.id}`,
           p_wallet_kind: walletKind,
           p_reference_id: data.id,
-          p_allow_negative: false,
+          // Admin-initiated external CRM top-up: never blocked by balance.
+          // Wallet is allowed to go negative (due) for both main and secondary.
+          p_allow_negative: true,
         });
         if (dErr || (res && res.ok === false)) {
           await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
-          throw new Error(
-            res?.error === "insufficient_balance"
-              ? `Insufficient wallet balance ($${Number(res.balance ?? 0).toFixed(2)})`
-              : dErr?.message || res?.error || "Wallet deduction failed",
-          );
+          throw new Error(dErr?.message || res?.error || "Wallet deduction failed");
         }
         newBalance = Number(res.balance_after);
       }
