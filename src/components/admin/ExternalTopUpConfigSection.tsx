@@ -37,12 +37,13 @@ export function ExternalTopUpConfigSection({ account }: Props) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (enabled && !url.trim()) throw new Error("External CRM URL is required when enabled");
+      if (enabled && !url.trim() && !urlSecondary.trim())
+        throw new Error("Add at least one CRM URL (main or secondary)");
       const { error } = await (supabase as any)
         .from("ad_accounts")
         .update({
           external_topup_required: enabled,
-          external_topup_url: enabled ? url.trim() : null,
+          external_topup_url: enabled ? (url.trim() || null) : null,
           external_topup_url_secondary: enabled ? (urlSecondary.trim() || null) : null,
           external_crm_name: enabled ? (crmName.trim() || "External CRM") : null,
         })
