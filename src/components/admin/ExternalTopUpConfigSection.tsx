@@ -15,6 +15,7 @@ interface Props {
     id: string;
     external_topup_required?: boolean | null;
     external_topup_url?: string | null;
+    external_topup_url_secondary?: string | null;
     external_crm_name?: string | null;
   };
 }
@@ -24,13 +25,15 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const [enabled, setEnabled] = useState(!!account.external_topup_required);
   const [crmName, setCrmName] = useState(account.external_crm_name || "");
   const [url, setUrl] = useState(account.external_topup_url || "");
+  const [urlSecondary, setUrlSecondary] = useState(account.external_topup_url_secondary || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnabled(!!account.external_topup_required);
     setCrmName(account.external_crm_name || "");
     setUrl(account.external_topup_url || "");
-  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url]);
+    setUrlSecondary(account.external_topup_url_secondary || "");
+  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url, account.external_topup_url_secondary]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -40,6 +43,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
         .update({
           external_topup_required: enabled,
           external_topup_url: enabled ? url.trim() : null,
+          external_topup_url_secondary: enabled ? (urlSecondary.trim() || null) : null,
           external_crm_name: enabled ? (crmName.trim() || "External CRM") : null,
         })
         .eq("id", account.id);
@@ -56,7 +60,8 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const dirty =
     enabled !== !!account.external_topup_required ||
     crmName !== (account.external_crm_name || "") ||
-    url !== (account.external_topup_url || "");
+    url !== (account.external_topup_url || "") ||
+    urlSecondary !== (account.external_topup_url_secondary || "");
 
   return (
     <Card>
@@ -96,7 +101,19 @@ export function ExternalTopUpConfigSection({ account }: Props) {
                 onChange={(e) => setUrl(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Direct link to the top-up page in the partner CRM.
+                Direct link to the top-up page in the partner CRM (used for main wallet top-ups).
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">Secondary Wallet Top-Up URL (optional)</Label>
+              <Input
+                type="url"
+                placeholder="https://partner-crm.example.com/topup-secondary"
+                value={urlSecondary}
+                onChange={(e) => setUrlSecondary(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Used when topping up from the client's secondary wallet. Leave empty to reuse the main URL.
               </p>
             </div>
           </div>
