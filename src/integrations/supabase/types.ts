@@ -542,6 +542,7 @@ export type Database = {
           external_crm_name: string | null
           external_topup_required: boolean
           external_topup_url: string | null
+          external_topup_url_secondary: string | null
           fraud_flag: boolean
           id: string
           meta_account_status: number | null
@@ -568,6 +569,7 @@ export type Database = {
           external_crm_name?: string | null
           external_topup_required?: boolean
           external_topup_url?: string | null
+          external_topup_url_secondary?: string | null
           fraud_flag?: boolean
           id?: string
           meta_account_status?: number | null
@@ -594,6 +596,7 @@ export type Database = {
           external_crm_name?: string | null
           external_topup_required?: boolean
           external_topup_url?: string | null
+          external_topup_url_secondary?: string | null
           fraud_flag?: boolean
           id?: string
           meta_account_status?: number | null
@@ -1870,6 +1873,7 @@ export type Database = {
           updated_at: string
           user_id: string | null
           wallet_deducted: boolean
+          wallet_kind: string
         }
         Insert: {
           ad_account_id: string
@@ -1888,6 +1892,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           wallet_deducted?: boolean
+          wallet_kind?: string
         }
         Update: {
           ad_account_id?: string
@@ -1906,6 +1911,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           wallet_deducted?: boolean
+          wallet_kind?: string
         }
         Relationships: [
           {

@@ -19,23 +19,30 @@ interface Props {
     account_id: string;
     account_name: string;
     external_topup_url?: string | null;
+    external_topup_url_secondary?: string | null;
     external_crm_name?: string | null;
     user_id?: string | null;
   };
+  /** Which client wallet to deduct from. Defaults to the main wallet. */
+  walletKind?: "primary" | "secondary";
 }
 
 /**
  * Initiate an external top-up: deducts the assigned client's wallet immediately,
  * logs the transaction, records the request as completed, then opens the 3rd party CRM.
  */
-export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
+export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = "primary" }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const url = account.external_topup_url || "";
+  const isSecondary = walletKind === "secondary";
+  const url = (isSecondary
+    ? account.external_topup_url_secondary || account.external_topup_url
+    : account.external_topup_url) || "";
+  const walletLabel = isSecondary ? "Secondary wallet" : "Main wallet";
   const crmName = account.external_crm_name || "External CRM";
   const cleanAccountId = account.account_id.replace(/^act_/, "");
 
@@ -76,6 +83,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
           notes: notes || null,
           external_crm_name: crmName,
           external_topup_url: url,
+          wallet_kind: walletKind,
         })
         .select()
         .single();
@@ -88,9 +96,9 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
           p_user_id: targetUserId,
           p_amount: -amt,
           p_type: "external_topup",
-          p_description: `External CRM top-up — ${crmName} (${account.account_name})`,
+          p_description: `External CRM top-up — ${crmName} (${account.account_name}) [${walletLabel}]`,
           p_processed_by: `admin:${user!.id}`,
-          p_wallet_kind: "primary",
+          p_wallet_kind: walletKind,
           p_reference_id: data.id,
           p_allow_negative: false,
         });
@@ -167,6 +175,8 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
           <DialogDescription>
             Top up <strong>{account.account_name}</strong> via{" "}
             <Badge variant="outline" className="ml-1">{crmName}</Badge>
+            {" "}
+            <Badge variant={isSecondary ? "secondary" : "outline"} className="ml-1">{walletLabel}</Badge>
           </DialogDescription>
         </DialogHeader>
 
@@ -174,7 +184,11 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
           {!url && (
             <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>External CRM URL is not configured for this account. Please set it in Account Settings first.</span>
+              <span>
+                {isSecondary
+                  ? "No external CRM URL is configured for this account (secondary or main). Please set it in Account Settings first."
+                  : "External CRM URL is not configured for this account. Please set it in Account Settings first."}
+              </span>
             </div>
           )}
 
@@ -214,7 +228,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account }: Props) {
           <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1">
             <p className="font-semibold text-amber-700 dark:text-amber-300">What happens next:</p>
             <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
-              <li>Client's wallet will be <strong>deducted immediately</strong> (if assigned).</li>
+              <li>Client's <strong>{walletLabel.toLowerCase()}</strong> will be <strong>deducted immediately</strong>.</li>
               <li>Partner CRM opens in a new tab with Account ID + amount copied.</li>
               <li>Login & complete the top-up there manually.</li>
             </ol>
