@@ -600,44 +600,52 @@ export function ClientAdAccounts() {
   const allPageSelected = paginatedAccounts.length > 0 && paginatedAccounts.every((a: any) => selectedIds.has(a.id));
 
   const walletBalance = Number(wallet?.balance ?? 0);
-  const effectiveBalance = walletBalance + dueLimit;
+  // External CRM accounts (no API connection) go through a request flow instead
+  const isExternalTopUp = !!topUpAccount?.external_topup_required;
+  const activeWalletBalance = topUpWallet === "secondary" ? Number(wallets.secondaryBalance ?? 0) : walletBalance;
+  const effectiveBalance = activeWalletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance;
-  const usingDueLimit = parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
+  const usingDueLimit = parsedAmount > activeWalletBalance && parsedAmount <= effectiveBalance;
 
-  const topUpMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
-      const { data, error } = await supabase.functions.invoke("spend-cap-update", {
-        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
+  const externalRequestMutation = useMutation({
+    mutationFn: async (walletKind: "primary" | "secondary") => {
+      const { data, error } = await (supabase as any).rpc("request_external_topup", {
+        p_ad_account_id: topUpAccount.id,
+        p_amount: parsedAmount,
+        p_wallet_kind: walletKind,
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) throw new Error(error.message);
+      if (!data?.ok) {
+        const map: Record<string, string> = {
+          insufficient_balance: "Insufficient fund",
+          account_not_assigned: "This ad account is not assigned to you",
+          crm_url_not_configured: "Top-up is not configured for this wallet",
+          not_external_account: "This account does not use external top-up",
+          invalid_amount: "Enter a valid amount",
+        };
+        throw new Error(map[data?.error] || data?.error || "Failed to submit request");
+      }
       return data;
     },
-
-    onSuccess: async (data) => {
-      toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
-      const topUpAccId = topUpAccount.id;
+    onSuccess: () => {
+      toast.success("Top-up request submitted! Our team will process it shortly.");
       setTopUpAccount(null);
       setTopUpAmount("");
-      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
-      // Post-topup: immediately sync just this 1 account from Meta (no cooldown)
-      try {
-        const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-        const result = await chunkedMetaSync([topUpAccId]);
-        if (result?.insights) {
-          refetchInsights();
-          queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
-        }
-      } catch (e) { console.error("Post-topup sync failed:", e); }
+      queryClient.invalidateQueries({ queryKey: ["client-external-topup-requests"] });
     },
+    onError: (err: any) => toast.error(err.message || "Failed to submit request"),
+  });
+
+  const topUpMutation = useMutation({
+...
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
+
 
   const lastUpdated = useMemo(() => {
     const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
@@ -894,6 +902,38 @@ export function ClientAdAccounts() {
                           <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
                             Admin Top-Up Only
                           </Button>
+                        ) : a.external_topup_required ? (
+                          <>
+                            {a.external_topup_url && (
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground text-xs h-8 shadow-md shadow-primary/25"
+                                disabled={isInactive}
+                                onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); }}
+                                data-tutorial={idx === 0 ? "ad-account-topup-btn" : undefined}
+                              >
+                                <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                                Top Up
+                              </Button>
+                            )}
+                            {a.external_topup_url_secondary && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1 text-xs h-8"
+                                disabled={isInactive}
+                                onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
+                              >
+                                <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                                Secondary Top Up
+                              </Button>
+                            )}
+                            {!a.external_topup_url && !a.external_topup_url_secondary && (
+                              <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
+                                Admin Top-Up Only
+                              </Button>
+                            )}
+                          </>
                         ) : (
                           <Button
                             size="sm"
@@ -1048,6 +1088,40 @@ export function ClientAdAccounts() {
                               <LockIcon className="h-4 w-4 mr-1" />
                               Admin Only
                             </Button>
+                          ) : a.external_topup_required ? (
+                            <>
+                              {a.external_topup_url && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25"
+                                  disabled={isInactive}
+                                  title="Request top-up (Main wallet)"
+                                  onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); }}
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                  Top Up
+                                </Button>
+                              )}
+                              {a.external_topup_url_secondary && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={isInactive}
+                                  title="Request top-up (Secondary wallet)"
+                                  onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                  Secondary
+                                </Button>
+                              )}
+                              {!a.external_topup_url && !a.external_topup_url_secondary && (
+                                <Button size="sm" variant="outline" disabled title="Admin top-up only">
+                                  <LockIcon className="h-4 w-4 mr-1" />
+                                  Admin Only
+                                </Button>
+                              )}
+                            </>
                           ) : (
                             <Button
                               size="sm"
@@ -1141,7 +1215,7 @@ export function ClientAdAccounts() {
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Increase Spend Limit</DialogTitle>
+            <DialogTitle>{isExternalTopUp ? "Request Top-Up" : "Increase Spend Limit"}</DialogTitle>
             <DialogDescription>
               Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id?.replace(/^act_/, '')})
             </DialogDescription>
@@ -1150,10 +1224,10 @@ export function ClientAdAccounts() {
             <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
               <span className="flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
-                Main Wallet
+                {topUpWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}
               </span>
-              <span className={`font-semibold ${walletBalance < 0 ? 'text-destructive' : ''}`}>
-                ${walletBalance.toLocaleString()}
+              <span className={`font-semibold ${activeWalletBalance < 0 ? 'text-destructive' : ''}`}>
+                ${activeWalletBalance.toLocaleString()}
               </span>
             </div>
             {dueLimit > 0 && (
@@ -1162,10 +1236,12 @@ export function ClientAdAccounts() {
                 <span className="font-semibold text-amber-700 dark:text-amber-400">${dueLimit.toLocaleString()}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Current Spend Cap</span>
-              <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
-            </div>
+            {!isExternalTopUp && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current Spend Cap</span>
+                <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Amount to Add (USD)</Label>
               <Input
@@ -1177,14 +1253,14 @@ export function ClientAdAccounts() {
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
+                <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
-                <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
+                <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - activeWalletBalance).toLocaleString()} from due limit</p>
               )}
             </div>
 
-            {parsedAmount > 0 && (
+            {!isExternalTopUp && parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
                 <span className="font-medium text-primary">
@@ -1192,21 +1268,39 @@ export function ClientAdAccounts() {
                 </span>
               </div>
             )}
+
+            {isExternalTopUp && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1">
+                <p className="font-semibold text-amber-700 dark:text-amber-300">How this works:</p>
+                <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
+                  <li>Amount is deducted from your {topUpWallet === "secondary" ? "secondary" : "main"} wallet right away.</li>
+                  <li>Our team gets the request instantly and tops up your ad account.</li>
+                  <li>If it can't be processed, the amount is refunded automatically.</li>
+                </ol>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-            <Button
-              onClick={() => topUpMutation.mutate("primary")}
-              disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
-            >
-              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
-            </Button>
+            {isExternalTopUp ? (
+              <Button
+                onClick={() => externalRequestMutation.mutate(topUpWallet)}
+                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending}
+              >
+                {externalRequestMutation.isPending ? "Submitting..." : "Send Top-Up Request"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => topUpMutation.mutate("primary")}
+                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
+              >
+                {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+              </Button>
+            )}
           </DialogFooter>
-
-
-
         </DialogContent>
       </Dialog>
+
 
       {/* BM Access Request Dialog */}
       <Dialog open={!!bmReqAccount} onOpenChange={(open) => { if (!open) setBmReqAccount(null); }}>
