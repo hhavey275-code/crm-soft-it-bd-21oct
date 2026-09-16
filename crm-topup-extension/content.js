@@ -368,6 +368,25 @@
     );
   }
 
+  // The top-up form must already know which ad account it belongs to before we
+  // submit. Some CRMs load the account id / name into the form a moment after
+  // the modal opens; submitting too early sends an empty id.
+  function formIdentityReady(scope) {
+    const inputs = Array.from(scope.querySelectorAll("input,select,textarea"));
+    const idFields = inputs.filter((i) =>
+      /(account|act[_-]?id|adaccount|spend)/i.test((i.name || "") + " " + (i.id || "") + " " + (i.getAttribute("data-name") || ""))
+    );
+    const filled = idFields.some((i) => String(i.value || "").trim().length > 0);
+    const shownText = (scope.innerText || "") + " " + inputs.map((i) => i.value || "").join(" ");
+    const hasAccount = shownText.includes(String(job.accountId)) || filled;
+    const noEmptyHidden = !inputs.some(
+      (i) => i.type === "hidden" && /(account|act[_-]?id|adaccount)/i.test((i.name || "") + (i.id || "")) && !String(i.value || "").trim()
+    );
+    return hasAccount && noEmptyHidden ? true : null;
+  }
+
+
+
   function setValue(el, value) {
     el.focus();
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
