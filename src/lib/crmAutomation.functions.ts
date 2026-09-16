@@ -56,6 +56,7 @@ export const createCrmTopUpJob = createServerFn({ method: "POST" })
       accountId,
       amount: Number(req.amount),
       walletKind: req.wallet_kind ?? "primary",
+      actorId: context.userId,
       exp: Math.floor(Date.now() / 1000) + 6 * 60 * 60,
     });
 

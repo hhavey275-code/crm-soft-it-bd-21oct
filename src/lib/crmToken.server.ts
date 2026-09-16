@@ -10,6 +10,7 @@ export type CrmJobPayload = {
   accountId?: string;
   amount?: number;
   walletKind?: string;
+  actorId?: string;
   exp: number; // epoch seconds
 };
 
