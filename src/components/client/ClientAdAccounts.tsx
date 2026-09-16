@@ -642,7 +642,36 @@ export function ClientAdAccounts() {
   });
 
   const topUpMutation = useMutation({
-...
+    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
+      const { data, error } = await supabase.functions.invoke("spend-cap-update", {
+        body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+
+    onSuccess: async (data) => {
+      toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
+      const topUpAccId = topUpAccount.id;
+      setTopUpAccount(null);
+      setTopUpAmount("");
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+      // Post-topup: immediately sync just this 1 account from Meta (no cooldown)
+      try {
+        const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+        const result = await chunkedMetaSync([topUpAccId]);
+        if (result?.insights) {
+          refetchInsights();
+          queryClient.invalidateQueries({ queryKey: ["client-all-insights"] });
+        }
+      } catch (e) { console.error("Post-topup sync failed:", e); }
+    },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
