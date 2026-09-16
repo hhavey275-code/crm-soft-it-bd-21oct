@@ -14,7 +14,6 @@ import { format } from "date-fns";
 import { ExternalLink, Copy, X, Zap, GraduationCap, Download } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
-import { useServerFn } from "@tanstack/react-start";
 
 
 interface Req {
@@ -449,7 +448,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.0.4)
+            Download helper (v1.0.5)
           </Button>
         </CardContent>
       </Card>
