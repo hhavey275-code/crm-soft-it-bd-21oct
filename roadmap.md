@@ -1,5 +1,5 @@
 # Roadmap
 
-- [ ] Ensure successful CRM top-up always marks the request completed (no not_authorized)
-- [ ] Add admin manual "Mark completed" fallback for pending requests
-- [ ] No artificial delay before CRM confirm
+- [x] Successful CRM top-up now always marks the request completed (retry + queued resend)
+- [x] Admin "Mark completed" fallback button for pending requests
+- [x] No artificial delay before CRM confirm
