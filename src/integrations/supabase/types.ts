@@ -4321,6 +4321,16 @@ export type Database = {
         }
         Returns: Json
       }
+      ensure_secondary_funds: {
+        Args: {
+          p_allow_negative?: boolean
+          p_due_limit?: number
+          p_needed_usd: number
+          p_processed_by?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       gen_referral_code: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
