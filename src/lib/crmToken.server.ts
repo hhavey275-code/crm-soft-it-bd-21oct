@@ -4,13 +4,15 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type CrmJobPayload = {
-  scope: "topup" | "learn";
+  scope: "topup" | "learn" | "autopilot";
   host: string;
   requestId?: string;
   accountId?: string;
   amount?: number;
   walletKind?: string;
   actorId?: string;
+  /** True when this top-up job was launched by the Auto-pilot (no human click). */
+  autopilot?: boolean;
   exp: number; // epoch seconds
 };
 

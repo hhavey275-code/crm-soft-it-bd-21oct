@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check } from "lucide-react";
+import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check, Bot } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 
@@ -40,6 +40,8 @@ export function AdminExternalTopUpRequests() {
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [autopilotToken, setAutopilotToken] = useState<string | null>(null);
+  const [autopilotBusy, setAutopilotBusy] = useState(false);
 
 
   const { data: requests = [] } = useQuery({
@@ -116,7 +118,7 @@ export function AdminExternalTopUpRequests() {
   // Lovable runtime secret used to verify CRM helper jobs.
   const apiBase = () => "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
 
-  const createRemoteJob = async (action: "create_job" | "create_learn", data: Record<string, string>) => {
+  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot", data: Record<string, string>) => {
     const accessToken = session?.access_token;
     if (!accessToken) throw new Error("Please sign in again");
     const response = await fetch(apiBase(), {
@@ -193,6 +195,20 @@ export function AdminExternalTopUpRequests() {
     }
   };
 
+  // Auto-pilot: mint a 30-day token for the browser helper. The extension
+  // then processes new pending requests by itself the moment they arrive.
+  const handleAutopilot = async () => {
+    setAutopilotBusy(true);
+    try {
+      const res = await createRemoteJob("create_autopilot", {});
+      setAutopilotToken(res.token);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to create Auto-pilot token");
+    } finally {
+      setAutopilotBusy(false);
+    }
+  };
+
   const downloadHelper = () => {
     fetch("/crm-topup-extension.zip")
       .then((res) => {
@@ -202,7 +218,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.1.0.zip";
+        a.download = "crm-topup-helper-v1.2.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -514,10 +530,16 @@ export function AdminExternalTopUpRequests() {
             <b className="text-foreground">Approve &amp; Top-Up</b> opens the CRM in your logged-in browser and the helper
             fills the account &amp; amount for you. New CRM? Run <b>Teach</b> (cap icon) once.
           </div>
-          <Button size="sm" variant="outline" onClick={downloadHelper}>
-            <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.1.0)
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleAutopilot} disabled={autopilotBusy}>
+              <Bot className="h-3.5 w-3.5 mr-1" />
+              {autopilotBusy ? "Creating…" : "Auto-pilot"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadHelper}>
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Download helper (v1.2.0)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -536,6 +558,40 @@ export function AdminExternalTopUpRequests() {
         <TabsContent value="pending" className="mt-3">{list(pending, true)}</TabsContent>
         <TabsContent value="history" className="mt-3">{list(history, false)}</TabsContent>
       </Tabs>
+
+      <Dialog open={!!autopilotToken} onOpenChange={(o) => !o && setAutopilotToken(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Auto-pilot চালু করুন</DialogTitle>
+            <DialogDescription>
+              এই token-টা helper extension-এ একবার বসালেই নতুন external top-up request আসামাত্র টপ-আপ নিজে নিজে হয়ে যাবে — এই ব্রাউজারে Chrome চালু ও CRM-এ লগইন থাকা লাগবে। Token ৩০ দিন কাজ করবে।
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <textarea
+              readOnly
+              className="w-full h-24 rounded-md border bg-muted p-2 font-mono text-[11px]"
+              value={autopilotToken ?? ""}
+              onFocus={(e) => e.target.select()}
+            />
+            <ol className="list-decimal pl-5 text-xs text-muted-foreground space-y-1">
+              <li>উপরের token কপি করুন।</li>
+              <li>Chrome-এ helper extension-এর আইকনে ক্লিক করুন।</li>
+              <li>Auto-pilot ঘরে token বসিয়ে <b>Auto-pilot চালু করুন</b> চাপুন।</li>
+            </ol>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (autopilotToken) navigator.clipboard.writeText(autopilotToken).then(() => toast.success("Token copied"));
+              }}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1" />
+              Copy token
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!rejectReq} onOpenChange={(o) => !o && setRejectReq(null)}>
         <DialogContent className="max-w-md">

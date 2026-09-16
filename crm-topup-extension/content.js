@@ -66,6 +66,18 @@
 
 
   // ---------- API ----------
+  function notifyBackground(success, error) {
+    if (!session || !session.autopilot || !session.job) return;
+    try {
+      chrome.runtime.sendMessage({
+        type: "crm-autopilot-done",
+        requestId: session.job.requestId,
+        success: !!success,
+        error: error || null,
+      });
+    } catch {}
+  }
+
   async function api(action, extra) {
     const res = await fetch(session.api, {
       method: "POST",
@@ -398,6 +410,7 @@
 
   // =====================  TOP-UP MODE  =====================
   async function reportFailure(msg) {
+    notifyBackground(false, String(msg).replace(/<[^>]*>/g, "").slice(0, 180));
     say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি approve হয়ে গেছে — টপ-আপ হাতে করে দিন বা Setup আবার চালান।", [
       { label: "আবার চেষ্টা", onClick: () => runTopUp(true), primary: true },
     ]);
@@ -426,6 +439,7 @@
     }
     session.job = job;
     session.autoConfirm = !!cfg.auto_confirm;
+    session.autopilot = !!job.autopilot;
     saveSession(session);
 
     if (!sel.amountInput || !sel.topupButton) {
@@ -549,13 +563,14 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
+      notifyBackground(true);
       say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
 
     };
 
-    if (session.autoConfirm) {
+    if (session.autoConfirm || session.autopilot) {
       await doSubmit();
     } else {
       say(
