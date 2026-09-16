@@ -530,8 +530,21 @@
       await reportFailure("টপ-আপ ফর্মের অ্যামাউন্টের ঘর খুঁজে পাইনি।");
       return;
     }
+    // The CRM fills the account id into the form after the modal opens. Submitting
+    // before that happens produces "route .../ad-account//-spend-cap not found".
+    const modalScope =
+      amountEl.closest(
+        "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
+      ) || document;
+    const ready = await waitFor(() => formIdentityReady(modalScope), 12000, 300);
+    if (!ready) {
+      await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
+      return;
+    }
+    await sleep(900);
     setValue(amountEl, job.amount);
-    await sleep(500);
+    await sleep(700);
+
 
     // 4) verify before submitting
     const typed = Number(String(amountEl.value).replace(/[^0-9.]/g, ""));
