@@ -141,13 +141,14 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             .maybeSingle();
           return json({
             ok: true,
-            job:
+                job:
               payload.scope === "topup"
                 ? {
                     requestId: payload.requestId,
                     accountId: payload.accountId,
                     amount: payload.amount,
                     walletKind: payload.walletKind,
+                    autopilot: !!payload.autopilot,
                   }
                 : null,
             scope: payload.scope,
