@@ -97,6 +97,82 @@ export function AdminExternalTopUpRequests() {
     return a?.external_topup_url || r.external_topup_url || "";
   };
 
+  const apiBase = () => `${window.location.origin}/api/public/crm-topup`;
+
+  const openWithHash = (url: string, hash: string) => {
+    const a = document.createElement("a");
+    a.href = `${url}${url.includes("#") ? "" : "#"}${hash}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  // Approve & Top-Up: opens the CRM with a short-lived signed job so the
+  // browser helper can search the account, fill the amount and submit.
+  const handleAutoTopUp = async (r: Req) => {
+    const url = resolveUrl(r);
+    if (!url) {
+      toast.error("No external CRM link configured for this account");
+      return;
+    }
+    setBusyId(r.id);
+    try {
+      const res: any = await makeJob({ data: { requestId: r.id, url } });
+      openWithHash(url, `crmtopup=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
+      toast.success("CRM opened — helper is filling the top-up form");
+      await logSystemAction(
+        "External Top-up Automation Started",
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        user?.id,
+        user?.email
+      );
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to start automation");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // One-time Learn mode for a CRM site.
+  const handleTeach = async (r: Req) => {
+    const url = resolveUrl(r);
+    if (!url) {
+      toast.error("No external CRM link configured for this account");
+      return;
+    }
+    setBusyId(r.id);
+    try {
+      const res: any = await makeLearn({ data: { url } });
+      openWithHash(url, `crmlearn=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
+      toast.success("Setup mode opened — follow the helper's instructions");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to open setup");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadHelper = () => {
+    fetch("/crm-topup-extension.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "crm-topup-extension.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
+
+
   const handleOpenAndComplete = async (r: Req) => {
     const url = resolveUrl(r);
     if (!url) {
