@@ -13,7 +13,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     if (isAdminUser) {
-      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes, sellerUsdtRes, withdrawReqRes, referralPayoutRes] = await Promise.all([
+      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes, sellerUsdtRes, withdrawReqRes, referralPayoutRes, externalTopupRes] = await Promise.all([
         (supabase as any)
           .from("top_up_requests")
           .select("*", { count: "exact", head: true })
@@ -52,6 +52,11 @@ export function useSidebarBadges(): Record<string, number> {
           .from("referral_payout_requests")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
+        (supabase as any)
+          .from("external_topup_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending")
+          .eq("requested_by_client", true),
       ]);
 
       setBadges({
@@ -59,7 +64,7 @@ export function useSidebarBadges(): Record<string, number> {
         chat: chatRes.count || 0,
         clients: clientsRes.count || 0,
         "failed-topups": failedRes.count || 0,
-        requests: (adReqRes.count || 0) + (bmReqRes.count || 0) + (withdrawReqRes.count || 0),
+        requests: (adReqRes.count || 0) + (bmReqRes.count || 0) + (withdrawReqRes.count || 0) + (externalTopupRes.count || 0),
         sellers: sellerUsdtRes.count || 0,
         referral: referralPayoutRes.count || 0,
       });
@@ -97,7 +102,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     const tables = isAdminUser
-      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups", "ad_account_requests", "bm_access_requests", "spend_cap_withdraw_requests", "referral_payout_requests", "notifications", "seller_transactions"]
+      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups", "ad_account_requests", "bm_access_requests", "spend_cap_withdraw_requests", "referral_payout_requests", "external_topup_requests", "notifications", "seller_transactions"]
       : ["failed_topups", "notifications"];
 
     let channel = supabase.channel("sidebar-badges");
