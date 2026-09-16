@@ -417,6 +417,19 @@ export function AdminExternalTopUpRequests() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-violet-500/30 bg-violet-500/5">
+        <CardContent className="p-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-muted-foreground">
+            <b className="text-foreground">Approve &amp; Top-Up</b> opens the CRM in your logged-in browser and the helper
+            fills the account &amp; amount for you. New CRM? Run <b>Teach</b> (cap icon) once.
+          </div>
+          <Button size="sm" variant="outline" onClick={downloadHelper}>
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Download helper
+          </Button>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending" className="gap-1.5">
