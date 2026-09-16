@@ -714,7 +714,7 @@ export function AdminDashboard() {
       )}>
         {!isMobile && (
           <div className="cursor-pointer" onClick={() => navigate("/wallet-balances")}>
-            <MetricCard title="Platform Balance" value={`$${totalBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
+            <MetricCard title="Platform Balance" value={fmtMoney(totalBalance)} subtitle={`Main ${fmtMoney(mainWalletBalance)} · Secondary ${fmtMoney(secondaryWalletBalance)}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
           </div>
         )}
         <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" size={isMobile ? "xs" : "default"} />
