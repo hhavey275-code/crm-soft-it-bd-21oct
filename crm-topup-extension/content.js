@@ -268,8 +268,10 @@
     { key: "search", label: "অ্যাকাউন্ট সার্চ করার ঘরে ক্লিক করুন", block: true },
     { key: "topupButton", label: "একটা অ্যাকাউন্টের Top-Up বাটনে ক্লিক করুন (ফর্মটা খুলতে দিন)", block: false },
     { key: "amountInput", label: "অ্যামাউন্ট লেখার ঘরে ক্লিক করুন", block: true },
-    { key: "submitButton", label: "Submit / Confirm বাটনে ক্লিক করুন (এখন চাপলে টাকা যাবে না — শুধু চিনে নিচ্ছে)", block: true },
+    { key: "submitButton", label: "Submit / Increase spend cap বাটনে ক্লিক করুন (এখন চাপলে টাকা যাবে না — শুধু চিনে নিচ্ছে)", block: true },
+    { key: "confirmButton", label: "কনফার্ম বক্সের 'Yes, increase it!' বাটনে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
     { key: "successIndicator", label: "সফল হলে যে মেসেজ দেখা যায় সেখানে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
+
   ];
 
   function renderLearn() {
