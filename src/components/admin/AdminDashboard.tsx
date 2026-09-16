@@ -235,6 +235,50 @@ export function AdminDashboard() {
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const remainingLimit = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
+  // Remaining limit breakdown (per ad account and per client)
+  const remainingAccountRows = useMemo(() => {
+    const ownerMap: Record<string, string> = {};
+    (userAdAccounts ?? []).forEach((r: any) => { ownerMap[r.ad_account_id] = r.user_id; });
+    const profileMap: Record<string, any> = {};
+    (profiles ?? []).forEach((p: any) => { profileMap[p.user_id] = p; });
+    return (adAccounts ?? []).map((a: any) => {
+      const userId = ownerMap[a.id];
+      const prof = userId ? profileMap[userId] : null;
+      return {
+        id: a.id,
+        name: a.account_name || "(unnamed)",
+        accountId: a.account_id,
+        status: a.status,
+        external: !!a.external_topup_required,
+        userId: userId || null,
+        clientName: prof?.full_name || prof?.email || "Unassigned",
+        remaining: Math.max(0, Number(a.spend_cap || 0) - Number(a.amount_spent || 0)),
+      };
+    });
+  }, [adAccounts, userAdAccounts, profiles]);
+
+  const remainingClientRows = useMemo(() => {
+    const map: Record<string, { key: string; clientName: string; userId: string | null; remaining: number; accounts: number }> = {};
+    remainingAccountRows.forEach((r) => {
+      const key = r.userId || "unassigned";
+      if (!map[key]) map[key] = { key, clientName: r.clientName, userId: r.userId, remaining: 0, accounts: 0 };
+      map[key].remaining += r.remaining;
+      map[key].accounts += 1;
+    });
+    return Object.values(map);
+  }, [remainingAccountRows]);
+
+  const filteredRemainingRows = useMemo(() => {
+    const q = remainingSearch.trim().toLowerCase();
+    const rows: { key: string; primary: string; secondary: string; remaining: number; navId: string | null }[] =
+      remainingView === "clients"
+        ? remainingClientRows.map((r) => ({ key: r.key, primary: r.clientName, secondary: `${r.accounts} account(s)`, remaining: r.remaining, navId: r.userId ? `/clients/${r.userId}` : null }))
+        : remainingAccountRows.map((r) => ({ key: r.id, primary: r.name, secondary: `${r.clientName}${r.accountId ? ` · act_${r.accountId}` : ""}${r.external ? " · External CRM" : ""}`, remaining: r.remaining, navId: `/ad-accounts/${r.id}` }));
+    const filtered = q ? rows.filter((r) => r.primary.toLowerCase().includes(q) || r.secondary.toLowerCase().includes(q)) : rows;
+    return filtered.sort((a, b) => (remainingSortDesc ? b.remaining - a.remaining : a.remaining - b.remaining));
+  }, [remainingView, remainingClientRows, remainingAccountRows, remainingSearch, remainingSortDesc]);
+
+
   // Top Spenders — proxy-based live fetch (Spend Report style), persisted snapshot.
   type TopSpenderSnapshot = {
     from: string;
