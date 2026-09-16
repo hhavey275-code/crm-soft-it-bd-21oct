@@ -549,34 +549,9 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
-      say("টপ-আপ হয়েছে — রিকোয়েস্ট আপডেট করছি…");
-      const r = await reportSuccessWithRetry();
-      if (r.ok) {
-        say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId + "<br>রিকোয়েস্ট completed হয়ে গেছে।", [
-          { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
-        ]);
-      } else {
-        say(
-          "<b>CRM-এ টপ-আপ হয়েছে</b>, কিন্তু রিকোয়েস্ট আপডেট হয়নি: " +
-            (r.error || "unknown") +
-            "<br>চেষ্টা চালু থাকবে। না হলে ড্যাশবোর্ড থেকে <b>Mark completed</b> চাপুন।",
-          [
-            {
-              label: "আবার পাঠান",
-              primary: true,
-              onClick: async () => {
-                const again = await reportSuccessWithRetry();
-                say(
-                  again.ok
-                    ? "<b style='color:#86efac'>রিকোয়েস্ট completed হয়ে গেছে।</b>"
-                    : "এখনো হয়নি: " + (again.error || "unknown") + " — ড্যাশবোর্ড থেকে Mark completed করুন।"
-                );
-              },
-            },
-            { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
-          ]
-        );
-      }
+      say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
+        { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
+      ]);
 
     };
 
