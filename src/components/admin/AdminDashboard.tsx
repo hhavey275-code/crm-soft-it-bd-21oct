@@ -695,7 +695,10 @@ export function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs opacity-80">Platform Balance</p>
-                <p className="text-2xl font-bold mt-0.5">${totalBalance.toLocaleString()}</p>
+                <p className="text-2xl font-bold mt-0.5">{fmtMoney(totalBalance)}</p>
+                <p className="text-[11px] opacity-90 mt-1">
+                  Main {fmtMoney(mainWalletBalance)} · Secondary {fmtMoney(secondaryWalletBalance)}
+                </p>
               </div>
               <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
                 <Wallet className="h-5 w-5" />
