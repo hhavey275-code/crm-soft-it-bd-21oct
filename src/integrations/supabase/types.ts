@@ -1150,6 +1150,21 @@ export type Database = {
           },
         ]
       }
+      autopilot_pings: {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_name: string
