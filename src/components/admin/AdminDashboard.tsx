@@ -81,6 +81,7 @@ export function AdminDashboard() {
   const [selectedPreset, setSelectedPreset] = useState<string>("Yesterday");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dateSpend, setDateSpend] = useState<number | null>(null);
+  const [dateSpendSplit, setDateSpendSplit] = useState<{ own: number; external: number } | null>(null);
   const [dateSpendRange, setDateSpendRange] = useState<{ from: string; to: string } | null>(null);
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
@@ -127,7 +128,7 @@ export function AdminDashboard() {
   const { data: adAccounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("ad_accounts").select("id, account_name, status, spend_cap, amount_spent, account_id");
+      const { data } = await supabase.from("ad_accounts").select("id, account_name, status, spend_cap, amount_spent, account_id, external_topup_required");
       return (data as any[]) ?? [];
     },
     staleTime: 30_000,
@@ -431,16 +432,26 @@ export function AdminDashboard() {
       // the result massively incorrect. Include USD accounts only and clearly
       // flag any non-USD accounts instead of displaying a false dollar total.
       let total = 0;
+      let ownSpend = 0;
+      let externalSpend = 0;
+      const externalIdSet = new Set(
+        (adAccounts ?? []).filter((a: any) => !!a.external_topup_required).map((a: any) => a.id)
+      );
       const nonUsdCurrencies = new Set<string>();
       Object.entries(result.spend).forEach(([id, amount]) => {
         const currency = result.currencies[id];
         if (!currency || currency === "USD") {
-          total += Number(amount) || 0;
+          const v = Number(amount) || 0;
+          total += v;
+          if (externalIdSet.has(id)) externalSpend += v; else ownSpend += v;
         } else {
           nonUsdCurrencies.add(currency);
         }
       });
       total = Math.round(total * 100) / 100;
+      ownSpend = Math.round(ownSpend * 100) / 100;
+      externalSpend = Math.round(externalSpend * 100) / 100;
+      setDateSpendSplit({ own: ownSpend, external: externalSpend });
       if (nonUsdCurrencies.size) {
         toast.info(`USD total shown. ${Array.from(nonUsdCurrencies).join(", ")} account spend is excluded to prevent mixed-currency calculation.`);
       }
@@ -753,6 +764,16 @@ export function AdminDashboard() {
                       ? `$${dateSpend!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                 </p>
+                {showValue && dateSpendSplit && !dateSpendLoading && (
+                  <div className="text-[10px] mt-1 space-y-0.5">
+                    <p className="text-muted-foreground">
+                      Own accounts: <span className="font-semibold text-emerald-600">${dateSpendSplit.own.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      External CRM: <span className="font-semibold text-violet-600">${dateSpendSplit.external.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </p>
+                  </div>
+                )}
                 {dateSpendCalls !== null && !dateSpendLoading && showValue && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
