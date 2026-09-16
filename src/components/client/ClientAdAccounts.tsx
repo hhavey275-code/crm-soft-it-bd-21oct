@@ -602,11 +602,23 @@ export function ClientAdAccounts() {
   const walletBalance = Number(wallet?.balance ?? 0);
   // External CRM accounts (no API connection) go through a request flow instead
   const isExternalTopUp = !!topUpAccount?.external_topup_required;
-  const activeWalletBalance = topUpWallet === "secondary" ? Number(wallets.secondaryBalance ?? 0) : walletBalance;
-  const effectiveBalance = activeWalletBalance + dueLimit;
+  const isSecondaryTopUp = topUpWallet === "secondary";
+  const secondaryBalance = Number(wallets.secondaryBalance ?? 0);
+  const mainRate = Number(wallets.mainRate ?? 0);
+  const secRate = Number(wallets.secondaryRate ?? 0) || mainRate;
+  // Secondary wallet is funded from the main wallet at the rate difference,
+  // so main balance counts towards a secondary top-up too.
+  const mainToSecondaryFactor = secRate > 0 && mainRate > 0 ? mainRate / secRate : 1;
+  const activeWalletBalance = isSecondaryTopUp ? secondaryBalance : walletBalance;
+  const effectiveBalance = isSecondaryTopUp
+    ? secondaryBalance + (walletBalance + dueLimit) * mainToSecondaryFactor
+    : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
-  const exceedsBalance = parsedAmount > effectiveBalance;
-  const usingDueLimit = parsedAmount > activeWalletBalance && parsedAmount <= effectiveBalance;
+  const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
+  const usingDueLimit = !isSecondaryTopUp && parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
+  const secondaryShortfall = isSecondaryTopUp ? Math.max(0, parsedAmount - secondaryBalance) : 0;
+  const convertFromMain =
+    secondaryShortfall > 0 && mainToSecondaryFactor > 0 ? secondaryShortfall / mainToSecondaryFactor : 0;
 
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
@@ -1259,6 +1271,17 @@ export function ClientAdAccounts() {
                 ${activeWalletBalance.toLocaleString()}
               </span>
             </div>
+            {isSecondaryTopUp && (
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/60">
+                <span className="text-muted-foreground">Main Wallet (usable here)</span>
+                <span className="font-medium">
+                  ${walletBalance.toLocaleString()}
+                  {mainToSecondaryFactor !== 1 && (
+                    <span className="text-muted-foreground"> ≈ ${(walletBalance * mainToSecondaryFactor).toFixed(2)}</span>
+                  )}
+                </span>
+              </div>
+            )}
             {dueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
@@ -1287,7 +1310,14 @@ export function ClientAdAccounts() {
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - activeWalletBalance).toLocaleString()} from due limit</p>
               )}
+              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0 && parsedAmount > 0 && (
+                <p className="text-sm text-blue-600">
+                  ${convertFromMain.toFixed(2)} will be moved from your Main Wallet to cover ${secondaryShortfall.toFixed(2)} here
+                  {mainRate > 0 && secRate > 0 && mainRate !== secRate && ` (rate ${mainRate} → ${secRate})`}
+                </p>
+              )}
             </div>
+
 
             {!isExternalTopUp && parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
