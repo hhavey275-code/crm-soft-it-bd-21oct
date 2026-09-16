@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.process_internal_topup_wallet(uuid, numeric, uuid, text, text, text, boolean);

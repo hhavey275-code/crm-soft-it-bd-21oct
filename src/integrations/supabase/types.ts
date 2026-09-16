@@ -4411,18 +4411,6 @@ export type Database = {
       money_health_report: { Args: never; Returns: Json }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
-      process_internal_topup_wallet: {
-        Args: {
-          p_ad_account_id: string
-          p_allow_negative?: boolean
-          p_amount: number
-          p_description: string
-          p_processed_by: string
-          p_user_id: string
-          p_wallet_kind?: string
-        }
-        Returns: Json
-      }
       recalc_referral_earnings: { Args: { p_month?: string }; Returns: Json }
       recalculate_tenant_ledger: {
         Args: { p_tenant_id: string }
