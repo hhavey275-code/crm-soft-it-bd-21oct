@@ -128,6 +128,9 @@ export default function ClientDetailPage() {
   const [editingDueLimit, setEditingDueLimit] = useState(false);
   const [dueLimitInput, setDueLimitInput] = useState("");
   const [dueLimitExpiry, setDueLimitExpiry] = useState<string>("never");
+  const [editingSecDueLimit, setEditingSecDueLimit] = useState(false);
+  const [secDueLimitInput, setSecDueLimitInput] = useState("");
+  const [secDueLimitExpiry, setSecDueLimitExpiry] = useState<string>("never");
 
   // Wallet adjust dialog
   const [walletDialogType, setWalletDialogType] = useState<"credit" | "debit" | null>(null);
@@ -1900,6 +1903,158 @@ export default function ClientDetailPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Secondary Wallet Due Limit — used only for secondary-wallet top-ups */}
+                  <div className="rounded-xl border border-violet-200/60 bg-violet-50/40 dark:bg-violet-950/20 dark:border-violet-800/40 p-4 transition-colors hover:bg-violet-50/60">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+                        <Shield className="h-4 w-4 text-violet-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          Secondary Due Limit
+                        </p>
+                        {editingSecDueLimit ? (
+                          <div className="space-y-2 mt-1.5">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                step="1"
+                                className="w-24 h-8 text-sm"
+                                value={secDueLimitInput}
+                                onChange={(e) => setSecDueLimitInput(e.target.value)}
+                                placeholder="e.g. 500"
+                              />
+                              <Select value={secDueLimitExpiry} onValueChange={setSecDueLimitExpiry}>
+                                <SelectTrigger className="h-8 w-36 text-xs">
+                                  <SelectValue placeholder="Auto-reset" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="never">Never expire</SelectItem>
+                                  <SelectItem value="12h">12 hours</SelectItem>
+                                  <SelectItem value="24h">24 hours</SelectItem>
+                                  <SelectItem value="2d">2 days</SelectItem>
+                                  <SelectItem value="3d">3 days</SelectItem>
+                                  <SelectItem value="7d">1 week</SelectItem>
+                                  <SelectItem value="30d">1 month</SelectItem>
+                                  <SelectItem value="365d">1 year</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  const amt =
+                                    secDueLimitInput.trim() === "" ? null : parseFloat(secDueLimitInput);
+                                  let expires_at: string | null = null;
+                                  let set_at: string | null = null;
+                                  if (amt && amt > 0 && secDueLimitExpiry !== "never") {
+                                    const map: Record<string, number> = {
+                                      "12h": 12 * 3600e3,
+                                      "24h": 24 * 3600e3,
+                                      "2d": 2 * 86400e3,
+                                      "3d": 3 * 86400e3,
+                                      "7d": 7 * 86400e3,
+                                      "30d": 30 * 86400e3,
+                                      "365d": 365 * 86400e3,
+                                    };
+                                    expires_at = new Date(Date.now() + map[secDueLimitExpiry]).toISOString();
+                                    set_at = new Date().toISOString();
+                                  }
+                                  saveProfileMutation.mutate({
+                                    secondary_due_limit: amt,
+                                    secondary_due_limit_expires_at: expires_at,
+                                    secondary_due_limit_set_at: set_at,
+                                  } as any);
+                                  const prev = Number((profile as any)?.secondary_due_limit ?? 0);
+                                  const next = Number(amt ?? 0);
+                                  const clientName =
+                                    (profile as any)?.full_name || (profile as any)?.email || "Unknown client";
+                                  const adminName =
+                                    (currentUser as any)?.user_metadata?.full_name || currentUser?.email || "Admin";
+                                  const expiryLabel =
+                                    secDueLimitExpiry === "never" || !expires_at
+                                      ? "never expires"
+                                      : `expires ${format(new Date(expires_at), "dd MMM yyyy, hh:mm a")}`;
+                                  void logSystemAction(
+                                    next === 0
+                                      ? "Secondary Due Limit Removed"
+                                      : prev === 0
+                                        ? "Secondary Due Limit Set"
+                                        : "Secondary Due Limit Updated",
+                                    next === 0
+                                      ? `${clientName} — Secondary due limit removed (was $${prev.toLocaleString()}) by ${adminName}`
+                                      : `${clientName} — Secondary due limit $${prev.toLocaleString()} → $${next.toLocaleString()} (${expiryLabel}) by ${adminName}`,
+                                    currentUser?.id ?? null,
+                                    adminName,
+                                  );
+                                  setEditingSecDueLimit(false);
+                                }}
+                              >
+                                <Save className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8"
+                                onClick={() => setEditingSecDueLimit(false)}
+                              >
+                                <XCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              ↳ Only usable for secondary-wallet top-ups
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p
+                              className="font-semibold text-sm text-violet-700 dark:text-violet-400 cursor-pointer hover:text-violet-500 transition-colors"
+                              onClick={() => {
+                                setSecDueLimitInput(
+                                  (profile as any)?.secondary_due_limit?.toString() ?? "",
+                                );
+                                setSecDueLimitExpiry("never");
+                                setEditingSecDueLimit(true);
+                              }}
+                            >
+                              {(profile as any)?.secondary_due_limit
+                                ? `$${Number((profile as any).secondary_due_limit).toLocaleString()}`
+                                : "No due limit"}
+                            </p>
+                            {Number((profile as any)?.secondary_due_limit ?? 0) > 0 &&
+                              (profile as any)?.secondary_due_limit_expires_at &&
+                              (() => {
+                                const expires = new Date((profile as any).secondary_due_limit_expires_at);
+                                const ms = expires.getTime() - Date.now();
+                                if (ms <= 0)
+                                  return (
+                                    <Badge variant="destructive" className="text-[10px]">
+                                      Expired
+                                    </Badge>
+                                  );
+                                const hrs = Math.floor(ms / 3600e3);
+                                const mins = Math.floor((ms % 3600e3) / 60e3);
+                                const days = Math.floor(hrs / 24);
+                                const label =
+                                  days > 0 ? `${days}d ${hrs % 24}h` : hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                                return (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] gap-1 bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/30"
+                                    title={`Resets on ${format(expires, "MMM d, yyyy 'at' h:mm a")}`}
+                                  >
+                                    <CalendarDays className="h-2.5 w-2.5" />
+                                    Expires in {label}
+                                  </Badge>
+                                );
+                              })()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Auto Top-Up Permission */}
                   <div className="flex items-center justify-between pt-3 border-t">
                     <div>

@@ -402,26 +402,31 @@ Deno.serve(async (req)=>{
       let dueLimit = 0;
       const { data: prof } = await supabase
         .from("profiles")
-        .select("due_limit, secondary_wallet_enabled")
+        .select("due_limit, due_limit_expires_at, secondary_due_limit, secondary_due_limit_expires_at, secondary_wallet_enabled")
         .eq("user_id", walletUserId)
         .single();
+      // Each wallet has its own due limit; an expired limit counts as zero and
+      // the main wallet's limit is never usable on secondary-wallet accounts.
+      const notExpired = (ts: string | null | undefined) => !ts || new Date(ts).getTime() > Date.now();
       if (!isAdmin) {
-        dueLimit = Number(prof?.due_limit ?? 0);
+        dueLimit = walletKind === "secondary"
+          ? (notExpired((prof as any)?.secondary_due_limit_expires_at) ? Number((prof as any)?.secondary_due_limit ?? 0) : 0)
+          : (notExpired((prof as any)?.due_limit_expires_at) ? Number(prof?.due_limit ?? 0) : 0);
       }
       if (walletKind === "secondary" && !prof?.secondary_wallet_enabled) {
         return json({ error: "Secondary wallet is not enabled for this client" }, 400);
       }
 
-      // Secondary wallet is funded from the main wallet at the rate difference.
-      // Pull whatever is short before deducting so a client with main balance
-      // is never blocked on a secondary-rate account.
+      // Secondary wallet is funded from the main wallet's POSITIVE balance at the
+      // rate difference. Anything still short is covered by the secondary
+      // wallet's own due limit below.
       if (walletKind === "secondary") {
         const { data: convRes, error: convErr } = await supabaseUser.rpc("ensure_secondary_funds", {
           p_user_id: walletUserId,
           p_needed_usd: amount,
           p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
           p_allow_negative: isAdmin,
-          p_due_limit: Number(prof?.due_limit ?? 0),
+          p_due_limit: 0,
         });
         if (convErr) {
           console.error("ensure_secondary_funds failed", convErr);
@@ -433,7 +438,6 @@ Deno.serve(async (req)=>{
           return json({ error: "Secondary wallet funding failed" }, 400);
         }
       }
-
 
       // ATOMIC + ledger-consistent deduction. The DB function locks the chosen
       // wallet row (main or secondary), realigns its balance with that wallet's
@@ -447,8 +451,9 @@ Deno.serve(async (req)=>{
         p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
         p_wallet_kind: walletKind,
         p_allow_negative: isAdmin,
-        p_due_limit: walletKind === "primary" ? dueLimit : 0,
+        p_due_limit: dueLimit,
       });
+
 
       const walletLabel = walletKind === "secondary" ? "Secondary wallet" : "Wallet";
       if (deductErr) {

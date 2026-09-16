@@ -278,7 +278,14 @@ export function ClientAdAccounts() {
   });
 
   const isInactive = (profile as any)?.status === "inactive";
-  const dueLimit = Number((profile as any)?.due_limit ?? 0);
+  // Each wallet has its own due limit; an expired limit counts as zero.
+  const notExpired = (ts?: string | null) => !ts || new Date(ts).getTime() > Date.now();
+  const dueLimit = notExpired((profile as any)?.due_limit_expires_at)
+    ? Number((profile as any)?.due_limit ?? 0)
+    : 0;
+  const secondaryDueLimit = notExpired((profile as any)?.secondary_due_limit_expires_at)
+    ? Number((profile as any)?.secondary_due_limit ?? 0)
+    : 0;
   const META_COOLDOWN_MS = 10 * 60 * 1000;
 
   const { data: accounts = [] } = useQuery({
@@ -606,19 +613,29 @@ export function ClientAdAccounts() {
   const secondaryBalance = Number(wallets.secondaryBalance ?? 0);
   const mainRate = Number(wallets.mainRate ?? 0);
   const secRate = Number(wallets.secondaryRate ?? 0) || mainRate;
-  // Secondary wallet is funded from the main wallet at the rate difference,
-  // so main balance counts towards a secondary top-up too.
+  // Secondary top-ups draw on: secondary balance → main wallet's POSITIVE
+  // balance (rate converted) → secondary wallet's own due limit.
+  // The main wallet's due limit is never usable on a secondary top-up.
   const mainToSecondaryFactor = secRate > 0 && mainRate > 0 ? mainRate / secRate : 1;
+  const activeDueLimit = isSecondaryTopUp ? secondaryDueLimit : dueLimit;
+  const mainSurplusAsSecondary = Math.max(0, walletBalance) * mainToSecondaryFactor;
   const activeWalletBalance = isSecondaryTopUp ? secondaryBalance : walletBalance;
   const effectiveBalance = isSecondaryTopUp
-    ? secondaryBalance + (walletBalance + dueLimit) * mainToSecondaryFactor
+    ? secondaryBalance + mainSurplusAsSecondary + secondaryDueLimit
     : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
-  const usingDueLimit = !isSecondaryTopUp && parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
   const secondaryShortfall = isSecondaryTopUp ? Math.max(0, parsedAmount - secondaryBalance) : 0;
   const convertFromMain =
-    secondaryShortfall > 0 && mainToSecondaryFactor > 0 ? secondaryShortfall / mainToSecondaryFactor : 0;
+    secondaryShortfall > 0 && mainToSecondaryFactor > 0
+      ? Math.min(secondaryShortfall / mainToSecondaryFactor, Math.max(0, walletBalance))
+      : 0;
+  const secondaryDueUsed = isSecondaryTopUp
+    ? Math.max(0, secondaryShortfall - convertFromMain * mainToSecondaryFactor)
+    : 0;
+  const usingDueLimit = isSecondaryTopUp
+    ? secondaryDueUsed > 0.01 && !exceedsBalance
+    : parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
@@ -1282,10 +1299,12 @@ export function ClientAdAccounts() {
                 </span>
               </div>
             )}
-            {dueLimit > 0 && (
+            {activeDueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
-                <span className="font-semibold text-amber-700 dark:text-amber-400">${dueLimit.toLocaleString()}</span>
+                <span className="text-amber-700 dark:text-amber-400">
+                  {isSecondaryTopUp ? "Secondary Due Limit" : "Due Limit"}
+                </span>
+                <span className="font-semibold text-amber-700 dark:text-amber-400">${activeDueLimit.toLocaleString()}</span>
               </div>
             )}
             {!isExternalTopUp && (
@@ -1305,18 +1324,22 @@ export function ClientAdAccounts() {
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
+                <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{activeDueLimit > 0 ? " + due limit" : ""}</p>
               )}
-              {usingDueLimit && parsedAmount > 0 && (
-                <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - activeWalletBalance).toLocaleString()} from due limit</p>
-              )}
-              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0 && parsedAmount > 0 && (
+              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0.009 && parsedAmount > 0 && (
                 <p className="text-sm text-blue-600">
-                  ${convertFromMain.toFixed(2)} will be moved from your Main Wallet to cover ${secondaryShortfall.toFixed(2)} here
+                  ${convertFromMain.toFixed(2)} will be moved from your Main Wallet
                   {mainRate > 0 && secRate > 0 && mainRate !== secRate && ` (rate ${mainRate} → ${secRate})`}
                 </p>
               )}
+              {usingDueLimit && parsedAmount > 0 && (
+                <p className="text-sm text-amber-600">
+                  ⚠️ Using ${(isSecondaryTopUp ? secondaryDueUsed : parsedAmount - activeWalletBalance).toFixed(2)} from
+                  {isSecondaryTopUp ? " secondary" : ""} due limit
+                </p>
+              )}
             </div>
+
 
 
             {!isExternalTopUp && parsedAmount > 0 && (
