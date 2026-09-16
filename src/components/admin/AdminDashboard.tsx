@@ -81,6 +81,7 @@ export function AdminDashboard() {
   const [selectedPreset, setSelectedPreset] = useState<string>("Yesterday");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dateSpend, setDateSpend] = useState<number | null>(null);
+  const [dateSpendSplit, setDateSpendSplit] = useState<{ own: number; external: number } | null>(null);
   const [dateSpendRange, setDateSpendRange] = useState<{ from: string; to: string } | null>(null);
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
@@ -127,7 +128,7 @@ export function AdminDashboard() {
   const { data: adAccounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("ad_accounts").select("id, account_name, status, spend_cap, amount_spent, account_id");
+      const { data } = await supabase.from("ad_accounts").select("id, account_name, status, spend_cap, amount_spent, account_id, external_topup_required");
       return (data as any[]) ?? [];
     },
     staleTime: 30_000,
