@@ -306,13 +306,20 @@ export function ClientDashboard() {
     return "Good night";
   };
 
+  // This dashboard flow tops up from the main wallet, so only the main
+  // wallet's own due limit applies here (expired limits count as zero).
+  const mainDueLimit = (() => {
+    const exp = (profile as any)?.due_limit_expires_at;
+    if (exp && new Date(exp).getTime() <= Date.now()) return 0;
+    return Number((profile as any)?.due_limit ?? 0);
+  })();
+
   const handleSpendCapIncrease = async () => {
     if (!topUpAccount || !topUpAmount) return;
     const amount = Number(topUpAmount);
     if (isNaN(amount) || amount <= 0) { toast.error("Enter a valid amount"); return; }
     const walletBalance = clientWallets.mainBalance;
-    const dueLimit = Number((profile as any)?.due_limit ?? 0);
-    if (walletBalance + dueLimit < amount) { toast.error("Insufficient wallet balance"); return; }
+    if (walletBalance + mainDueLimit < amount) { toast.error("Insufficient wallet balance"); return; }
     setTopUpLoading(true);
     try {
       const res = await supabase.functions.invoke("spend-cap-update", {
