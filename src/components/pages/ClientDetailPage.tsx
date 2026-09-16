@@ -128,6 +128,9 @@ export default function ClientDetailPage() {
   const [editingDueLimit, setEditingDueLimit] = useState(false);
   const [dueLimitInput, setDueLimitInput] = useState("");
   const [dueLimitExpiry, setDueLimitExpiry] = useState<string>("never");
+  const [editingSecDueLimit, setEditingSecDueLimit] = useState(false);
+  const [secDueLimitInput, setSecDueLimitInput] = useState("");
+  const [secDueLimitExpiry, setSecDueLimitExpiry] = useState<string>("never");
 
   // Wallet adjust dialog
   const [walletDialogType, setWalletDialogType] = useState<"credit" | "debit" | null>(null);
