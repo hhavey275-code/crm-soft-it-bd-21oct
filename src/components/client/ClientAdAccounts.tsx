@@ -602,11 +602,23 @@ export function ClientAdAccounts() {
   const walletBalance = Number(wallet?.balance ?? 0);
   // External CRM accounts (no API connection) go through a request flow instead
   const isExternalTopUp = !!topUpAccount?.external_topup_required;
-  const activeWalletBalance = topUpWallet === "secondary" ? Number(wallets.secondaryBalance ?? 0) : walletBalance;
-  const effectiveBalance = activeWalletBalance + dueLimit;
+  const isSecondaryTopUp = topUpWallet === "secondary";
+  const secondaryBalance = Number(wallets.secondaryBalance ?? 0);
+  const mainRate = Number(wallets.mainRate ?? 0);
+  const secRate = Number(wallets.secondaryRate ?? 0) || mainRate;
+  // Secondary wallet is funded from the main wallet at the rate difference,
+  // so main balance counts towards a secondary top-up too.
+  const mainToSecondaryFactor = secRate > 0 && mainRate > 0 ? mainRate / secRate : 1;
+  const activeWalletBalance = isSecondaryTopUp ? secondaryBalance : walletBalance;
+  const effectiveBalance = isSecondaryTopUp
+    ? secondaryBalance + (walletBalance + dueLimit) * mainToSecondaryFactor
+    : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
-  const exceedsBalance = parsedAmount > effectiveBalance;
-  const usingDueLimit = parsedAmount > activeWalletBalance && parsedAmount <= effectiveBalance;
+  const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
+  const usingDueLimit = !isSecondaryTopUp && parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
+  const secondaryShortfall = isSecondaryTopUp ? Math.max(0, parsedAmount - secondaryBalance) : 0;
+  const convertFromMain =
+    secondaryShortfall > 0 && mainToSecondaryFactor > 0 ? secondaryShortfall / mainToSecondaryFactor : 0;
 
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
