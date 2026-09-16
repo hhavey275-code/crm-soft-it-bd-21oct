@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check } from "lucide-react";
+import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check, Bot } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 
@@ -530,10 +530,16 @@ export function AdminExternalTopUpRequests() {
             <b className="text-foreground">Approve &amp; Top-Up</b> opens the CRM in your logged-in browser and the helper
             fills the account &amp; amount for you. New CRM? Run <b>Teach</b> (cap icon) once.
           </div>
-          <Button size="sm" variant="outline" onClick={downloadHelper}>
-            <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.1.0)
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleAutopilot} disabled={autopilotBusy}>
+              <Bot className="h-3.5 w-3.5 mr-1" />
+              {autopilotBusy ? "Creating…" : "Auto-pilot"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadHelper}>
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Download helper (v1.2.0)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
