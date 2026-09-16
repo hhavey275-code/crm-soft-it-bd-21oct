@@ -808,11 +808,12 @@ export function ClientDashboard() {
           <DialogHeader><DialogTitle>Increase Spend Cap</DialogTitle><DialogDescription>Top up <span className="font-medium text-foreground">{topUpAccount?.account_name}</span></DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted"><span className="text-muted-foreground">Wallet</span><span className="font-semibold">{fmt(clientWallets.mainBalance)}</span></div>
-            {Number((profile as any)?.due_limit ?? 0) > 0 && (
+            {mainDueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-warning/10 border border-warning/30">
-                <span className="text-warning">Due Limit</span><span className="font-semibold text-warning">{fmt(Number((profile as any)?.due_limit ?? 0))}</span>
+                <span className="text-warning">Main Wallet Due Limit</span><span className="font-semibold text-warning">{fmt(mainDueLimit)}</span>
               </div>
             )}
+
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Current Spend Cap</span><span className="font-semibold">{fmt(Number(topUpAccount?.spend_cap ?? 0))}</span></div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Amount Spent</span><span className="font-semibold">{fmt(Number(topUpAccount?.amount_spent ?? 0))}</span></div>
             <div>
