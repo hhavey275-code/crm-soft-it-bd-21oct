@@ -1858,6 +1858,7 @@ export type Database = {
       external_topup_requests: {
         Row: {
           ad_account_id: string
+          admin_note: string | null
           amount: number
           completed_at: string | null
           completed_by: string | null
@@ -1869,6 +1870,10 @@ export type Database = {
           initiated_by: string
           notes: string | null
           proof_url: string | null
+          refunded_at: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          requested_by_client: boolean
           status: string
           updated_at: string
           user_id: string | null
@@ -1877,6 +1882,7 @@ export type Database = {
         }
         Insert: {
           ad_account_id: string
+          admin_note?: string | null
           amount: number
           completed_at?: string | null
           completed_by?: string | null
@@ -1888,6 +1894,10 @@ export type Database = {
           initiated_by: string
           notes?: string | null
           proof_url?: string | null
+          refunded_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          requested_by_client?: boolean
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -1896,6 +1906,7 @@ export type Database = {
         }
         Update: {
           ad_account_id?: string
+          admin_note?: string | null
           amount?: number
           completed_at?: string | null
           completed_by?: string | null
@@ -1907,6 +1918,10 @@ export type Database = {
           initiated_by?: string
           notes?: string | null
           proof_url?: string | null
+          refunded_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          requested_by_client?: boolean
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -4246,6 +4261,7 @@ export type Database = {
         Args: { p_group_id: string; p_source_id: string; p_source_type: string }
         Returns: boolean
       }
+      complete_external_topup: { Args: { p_id: string }; Returns: Json }
       complete_forward_slot: {
         Args: {
           p_caption_total: number
@@ -4350,12 +4366,24 @@ export type Database = {
         }
         Returns: Json
       }
+      reject_external_topup: {
+        Args: { p_id: string; p_note?: string }
+        Returns: Json
+      }
       release_forward_slot: {
         Args: { p_source_id: string; p_source_type: string }
         Returns: undefined
       }
       repair_wallet_balance: {
         Args: { p_reason: string; p_user_id: string; p_wallet_kind: string }
+        Returns: Json
+      }
+      request_external_topup: {
+        Args: {
+          p_ad_account_id: string
+          p_amount: number
+          p_wallet_kind?: string
+        }
         Returns: Json
       }
       request_referral_payout: { Args: { p_amount: number }; Returns: Json }
