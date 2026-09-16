@@ -40,6 +40,8 @@ export function AdminExternalTopUpRequests() {
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [autopilotToken, setAutopilotToken] = useState<string | null>(null);
+  const [autopilotBusy, setAutopilotBusy] = useState(false);
 
 
   const { data: requests = [] } = useQuery({
@@ -116,7 +118,7 @@ export function AdminExternalTopUpRequests() {
   // Lovable runtime secret used to verify CRM helper jobs.
   const apiBase = () => "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
 
-  const createRemoteJob = async (action: "create_job" | "create_learn", data: Record<string, string>) => {
+  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot", data: Record<string, string>) => {
     const accessToken = session?.access_token;
     if (!accessToken) throw new Error("Please sign in again");
     const response = await fetch(apiBase(), {
@@ -202,7 +204,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.1.0.zip";
+        a.download = "crm-topup-helper-v1.2.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
