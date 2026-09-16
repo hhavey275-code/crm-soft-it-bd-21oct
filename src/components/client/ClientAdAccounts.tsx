@@ -278,7 +278,14 @@ export function ClientAdAccounts() {
   });
 
   const isInactive = (profile as any)?.status === "inactive";
-  const dueLimit = Number((profile as any)?.due_limit ?? 0);
+  // Each wallet has its own due limit; an expired limit counts as zero.
+  const notExpired = (ts?: string | null) => !ts || new Date(ts).getTime() > Date.now();
+  const dueLimit = notExpired((profile as any)?.due_limit_expires_at)
+    ? Number((profile as any)?.due_limit ?? 0)
+    : 0;
+  const secondaryDueLimit = notExpired((profile as any)?.secondary_due_limit_expires_at)
+    ? Number((profile as any)?.secondary_due_limit ?? 0)
+    : 0;
   const META_COOLDOWN_MS = 10 * 60 * 1000;
 
   const { data: accounts = [] } = useQuery({
