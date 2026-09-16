@@ -428,9 +428,30 @@
 
     const doSubmit = async () => {
       say("সাবমিট করছি…");
+      say("সাবমিট করছি…");
       submit.click();
+
+      // Second confirmation dialog (e.g. "Are you sure you want to increase spend cap by 8?")
+      const confirmEl = await waitFor(() => {
+        const learned = sel.confirmButton ? find(sel.confirmButton) : null;
+        if (learned && learned.offsetParent !== null && learned !== submit) return learned;
+        const dialog =
+          document.querySelector(".swal2-popup,.swal-modal,[role='alertdialog'],[role='dialog'].show,.modal.show") || null;
+        const scope = dialog || document;
+        const btns = candidates(scope, "button,a,[role='button']");
+        return (
+          btns.find((b) => /(yes[, ]|yes$|increase it|confirm|নিশ্চিত|হ্যাঁ)/i.test((b.innerText || "").trim())) || null
+        );
+      }, 6000, 300);
+      if (confirmEl) {
+        say("কনফার্ম করছি…");
+        confirmEl.click();
+        await sleep(600);
+      }
+
       const ok = await waitFor(() => {
         const t = document.body.innerText || "";
+
         if (sel.successIndicator && sel.successIndicator.text && t.includes(sel.successIndicator.text)) return true;
         return /(success|successful|successfully|completed|approved|সফল)/i.test(t) ? true : null;
       }, 20000);
