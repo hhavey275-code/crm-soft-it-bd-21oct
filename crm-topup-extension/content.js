@@ -439,6 +439,7 @@
     }
     session.job = job;
     session.autoConfirm = !!cfg.auto_confirm;
+    session.autopilot = !!job.autopilot;
     saveSession(session);
 
     if (!sel.amountInput || !sel.topupButton) {
@@ -562,13 +563,14 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
+      notifyBackground(true);
       say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
 
     };
 
-    if (session.autoConfirm) {
+    if (session.autoConfirm || session.autopilot) {
       await doSubmit();
     } else {
       say(
