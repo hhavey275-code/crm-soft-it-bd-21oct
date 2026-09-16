@@ -2218,6 +2218,9 @@ export type Database = {
           referral_rate_usd: number | null
           referred_by: string | null
           secondary_deposit_enabled: boolean
+          secondary_due_limit: number | null
+          secondary_due_limit_expires_at: string | null
+          secondary_due_limit_set_at: string | null
           secondary_usd_rate: number | null
           secondary_wallet_enabled: boolean
           spend_cap_withdraw_enabled: boolean
@@ -2253,6 +2256,9 @@ export type Database = {
           referral_rate_usd?: number | null
           referred_by?: string | null
           secondary_deposit_enabled?: boolean
+          secondary_due_limit?: number | null
+          secondary_due_limit_expires_at?: string | null
+          secondary_due_limit_set_at?: string | null
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
           spend_cap_withdraw_enabled?: boolean
@@ -2288,6 +2294,9 @@ export type Database = {
           referral_rate_usd?: number | null
           referred_by?: string | null
           secondary_deposit_enabled?: boolean
+          secondary_due_limit?: number | null
+          secondary_due_limit_expires_at?: string | null
+          secondary_due_limit_set_at?: string | null
           secondary_usd_rate?: number | null
           secondary_wallet_enabled?: boolean
           spend_cap_withdraw_enabled?: boolean
@@ -4320,6 +4329,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      effective_due_limit: {
+        Args: { p_user_id: string; p_wallet_kind?: string }
+        Returns: number
       }
       ensure_secondary_funds: {
         Args: {
