@@ -433,7 +433,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper
+            Download helper (v1.0.3)
           </Button>
         </CardContent>
       </Card>
