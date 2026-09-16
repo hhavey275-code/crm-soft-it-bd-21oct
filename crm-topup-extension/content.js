@@ -58,11 +58,17 @@
       history.replaceState(null, "", location.pathname + location.search);
     } catch {}
   }
+  // Any confirmed top-up that failed to reach the dashboard earlier is retried
+  // on every page load, so no completed top-up stays pending.
+  try {
+    flushQueue();
+  } catch {}
   if (!session) return;
   if (Date.now() - (session.startedAt || 0) > 24 * 60 * 60 * 1000) {
     clearSession();
     return;
   }
+
 
   // ---------- API ----------
   async function api(action, extra) {
@@ -72,6 +78,74 @@
       body: JSON.stringify(Object.assign({ action, token: session.token }, extra || {})),
     });
     return res.json();
+  }
+
+  // ---------- pending completion queue ----------
+  // A successful CRM top-up must always reach our dashboard, otherwise the
+  // client's wallet is already debited while the request stays pending.
+  const QUEUE_KEY = "crmPendingResults";
+  function readQueue() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([QUEUE_KEY], (r) => resolve((r && r[QUEUE_KEY]) || []));
+      } catch {
+        resolve([]);
+      }
+    });
+  }
+  function writeQueue(items) {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.set({ [QUEUE_KEY]: items }, resolve);
+      } catch {
+        resolve();
+      }
+    });
+  }
+  async function queueSuccess(entry) {
+    const items = await readQueue();
+    if (!items.some((i) => i.token === entry.token)) items.push(entry);
+    await writeQueue(items);
+  }
+  async function postSuccess(apiUrl, token) {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "result", token, success: true }),
+    });
+    return res.json();
+  }
+  // Retry a confirmed success several times before giving up.
+  async function reportSuccessWithRetry() {
+    let last = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const r = await postSuccess(session.api, session.token);
+        if (r && r.ok) return { ok: true };
+        last = (r && r.error) || "unknown";
+      } catch (e) {
+        last = "connection failed";
+      }
+      await sleep(1200 * (attempt + 1));
+    }
+    await queueSuccess({ api: session.api, token: session.token, queuedAt: Date.now() });
+    return { ok: false, error: last };
+  }
+  // Flush anything queued from an earlier attempt, on any CRM page load.
+  async function flushQueue() {
+    const items = await readQueue();
+    if (!items.length) return;
+    const left = [];
+    for (const item of items) {
+      if (Date.now() - (item.queuedAt || 0) > 6 * 60 * 60 * 1000) continue;
+      try {
+        const r = await postSuccess(item.api, item.token);
+        if (!(r && r.ok)) left.push(item);
+      } catch {
+        left.push(item);
+      }
+    }
+    await writeQueue(left);
   }
 
   // ---------- local fallback store (works even if the link expired) ----------
@@ -94,6 +168,7 @@
       }
     });
   }
+
 
   // ---------- UI panel ----------
   let panel, panelBody, panelActions;
@@ -515,14 +590,35 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
-      const r = await api("result", { success: true }).catch(() => null);
-      if (r && r.ok) {
+      say("টপ-আপ হয়েছে — রিকোয়েস্ট আপডেট করছি…");
+      const r = await reportSuccessWithRetry();
+      if (r.ok) {
         say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId + "<br>রিকোয়েস্ট completed হয়ে গেছে।", [
           { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
         ]);
       } else {
-        say("CRM-এ টপ-আপ হয়েছে, কিন্তু রিকোয়েস্ট আপডেট হয়নি: " + ((r && r.error) || "unknown"));
+        say(
+          "<b>CRM-এ টপ-আপ হয়েছে</b>, কিন্তু রিকোয়েস্ট আপডেট হয়নি: " +
+            (r.error || "unknown") +
+            "<br>চেষ্টা চালু থাকবে। না হলে ড্যাশবোর্ড থেকে <b>Mark completed</b> চাপুন।",
+          [
+            {
+              label: "আবার পাঠান",
+              primary: true,
+              onClick: async () => {
+                const again = await reportSuccessWithRetry();
+                say(
+                  again.ok
+                    ? "<b style='color:#86efac'>রিকোয়েস্ট completed হয়ে গেছে।</b>"
+                    : "এখনো হয়নি: " + (again.error || "unknown") + " — ড্যাশবোর্ড থেকে Mark completed করুন।"
+                );
+              },
+            },
+            { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
+          ]
+        );
       }
+
     };
 
     if (session.autoConfirm) {

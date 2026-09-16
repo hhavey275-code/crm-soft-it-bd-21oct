@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ExternalLink, Copy, X, Zap, GraduationCap, Download } from "lucide-react";
+import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
 
@@ -180,7 +180,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.0.7.zip";
+        a.download = "crm-topup-helper-v1.0.8.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -228,7 +228,32 @@ export function AdminExternalTopUpRequests() {
     }
   };
 
+  // Manual fallback: the CRM top-up already went through, so credit the request
+  // without reopening the CRM.
+  const handleMarkCompleted = async (r: Req) => {
+    setBusyId(r.id);
+    try {
+      const { data, error } = await (supabase as any).rpc("complete_external_topup", { p_id: r.id });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Failed to complete");
+      await logSystemAction(
+        "External Top-up Marked Completed",
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        user?.id,
+        user?.email
+      );
+      toast.success("Request marked completed");
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-pending-count"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to complete request");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleReject = async () => {
+
     if (!rejectReq) return;
     setBusyId(rejectReq.id);
     try {
@@ -335,6 +360,17 @@ export function AdminExternalTopUpRequests() {
               <Button
                 size="sm"
                 variant="outline"
+                className="text-emerald-600"
+                disabled={busyId === r.id}
+                onClick={() => handleMarkCompleted(r)}
+                title="Top-up already done in CRM — mark completed"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={busyId === r.id}
                 onClick={() => handleTeach(r)}
                 title="Teach the helper this CRM (one time)"
@@ -400,6 +436,16 @@ export function AdminExternalTopUpRequests() {
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-600"
+                disabled={busyId === r.id}
+                onClick={() => handleMarkCompleted(r)}
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+
 
               <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setRejectReq(r)}>
                 <X className="h-3.5 w-3.5" />
@@ -448,7 +494,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.0.7)
+            Download helper (v1.0.8)
           </Button>
         </CardContent>
       </Card>
