@@ -1271,6 +1271,17 @@ export function ClientAdAccounts() {
                 ${activeWalletBalance.toLocaleString()}
               </span>
             </div>
+            {isSecondaryTopUp && (
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/60">
+                <span className="text-muted-foreground">Main Wallet (usable here)</span>
+                <span className="font-medium">
+                  ${walletBalance.toLocaleString()}
+                  {mainToSecondaryFactor !== 1 && (
+                    <span className="text-muted-foreground"> ≈ ${(walletBalance * mainToSecondaryFactor).toFixed(2)}</span>
+                  )}
+                </span>
+              </div>
+            )}
             {dueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
@@ -1299,7 +1310,14 @@ export function ClientAdAccounts() {
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - activeWalletBalance).toLocaleString()} from due limit</p>
               )}
+              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0 && parsedAmount > 0 && (
+                <p className="text-sm text-blue-600">
+                  ${convertFromMain.toFixed(2)} will be moved from your Main Wallet to cover ${secondaryShortfall.toFixed(2)} here
+                  {mainRate > 0 && secRate > 0 && mainRate !== secRate && ` (rate ${mainRate} → ${secRate})`}
+                </p>
+              )}
             </div>
+
 
             {!isExternalTopUp && parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
