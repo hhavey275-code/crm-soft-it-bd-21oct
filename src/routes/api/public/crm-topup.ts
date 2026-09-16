@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         // Mint and verify on this same deployment. This avoids invalid
         // signatures when the dashboard is served from a custom domain whose
         // runtime has a different secret binding.
-        if (action === "create_job" || action === "create_learn") {
+        if (action === "create_job" || action === "create_learn" || action === "create_autopilot") {
           const auth = request.headers.get("authorization") ?? "";
           const accessToken = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
           if (!accessToken) return json({ ok: false, error: "Admin login required" }, 401);
