@@ -371,14 +371,14 @@
   // The top-up form must already know which ad account it belongs to before we
   // submit. Some CRMs load the account id / name into the form a moment after
   // the modal opens; submitting too early sends an empty id.
-  function formIdentityReady(scope) {
+  function formIdentityReady(scope, accountId) {
     const inputs = Array.from(scope.querySelectorAll("input,select,textarea"));
     const idFields = inputs.filter((i) =>
       /(account|act[_-]?id|adaccount|spend)/i.test((i.name || "") + " " + (i.id || "") + " " + (i.getAttribute("data-name") || ""))
     );
     const filled = idFields.some((i) => String(i.value || "").trim().length > 0);
     const shownText = (scope.innerText || "") + " " + inputs.map((i) => i.value || "").join(" ");
-    const hasAccount = shownText.includes(String(job.accountId)) || filled;
+    const hasAccount = shownText.includes(String(accountId)) || filled;
     const noEmptyHidden = !inputs.some(
       (i) => i.type === "hidden" && /(account|act[_-]?id|adaccount)/i.test((i.name || "") + (i.id || "")) && !String(i.value || "").trim()
     );
@@ -555,7 +555,7 @@
       amountEl.closest(
         "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
       ) || document;
-    const ready = await waitFor(() => formIdentityReady(modalScope), 12000, 300);
+    const ready = await waitFor(() => formIdentityReady(modalScope, job.accountId), 12000, 300);
     if (!ready) {
       await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
       return;
