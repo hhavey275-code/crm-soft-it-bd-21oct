@@ -37,6 +37,34 @@ export function signCrmToken(payload: CrmJobPayload): string {
   return `${body}.${sig}`;
 }
 
+export type CrmVerifyResult =
+  | { payload: CrmJobPayload; reason: null }
+  | { payload: null; reason: "malformed" | "bad_signature" | "expired" | "no_secret" };
+
+export function verifyCrmTokenDetailed(token: string): CrmVerifyResult {
+  let key: string;
+  try {
+    key = secret();
+  } catch {
+    return { payload: null, reason: "no_secret" };
+  }
+  const [body, sig] = String(token).split(".");
+  if (!body || !sig) return { payload: null, reason: "malformed" };
+  let payload: CrmJobPayload;
+  try {
+    const expected = createHmac("sha256", key).update(body).digest();
+    const given = fromB64url(sig);
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return { payload: null, reason: "bad_signature" };
+    }
+    payload = JSON.parse(fromB64url(body).toString("utf8")) as CrmJobPayload;
+  } catch {
+    return { payload: null, reason: "malformed" };
+  }
+  if (!payload?.exp || payload.exp * 1000 < Date.now()) return { payload: null, reason: "expired" };
+  return { payload, reason: null };
+}
+
 export function verifyCrmToken(token: string): CrmJobPayload | null {
   try {
     const [body, sig] = String(token).split(".");

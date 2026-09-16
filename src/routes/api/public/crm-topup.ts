@@ -28,9 +28,17 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           return json({ ok: false, error: "Invalid JSON" }, 400);
         }
 
-        const { verifyCrmToken } = await import("@/lib/crmToken.server");
-        const payload = verifyCrmToken(String(body?.token ?? ""));
-        if (!payload) return json({ ok: false, error: "Invalid or expired token" }, 401);
+        const { verifyCrmTokenDetailed } = await import("@/lib/crmToken.server");
+        const { payload, reason } = verifyCrmTokenDetailed(String(body?.token ?? ""));
+        if (!payload) {
+          const msg =
+            reason === "expired"
+              ? "Link expired — press Teach / Approve & Top-Up again"
+              : reason === "no_secret"
+                ? "Server not configured (CRM_JOB_SECRET missing)"
+                : "Invalid token — reopen from the dashboard";
+          return json({ ok: false, error: msg, reason }, 401);
+        }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const action = String(body?.action ?? "");
