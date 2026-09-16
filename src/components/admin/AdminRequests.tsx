@@ -234,6 +234,18 @@ export function AdminRequests() {
     refetchInterval: 20000,
   });
 
+  const { data: pendingExternalCount = 0 } = useQuery({
+    queryKey: ["admin-external-topup-pending-count"],
+    queryFn: async () => {
+      const { count } = await (supabase as any)
+        .from("external_topup_requests")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+      return count || 0;
+    },
+    refetchInterval: 15000,
+  });
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl md:text-2xl font-bold">Requests</h1>
