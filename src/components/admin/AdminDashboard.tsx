@@ -86,6 +86,10 @@ export function AdminDashboard() {
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
   const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
+  const [remainingDialogOpen, setRemainingDialogOpen] = useState(false);
+  const [remainingSearch, setRemainingSearch] = useState("");
+  const [remainingSortDesc, setRemainingSortDesc] = useState(true);
+  const [remainingView, setRemainingView] = useState<"clients" | "accounts">("clients");
   const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
 
 
@@ -111,6 +115,17 @@ export function AdminDashboard() {
     refetchIntervalInBackground: false,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+
+  const { data: secondaryWallets } = useQuery({
+    queryKey: ["admin-secondary-wallets"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("secondary_wallets").select("user_id, balance");
+      return (data as any[]) ?? [];
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: pendingRequests } = useQuery({
@@ -212,10 +227,57 @@ export function AdminDashboard() {
   // Realtime subscription removed for performance — data refreshes only via manual actions
   // (Update from Meta button, top-up actions, page reload).
 
-  const totalBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance), 0) ?? 0;
+  const mainWalletBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance || 0), 0) ?? 0;
+  const secondaryWalletBalance = secondaryWallets?.reduce((sum: number, w: any) => sum + Number(w.balance || 0), 0) ?? 0;
+  const totalBalance = mainWalletBalance + secondaryWalletBalance;
+  const fmtMoney = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const remainingLimit = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
+
+  // Remaining limit breakdown (per ad account and per client)
+  const remainingAccountRows = useMemo(() => {
+    const ownerMap: Record<string, string> = {};
+    (userAdAccounts ?? []).forEach((r: any) => { ownerMap[r.ad_account_id] = r.user_id; });
+    const profileMap: Record<string, any> = {};
+    (profiles ?? []).forEach((p: any) => { profileMap[p.user_id] = p; });
+    return (adAccounts ?? []).map((a: any) => {
+      const userId = ownerMap[a.id];
+      const prof = userId ? profileMap[userId] : null;
+      return {
+        id: a.id,
+        name: a.account_name || "(unnamed)",
+        accountId: a.account_id,
+        status: a.status,
+        external: !!a.external_topup_required,
+        userId: userId || null,
+        clientName: prof?.full_name || prof?.email || "Unassigned",
+        remaining: Math.max(0, Number(a.spend_cap || 0) - Number(a.amount_spent || 0)),
+      };
+    });
+  }, [adAccounts, userAdAccounts, profiles]);
+
+  const remainingClientRows = useMemo(() => {
+    const map: Record<string, { key: string; clientName: string; userId: string | null; remaining: number; accounts: number }> = {};
+    remainingAccountRows.forEach((r) => {
+      const key = r.userId || "unassigned";
+      if (!map[key]) map[key] = { key, clientName: r.clientName, userId: r.userId, remaining: 0, accounts: 0 };
+      map[key].remaining += r.remaining;
+      map[key].accounts += 1;
+    });
+    return Object.values(map);
+  }, [remainingAccountRows]);
+
+  const filteredRemainingRows = useMemo(() => {
+    const q = remainingSearch.trim().toLowerCase();
+    const rows: { key: string; primary: string; secondary: string; remaining: number; navId: string | null }[] =
+      remainingView === "clients"
+        ? remainingClientRows.map((r) => ({ key: r.key, primary: r.clientName, secondary: `${r.accounts} account(s)`, remaining: r.remaining, navId: r.userId ? `/clients/${r.userId}` : null }))
+        : remainingAccountRows.map((r) => ({ key: r.id, primary: r.name, secondary: `${r.clientName}${r.accountId ? ` · act_${r.accountId}` : ""}${r.external ? " · External CRM" : ""}`, remaining: r.remaining, navId: `/ad-accounts/${r.id}` }));
+    const filtered = q ? rows.filter((r) => r.primary.toLowerCase().includes(q) || r.secondary.toLowerCase().includes(q)) : rows;
+    return filtered.sort((a, b) => (remainingSortDesc ? b.remaining - a.remaining : a.remaining - b.remaining));
+  }, [remainingView, remainingClientRows, remainingAccountRows, remainingSearch, remainingSortDesc]);
+
 
   // Top Spenders — proxy-based live fetch (Spend Report style), persisted snapshot.
   type TopSpenderSnapshot = {
@@ -633,7 +695,10 @@ export function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs opacity-80">Platform Balance</p>
-                <p className="text-2xl font-bold mt-0.5">${totalBalance.toLocaleString()}</p>
+                <p className="text-2xl font-bold mt-0.5">{fmtMoney(totalBalance)}</p>
+                <p className="text-[11px] opacity-90 mt-1">
+                  Main {fmtMoney(mainWalletBalance)} · Secondary {fmtMoney(secondaryWalletBalance)}
+                </p>
               </div>
               <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
                 <Wallet className="h-5 w-5" />
@@ -649,14 +714,16 @@ export function AdminDashboard() {
       )}>
         {!isMobile && (
           <div className="cursor-pointer" onClick={() => navigate("/wallet-balances")}>
-            <MetricCard title="Platform Balance" value={`$${totalBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
+            <MetricCard title="Platform Balance" value={fmtMoney(totalBalance)} subtitle={`Main ${fmtMoney(mainWalletBalance)} · Secondary ${fmtMoney(secondaryWalletBalance)}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
           </div>
         )}
         <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" size={isMobile ? "xs" : "default"} />
         <MetricCard title="Pending Top-Ups" value={pendingRequests?.length ?? 0} icon={Clock} iconBg="bg-amber-50 dark:bg-amber-900/30" iconColor="text-amber-600" size={isMobile ? "xs" : "default"} />
         <MetricCard title="Active Accounts" value={activeAccounts.length} icon={Activity} iconBg="bg-teal-50 dark:bg-teal-900/30" iconColor="text-teal-600" size={isMobile ? "xs" : "default"} />
         <MetricCard title="Disabled" value={disabledAccounts.length} icon={Ban} iconBg="bg-red-50 dark:bg-red-900/30" iconColor="text-red-500" size={isMobile ? "xs" : "default"} />
-        <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" size={isMobile ? "xs" : "default"} className={isMobile ? "col-span-2" : ""} />
+        <div className={cn("cursor-pointer", isMobile && "col-span-2")} onClick={() => setRemainingDialogOpen(true)}>
+          <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} subtitle="Tap to see breakdown" icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" size={isMobile ? "xs" : "default"} />
+        </div>
       </div>
 
       {/* Spend Overview */}
@@ -1044,6 +1111,48 @@ export function AdminDashboard() {
           </Button>
         </div>
       )}
+
+      <Dialog open={remainingDialogOpen} onOpenChange={setRemainingDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Remaining Limit — ${remainingLimit.toLocaleString()}</DialogTitle>
+            <DialogDescription>Who is holding the remaining limit. Search and sort to find the biggest holders.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-md border overflow-hidden">
+              <Button size="sm" variant={remainingView === "clients" ? "default" : "ghost"} className="rounded-none" onClick={() => setRemainingView("clients")}>By client</Button>
+              <Button size="sm" variant={remainingView === "accounts" ? "default" : "ghost"} className="rounded-none" onClick={() => setRemainingView("accounts")}>By ad account</Button>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setRemainingSortDesc((v) => !v)}>
+              {remainingSortDesc ? "High → Low" : "Low → High"}
+            </Button>
+            <input
+              value={remainingSearch}
+              onChange={(e) => setRemainingSearch(e.target.value)}
+              placeholder="Search name…"
+              className="h-9 flex-1 min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+            />
+          </div>
+          <div className="rounded border divide-y mt-2">
+            {filteredRemainingRows.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No matching records</div>
+            )}
+            {filteredRemainingRows.map((r) => (
+              <div
+                key={r.key}
+                className={cn("flex items-center justify-between gap-3 px-3 py-2 text-xs", r.navId && "hover:bg-muted/50 cursor-pointer")}
+                onClick={() => { if (r.navId) { setRemainingDialogOpen(false); navigate(r.navId); } }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{r.primary}</div>
+                  <div className="text-muted-foreground truncate">{r.secondary}</div>
+                </div>
+                <div className="font-bold text-violet-600 shrink-0">${r.remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={rateLimitedDialogOpen} onOpenChange={setRateLimitedDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
