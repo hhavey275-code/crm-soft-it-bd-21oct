@@ -436,6 +436,16 @@ export function AdminExternalTopUpRequests() {
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-600"
+                disabled={busyId === r.id}
+                onClick={() => handleMarkCompleted(r)}
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+
 
               <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setRejectReq(r)}>
                 <X className="h-3.5 w-3.5" />
