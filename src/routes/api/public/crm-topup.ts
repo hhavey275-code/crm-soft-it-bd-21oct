@@ -174,6 +174,92 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           return json({ ok: true });
         }
 
+        // ---- Auto-pilot: list & claim pending requests ------------------
+        if (action === "list_pending") {
+          if (payload.scope !== "autopilot") return json({ ok: false, error: "Auto-pilot token required" }, 403);
+          const { data, error } = await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .select(
+              "id, amount, wallet_kind, external_topup_url, created_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary)"
+            )
+            .eq("status", "pending")
+            .order("created_at", { ascending: true })
+            .limit(20);
+          if (error) return json({ ok: false, error: error.message }, 400);
+          const items = (data ?? []).map((r: any) => {
+            const a = r.ad_accounts ?? {};
+            const url =
+              r.wallet_kind === "secondary"
+                ? a.external_topup_url_secondary || a.external_topup_url || r.external_topup_url || ""
+                : a.external_topup_url || r.external_topup_url || "";
+            return {
+              id: r.id,
+              amount: Number(r.amount),
+              walletKind: r.wallet_kind ?? "primary",
+              accountId: String(a.account_id ?? "").replace(/^act_/, ""),
+              url,
+            };
+          });
+          return json({ ok: true, items });
+        }
+
+        if (action === "claim") {
+          if (payload.scope !== "autopilot") return json({ ok: false, error: "Auto-pilot token required" }, 403);
+          const requestId = String(body?.requestId ?? "");
+          if (!requestId) return json({ ok: false, error: "requestId is required" }, 400);
+
+          // Atomic claim: only one Auto-pilot instance can take a request.
+          const now = new Date().toISOString();
+          const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+          const { data: claimed, error: claimErr } = await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .update({ automation_started_at: now, last_error: null, updated_at: now })
+            .eq("id", requestId)
+            .eq("status", "pending")
+            .or(`automation_started_at.is.null,automation_started_at.lt.${staleBefore}`)
+            .select("id, amount, wallet_kind, ad_account_id, external_topup_url")
+            .maybeSingle();
+          if (claimErr) return json({ ok: false, error: claimErr.message }, 400);
+          if (!claimed) return json({ ok: false, error: "Already claimed or no longer pending" }, 409);
+
+          // Approve right away — same as a human pressing Approve & Top-Up.
+          // If the automation then fails, an admin finishes it manually.
+          await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .update({ status: "completed", completed_by: payload.actorId ?? null, completed_at: now, updated_at: now })
+            .eq("id", requestId)
+            .eq("status", "pending");
+
+          const { data: acct } = await supabaseAdmin
+            .from("ad_accounts")
+            .select("account_id, external_topup_url, external_topup_url_secondary")
+            .eq("id", (claimed as any).ad_account_id)
+            .maybeSingle();
+          const accountId = String(acct?.account_id ?? "").replace(/^act_/, "");
+          const url =
+            (claimed as any).wallet_kind === "secondary"
+              ? acct?.external_topup_url_secondary || acct?.external_topup_url || (claimed as any).external_topup_url || ""
+              : acct?.external_topup_url || (claimed as any).external_topup_url || "";
+          if (!accountId || !url) {
+            return json({ ok: false, error: "Ad account ID or CRM URL missing" }, 400);
+          }
+
+          const { signCrmToken } = await import("@/lib/crmToken.server");
+          const host = new URL(url).host.toLowerCase();
+          const token = signCrmToken({
+            scope: "topup",
+            host,
+            requestId,
+            accountId,
+            amount: Number((claimed as any).amount),
+            walletKind: (claimed as any).wallet_kind ?? "primary",
+            actorId: payload.actorId,
+            autopilot: true,
+            exp: Math.floor(Date.now() / 1000) + 60 * 60,
+          });
+          return json({ ok: true, token, url, accountId, amount: Number((claimed as any).amount) });
+        }
+
         // ---- automation result ----------------------------------------
         if (action === "result") {
           if (payload.scope !== "topup" || !payload.requestId) {
