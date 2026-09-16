@@ -66,6 +66,18 @@
 
 
   // ---------- API ----------
+  function notifyBackground(success, error) {
+    if (!session || !session.autopilot || !session.job) return;
+    try {
+      chrome.runtime.sendMessage({
+        type: "crm-autopilot-done",
+        requestId: session.job.requestId,
+        success: !!success,
+        error: error || null,
+      });
+    } catch {}
+  }
+
   async function api(action, extra) {
     const res = await fetch(session.api, {
       method: "POST",
