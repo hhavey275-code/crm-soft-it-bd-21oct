@@ -14,8 +14,6 @@ import { format } from "date-fns";
 import { ExternalLink, Copy, X, Zap, GraduationCap, Download } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
-import { useServerFn } from "@tanstack/react-start";
-import { createCrmTopUpJob, createCrmLearnJob } from "@/lib/crmAutomation.functions";
 
 
 interface Req {
@@ -36,14 +34,12 @@ interface Req {
 }
 
 export function AdminExternalTopUpRequests() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const qc = useQueryClient();
   const isMobile = useIsMobile();
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const makeJob = useServerFn(createCrmTopUpJob);
-  const makeLearn = useServerFn(createCrmLearnJob);
 
 
   const { data: requests = [] } = useQuery({
@@ -103,6 +99,22 @@ export function AdminExternalTopUpRequests() {
   // Lovable runtime secret used to verify CRM helper jobs.
   const apiBase = () => "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
 
+  const createRemoteJob = async (action: "create_job" | "create_learn", data: Record<string, string>) => {
+    const accessToken = session?.access_token;
+    if (!accessToken) throw new Error("Please sign in again");
+    const response = await fetch(apiBase(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ action, ...data }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result?.ok) throw new Error(result?.error || "Failed to create helper link");
+    return result;
+  };
+
   const openWithHash = (url: string, hash: string) => {
     const a = document.createElement("a");
     a.href = `${url}${url.includes("#") ? "" : "#"}${hash}`;
@@ -123,7 +135,7 @@ export function AdminExternalTopUpRequests() {
     }
     setBusyId(r.id);
     try {
-      const res: any = await makeJob({ data: { requestId: r.id, url } });
+      const res = await createRemoteJob("create_job", { requestId: r.id, url });
       openWithHash(url, `crmtopup=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
       toast.success("CRM opened — helper is filling the top-up form");
       await logSystemAction(
@@ -149,7 +161,7 @@ export function AdminExternalTopUpRequests() {
     }
     setBusyId(r.id);
     try {
-      const res: any = await makeLearn({ data: { url } });
+      const res = await createRemoteJob("create_learn", { url });
       openWithHash(url, `crmlearn=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
       toast.success("Setup mode opened — follow the helper's instructions");
     } catch (e: any) {
@@ -168,7 +180,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.0.4.zip";
+        a.download = "crm-topup-helper-v1.0.5.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -436,7 +448,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.0.4)
+            Download helper (v1.0.5)
           </Button>
         </CardContent>
       </Card>

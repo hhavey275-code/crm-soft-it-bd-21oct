@@ -6,7 +6,7 @@ import { createFileRoute } from "@tanstack/react-router";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Headers": "content-type, authorization",
 };
 
 function json(body: unknown, status = 200) {
@@ -28,6 +28,84 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           return json({ ok: false, error: "Invalid JSON" }, 400);
         }
 
+        const action = String(body?.action ?? "");
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Mint and verify on this same deployment. This avoids invalid
+        // signatures when the dashboard is served from a custom domain whose
+        // runtime has a different secret binding.
+        if (action === "create_job" || action === "create_learn") {
+          const auth = request.headers.get("authorization") ?? "";
+          const accessToken = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+          if (!accessToken) return json({ ok: false, error: "Admin login required" }, 401);
+
+          const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
+          const userId = authData.user?.id;
+          if (authError || !userId) return json({ ok: false, error: "Admin session expired" }, 401);
+
+          const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
+            supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
+            supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "superadmin" }),
+          ]);
+          if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
+
+          let crmUrl: URL;
+          try {
+            crmUrl = new URL(String(body?.url ?? ""));
+          } catch {
+            return json({ ok: false, error: "Invalid CRM URL" }, 400);
+          }
+          if (crmUrl.protocol !== "https:" && crmUrl.protocol !== "http:") {
+            return json({ ok: false, error: "Invalid CRM URL" }, 400);
+          }
+
+          const host = crmUrl.host.toLowerCase();
+          const { signCrmToken } = await import("@/lib/crmToken.server");
+
+          if (action === "create_learn") {
+            const token = signCrmToken({
+              scope: "learn",
+              host,
+              exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+            });
+            return json({ ok: true, token, host });
+          }
+
+          const requestId = String(body?.requestId ?? "");
+          if (!requestId) return json({ ok: false, error: "Request is required" }, 400);
+          const { data: topup, error: topupError } = await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .select("id, amount, status, wallet_kind, ad_account_id")
+            .eq("id", requestId)
+            .maybeSingle();
+          if (topupError) return json({ ok: false, error: topupError.message }, 400);
+          if (!topup || (topup as any).status !== "pending") {
+            return json({ ok: false, error: "Pending request not found" }, 404);
+          }
+          const { data: account } = await supabaseAdmin
+            .from("ad_accounts")
+            .select("account_id")
+            .eq("id", (topup as any).ad_account_id)
+            .maybeSingle();
+          const accountId = String(account?.account_id ?? "").replace(/^act_/, "");
+          if (!accountId) return json({ ok: false, error: "Ad account ID missing" }, 400);
+
+          const token = signCrmToken({
+            scope: "topup",
+            host,
+            requestId: (topup as any).id,
+            accountId,
+            amount: Number((topup as any).amount),
+            walletKind: (topup as any).wallet_kind ?? "primary",
+            exp: Math.floor(Date.now() / 1000) + 6 * 60 * 60,
+          });
+          await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .update({ crm_provider: host, automation_started_at: new Date().toISOString() })
+            .eq("id", requestId);
+          return json({ ok: true, token, host, accountId, amount: Number((topup as any).amount) });
+        }
+
         const { verifyCrmTokenDetailed } = await import("@/lib/crmToken.server");
         const { payload, reason } = verifyCrmTokenDetailed(String(body?.token ?? ""));
         if (!payload) {
@@ -39,9 +117,6 @@ export const Route = createFileRoute("/api/public/crm-topup")({
                 : "Invalid token — reopen from the dashboard";
           return json({ ok: false, error: msg, reason }, 401);
         }
-
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const action = String(body?.action ?? "");
 
         // ---- layout the helper learned / needs -------------------------
         if (action === "get_config") {
