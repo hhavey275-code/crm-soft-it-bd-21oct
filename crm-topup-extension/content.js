@@ -227,7 +227,10 @@
     if (desc.text) {
       const wanted = desc.text.toLowerCase();
       const el = candidates(scope, desc.tag + ",button,a,[role='button']").find(
-        (c) => (c.innerText || "").trim().toLowerCase() === wanted
+        (c) => {
+          const actual = (c.innerText || "").trim().toLowerCase();
+          return actual === wanted || (wanted.length >= 4 && actual.includes(wanted));
+        }
       );
       if (el) return el;
     }
@@ -253,7 +256,7 @@
   }
 
   // Generic fallbacks (used only when the learned descriptor fails).
-  const TOPUP_RE = /(top\s*up|topup|deposit|add\s*fund|recharge|balance\s*add)/i;
+  const TOPUP_RE = /(top\s*up|topup|deposit|add\s*fund|add\s*balance|recharge|balance\s*add|credit|increase)/i;
   function fallbackTopUpButton(scope) {
     return candidates(scope, "button,a,[role='button']").find((c) => {
       const icon = c.querySelector("svg,i,[class*='icon'],[class*='fa-']");
@@ -461,7 +464,10 @@
       await reportFailure("অ্যামাউন্ট ঠিকভাবে বসেনি (ফর্মে: " + amountEl.value + ")।");
       return;
     }
-    const formScope = amountEl.closest("form,[role='dialog'],.modal") || document;
+    const formScope =
+      amountEl.closest(
+        "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
+      ) || document;
     if (!(document.body.innerText || "").includes(job.accountId)) {
       await reportFailure("ফর্মে অ্যাকাউন্ট ID মিলছে না — নিরাপত্তার জন্য থেমে গেছি।");
       return;
@@ -482,8 +488,11 @@
       const confirmEl = await waitFor(() => {
         const learned = sel.confirmButton ? find(sel.confirmButton) : null;
         if (learned && learned.offsetParent !== null && learned !== submit) return learned;
-        const dialog =
-          document.querySelector(".swal2-popup,.swal-modal,[role='alertdialog'],[role='dialog'].show,.modal.show") || null;
+        const dialogs = candidates(
+          document,
+          ".swal2-popup,.swal-modal,[role='alertdialog'],[role='dialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup']"
+        );
+        const dialog = dialogs[dialogs.length - 1] || null;
         const scope = dialog || document;
         const btns = candidates(scope, "button,a,[role='button']");
         return (
