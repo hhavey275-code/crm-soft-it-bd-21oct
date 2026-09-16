@@ -161,15 +161,25 @@
 
   function describe(el) {
     const txt = (el.innerText || el.value || "").trim().slice(0, 60);
+    const row = el.closest("tr,li,[class*='row'],[class*='card']");
+    const rowControls = row ? candidates(row, "button,a,[role='button']") : [];
+    const controlIndex = rowControls.indexOf(el);
+    const icon = el.querySelector("svg,i,[class*='icon'],[class*='fa-']");
     return {
       tag: el.tagName.toLowerCase(),
       id: el.id || null,
       name: el.getAttribute("name") || null,
       type: el.getAttribute("type") || null,
+      title: el.getAttribute("title") || null,
       placeholder: el.getAttribute("placeholder") || null,
       aria: el.getAttribute("aria-label") || null,
       text: txt || null,
       cls: (el.className && typeof el.className === "string" ? el.className : "").slice(0, 160) || null,
+      iconCls:
+        icon && icon.className
+          ? String(typeof icon.className === "string" ? icon.className : icon.className.baseVal || "").slice(0, 160) || null
+          : null,
+      controlIndex: controlIndex >= 0 ? controlIndex : null,
       path: cssPath(el),
     };
   }
@@ -196,6 +206,10 @@
       const el = scope.querySelector("[name='" + CSS.escape(desc.name) + "']");
       if (visible(el)) return el;
     }
+    if (desc.title) {
+      const el = scope.querySelector("[title='" + CSS.escape(desc.title) + "']");
+      if (visible(el)) return el;
+    }
     if (desc.path && !root) {
       try {
         const el = document.querySelector(desc.path);
@@ -217,13 +231,43 @@
       );
       if (el) return el;
     }
+    // Icon-only action buttons (such as Admiki's blue +) have no readable
+    // text. Remember their position within the account row and icon class.
+    if (root && Number.isInteger(desc.controlIndex)) {
+      const controls = candidates(scope, "button,a,[role='button']");
+      const el = controls[desc.controlIndex];
+      if (el && (!desc.tag || el.tagName.toLowerCase() === desc.tag)) return el;
+    }
+    if (desc.iconCls) {
+      const wanted = desc.iconCls.split(/\s+/).filter(Boolean);
+      const el = candidates(scope, "button,a,[role='button']").find((control) => {
+        const icon = control.querySelector("svg,i,[class*='icon'],[class*='fa-']");
+        const iconClass = icon && icon.className
+          ? String(typeof icon.className === "string" ? icon.className : icon.className.baseVal || "")
+          : "";
+        return wanted.some((token) => token.length > 2 && iconClass.split(/\s+/).includes(token));
+      });
+      if (el) return el;
+    }
     return null;
   }
 
   // Generic fallbacks (used only when the learned descriptor fails).
   const TOPUP_RE = /(top\s*up|topup|deposit|add\s*fund|recharge|balance\s*add)/i;
   function fallbackTopUpButton(scope) {
-    return candidates(scope, "button,a,[role='button']").find((c) => TOPUP_RE.test(c.innerText || ""));
+    return candidates(scope, "button,a,[role='button']").find((c) => {
+      const icon = c.querySelector("svg,i,[class*='icon'],[class*='fa-']");
+      const signal = [
+        c.innerText,
+        c.getAttribute("title"),
+        c.getAttribute("aria-label"),
+        c.className,
+        icon && (typeof icon.className === "string" ? icon.className : icon.className.baseVal),
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return TOPUP_RE.test(signal) || /(^|[\s_-])(plus|add|increase)([\s_-]|$)/i.test(signal);
+    });
   }
   function fallbackAmountInput(scope) {
     return (
@@ -240,7 +284,9 @@
   function fallbackSubmit(scope) {
     return (
       candidates(scope, "button[type='submit'],input[type='submit']")[0] ||
-      candidates(scope, "button").find((b) => /(submit|confirm|save|top\s*up|deposit|pay)/i.test(b.innerText || ""))
+      candidates(scope, "button").find((b) =>
+        /(submit|confirm|save|top\s*up|deposit|pay|increase\s*spend\s*cap)/i.test(b.innerText || "")
+      )
     );
   }
 
@@ -268,8 +314,8 @@
     { key: "search", label: "অ্যাকাউন্ট সার্চ করার ঘরে ক্লিক করুন", block: true },
     { key: "topupButton", label: "একটা অ্যাকাউন্টের Top-Up বাটনে ক্লিক করুন (ফর্মটা খুলতে দিন)", block: false },
     { key: "amountInput", label: "অ্যামাউন্ট লেখার ঘরে ক্লিক করুন", block: true },
-    { key: "submitButton", label: "Submit / Increase spend cap বাটনে ক্লিক করুন (এখন চাপলে টাকা যাবে না — শুধু চিনে নিচ্ছে)", block: true },
-    { key: "confirmButton", label: "কনফার্ম বক্সের 'Yes, increase it!' বাটনে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
+    { key: "submitButton", label: "Increase Spend Cap বাটনে ক্লিক করুন—confirmation box খুলবে, এখনো টাকা যাবে না", block: false },
+    { key: "confirmButton", label: "কনফার্ম বক্সের 'Yes, increase it!' বাটনে একবার ক্লিক করুন—Helper final submit আটকাবে", block: true, optional: true },
     { key: "successIndicator", label: "সফল হলে যে মেসেজ দেখা যায় সেখানে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
 
   ];
@@ -310,7 +356,8 @@
   function learnClickHandler(e) {
     const step = LEARN_STEPS[session.step];
     if (!step) return;
-    const el = e.target.closest("input,textarea,select,button,a,[role='button'],span,div");
+    const raw = e.target.closest("input,textarea,select,button,a,[role='button'],span,div");
+    const el = raw && (raw.closest("button,a,[role='button']") || raw);
     if (!el || panel.contains(el)) return;
     if (step.block) {
       e.preventDefault();
