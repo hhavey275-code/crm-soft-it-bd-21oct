@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.ping_autopilot_on_topup_request() FROM PUBLIC, anon, authenticated;
