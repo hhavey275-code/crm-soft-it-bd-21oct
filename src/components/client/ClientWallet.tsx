@@ -18,7 +18,11 @@ export function ClientWallet() {
   const { data: profile } = useQuery({
     queryKey: ["client-wallet-profile", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("due_limit,due_limit_expires_at").eq("user_id", user!.id).single();
+      const { data } = await supabase
+        .from("profiles")
+        .select("due_limit,due_limit_expires_at,secondary_due_limit,secondary_due_limit_expires_at")
+        .eq("user_id", user!.id)
+        .single();
       return data as any;
     },
     enabled: !!user,
