@@ -11,9 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ExternalLink, Copy, X } from "lucide-react";
+import { ExternalLink, Copy, X, Zap, GraduationCap, Download } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
+import { useServerFn } from "@tanstack/react-start";
+import { createCrmTopUpJob, createCrmLearnJob } from "@/lib/crmAutomation.functions";
+
 
 interface Req {
   id: string;
