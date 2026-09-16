@@ -56,7 +56,7 @@ export const createCrmTopUpJob = createServerFn({ method: "POST" })
       accountId,
       amount: Number(req.amount),
       walletKind: req.wallet_kind ?? "primary",
-      exp: Math.floor(Date.now() / 1000) + 30 * 60,
+      exp: Math.floor(Date.now() / 1000) + 6 * 60 * 60,
     });
 
     await context.supabase
@@ -81,7 +81,7 @@ export const createCrmLearnJob = createServerFn({ method: "POST" })
     const token = signCrmToken({
       scope: "learn",
       host,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+      exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
     });
     return { token, host };
   });

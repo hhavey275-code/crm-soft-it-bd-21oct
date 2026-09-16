@@ -59,7 +59,7 @@
     } catch {}
   }
   if (!session) return;
-  if (Date.now() - (session.startedAt || 0) > 60 * 60 * 1000) {
+  if (Date.now() - (session.startedAt || 0) > 24 * 60 * 60 * 1000) {
     clearSession();
     return;
   }
@@ -72,6 +72,27 @@
       body: JSON.stringify(Object.assign({ action, token: session.token }, extra || {})),
     });
     return res.json();
+  }
+
+  // ---------- local fallback store (works even if the link expired) ----------
+  const LOCAL_KEY = "crmLayout:" + location.host;
+  function saveLocalConfig(selectors) {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.set({ [LOCAL_KEY]: { selectors, savedAt: Date.now() } }, resolve);
+      } catch {
+        resolve();
+      }
+    });
+  }
+  function loadLocalConfig() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([LOCAL_KEY], (r) => resolve((r && r[LOCAL_KEY]) || null));
+      } catch {
+        resolve(null);
+      }
+    });
   }
 
   // ---------- UI panel ----------
@@ -255,17 +276,25 @@
     const step = LEARN_STEPS[session.step];
     if (!step) {
       say("সব শেখা শেষ। সেভ করছি…");
-      api("save_config", { selectors: session.selectors, name: location.host }).then((r) => {
-        if (r && r.ok) {
-          say("<b>Setup সম্পন্ন!</b><br>এই CRM-এর জন্য আর সেটআপ লাগবে না।", [
-            { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
-          ]);
-        } else {
-          say("সেভ করা যায়নি: " + ((r && r.error) || "unknown"), [
-            { label: "আবার", onClick: renderLearn, primary: true },
-          ]);
-        }
-      });
+      const selectors = session.selectors;
+      saveLocalConfig(selectors).then(() =>
+        api("save_config", { selectors, name: location.host })
+          .catch(() => null)
+          .then((r) => {
+            if (r && r.ok) {
+              say("<b>Setup সম্পন্ন!</b><br>এই CRM-এর জন্য আর সেটআপ লাগবে না।", [
+                { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
+              ]);
+            } else {
+              say(
+                "<b>Setup এই ব্রাউজারে সেভ হয়েছে</b> — টপ-আপ কাজ করবে।<br>সার্ভারে সেভ হয়নি: " +
+                  ((r && r.error) || "connection failed") +
+                  "<br>অন্য কম্পিউটারেও লাগলে ড্যাশবোর্ড থেকে আবার Teach চাপুন।",
+                [{ label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) }]
+              );
+            }
+          })
+      );
       return;
     }
     say(
@@ -304,12 +333,20 @@
   async function runTopUp(restart) {
     const info = await api("get_config").catch(() => null);
     if (!info || !info.ok) {
-      say("লিংকের সময় শেষ বা বাতিল। ড্যাশবোর্ড থেকে আবার Approve & Top-Up চাপুন।");
+      say(
+        "লিংক ব্যবহার করা যাচ্ছে না: " +
+          ((info && info.error) || "connection failed") +
+          "<br>ড্যাশবোর্ড থেকে আবার Approve & Top-Up চাপুন।"
+      );
       return;
     }
     const job = info.job;
     const cfg = info.config || {};
-    const sel = cfg.selectors || {};
+    let sel = cfg.selectors || {};
+    if (!sel.amountInput || !sel.topupButton) {
+      const local = await loadLocalConfig();
+      if (local && local.selectors) sel = local.selectors;
+    }
     if (!job) {
       say("এই লিংকে কোনো টপ-আপ রিকোয়েস্ট নেই।");
       return;
