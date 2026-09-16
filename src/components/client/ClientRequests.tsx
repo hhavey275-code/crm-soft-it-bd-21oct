@@ -36,14 +36,85 @@ export function ClientRequests() {
     enabled: !!user,
   });
 
+  const { data: topUpRequests = [] } = useQuery({
+    queryKey: ["client-external-topup-requests", user?.id],
+    enabled: !!user,
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("external_topup_requests")
+        .select("*, ad_accounts(account_name, account_id)")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      return data ?? [];
+    },
+  });
+
+  const pendingTopUps = topUpRequests.filter((r: any) => r.status === "pending").length;
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl md:text-2xl font-bold">My Requests</h1>
-      <Tabs defaultValue="ad-account">
+      <Tabs defaultValue="top-up">
         <TabsList>
+          <TabsTrigger value="top-up" className="gap-1.5">
+            Top-Up Requests
+            {pendingTopUps > 0 && (
+              <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                {pendingTopUps}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="ad-account">Ad Account Requests</TabsTrigger>
           <TabsTrigger value="bm-access">BM Access Requests</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="top-up">
+          <Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ad Account</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Wallet</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topUpRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">
+                        No top-up requests yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    topUpRequests.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <div className="text-sm font-medium">{r.ad_accounts?.account_name ?? "—"}</div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {(r.ad_accounts?.account_id ?? "").replace(/^act_/, "")}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">
+                          {r.wallet_kind === "secondary" ? "Secondary" : "Main"}
+                        </TableCell>
+                        <TableCell><StatusBadge status={r.status} /></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {format(new Date(r.created_at), "dd MMM yyyy HH:mm")}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="ad-account">
           <Card>
