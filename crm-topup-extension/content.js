@@ -428,7 +428,7 @@
 
     const doSubmit = async () => {
       say("সাবমিট করছি…");
-      say("সাবমিট করছি…");
+
       submit.click();
 
       // Second confirmation dialog (e.g. "Are you sure you want to increase spend cap by 8?")
