@@ -227,7 +227,10 @@ export function AdminDashboard() {
   // Realtime subscription removed for performance — data refreshes only via manual actions
   // (Update from Meta button, top-up actions, page reload).
 
-  const totalBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance), 0) ?? 0;
+  const mainWalletBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance || 0), 0) ?? 0;
+  const secondaryWalletBalance = secondaryWallets?.reduce((sum: number, w: any) => sum + Number(w.balance || 0), 0) ?? 0;
+  const totalBalance = mainWalletBalance + secondaryWalletBalance;
+  const fmtMoney = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const remainingLimit = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
