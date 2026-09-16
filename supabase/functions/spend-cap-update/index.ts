@@ -412,6 +412,29 @@ Deno.serve(async (req)=>{
         return json({ error: "Secondary wallet is not enabled for this client" }, 400);
       }
 
+      // Secondary wallet is funded from the main wallet at the rate difference.
+      // Pull whatever is short before deducting so a client with main balance
+      // is never blocked on a secondary-rate account.
+      if (walletKind === "secondary") {
+        const { data: convRes, error: convErr } = await supabaseUser.rpc("ensure_secondary_funds", {
+          p_user_id: walletUserId,
+          p_needed_usd: amount,
+          p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+          p_allow_negative: isAdmin,
+          p_due_limit: Number(prof?.due_limit ?? 0),
+        });
+        if (convErr) {
+          console.error("ensure_secondary_funds failed", convErr);
+          return json({ error: "Secondary wallet funding failed. Please try again." }, 500);
+        }
+        const cr: any = convRes;
+        if (!cr?.ok) {
+          if (cr?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
+          return json({ error: "Secondary wallet funding failed" }, 400);
+        }
+      }
+
+
       // ATOMIC + ledger-consistent deduction. The DB function locks the chosen
       // wallet row (main or secondary), realigns its balance with that wallet's
       // transaction ledger if they have drifted, then deducts. This makes it

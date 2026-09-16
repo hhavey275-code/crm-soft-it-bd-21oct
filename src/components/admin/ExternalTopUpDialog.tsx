@@ -89,6 +89,22 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
         .single();
       if (error) throw error;
 
+      // Secondary wallet is funded from the main wallet at the rate difference.
+      // Pull whatever is short first so the ledger reflects the conversion.
+      if (walletKind === "secondary") {
+        const { data: conv, error: convErr } = await (supabase as any).rpc("ensure_secondary_funds", {
+          p_user_id: targetUserId,
+          p_needed_usd: amt,
+          p_processed_by: `admin:${user!.id}`,
+          p_allow_negative: true,
+          p_due_limit: 0,
+        });
+        if (convErr || (conv && conv.ok === false)) {
+          await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
+          throw new Error(convErr?.message || conv?.error || "Secondary wallet funding failed");
+        }
+      }
+
       // Deduct the wallet atomically: balance + ledger row in ONE transaction,
       // with the amount signed negative so history and balance always agree.
       {
