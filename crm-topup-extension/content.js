@@ -58,11 +58,17 @@
       history.replaceState(null, "", location.pathname + location.search);
     } catch {}
   }
+  // Any confirmed top-up that failed to reach the dashboard earlier is retried
+  // on every page load, so no completed top-up stays pending.
+  try {
+    flushQueue();
+  } catch {}
   if (!session) return;
   if (Date.now() - (session.startedAt || 0) > 24 * 60 * 60 * 1000) {
     clearSession();
     return;
   }
+
 
   // ---------- API ----------
   async function api(action, extra) {
