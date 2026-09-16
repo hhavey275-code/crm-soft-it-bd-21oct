@@ -1112,6 +1112,48 @@ export function AdminDashboard() {
         </div>
       )}
 
+      <Dialog open={remainingDialogOpen} onOpenChange={setRemainingDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Remaining Limit — ${remainingLimit.toLocaleString()}</DialogTitle>
+            <DialogDescription>Who is holding the remaining limit. Search and sort to find the biggest holders.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-md border overflow-hidden">
+              <Button size="sm" variant={remainingView === "clients" ? "default" : "ghost"} className="rounded-none" onClick={() => setRemainingView("clients")}>By client</Button>
+              <Button size="sm" variant={remainingView === "accounts" ? "default" : "ghost"} className="rounded-none" onClick={() => setRemainingView("accounts")}>By ad account</Button>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setRemainingSortDesc((v) => !v)}>
+              {remainingSortDesc ? "High → Low" : "Low → High"}
+            </Button>
+            <input
+              value={remainingSearch}
+              onChange={(e) => setRemainingSearch(e.target.value)}
+              placeholder="Search name…"
+              className="h-9 flex-1 min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+            />
+          </div>
+          <div className="rounded border divide-y mt-2">
+            {filteredRemainingRows.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No matching records</div>
+            )}
+            {filteredRemainingRows.map((r) => (
+              <div
+                key={r.key}
+                className={cn("flex items-center justify-between gap-3 px-3 py-2 text-xs", r.navId && "hover:bg-muted/50 cursor-pointer")}
+                onClick={() => { if (r.navId) { setRemainingDialogOpen(false); navigate(r.navId); } }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{r.primary}</div>
+                  <div className="text-muted-foreground truncate">{r.secondary}</div>
+                </div>
+                <div className="font-bold text-violet-600 shrink-0">${r.remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={rateLimitedDialogOpen} onOpenChange={setRateLimitedDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
