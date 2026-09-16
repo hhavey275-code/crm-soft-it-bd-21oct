@@ -613,19 +613,29 @@ export function ClientAdAccounts() {
   const secondaryBalance = Number(wallets.secondaryBalance ?? 0);
   const mainRate = Number(wallets.mainRate ?? 0);
   const secRate = Number(wallets.secondaryRate ?? 0) || mainRate;
-  // Secondary wallet is funded from the main wallet at the rate difference,
-  // so main balance counts towards a secondary top-up too.
+  // Secondary top-ups draw on: secondary balance → main wallet's POSITIVE
+  // balance (rate converted) → secondary wallet's own due limit.
+  // The main wallet's due limit is never usable on a secondary top-up.
   const mainToSecondaryFactor = secRate > 0 && mainRate > 0 ? mainRate / secRate : 1;
+  const activeDueLimit = isSecondaryTopUp ? secondaryDueLimit : dueLimit;
+  const mainSurplusAsSecondary = Math.max(0, walletBalance) * mainToSecondaryFactor;
   const activeWalletBalance = isSecondaryTopUp ? secondaryBalance : walletBalance;
   const effectiveBalance = isSecondaryTopUp
-    ? secondaryBalance + (walletBalance + dueLimit) * mainToSecondaryFactor
+    ? secondaryBalance + mainSurplusAsSecondary + secondaryDueLimit
     : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
-  const usingDueLimit = !isSecondaryTopUp && parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
   const secondaryShortfall = isSecondaryTopUp ? Math.max(0, parsedAmount - secondaryBalance) : 0;
   const convertFromMain =
-    secondaryShortfall > 0 && mainToSecondaryFactor > 0 ? secondaryShortfall / mainToSecondaryFactor : 0;
+    secondaryShortfall > 0 && mainToSecondaryFactor > 0
+      ? Math.min(secondaryShortfall / mainToSecondaryFactor, Math.max(0, walletBalance))
+      : 0;
+  const secondaryDueUsed = isSecondaryTopUp
+    ? Math.max(0, secondaryShortfall - convertFromMain * mainToSecondaryFactor)
+    : 0;
+  const usingDueLimit = isSecondaryTopUp
+    ? secondaryDueUsed > 0.01 && !exceedsBalance
+    : parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
