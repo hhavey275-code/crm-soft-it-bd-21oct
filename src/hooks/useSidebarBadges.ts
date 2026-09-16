@@ -121,7 +121,7 @@ export function useSidebarBadges(): Record<string, number> {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, isAdminUser, debouncedFetch]);
+  }, [user, isAdminUser, debouncedFetch, fetchCounts]);
 
   return badges;
 }
