@@ -86,6 +86,10 @@ export function AdminDashboard() {
   const [dateSpendLoading, setDateSpendLoading] = useState(false);
   const [rateLimitedDetails, setRateLimitedDetails] = useState<RateLimitedDetail[]>([]);
   const [rateLimitedDialogOpen, setRateLimitedDialogOpen] = useState(false);
+  const [remainingDialogOpen, setRemainingDialogOpen] = useState(false);
+  const [remainingSearch, setRemainingSearch] = useState("");
+  const [remainingSortDesc, setRemainingSortDesc] = useState(true);
+  const [remainingView, setRemainingView] = useState<"clients" | "accounts">("clients");
   const [rateLimitedSource, setRateLimitedSource] = useState<string>("");
 
 
