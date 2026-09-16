@@ -37,8 +37,21 @@ export function ClientWallet() {
     enabled: !!user,
   });
 
-  const dueLimit = Number(profile?.due_limit ?? 0);
+  // Each wallet keeps its own due limit; an expired limit counts as zero.
+  const notExpired = (ts?: string | null) => !ts || new Date(ts).getTime() > Date.now();
+  const dueLimit = notExpired(profile?.due_limit_expires_at) ? Number(profile?.due_limit ?? 0) : 0;
+  const secDueLimit = notExpired(profile?.secondary_due_limit_expires_at)
+    ? Number(profile?.secondary_due_limit ?? 0)
+    : 0;
   const dueExpiresAt = profile?.due_limit_expires_at ? new Date(profile.due_limit_expires_at) : null;
+  const secDueExpiresAt = profile?.secondary_due_limit_expires_at
+    ? new Date(profile.secondary_due_limit_expires_at)
+    : null;
+  // A negative wallet balance is due already consumed from that wallet's limit.
+  const mainDueUsed = Math.max(0, -Number(wallets.mainBalance ?? 0));
+  const secDueUsed = Math.max(0, -Number(wallets.secondaryBalance ?? 0));
+  const mainDueRemaining = Math.max(0, dueLimit - mainDueUsed);
+  const secDueRemaining = Math.max(0, secDueLimit - secDueUsed);
 
   return (
     <div className="space-y-4 md:space-y-6">
