@@ -276,7 +276,19 @@ export function AdminRequests() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="external-topup" className="gap-1.5 flex-1 md:flex-none text-xs md:text-sm">
+            {isMobile ? "Top-Up" : "External Top-Up"}
+            {pendingExternalCount > 0 && (
+              <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                {pendingExternalCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="external-topup">
+          <AdminExternalTopUpRequests />
+        </TabsContent>
 
         <TabsContent value="withdraw">
           <AdminWithdrawRequests />
