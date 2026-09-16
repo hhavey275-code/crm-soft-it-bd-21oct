@@ -368,6 +368,25 @@
     );
   }
 
+  // The top-up form must already know which ad account it belongs to before we
+  // submit. Some CRMs load the account id / name into the form a moment after
+  // the modal opens; submitting too early sends an empty id.
+  function formIdentityReady(scope, accountId) {
+    const inputs = Array.from(scope.querySelectorAll("input,select,textarea"));
+    const idFields = inputs.filter((i) =>
+      /(account|act[_-]?id|adaccount|spend)/i.test((i.name || "") + " " + (i.id || "") + " " + (i.getAttribute("data-name") || ""))
+    );
+    const filled = idFields.some((i) => String(i.value || "").trim().length > 0);
+    const shownText = (scope.innerText || "") + " " + inputs.map((i) => i.value || "").join(" ");
+    const hasAccount = shownText.includes(String(accountId)) || filled;
+    const noEmptyHidden = !inputs.some(
+      (i) => i.type === "hidden" && /(account|act[_-]?id|adaccount)/i.test((i.name || "") + (i.id || "")) && !String(i.value || "").trim()
+    );
+    return hasAccount && noEmptyHidden ? true : null;
+  }
+
+
+
   function setValue(el, value) {
     el.focus();
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -530,8 +549,21 @@
       await reportFailure("টপ-আপ ফর্মের অ্যামাউন্টের ঘর খুঁজে পাইনি।");
       return;
     }
+    // The CRM fills the account id into the form after the modal opens. Submitting
+    // before that happens produces "route .../ad-account//-spend-cap not found".
+    const modalScope =
+      amountEl.closest(
+        "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
+      ) || document;
+    const ready = await waitFor(() => formIdentityReady(modalScope, job.accountId), 12000, 300);
+    if (!ready) {
+      await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
+      return;
+    }
+    await sleep(900);
     setValue(amountEl, job.amount);
-    await sleep(500);
+    await sleep(700);
+
 
     // 4) verify before submitting
     const typed = Number(String(amountEl.value).replace(/[^0-9.]/g, ""));
