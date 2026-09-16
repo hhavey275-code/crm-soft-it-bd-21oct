@@ -291,13 +291,34 @@ export function AdminExternalTopUpRequests() {
             <div className="flex gap-1 justify-end">
               <Button
                 size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                disabled={busyId === r.id}
+                onClick={() => handleAutoTopUp(r)}
+                title="Opens the CRM and lets the helper fill the top-up form"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                Approve & Top-Up
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-amber-600"
                 disabled={busyId === r.id}
                 onClick={() => handleOpenAndComplete(r)}
+                title="Open CRM manually and mark completed"
               >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Open CRM & Complete
+                <ExternalLink className="h-3.5 w-3.5" />
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busyId === r.id}
+                onClick={() => handleTeach(r)}
+                title="Teach the helper this CRM (one time)"
+              >
+                <GraduationCap className="h-3.5 w-3.5" />
+              </Button>
+
               <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setRejectReq(r)}>
                 <X className="h-3.5 w-3.5" />
               </Button>
