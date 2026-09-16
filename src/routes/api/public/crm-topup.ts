@@ -97,6 +97,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             accountId,
             amount: Number((topup as any).amount),
             walletKind: (topup as any).wallet_kind ?? "primary",
+             actorId: userId,
             exp: Math.floor(Date.now() / 1000) + 6 * 60 * 60,
           });
           await supabaseAdmin
@@ -152,6 +153,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
               host: payload.host,
               name: body?.name ? String(body.name).slice(0, 120) : payload.host,
               selectors,
+               auto_confirm: true,
             },
             { onConflict: "host" }
           );
@@ -165,17 +167,35 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             return json({ ok: false, error: "Top-up token required" }, 403);
           }
           if (body?.success) {
-            const { data, error } = await supabaseAdmin.rpc("complete_external_topup" as any, {
-              p_id: payload.requestId,
-            });
-            if (error) return json({ ok: false, error: error.message }, 400);
-            if (!(data as any)?.ok) return json({ ok: false, error: (data as any)?.error ?? "Failed" }, 400);
-            if (body?.providerTxnId) {
-              await supabaseAdmin
-                .from("external_topup_requests" as any)
-                .update({ provider_txn_id: String(body.providerTxnId).slice(0, 120), last_error: null })
-                .eq("id", payload.requestId);
-            }
+             const completedAt = new Date().toISOString();
+             const completion = {
+               status: "completed",
+               completed_by: payload.actorId ?? null,
+               completed_at: completedAt,
+               updated_at: completedAt,
+               last_error: null,
+               ...(body?.providerTxnId
+                 ? { provider_txn_id: String(body.providerTxnId).slice(0, 120) }
+                 : {}),
+             };
+             const { data, error } = await supabaseAdmin
+               .from("external_topup_requests" as any)
+               .update(completion)
+               .eq("id", payload.requestId)
+               .eq("status", "pending")
+               .select("id")
+               .maybeSingle();
+             if (error) return json({ ok: false, error: error.message }, 400);
+             if (!data) {
+               const { data: existing } = await supabaseAdmin
+                 .from("external_topup_requests" as any)
+                 .select("status")
+                 .eq("id", payload.requestId)
+                 .maybeSingle();
+               if ((existing as any)?.status !== "completed") {
+                 return json({ ok: false, error: "Request is no longer pending" }, 409);
+               }
+             }
             return json({ ok: true });
           }
           const { error } = await supabaseAdmin.rpc("fail_external_topup" as any, {
