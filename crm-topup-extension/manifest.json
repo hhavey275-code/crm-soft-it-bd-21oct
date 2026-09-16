@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CRM Top-Up Helper",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Semi-automatic external CRM ad account top-up: fills the account search, top-up form and amount from a CRM top-up request, then reports the result back.",
   "permissions": ["storage", "activeTab", "notifications"],
   "host_permissions": ["<all_urls>"],

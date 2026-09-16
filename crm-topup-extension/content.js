@@ -268,8 +268,10 @@
     { key: "search", label: "অ্যাকাউন্ট সার্চ করার ঘরে ক্লিক করুন", block: true },
     { key: "topupButton", label: "একটা অ্যাকাউন্টের Top-Up বাটনে ক্লিক করুন (ফর্মটা খুলতে দিন)", block: false },
     { key: "amountInput", label: "অ্যামাউন্ট লেখার ঘরে ক্লিক করুন", block: true },
-    { key: "submitButton", label: "Submit / Confirm বাটনে ক্লিক করুন (এখন চাপলে টাকা যাবে না — শুধু চিনে নিচ্ছে)", block: true },
+    { key: "submitButton", label: "Submit / Increase spend cap বাটনে ক্লিক করুন (এখন চাপলে টাকা যাবে না — শুধু চিনে নিচ্ছে)", block: true },
+    { key: "confirmButton", label: "কনফার্ম বক্সের 'Yes, increase it!' বাটনে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
     { key: "successIndicator", label: "সফল হলে যে মেসেজ দেখা যায় সেখানে ক্লিক করুন (না থাকলে Skip)", block: true, optional: true },
+
   ];
 
   function renderLearn() {
@@ -426,9 +428,30 @@
 
     const doSubmit = async () => {
       say("সাবমিট করছি…");
+
       submit.click();
+
+      // Second confirmation dialog (e.g. "Are you sure you want to increase spend cap by 8?")
+      const confirmEl = await waitFor(() => {
+        const learned = sel.confirmButton ? find(sel.confirmButton) : null;
+        if (learned && learned.offsetParent !== null && learned !== submit) return learned;
+        const dialog =
+          document.querySelector(".swal2-popup,.swal-modal,[role='alertdialog'],[role='dialog'].show,.modal.show") || null;
+        const scope = dialog || document;
+        const btns = candidates(scope, "button,a,[role='button']");
+        return (
+          btns.find((b) => /(yes[, ]|yes$|increase it|confirm|নিশ্চিত|হ্যাঁ)/i.test((b.innerText || "").trim())) || null
+        );
+      }, 6000, 300);
+      if (confirmEl) {
+        say("কনফার্ম করছি…");
+        confirmEl.click();
+        await sleep(600);
+      }
+
       const ok = await waitFor(() => {
         const t = document.body.innerText || "";
+
         if (sel.successIndicator && sel.successIndicator.text && t.includes(sel.successIndicator.text)) return true;
         return /(success|successful|successfully|completed|approved|সফল)/i.test(t) ? true : null;
       }, 20000);
