@@ -117,6 +117,17 @@ export function AdminDashboard() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: secondaryWallets } = useQuery({
+    queryKey: ["admin-secondary-wallets"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("secondary_wallets").select("user_id, balance");
+      return (data as any[]) ?? [];
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+
   const { data: pendingRequests } = useQuery({
     queryKey: ["admin-pending-topups"],
     queryFn: async () => {
