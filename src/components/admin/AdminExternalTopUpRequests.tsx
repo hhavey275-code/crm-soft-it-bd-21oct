@@ -98,7 +98,10 @@ export function AdminExternalTopUpRequests() {
     return a?.external_topup_url || r.external_topup_url || "";
   };
 
-  const apiBase = () => `${window.location.origin}/api/public/crm-topup`;
+  // Keep token signing and callback verification on the same deployment.
+  // app.softitbd.com is currently hosted separately and does not receive the
+  // Lovable runtime secret used to verify CRM helper jobs.
+  const apiBase = () => "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
 
   const openWithHash = (url: string, hash: string) => {
     const a = document.createElement("a");
@@ -165,7 +168,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-extension.zip";
+        a.download = "crm-topup-helper-v1.0.4.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -433,7 +436,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.0.3)
+            Download helper (v1.0.4)
           </Button>
         </CardContent>
       </Card>
