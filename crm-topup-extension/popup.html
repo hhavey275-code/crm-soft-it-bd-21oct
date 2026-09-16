@@ -5,7 +5,7 @@
     <style>
       body {
         margin: 0;
-        width: 300px;
+        width: 320px;
         font: 13px/1.55 system-ui, sans-serif;
         background: #0f172a;
         color: #e2e8f0;
@@ -25,19 +25,76 @@
       .ok {
         color: #86efac;
       }
+      .warn {
+        color: #fca5a5;
+      }
+      .muted {
+        opacity: 0.65;
+        font-size: 12px;
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        background: #1e293b;
+        color: #e2e8f0;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 8px;
+        font: 11px/1.4 monospace;
+        resize: vertical;
+        min-height: 56px;
+      }
+      button {
+        width: 100%;
+        margin-top: 8px;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        background: #f59e0b;
+        color: #0f172a;
+      }
+      button.ghost {
+        background: #334155;
+        color: #e2e8f0;
+      }
+      .card {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      #autopilotStatus.on {
+        color: #86efac;
+      }
+      #autopilotStatus.off {
+        color: #94a3b8;
+      }
     </style>
   </head>
   <body>
-    <header>CRM Top-Up Helper <span style="font-weight:400;opacity:.7;font-size:11px;">v1.1.0</span></header>
+    <header>CRM Top-Up Helper <span style="font-weight:400;opacity:.7;font-size:11px;">v1.2.0</span></header>
     <main>
-      <p class="ok">Installed and ready.</p>
-      <p>এটি নিজে থেকে কিছু করে না। কাজ শুরু হয় আপনার CRM ড্যাশবোর্ড থেকে:</p>
-      <ol>
-        <li>Requests → External Top-Up</li>
-        <li>নতুন CRM হলে একবার <b>Teach helper</b></li>
-        <li>তারপর প্রতিটি রিকোয়েস্টে <b>Approve &amp; Top-Up</b></li>
-      </ol>
-      <p>CRM-এ আপনার নিজের লগইন সেশনই ব্যবহার হয়; কোনো পাসওয়ার্ড সংরক্ষণ হয় না।</p>
+      <div class="card">
+        <b>Auto-pilot</b> — <span id="autopilotStatus" class="off">চেক হচ্ছে…</span>
+        <div id="autopilotLast" class="muted"></div>
+        <div id="autopilotOff">
+          <p class="muted" style="margin:8px 0 6px">
+            ড্যাশবোর্ড → External Top-Up → <b>Auto-pilot</b> বাটনে চাপুন, token কপি করে এখানে বসান:
+          </p>
+          <textarea id="tokenInput" placeholder="Auto-pilot token পেস্ট করুন"></textarea>
+          <button id="enableBtn">Auto-pilot চালু করুন</button>
+        </div>
+        <div id="autopilotOn" style="display:none">
+          <p class="muted" style="margin:8px 0 0">
+            এই ব্রাউজারে Chrome চালু ও CRM-এ লগইন থাকলে নতুন রিকোয়েস্ট আসামাত্র টপ-আপ নিজে হবে।
+          </p>
+          <button id="disableBtn" class="ghost">Auto-pilot বন্ধ করুন</button>
+        </div>
+        <div id="msg" class="warn"></div>
+      </div>
+      <p class="muted">ম্যানুয়াল ফ্লো আগের মতোই: Requests → External Top-Up → Teach / Approve &amp; Top-Up। কোনো পাসওয়ার্ড সংরক্ষণ হয় না।</p>
     </main>
     <script src="popup.js"></script>
   </body>
