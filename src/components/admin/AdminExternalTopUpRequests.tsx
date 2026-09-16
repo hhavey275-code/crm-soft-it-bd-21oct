@@ -41,6 +41,9 @@ export function AdminExternalTopUpRequests() {
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const makeJob = useServerFn(createCrmTopUpJob);
+  const makeLearn = useServerFn(createCrmLearnJob);
+
 
   const { data: requests = [] } = useQuery({
     queryKey: ["admin-external-topup-requests"],
