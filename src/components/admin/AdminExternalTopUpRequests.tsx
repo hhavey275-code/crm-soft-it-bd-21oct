@@ -32,6 +32,7 @@ interface Req {
   created_at: string;
   completed_at: string | null;
   rejected_at: string | null;
+  last_error?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -285,7 +286,14 @@ export function AdminExternalTopUpRequests() {
         <TableCell className="text-xs text-muted-foreground">
           {format(new Date(r.created_at), "dd MMM yyyy HH:mm")}
         </TableCell>
-        <TableCell>{statusBadge(r.status)}</TableCell>
+        <TableCell>
+          {statusBadge(r.status)}
+          {r.last_error && (
+            <div className="text-[10px] text-destructive max-w-[180px] truncate" title={r.last_error}>
+              {r.last_error}
+            </div>
+          )}
+        </TableCell>
         <TableCell className="text-right">
           {isPending ? (
             <div className="flex gap-1 justify-end">
