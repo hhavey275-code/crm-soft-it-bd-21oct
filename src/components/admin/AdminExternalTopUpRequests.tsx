@@ -195,6 +195,20 @@ export function AdminExternalTopUpRequests() {
     }
   };
 
+  // Auto-pilot: mint a 30-day token for the browser helper. The extension
+  // then processes new pending requests by itself the moment they arrive.
+  const handleAutopilot = async () => {
+    setAutopilotBusy(true);
+    try {
+      const res = await createRemoteJob("create_autopilot", {});
+      setAutopilotToken(res.token);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to create Auto-pilot token");
+    } finally {
+      setAutopilotBusy(false);
+    }
+  };
+
   const downloadHelper = () => {
     fetch("/crm-topup-extension.zip")
       .then((res) => {
