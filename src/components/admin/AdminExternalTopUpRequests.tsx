@@ -228,7 +228,32 @@ export function AdminExternalTopUpRequests() {
     }
   };
 
+  // Manual fallback: the CRM top-up already went through, so credit the request
+  // without reopening the CRM.
+  const handleMarkCompleted = async (r: Req) => {
+    setBusyId(r.id);
+    try {
+      const { data, error } = await (supabase as any).rpc("complete_external_topup", { p_id: r.id });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Failed to complete");
+      await logSystemAction(
+        "External Top-up Marked Completed",
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        user?.id,
+        user?.email
+      );
+      toast.success("Request marked completed");
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-pending-count"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to complete request");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleReject = async () => {
+
     if (!rejectReq) return;
     setBusyId(rejectReq.id);
     try {
