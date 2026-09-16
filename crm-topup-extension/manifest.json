@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "CRM Top-Up Helper",
+  "version": "1.0.0",
+  "description": "Semi-automatic external CRM ad account top-up: fills the account search, top-up form and amount from a CRM top-up request, then reports the result back.",
+  "permissions": ["storage", "activeTab", "notifications"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CRM Top-Up Helper"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

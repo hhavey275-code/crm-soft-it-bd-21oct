@@ -11,9 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ExternalLink, Copy, X } from "lucide-react";
+import { ExternalLink, Copy, X, Zap, GraduationCap, Download } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
+import { useServerFn } from "@tanstack/react-start";
+import { createCrmTopUpJob, createCrmLearnJob } from "@/lib/crmAutomation.functions";
+
 
 interface Req {
   id: string;
@@ -29,6 +32,7 @@ interface Req {
   created_at: string;
   completed_at: string | null;
   rejected_at: string | null;
+  last_error?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -38,6 +42,9 @@ export function AdminExternalTopUpRequests() {
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const makeJob = useServerFn(createCrmTopUpJob);
+  const makeLearn = useServerFn(createCrmLearnJob);
+
 
   const { data: requests = [] } = useQuery({
     queryKey: ["admin-external-topup-requests"],
@@ -90,6 +97,82 @@ export function AdminExternalTopUpRequests() {
     if (r.wallet_kind === "secondary") return a?.external_topup_url_secondary || a?.external_topup_url || r.external_topup_url || "";
     return a?.external_topup_url || r.external_topup_url || "";
   };
+
+  const apiBase = () => `${window.location.origin}/api/public/crm-topup`;
+
+  const openWithHash = (url: string, hash: string) => {
+    const a = document.createElement("a");
+    a.href = `${url}${url.includes("#") ? "" : "#"}${hash}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  // Approve & Top-Up: opens the CRM with a short-lived signed job so the
+  // browser helper can search the account, fill the amount and submit.
+  const handleAutoTopUp = async (r: Req) => {
+    const url = resolveUrl(r);
+    if (!url) {
+      toast.error("No external CRM link configured for this account");
+      return;
+    }
+    setBusyId(r.id);
+    try {
+      const res: any = await makeJob({ data: { requestId: r.id, url } });
+      openWithHash(url, `crmtopup=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
+      toast.success("CRM opened — helper is filling the top-up form");
+      await logSystemAction(
+        "External Top-up Automation Started",
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        user?.id,
+        user?.email
+      );
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to start automation");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // One-time Learn mode for a CRM site.
+  const handleTeach = async (r: Req) => {
+    const url = resolveUrl(r);
+    if (!url) {
+      toast.error("No external CRM link configured for this account");
+      return;
+    }
+    setBusyId(r.id);
+    try {
+      const res: any = await makeLearn({ data: { url } });
+      openWithHash(url, `crmlearn=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
+      toast.success("Setup mode opened — follow the helper's instructions");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to open setup");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadHelper = () => {
+    fetch("/crm-topup-extension.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "crm-topup-extension.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
+
 
   const handleOpenAndComplete = async (r: Req) => {
     const url = resolveUrl(r);
@@ -203,19 +286,47 @@ export function AdminExternalTopUpRequests() {
         <TableCell className="text-xs text-muted-foreground">
           {format(new Date(r.created_at), "dd MMM yyyy HH:mm")}
         </TableCell>
-        <TableCell>{statusBadge(r.status)}</TableCell>
+        <TableCell>
+          {statusBadge(r.status)}
+          {r.last_error && (
+            <div className="text-[10px] text-destructive max-w-[180px] truncate" title={r.last_error}>
+              {r.last_error}
+            </div>
+          )}
+        </TableCell>
         <TableCell className="text-right">
           {isPending ? (
             <div className="flex gap-1 justify-end">
               <Button
                 size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                disabled={busyId === r.id}
+                onClick={() => handleAutoTopUp(r)}
+                title="Opens the CRM and lets the helper fill the top-up form"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                Approve & Top-Up
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-amber-600"
                 disabled={busyId === r.id}
                 onClick={() => handleOpenAndComplete(r)}
+                title="Open CRM manually and mark completed"
               >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Open CRM & Complete
+                <ExternalLink className="h-3.5 w-3.5" />
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busyId === r.id}
+                onClick={() => handleTeach(r)}
+                title="Teach the helper this CRM (one time)"
+              >
+                <GraduationCap className="h-3.5 w-3.5" />
+              </Button>
+
               <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setRejectReq(r)}>
                 <X className="h-3.5 w-3.5" />
               </Button>
@@ -258,13 +369,23 @@ export function AdminExternalTopUpRequests() {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+                disabled={busyId === r.id}
+                onClick={() => handleAutoTopUp(r)}
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                Approve & Top-Up
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-amber-600"
                 disabled={busyId === r.id}
                 onClick={() => handleOpenAndComplete(r)}
               >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Open CRM
+                <ExternalLink className="h-3.5 w-3.5" />
               </Button>
+
               <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setRejectReq(r)}>
                 <X className="h-3.5 w-3.5" />
               </Button>
@@ -304,6 +425,19 @@ export function AdminExternalTopUpRequests() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-violet-500/30 bg-violet-500/5">
+        <CardContent className="p-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-muted-foreground">
+            <b className="text-foreground">Approve &amp; Top-Up</b> opens the CRM in your logged-in browser and the helper
+            fills the account &amp; amount for you. New CRM? Run <b>Teach</b> (cap icon) once.
+          </div>
+          <Button size="sm" variant="outline" onClick={downloadHelper}>
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Download helper
+          </Button>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending" className="gap-1.5">

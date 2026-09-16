@@ -1738,6 +1738,39 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_automation_configs: {
+        Row: {
+          auto_confirm: boolean
+          created_at: string
+          host: string
+          id: string
+          name: string | null
+          selectors: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_confirm?: boolean
+          created_at?: string
+          host: string
+          id?: string
+          name?: string | null
+          selectors?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_confirm?: boolean
+          created_at?: string
+          host?: string
+          id?: string
+          name?: string | null
+          selectors?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       custom_invoices: {
         Row: {
           amount_paid: number
@@ -1860,16 +1893,21 @@ export type Database = {
           ad_account_id: string
           admin_note: string | null
           amount: number
+          auto_attempts: number
+          automation_started_at: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
+          crm_provider: string | null
           external_crm_name: string | null
           external_topup_url: string | null
           id: string
           initiated_at: string
           initiated_by: string
+          last_error: string | null
           notes: string | null
           proof_url: string | null
+          provider_txn_id: string | null
           refunded_at: string | null
           rejected_at: string | null
           rejected_by: string | null
@@ -1884,16 +1922,21 @@ export type Database = {
           ad_account_id: string
           admin_note?: string | null
           amount: number
+          auto_attempts?: number
+          automation_started_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          crm_provider?: string | null
           external_crm_name?: string | null
           external_topup_url?: string | null
           id?: string
           initiated_at?: string
           initiated_by: string
+          last_error?: string | null
           notes?: string | null
           proof_url?: string | null
+          provider_txn_id?: string | null
           refunded_at?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
@@ -1908,16 +1951,21 @@ export type Database = {
           ad_account_id?: string
           admin_note?: string | null
           amount?: number
+          auto_attempts?: number
+          automation_started_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          crm_provider?: string | null
           external_crm_name?: string | null
           external_topup_url?: string | null
           id?: string
           initiated_at?: string
           initiated_by?: string
+          last_error?: string | null
           notes?: string | null
           proof_url?: string | null
+          provider_txn_id?: string | null
           refunded_at?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
@@ -4342,6 +4390,10 @@ export type Database = {
           p_processed_by?: string
           p_user_id: string
         }
+        Returns: Json
+      }
+      fail_external_topup: {
+        Args: { p_error: string; p_id: string }
         Returns: Json
       }
       gen_referral_code: { Args: never; Returns: string }
