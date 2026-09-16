@@ -559,6 +559,40 @@ export function AdminExternalTopUpRequests() {
         <TabsContent value="history" className="mt-3">{list(history, false)}</TabsContent>
       </Tabs>
 
+      <Dialog open={!!autopilotToken} onOpenChange={(o) => !o && setAutopilotToken(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Auto-pilot চালু করুন</DialogTitle>
+            <DialogDescription>
+              এই token-টা helper extension-এ একবার বসালেই নতুন external top-up request আসামাত্র টপ-আপ নিজে নিজে হয়ে যাবে — এই ব্রাউজারে Chrome চালু ও CRM-এ লগইন থাকা লাগবে। Token ৩০ দিন কাজ করবে।
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <textarea
+              readOnly
+              className="w-full h-24 rounded-md border bg-muted p-2 font-mono text-[11px]"
+              value={autopilotToken ?? ""}
+              onFocus={(e) => e.target.select()}
+            />
+            <ol className="list-decimal pl-5 text-xs text-muted-foreground space-y-1">
+              <li>উপরের token কপি করুন।</li>
+              <li>Chrome-এ helper extension-এর আইকনে ক্লিক করুন।</li>
+              <li>Auto-pilot ঘরে token বসিয়ে <b>Auto-pilot চালু করুন</b> চাপুন।</li>
+            </ol>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (autopilotToken) navigator.clipboard.writeText(autopilotToken).then(() => toast.success("Token copied"));
+              }}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1" />
+              Copy token
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!rejectReq} onOpenChange={(o) => !o && setRejectReq(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
