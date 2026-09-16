@@ -764,6 +764,16 @@ export function AdminDashboard() {
                       ? `$${dateSpend!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                 </p>
+                {showValue && dateSpendSplit && !dateSpendLoading && (
+                  <div className="text-[10px] mt-1 space-y-0.5">
+                    <p className="text-muted-foreground">
+                      Own accounts: <span className="font-semibold text-emerald-600">${dateSpendSplit.own.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      External CRM: <span className="font-semibold text-violet-600">${dateSpendSplit.external.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </p>
+                  </div>
+                )}
                 {dateSpendCalls !== null && !dateSpendLoading && showValue && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     Meta API calls: <span className="font-semibold text-foreground">{dateSpendCalls}</span>
