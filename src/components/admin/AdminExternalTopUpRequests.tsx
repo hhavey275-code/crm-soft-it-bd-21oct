@@ -100,7 +100,7 @@ export function AdminExternalTopUpRequests() {
     setBusyId(r.id);
     try {
       try {
-        await navigator clipboardSafe(`${cleanId(r)}\t${Number(r.amount)}`);
+        await navigator.clipboard.writeText(`${cleanId(r)}\t${Number(r.amount)}`);
       } catch {}
       const a = document.createElement("a");
       a.href = url;
