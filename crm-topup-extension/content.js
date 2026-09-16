@@ -410,6 +410,7 @@
 
   // =====================  TOP-UP MODE  =====================
   async function reportFailure(msg) {
+    notifyBackground(false, String(msg).replace(/<[^>]*>/g, "").slice(0, 180));
     say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি approve হয়ে গেছে — টপ-আপ হাতে করে দিন বা Setup আবার চালান।", [
       { label: "আবার চেষ্টা", onClick: () => runTopUp(true), primary: true },
     ]);
