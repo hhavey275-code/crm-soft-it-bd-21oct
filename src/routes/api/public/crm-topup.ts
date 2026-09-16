@@ -49,6 +49,19 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           ]);
           if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
 
+          // Long-lived Auto-pilot token (30 days). The extension stores it and
+          // uses it to list/claim pending requests — no CRM URL needed.
+          if (action === "create_autopilot") {
+            const { signCrmToken } = await import("@/lib/crmToken.server");
+            const token = signCrmToken({
+              scope: "autopilot",
+              host: "*",
+              actorId: userId,
+              exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            });
+            return json({ ok: true, token });
+          }
+
           let crmUrl: URL;
           try {
             crmUrl = new URL(String(body?.url ?? ""));
