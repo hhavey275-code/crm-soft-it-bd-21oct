@@ -98,24 +98,56 @@ export function ClientWallet() {
       )}
 
 
-      {/* Due Limit Notice */}
-      {dueLimit > 0 && dueExpiresAt && (
-        <div className="rounded-lg border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/40 p-3 flex items-start gap-2.5">
-          <div className="h-8 w-8 shrink-0 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <span className="text-amber-700 dark:text-amber-400 text-sm font-bold">!</span>
-          </div>
-          <div className="flex-1 text-xs">
-            <p className="font-semibold text-amber-800 dark:text-amber-300">
-              Due limit ${dueLimit.toLocaleString()} active
-            </p>
-            <p className="text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-              {dueExpiresAt.getTime() > Date.now()
-                ? `Expires on ${format(dueExpiresAt, "MMM d, yyyy 'at' h:mm a")}`
-                : "Expired — pending auto-reset"}
-            </p>
-          </div>
+      {/* Due Limit Notices — each wallet has its own limit */}
+      {(dueLimit > 0 || (wallets.secondaryEnabled && secDueLimit > 0)) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {dueLimit > 0 && (
+            <div className="rounded-lg border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/40 p-3 flex items-start gap-2.5">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <span className="text-amber-700 dark:text-amber-400 text-sm font-bold">!</span>
+              </div>
+              <div className="flex-1 text-xs">
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  Main wallet due limit ${dueLimit.toLocaleString()}
+                </p>
+                <p className="text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                  Used ${mainDueUsed.toFixed(2)} · Remaining ${mainDueRemaining.toFixed(2)}
+                </p>
+                {dueExpiresAt && (
+                  <p className="text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                    {dueExpiresAt.getTime() > Date.now()
+                      ? `Expires on ${format(dueExpiresAt, "MMM d, yyyy 'at' h:mm a")}`
+                      : "Expired — pending auto-reset"}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {wallets.secondaryEnabled && secDueLimit > 0 && (
+            <div className="rounded-lg border border-violet-300/60 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-800/40 p-3 flex items-start gap-2.5">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-violet-500/20 flex items-center justify-center">
+                <span className="text-violet-700 dark:text-violet-400 text-sm font-bold">!</span>
+              </div>
+              <div className="flex-1 text-xs">
+                <p className="font-semibold text-violet-800 dark:text-violet-300">
+                  Secondary wallet due limit ${secDueLimit.toLocaleString()}
+                </p>
+                <p className="text-violet-700/80 dark:text-violet-400/80 mt-0.5">
+                  Used ${secDueUsed.toFixed(2)} · Remaining ${secDueRemaining.toFixed(2)}
+                </p>
+                {secDueExpiresAt && (
+                  <p className="text-violet-700/80 dark:text-violet-400/80 mt-0.5">
+                    {secDueExpiresAt.getTime() > Date.now()
+                      ? `Expires on ${format(secDueExpiresAt, "MMM d, yyyy 'at' h:mm a")}`
+                      : "Expired — pending auto-reset"}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
+
 
       <Card data-tutorial="wallet-history">
         <CardHeader className="p-4 pb-2">
