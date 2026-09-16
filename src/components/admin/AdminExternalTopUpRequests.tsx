@@ -360,6 +360,17 @@ export function AdminExternalTopUpRequests() {
               <Button
                 size="sm"
                 variant="outline"
+                className="text-emerald-600"
+                disabled={busyId === r.id}
+                onClick={() => handleMarkCompleted(r)}
+                title="Top-up already done in CRM — mark completed"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={busyId === r.id}
                 onClick={() => handleTeach(r)}
                 title="Teach the helper this CRM (one time)"
