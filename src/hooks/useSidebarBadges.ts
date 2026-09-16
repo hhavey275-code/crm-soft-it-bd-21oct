@@ -64,7 +64,8 @@ export function useSidebarBadges(): Record<string, number> {
         chat: chatRes.count || 0,
         clients: clientsRes.count || 0,
         "failed-topups": failedRes.count || 0,
-        requests: (adReqRes.count || 0) + (bmReqRes.count || 0) + (withdrawReqRes.count || 0) + (externalTopupRes.count || 0),
+        requests: (adReqRes.count || 0) + (bmReqRes.count || 0) + (withdrawReqRes.count || 0),
+        "external-top-up": externalTopupRes.count || 0,
         sellers: sellerUsdtRes.count || 0,
         referral: referralPayoutRes.count || 0,
       });
@@ -107,7 +108,13 @@ export function useSidebarBadges(): Record<string, number> {
 
     let channel = supabase.channel("sidebar-badges");
     tables.forEach((table) => {
-      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => debouncedFetch());
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        if (table === "external_topup_requests") {
+          void fetchCounts();
+          return;
+        }
+        debouncedFetch();
+      });
     });
     channel.subscribe();
 
