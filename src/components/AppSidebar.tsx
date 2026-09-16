@@ -58,6 +58,7 @@ const adminNavItems = [
   { title: "Requests", url: "/requests", icon: FileText, key: "requests" },
   { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
   { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
+  { title: "External Top-Up", url: "/external-top-up", icon: Zap, key: "external-top-up" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Clients", url: "/clients", icon: Users, key: "clients" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
@@ -180,7 +181,10 @@ export function AppSidebar() {
   } else if (role === "admin") {
     let base = adminNavItems;
     if (menuPermissions && menuPermissions.length > 0) {
-      base = adminNavItems.filter(item => menuPermissions.includes(item.key));
+      base = adminNavItems.filter(item =>
+        menuPermissions.includes(item.key) ||
+        (item.key === "external-top-up" && menuPermissions.includes("requests"))
+      );
     }
     navItems = isTenantMode ? base.filter(i => !tenantHiddenKeys.includes(i.key)) : base;
   } else if (isAgency) {
@@ -268,7 +272,7 @@ export function AppSidebar() {
                         <div className="relative mr-2">
                           <item.icon className="h-4 w-4" />
                           {(badges[item.key] ?? 0) > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+                            <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-0.5 text-[9px] font-bold ${item.key === "external-top-up" ? "animate-pulse bg-warning text-warning-foreground ring-2 ring-warning/25" : "bg-destructive text-destructive-foreground"}`}>
                               {badges[item.key] > 9 ? "9+" : badges[item.key]}
                             </span>
                           )}

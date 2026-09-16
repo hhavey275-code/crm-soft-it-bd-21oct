@@ -33,6 +33,7 @@ import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callb
 import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
+import { Route as ExternalTopUpRouteImport } from './routes/external-top-up'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
@@ -185,6 +186,11 @@ const FeedbackRoute = FeedbackRouteImport.update({
 const FailedTopupsRoute = FailedTopupsRouteImport.update({
   id: '/failed-topups',
   path: '/failed-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExternalTopUpRoute = ExternalTopUpRouteImport.update({
+  id: '/external-top-up',
+  path: '/external-top-up',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -372,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRoute
+  '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
@@ -431,6 +438,7 @@ export interface FileRoutesByTo {
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRoute
+  '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
@@ -490,6 +498,7 @@ export interface FileRoutesById {
   '/client-spend-report': typeof ClientSpendReportRoute
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRoute
+  '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/client-spend-report'
     | '/dashboard'
     | '/documents'
+    | '/external-top-up'
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
@@ -610,6 +620,7 @@ export interface FileRouteTypes {
     | '/client-spend-report'
     | '/dashboard'
     | '/documents'
+    | '/external-top-up'
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
@@ -668,6 +679,7 @@ export interface FileRouteTypes {
     | '/client-spend-report'
     | '/dashboard'
     | '/documents'
+    | '/external-top-up'
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
@@ -728,6 +740,7 @@ export interface RootRouteChildren {
   ClientSpendReportRoute: typeof ClientSpendReportRoute
   DashboardRoute: typeof DashboardRoute
   DocumentsRoute: typeof DocumentsRoute
+  ExternalTopUpRoute: typeof ExternalTopUpRoute
   FailedTopupsRoute: typeof FailedTopupsRoute
   FeedbackRoute: typeof FeedbackRoute
   InvoiceMakerRoute: typeof InvoiceMakerRoute
@@ -933,6 +946,13 @@ declare module '@tanstack/react-router' {
       path: '/failed-topups'
       fullPath: '/failed-topups'
       preLoaderRoute: typeof FailedTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/external-top-up': {
+      id: '/external-top-up'
+      path: '/external-top-up'
+      fullPath: '/external-top-up'
+      preLoaderRoute: typeof ExternalTopUpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -1225,6 +1245,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientSpendReportRoute: ClientSpendReportRoute,
   DashboardRoute: DashboardRoute,
   DocumentsRoute: DocumentsRoute,
+  ExternalTopUpRoute: ExternalTopUpRoute,
   FailedTopupsRoute: FailedTopupsRoute,
   FeedbackRoute: FeedbackRoute,
   InvoiceMakerRoute: InvoiceMakerRoute,

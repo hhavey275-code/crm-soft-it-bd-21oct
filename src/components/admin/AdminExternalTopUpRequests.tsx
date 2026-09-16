@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +55,23 @@ export function AdminExternalTopUpRequests() {
       return (data ?? []) as Req[];
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-external-topup-requests-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "external_topup_requests" },
+        () => {
+          void qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const accountIds = [...new Set(requests.map((r) => r.ad_account_id).filter(Boolean))];
   const userIds = [...new Set(requests.map((r) => r.user_id).filter(Boolean))];

@@ -29,6 +29,7 @@ const ALL_MENU_KEYS = [
   { key: "requests", label: "Requests" },
   { key: "billings", label: "Billings" },
   { key: "business-managers", label: "Business Managers" },
+  { key: "external-top-up", label: "External Top-Up" },
   { key: "top-up", label: "Top-Up Request" },
   { key: "clients", label: "Clients" },
   { key: "transactions", label: "Transactions" },
