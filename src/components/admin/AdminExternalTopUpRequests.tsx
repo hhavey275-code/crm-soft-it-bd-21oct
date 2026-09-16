@@ -180,7 +180,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.0.7.zip";
+        a.download = "crm-topup-helper-v1.0.8.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -448,7 +448,7 @@ export function AdminExternalTopUpRequests() {
           </div>
           <Button size="sm" variant="outline" onClick={downloadHelper}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Download helper (v1.0.7)
+            Download helper (v1.0.8)
           </Button>
         </CardContent>
       </Card>

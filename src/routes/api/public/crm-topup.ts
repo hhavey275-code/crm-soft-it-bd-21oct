@@ -98,7 +98,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             amount: Number((topup as any).amount),
             walletKind: (topup as any).wallet_kind ?? "primary",
              actorId: userId,
-            exp: Math.floor(Date.now() / 1000) + 6 * 60 * 60,
+            exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
           });
           await supabaseAdmin
             .from("external_topup_requests" as any)
