@@ -209,9 +209,24 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           const requestId = String(body?.requestId ?? "");
           if (!requestId) return json({ ok: false, error: "requestId is required" }, 400);
 
-          // Atomic claim: only one Auto-pilot instance can take a request.
           const now = new Date().toISOString();
-          const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+          const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+          // Only one external top-up may run at a time across every helper /
+          // PC — the CRM cannot handle two spend-cap forms at once.
+          const { data: inFlight } = await supabaseAdmin
+            .from("external_topup_requests" as any)
+            .select("id")
+            .eq("status", "pending")
+            .not("automation_started_at", "is", null)
+            .gt("automation_started_at", staleBefore)
+            .neq("id", requestId)
+            .limit(1);
+          if (inFlight && inFlight.length > 0) {
+            return json({ ok: false, error: "Another top-up is running", reason: "busy" }, 409);
+          }
+
+          // Atomic claim: only one Auto-pilot instance can take a request.
           const { data: claimed, error: claimErr } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .update({ automation_started_at: now, last_error: null, updated_at: now })
@@ -223,13 +238,8 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           if (claimErr) return json({ ok: false, error: claimErr.message }, 400);
           if (!claimed) return json({ ok: false, error: "Already claimed or no longer pending" }, 409);
 
-          // Approve right away — same as a human pressing Approve & Top-Up.
-          // If the automation then fails, an admin finishes it manually.
-          await supabaseAdmin
-            .from("external_topup_requests" as any)
-            .update({ status: "completed", completed_by: payload.actorId ?? null, completed_at: now, updated_at: now })
-            .eq("id", requestId)
-            .eq("status", "pending");
+          // The request stays pending until the helper confirms the CRM
+          // top-up actually went through (action=result).
 
           const { data: acct } = await supabaseAdmin
             .from("ad_accounts")
@@ -260,6 +270,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           });
           return json({ ok: true, token, url, accountId, amount: Number((claimed as any).amount) });
         }
+
 
         // ---- automation result ----------------------------------------
         if (action === "result") {
