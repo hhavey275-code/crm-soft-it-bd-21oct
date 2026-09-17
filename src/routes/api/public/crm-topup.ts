@@ -309,12 +309,29 @@ export const Route = createFileRoute("/api/public/crm-topup")({
              }
             return json({ ok: true });
           }
+          // Auto-pilot failure: release the claim so the request stays visible
+          // as pending with the reason, and can be retried or done by hand.
+          if (payload.autopilot) {
+            const failedAt = new Date().toISOString();
+            const { error: relErr } = await supabaseAdmin
+              .from("external_topup_requests" as any)
+              .update({
+                automation_started_at: null,
+                last_error: String(body?.error ?? "Automation failed").slice(0, 500),
+                updated_at: failedAt,
+              })
+              .eq("id", payload.requestId)
+              .eq("status", "pending");
+            if (relErr) return json({ ok: false, error: relErr.message }, 400);
+            return json({ ok: true, recorded: "released" });
+          }
           const { error } = await supabaseAdmin.rpc("fail_external_topup" as any, {
             p_id: payload.requestId,
             p_error: String(body?.error ?? "Automation failed").slice(0, 500),
           });
           if (error) return json({ ok: false, error: error.message }, 400);
           return json({ ok: true, recorded: "failure" });
+
         }
 
         return json({ ok: false, error: "Unknown action" }, 400);
