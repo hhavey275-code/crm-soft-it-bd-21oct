@@ -78,6 +78,20 @@
     } catch {}
   }
 
+  // Auto-pilot jobs stay "pending" on the server until the CRM top-up is
+  // confirmed, so always report the outcome back.
+  async function reportServer(success, error) {
+    if (!session || !session.autopilot) return;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const r = await api("result", { success: !!success, error: error || null });
+        if (r && r.ok) return;
+      } catch {}
+      await sleep(1500 * (i + 1));
+    }
+  }
+
+
   async function api(action, extra) {
     const res = await fetch(session.api, {
       method: "POST",
@@ -410,8 +424,11 @@
 
   // =====================  TOP-UP MODE  =====================
   async function reportFailure(msg) {
-    notifyBackground(false, String(msg).replace(/<[^>]*>/g, "").slice(0, 180));
-    say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি approve হয়ে গেছে — টপ-আপ হাতে করে দিন বা Setup আবার চালান।", [
+    const clean = String(msg).replace(/<[^>]*>/g, "").slice(0, 180);
+    await reportServer(false, clean);
+    notifyBackground(false, clean);
+
+    say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি এখনো pending আছে — আবার চেষ্টা করুন, নয়তো CRM-এ হাতে টপ-আপ দিয়ে ড্যাশবোর্ড থেকে Mark completed চাপুন।", [
       { label: "আবার চেষ্টা", onClick: () => runTopUp(true), primary: true },
     ]);
   }
@@ -563,7 +580,9 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
+      await reportServer(true);
       notifyBackground(true);
+
       say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
