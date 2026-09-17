@@ -61,6 +61,12 @@ function notify(title, message) {
 }
 
 // ---------- queue ----------
+const GAP_MS = 30000; // spacing between two CRM top-ups
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function processQueue() {
   if (running) return;
   running = true;
@@ -72,10 +78,14 @@ async function processQueue() {
       }
       return;
     }
+    let first = true;
     for (const item of list.items || []) {
       if (!item.url || !item.accountId) continue;
+      if (!first) await sleep(GAP_MS);
+      first = false;
       try {
-        await runOne(item);
+        const done = await runOne(item);
+        if (done === "busy") return; // another PC is running one — wait for next wake-up
       } catch (e) {
         notify("Auto-pilot ব্যর্থ", `${item.accountId} — $${item.amount}: ${e && e.message ? e.message : e}`);
         setLast({ at: Date.now(), ok: false, accountId: item.accountId, amount: item.amount, error: String(e && e.message ? e.message : e) });
@@ -91,9 +101,11 @@ async function processQueue() {
 async function runOne(item) {
   const claim = await api({ action: "claim", requestId: item.id });
   if (!claim || !claim.ok) {
-    if (claim && claim.error && /claimed|pending/i.test(claim.error)) return; // another instance took it
+    if (claim && claim.reason === "busy") return "busy";
+    if (claim && claim.error && /claimed|pending|running/i.test(claim.error)) return "skip"; // another instance took it
     throw new Error((claim && claim.error) || "claim failed");
   }
+
   const url = `${claim.url}${claim.url.includes("#") ? "" : "#"}crmtopup=${encodeURIComponent(claim.token)}&api=${encodeURIComponent(API)}`;
   const tab = await chrome.tabs.create({ url, active: false });
 
