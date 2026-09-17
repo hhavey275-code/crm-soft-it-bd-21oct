@@ -78,6 +78,20 @@
     } catch {}
   }
 
+  // Auto-pilot jobs stay "pending" on the server until the CRM top-up is
+  // confirmed, so always report the outcome back.
+  async function reportServer(success, error) {
+    if (!session || !session.autopilot) return;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const r = await api("result", { success: !!success, error: error || null });
+        if (r && r.ok) return;
+      } catch {}
+      await sleep(1500 * (i + 1));
+    }
+  }
+
+
   async function api(action, extra) {
     const res = await fetch(session.api, {
       method: "POST",
