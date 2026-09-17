@@ -428,7 +428,7 @@
     await reportServer(false, clean);
     notifyBackground(false, clean);
 
-    say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি approve হয়ে গেছে — টপ-আপ হাতে করে দিন বা Setup আবার চালান।", [
+    say("<b style='color:#fca5a5'>থেমে গেছে</b><br>" + msg + "<br><br>রিকোয়েস্টটি এখনো pending আছে — আবার চেষ্টা করুন, নয়তো CRM-এ হাতে টপ-আপ দিয়ে ড্যাশবোর্ড থেকে Mark completed চাপুন।", [
       { label: "আবার চেষ্টা", onClick: () => runTopUp(true), primary: true },
     ]);
   }
