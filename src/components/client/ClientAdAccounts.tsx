@@ -637,6 +637,19 @@ export function ClientAdAccounts() {
     ? secondaryDueUsed > 0.01 && !exceedsBalance
     : parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
+  // 30s gap between external top-up requests (server-enforced too) so the CRM
+  // helper can finish one top-up before the next request is queued.
+  const [externalCooldownUntil, setExternalCooldownUntil] = useState<number | null>(null);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!externalCooldownUntil) return;
+    const t = setInterval(() => setCooldownNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [externalCooldownUntil]);
+  const externalCooldownLeft = externalCooldownUntil
+    ? Math.max(0, Math.ceil((externalCooldownUntil - cooldownNow) / 1000))
+    : 0;
+
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
       const { data, error } = await (supabase as any).rpc("request_external_topup", {
@@ -1375,9 +1388,13 @@ export function ClientAdAccounts() {
             {isExternalTopUp ? (
               <Button
                 onClick={() => externalRequestMutation.mutate(topUpWallet)}
-                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending}
+                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending || externalCooldownLeft > 0}
               >
-                {externalRequestMutation.isPending ? "Submitting..." : "Send Top-Up Request"}
+                {externalRequestMutation.isPending
+                  ? "Submitting..."
+                  : externalCooldownLeft > 0
+                    ? `Wait ${externalCooldownLeft}s...`
+                    : "Send Top-Up Request"}
               </Button>
             ) : (
               <Button
