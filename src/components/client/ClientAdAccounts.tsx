@@ -661,11 +661,13 @@ export function ClientAdAccounts() {
       if (!data?.ok) {
         if (data?.error === "cooldown_active") {
           const secs = Number(data?.wait_seconds ?? 30);
-          throw new Error(
+          const err: any = new Error(
             data?.scope === "own"
               ? `Please wait ${secs}s — external top-up requests are processed one by one (30s gap).`
               : `Another external top-up is being processed. Please try again in ${secs}s.`,
           );
+          err.waitSeconds = secs;
+          throw err;
         }
         const map: Record<string, string> = {
           insufficient_balance: "Insufficient fund",
@@ -680,6 +682,7 @@ export function ClientAdAccounts() {
     },
     onSuccess: () => {
       toast.success("Top-up request submitted! Our team will process it shortly.");
+      setExternalCooldownUntil(Date.now() + 30_000);
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
@@ -688,7 +691,12 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-external-topup-requests"] });
     },
-    onError: (err: any) => toast.error(err.message || "Failed to submit request"),
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to submit request");
+      if (typeof err?.waitSeconds === "number" && err.waitSeconds > 0) {
+        setExternalCooldownUntil(Date.now() + err.waitSeconds * 1000);
+      }
+    },
   });
 
   const topUpMutation = useMutation({
