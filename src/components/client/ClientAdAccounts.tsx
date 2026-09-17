@@ -646,6 +646,14 @@ export function ClientAdAccounts() {
       });
       if (error) throw new Error(error.message);
       if (!data?.ok) {
+        if (data?.error === "cooldown_active") {
+          const secs = Number(data?.wait_seconds ?? 30);
+          throw new Error(
+            data?.scope === "own"
+              ? `Please wait ${secs}s — external top-up requests are processed one by one (30s gap).`
+              : `Another external top-up is being processed. Please try again in ${secs}s.`,
+          );
+        }
         const map: Record<string, string> = {
           insufficient_balance: "Insufficient fund",
           account_not_assigned: "This ad account is not assigned to you",
