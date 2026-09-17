@@ -5,4 +5,4 @@
 - [x] Audit and harden simultaneous internal API ad-account top-ups from multiple devices
 
 - [x] External top-up 30s per-client cooldown (user asked)
-- [ ] External top-up global spacing: no two clients requests within 30s window
+- [x] External top-up global spacing: no two clients requests within 30s window

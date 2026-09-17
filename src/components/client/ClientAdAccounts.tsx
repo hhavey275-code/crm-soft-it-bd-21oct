@@ -637,6 +637,19 @@ export function ClientAdAccounts() {
     ? secondaryDueUsed > 0.01 && !exceedsBalance
     : parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
+  // 30s gap between external top-up requests (server-enforced too) so the CRM
+  // helper can finish one top-up before the next request is queued.
+  const [externalCooldownUntil, setExternalCooldownUntil] = useState<number | null>(null);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!externalCooldownUntil) return;
+    const t = setInterval(() => setCooldownNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [externalCooldownUntil]);
+  const externalCooldownLeft = externalCooldownUntil
+    ? Math.max(0, Math.ceil((externalCooldownUntil - cooldownNow) / 1000))
+    : 0;
+
   const externalRequestMutation = useMutation({
     mutationFn: async (walletKind: "primary" | "secondary") => {
       const { data, error } = await (supabase as any).rpc("request_external_topup", {
@@ -646,6 +659,16 @@ export function ClientAdAccounts() {
       });
       if (error) throw new Error(error.message);
       if (!data?.ok) {
+        if (data?.error === "cooldown_active") {
+          const secs = Number(data?.wait_seconds ?? 30);
+          const err: any = new Error(
+            data?.scope === "own"
+              ? `Please wait ${secs}s — external top-up requests are processed one by one (30s gap).`
+              : `Another external top-up is being processed. Please try again in ${secs}s.`,
+          );
+          err.waitSeconds = secs;
+          throw err;
+        }
         const map: Record<string, string> = {
           insufficient_balance: "Insufficient fund",
           account_not_assigned: "This ad account is not assigned to you",
@@ -659,6 +682,7 @@ export function ClientAdAccounts() {
     },
     onSuccess: () => {
       toast.success("Top-up request submitted! Our team will process it shortly.");
+      setExternalCooldownUntil(Date.now() + 30_000);
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
@@ -667,7 +691,12 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-external-topup-requests"] });
     },
-    onError: (err: any) => toast.error(err.message || "Failed to submit request"),
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to submit request");
+      if (typeof err?.waitSeconds === "number" && err.waitSeconds > 0) {
+        setExternalCooldownUntil(Date.now() + err.waitSeconds * 1000);
+      }
+    },
   });
 
   const topUpMutation = useMutation({
@@ -1367,9 +1396,13 @@ export function ClientAdAccounts() {
             {isExternalTopUp ? (
               <Button
                 onClick={() => externalRequestMutation.mutate(topUpWallet)}
-                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending}
+                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending || externalCooldownLeft > 0}
               >
-                {externalRequestMutation.isPending ? "Submitting..." : "Send Top-Up Request"}
+                {externalRequestMutation.isPending
+                  ? "Submitting..."
+                  : externalCooldownLeft > 0
+                    ? `Wait ${externalCooldownLeft}s...`
+                    : "Send Top-Up Request"}
               </Button>
             ) : (
               <Button
