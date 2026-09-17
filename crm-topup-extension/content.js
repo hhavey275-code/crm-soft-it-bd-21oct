@@ -580,7 +580,9 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
         return;
       }
+      await reportServer(true);
       notifyBackground(true);
+
       say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
