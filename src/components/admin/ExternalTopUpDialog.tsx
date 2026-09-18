@@ -49,7 +49,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
   const cleanAccountId = account.account_id.replace(/^act_/, "");
 
   const initiateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: "auto" | "manual") => {
       const amt = parseFloat(amount);
       if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
       if (!url) throw new Error("External CRM URL not configured for this account");
