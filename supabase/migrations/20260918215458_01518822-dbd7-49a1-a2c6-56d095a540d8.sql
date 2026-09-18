@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS account_rename_enabled boolean NOT NULL DEFAULT false;

@@ -290,6 +290,8 @@ export function ClientAdAccounts() {
   const secondaryDueLimit = notExpired((profile as any)?.secondary_due_limit_expires_at)
     ? Number((profile as any)?.secondary_due_limit ?? 0)
     : 0;
+  // Renaming an ad account is an admin-granted permission (off by default).
+  const canRename = !!(profile as any)?.account_rename_enabled;
   const META_COOLDOWN_MS = 10 * 60 * 1000;
 
   const { data: accounts = [] } = useQuery({
@@ -778,6 +780,26 @@ export function ClientAdAccounts() {
             </div>
           </div>
         </div>
+        {/* Secondary wallet — shown for clients who have it enabled (mobile + desktop) */}
+        {wallets.secondaryEnabled && (
+          <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
+                <p className="text-2xl font-bold tracking-tight mt-1 text-green-700 dark:text-green-300">
+                  ${Number(wallets.secondaryBalance ?? 0).toLocaleString()}
+                </p>
+                <p className="text-[11px] text-green-700/70 dark:text-green-400/70 mt-0.5">
+                  Rate ৳{wallets.secondaryRate}/USD
+                  {secondaryDueLimit > 0 && ` · Due limit: $${secondaryDueLimit.toLocaleString()}`}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-green-500/15 flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+          </div>
+        )}
         {/* Spend & Orders */}
         <div className="grid gap-3 grid-cols-2">
           <MetricCard
@@ -1061,10 +1083,12 @@ export function ClientAdAccounts() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
-                              <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
+                            {canRename && (
+                              <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                               Request BM Access
                             </DropdownMenuItem>
@@ -1254,10 +1278,12 @@ export function ClientAdAccounts() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
-                                <Pencil className="h-3.5 w-3.5 mr-2" />
-                                Rename
-                              </DropdownMenuItem>
+                              {canRename && (
+                                <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                                 Request BM Access
                               </DropdownMenuItem>

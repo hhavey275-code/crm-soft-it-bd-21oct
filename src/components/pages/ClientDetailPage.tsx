@@ -2089,6 +2089,24 @@ export default function ClientDetailPage() {
                       disabled={saveProfileMutation.isPending}
                     />
                   </div>
+                  {/* Ad Account Rename Permission */}
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Account Rename
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Allow this client to rename their ad accounts
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!(profile as any)?.account_rename_enabled}
+                      onCheckedChange={(checked) =>
+                        saveProfileMutation.mutate({ account_rename_enabled: checked } as any)
+                      }
+                      disabled={saveProfileMutation.isPending}
+                    />
+                  </div>
                   {/* Secondary (sheet-rate) wallet on/off + rate */}
                   {userId && <SecondaryWalletToggle userId={userId} />}
                   {/* Client-side spend cap withdraw permission */}
