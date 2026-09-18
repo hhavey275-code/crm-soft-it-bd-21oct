@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.2)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.3)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -45,10 +45,29 @@ async function api(body) {
   if (!autopilot || !autopilot.token) throw new Error("Auto-pilot token not set");
   const res = await fetch(API, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify(Object.assign({ token: autopilot.token }, body)),
   });
-  return res.json();
+  return readJsonResponse(res, "CRM");
+}
+
+async function readJsonResponse(res, service) {
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const looksLikePage = /^\s*</.test(text);
+    throw new Error(
+      looksLikePage
+        ? `${service} সার্ভার API-এর বদলে ওয়েবপেজ দিয়েছে — অ্যাপ Publish করে Helper আপডেট করুন`
+        : `${service} সার্ভার সঠিক উত্তর দেয়নি (HTTP ${res.status})`
+    );
+  }
+  if (!res.ok && (!data || typeof data !== "object")) {
+    throw new Error(`${service} সার্ভার error (HTTP ${res.status})`);
+  }
+  return data;
 }
 
 // ---------- notifications ----------
@@ -266,10 +285,10 @@ async function waApi(body) {
   if (!autopilot || !autopilot.token) throw new Error("Auto-pilot token not set");
   const res = await fetch(WA_API, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify(Object.assign({ token: autopilot.token }, body)),
   });
-  return res.json();
+  return readJsonResponse(res, "WhatsApp");
 }
 
 function setWaLast(patch) {
