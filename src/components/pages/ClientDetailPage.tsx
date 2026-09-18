@@ -145,6 +145,7 @@ export default function ClientDetailPage() {
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   // External CRM top-up (per ad account, per wallet)
   const [extTopUp, setExtTopUp] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
+  const limitWatches = useLimitWatches();
 
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
