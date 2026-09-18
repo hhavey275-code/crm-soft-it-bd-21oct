@@ -4181,6 +4181,84 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_messages: {
+        Row: {
+          attempts: number
+          body: string
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          kind: string
+          last_error: string | null
+          phone: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: string
+          last_error?: string | null
+          phone: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: string
+          last_error?: string | null
+          phone?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      wa_notify_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          key: string
+          num_value: number | null
+          template: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          key: string
+          num_value?: number | null
+          template?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          key?: string
+          num_value?: number | null
+          template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number
@@ -4499,6 +4577,15 @@ export type Database = {
           p_reason: string
         }
         Returns: Json
+      }
+      wa_enqueue: {
+        Args: {
+          p_dedupe: string
+          p_kind: string
+          p_user_id: string
+          p_vars: Json
+        }
+        Returns: string
       }
     }
     Enums: {
