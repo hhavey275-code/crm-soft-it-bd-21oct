@@ -202,6 +202,7 @@ chrome.alarms.onAlarm.addListener(async (a) => {
   connectSocket();
   // Safety net: if the worker was asleep when a ping fired, catch up here.
   processQueue();
+  processWaQueue();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -209,6 +210,7 @@ chrome.runtime.onStartup.addListener(async () => {
   if (autopilot && autopilot.token) {
     connectSocket();
     processQueue();
+    processWaQueue();
   }
 });
 
