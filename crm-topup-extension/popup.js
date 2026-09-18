@@ -63,10 +63,19 @@ document.getElementById("enableBtn").addEventListener("click", async () => {
   try {
     const res = await fetch(API, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({ action: "list_pending", token }),
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      msgEl.textContent = /^\s*</.test(text)
+        ? "সার্ভার API-এর বদলে ওয়েবপেজ দিয়েছে — অ্যাপ Publish করে নতুন Helper নিন।"
+        : `সার্ভার সঠিক উত্তর দেয়নি (HTTP ${res.status})`;
+      return;
+    }
     if (!res.ok || !data.ok) {
       msgEl.textContent = "Token কাজ করছে না: " + ((data && data.error) || "সার্ভার error");
       return;
