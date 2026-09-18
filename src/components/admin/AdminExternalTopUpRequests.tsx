@@ -537,7 +537,7 @@ export function AdminExternalTopUpRequests() {
             </Button>
             <Button size="sm" variant="outline" onClick={downloadHelper}>
               <Download className="h-3.5 w-3.5 mr-1" />
-              Download helper (v1.2.1)
+              Download helper (v1.3.0)
             </Button>
           </div>
         </CardContent>
