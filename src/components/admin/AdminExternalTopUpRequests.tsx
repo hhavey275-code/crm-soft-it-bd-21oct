@@ -113,10 +113,8 @@ export function AdminExternalTopUpRequests() {
     return a?.external_topup_url || r.external_topup_url || "";
   };
 
-  // Keep token signing and callback verification on the same deployment.
-  // app.softitbd.com is currently hosted separately and does not receive the
-  // Lovable runtime secret used to verify CRM helper jobs.
-  const apiBase = () => "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
+  // Keep token signing and callback verification on this project's deployment.
+  const apiBase = () => "https://crm-korbo-plan.lovable.app/api/public/crm-topup";
 
   const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot", data: Record<string, string>) => {
     const accessToken = session?.access_token;
