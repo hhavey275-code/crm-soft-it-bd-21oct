@@ -32,6 +32,8 @@ import { InactiveBadge } from "@/components/InactiveBadge";
 import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 import { ArrowDownCircle } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
+import { startLimitWatch, useLimitWatches } from "@/hooks/useLimitUpdateWatch";
+import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
 
 
 const PAGE_SIZE = 20;
@@ -53,6 +55,8 @@ export function ClientAdAccounts() {
   const wallets = useWallets(user?.id);
 
   const queryClient = useQueryClient();
+  // Live "Updating your limit..." indicators for external top-up requests.
+  const limitWatches = useLimitWatches();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
@@ -683,8 +687,18 @@ export function ClientAdAccounts() {
     onSuccess: () => {
       toast.success("Top-up request submitted! Our team will process it shortly.");
       setExternalCooldownUntil(Date.now() + 30_000);
+      const watchedId = topUpAccount?.id;
+      const watchedCap = Number(topUpAccount?.spend_cap ?? 0);
       setTopUpAccount(null);
       setTopUpAmount("");
+      // Watch Meta for the new spending limit at 10s / 30s / 60s.
+      if (watchedId) {
+        startLimitWatch(watchedId, watchedCap, () => {
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-insights-cache"] });
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
@@ -957,6 +971,13 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
+                      {limitWatches[a.id] && (
+                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                          <LimitUpdateIndicator state={limitWatches[a.id]} />
+                        </div>
+                      )}
+
+
 
                       {/* Insights row */}
                       {ins && (
@@ -1161,6 +1182,11 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
+                        {limitWatches[a.id] && (
+                          <div className="mt-1.5">
+                            <LimitUpdateIndicator state={limitWatches[a.id]} />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
