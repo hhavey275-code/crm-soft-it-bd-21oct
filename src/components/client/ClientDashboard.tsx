@@ -357,6 +357,38 @@ export function ClientDashboard() {
 
   const fmt = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  // Secondary wallet + combined BDT total — only when enabled for this client.
+  // On mobile it sits directly under the wallet hero; on desktop it stays on top.
+  const secondaryBlock = clientWallets.secondaryEnabled ? (
+    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+      <Card className="border-border/60 bg-card">
+        <CardContent className="p-4">
+          <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
+          <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
+            ${clientWallets.secondaryBalance.toLocaleString()}
+          </p>
+          <p className="text-[11px] text-green-700/70 dark:text-green-400/70 mt-0.5">
+            Rate ৳{clientWallets.secondaryRate}/USD
+          </p>
+        </CardContent>
+      </Card>
+      <Card className="border-border/60 bg-card">
+        <CardContent className="p-4">
+          <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Combined Due / Adv</p>
+          <p className="text-2xl font-bold mt-1 text-purple-700 dark:text-purple-300">
+            {clientWallets.totalBdt < 0 ? "-" : ""}{formatBdt(clientWallets.totalBdt)}
+            <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-purple-700/70 dark:text-purple-400/70">
+              {clientWallets.totalBdt < 0 ? "Due" : "Adv"}
+            </span>
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Main ${clientWallets.mainBalance.toLocaleString()} × ৳{clientWallets.mainRate} + Secondary ${clientWallets.secondaryBalance.toLocaleString()} × ৳{clientWallets.secondaryRate}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-5">
       {/* Header */}
