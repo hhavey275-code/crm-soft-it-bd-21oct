@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.0)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.2)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -227,7 +227,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.command === "start") {
       connectSocket();
       processQueue();
+      processWaQueue();
       sendResponse({ ok: true });
+    } else if (msg.command === "wa-now") {
+      // Diagnostic: report what the server says, then run the queue.
+      try {
+        const list = await waApi({ action: "list_pending" });
+        if (!list || !list.ok) {
+          sendResponse({ ok: false, error: (list && list.error) || "সার্ভার সাড়া দেয়নি" });
+          return;
+        }
+        const n = (list.items || []).length;
+        processWaQueue();
+        sendResponse({ ok: true, pending: n });
+      } catch (e) {
+        sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
+      }
     } else if (msg.command === "stop") {
       if (ws) {
         try {
@@ -277,6 +292,7 @@ async function processWaQueue() {
         return;
       }
       if (!claim || !claim.ok) {
+        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: (claim && claim.error) || "claim failed" });
         // busy (gap not over) / daily limit reached / another PC took it
         if (claim && (claim.reason === "busy" || claim.reason === "limit")) return;
         continue;
