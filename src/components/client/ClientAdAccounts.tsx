@@ -32,6 +32,8 @@ import { InactiveBadge } from "@/components/InactiveBadge";
 import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 import { ArrowDownCircle } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
+import { startLimitWatch, useLimitWatches } from "@/hooks/useLimitUpdateWatch";
+import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
 
 
 const PAGE_SIZE = 20;
