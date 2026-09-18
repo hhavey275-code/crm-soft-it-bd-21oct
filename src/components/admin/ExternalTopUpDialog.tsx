@@ -255,21 +255,29 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             <p className="font-semibold text-amber-700 dark:text-amber-300">What happens next:</p>
             <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
               <li>Client's <strong>{walletLabel.toLowerCase()}</strong> will be <strong>deducted immediately</strong>.</li>
-              <li>Partner CRM opens in a new tab with Account ID + amount copied.</li>
-              <li>Login & complete the top-up there manually.</li>
+              <li>The CRM Helper (Auto-pilot) completes the top-up in the partner CRM automatically.</li>
+              <li>A live "Updating your limit…" indicator shows beside the account until the new limit arrives.</li>
             </ol>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={() => initiateMutation.mutate()}
+            variant="outline"
+            onClick={() => initiateMutation.mutate("manual")}
             disabled={!amount || !url || initiateMutation.isPending}
           >
             <ExternalLink className="h-4 w-4 mr-1" />
-            {initiateMutation.isPending ? "Processing..." : "Deduct & Open CRM"}
+            Deduct & Open CRM
+          </Button>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => initiateMutation.mutate("auto")}
+            disabled={!amount || !url || initiateMutation.isPending}
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            {initiateMutation.isPending ? "Processing..." : "Deduct & Auto Top-Up"}
           </Button>
         </DialogFooter>
       </DialogContent>
