@@ -7,6 +7,14 @@ const offBox = document.getElementById("autopilotOff");
 const tokenInput = document.getElementById("tokenInput");
 const msgEl = document.getElementById("msg");
 
+function cleanToken(value) {
+  const normalized = String(value || "")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .trim();
+  const match = normalized.match(/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  return match ? match[0] : normalized;
+}
+
 function render(state) {
   const ap = state.autopilot;
   if (ap && ap.token) {
@@ -47,7 +55,7 @@ function load() {
 
 document.getElementById("enableBtn").addEventListener("click", async () => {
   msgEl.textContent = "";
-  const token = tokenInput.value.trim();
+  const token = cleanToken(tokenInput.value);
   if (!token) {
     msgEl.textContent = "Token বসানো হয়নি।";
     return;
