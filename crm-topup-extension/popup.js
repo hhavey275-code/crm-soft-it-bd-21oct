@@ -1,4 +1,4 @@
-const API = "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
+const API = "https://crm-korbo-plan.lovable.app/api/public/crm-topup";
 
 const statusEl = document.getElementById("autopilotStatus");
 const lastEl = document.getElementById("autopilotLast");
@@ -28,10 +28,21 @@ function render(state) {
   } else {
     lastEl.textContent = "";
   }
+  const waEl = document.getElementById("waLast");
+  const wa = state.waLast;
+  if (waEl) {
+    if (wa && wa.at) {
+      const w = new Date(wa.at).toLocaleString();
+      waEl.textContent =
+        (wa.ok ? "WhatsApp: ✓ " : "WhatsApp: ✕ ") + `${wa.phone} (${w})` + (wa.error ? " — " + wa.error : "");
+    } else {
+      waEl.textContent = "";
+    }
+  }
 }
 
 function load() {
-  chrome.storage.local.get(["autopilot", "autopilotLast"], render);
+  chrome.storage.local.get(["autopilot", "autopilotLast", "waLast"], render);
 }
 
 document.getElementById("enableBtn").addEventListener("click", async () => {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CRM Top-Up Helper",
-  "version": "1.2.1",
-  "description": "Semi-automatic external CRM ad account top-up: fills the account search, top-up form and amount from a CRM top-up request. Auto-pilot mode processes new requests as soon as they arrive.",
+  "version": "1.3.0",
+  "description": "Semi-automatic external CRM ad account top-up plus WhatsApp client notifications. Auto-pilot processes new top-up requests and queued WhatsApp messages as soon as they arrive.",
   "permissions": ["storage", "activeTab", "notifications", "alarms", "tabs"],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -20,6 +20,12 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["wa-content.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
