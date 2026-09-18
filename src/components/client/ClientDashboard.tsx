@@ -489,6 +489,8 @@ export function ClientDashboard() {
               <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center"><Wallet className="h-6 w-6" /></div>
             </div>
           </div>
+          {/* Mobile: secondary wallet then combined due, right under the wallet balance */}
+          {secondaryBlock}
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
