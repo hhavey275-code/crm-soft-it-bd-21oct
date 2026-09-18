@@ -65,7 +65,6 @@ import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-link
 import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
-import { Route as ApiPublicWhatsappNotifyRouteImport } from './routes/api.public.whatsapp-notify'
 import { Route as ApiPublicWaJobsRouteImport } from './routes/api/public/wa-jobs'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
@@ -350,11 +349,6 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
-const ApiPublicWhatsappNotifyRoute = ApiPublicWhatsappNotifyRouteImport.update({
-  id: '/api/public/whatsapp-notify',
-  path: '/api/public/whatsapp-notify',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicWaJobsRoute = ApiPublicWaJobsRouteImport.update({
   id: '/api/public/wa-jobs',
   path: '/api/public/wa-jobs',
@@ -431,7 +425,6 @@ export interface FileRoutesByFullPath {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
-  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -492,7 +485,6 @@ export interface FileRoutesByTo {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
-  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -555,7 +547,6 @@ export interface FileRoutesById {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
-  '/api/public/whatsapp-notify': typeof ApiPublicWhatsappNotifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -619,7 +610,6 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
     | '/api/public/wa-jobs'
-    | '/api/public/whatsapp-notify'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -680,7 +670,6 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
     | '/api/public/wa-jobs'
-    | '/api/public/whatsapp-notify'
   id:
     | '__root__'
     | '/'
@@ -742,7 +731,6 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
     | '/api/public/wa-jobs'
-    | '/api/public/whatsapp-notify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -801,7 +789,6 @@ export interface RootRouteChildren {
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
   ApiPublicWaJobsRoute: typeof ApiPublicWaJobsRoute
-  ApiPublicWhatsappNotifyRoute: typeof ApiPublicWhatsappNotifyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1198,13 +1185,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
-    '/api/public/whatsapp-notify': {
-      id: '/api/public/whatsapp-notify'
-      path: '/api/public/whatsapp-notify'
-      fullPath: '/api/public/whatsapp-notify'
-      preLoaderRoute: typeof ApiPublicWhatsappNotifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/wa-jobs': {
       id: '/api/public/wa-jobs'
       path: '/api/public/wa-jobs'
@@ -1322,7 +1302,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
   ApiPublicWaJobsRoute: ApiPublicWaJobsRoute,
-  ApiPublicWhatsappNotifyRoute: ApiPublicWhatsappNotifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
