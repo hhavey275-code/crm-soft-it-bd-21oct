@@ -13,13 +13,17 @@ const SUPABASE_WS =
   "&vsn=1.0.0";
 const SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s";
-const API = "https://korbo-plan-spark.lovable.app/api/public/crm-topup";
+const BASE = "https://crm-korbo-plan.lovable.app";
+const API = BASE + "/api/public/crm-topup";
+const WA_API = BASE + "/api/public/wa-jobs";
 
 let ws = null;
 let wsRef = 0;
 let heartbeatTimer = null;
 let running = false;
+let waRunning = false;
 const tabWaiters = new Map(); // requestId -> {resolve, tabId}
+const waWaiters = new Map(); // tabId -> {resolve}
 
 // ---------- storage ----------
 function getState() {
