@@ -290,6 +290,8 @@ export function ClientAdAccounts() {
   const secondaryDueLimit = notExpired((profile as any)?.secondary_due_limit_expires_at)
     ? Number((profile as any)?.secondary_due_limit ?? 0)
     : 0;
+  // Renaming an ad account is an admin-granted permission (off by default).
+  const canRename = !!(profile as any)?.account_rename_enabled;
   const META_COOLDOWN_MS = 10 * 60 * 1000;
 
   const { data: accounts = [] } = useQuery({
