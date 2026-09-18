@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WhatsappNotificationsRouteImport } from './routes/whatsapp-notifications'
 import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as TransactionsRouteImport } from './routes/transactions'
@@ -69,6 +70,11 @@ import { Route as ApiPublicWaJobsRouteImport } from './routes/api/public/wa-jobs
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
+const WhatsappNotificationsRoute = WhatsappNotificationsRouteImport.update({
+  id: '/whatsapp-notifications',
+  path: '/whatsapp-notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
   id: '/wallet-balances',
   path: '/wallet-balances',
@@ -409,6 +415,7 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
+  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -469,6 +476,7 @@ export interface FileRoutesByTo {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
+  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -531,6 +539,7 @@ export interface FileRoutesById {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
+  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -594,6 +603,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
+    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -654,6 +664,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
+    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -715,6 +726,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
+    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -777,6 +789,7 @@ export interface RootRouteChildren {
   TransactionsRoute: typeof TransactionsRoute
   WalletRoute: typeof WalletRoute
   WalletBalancesRoute: typeof WalletBalancesRoute
+  WhatsappNotificationsRoute: typeof WhatsappNotificationsRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
@@ -793,6 +806,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/whatsapp-notifications': {
+      id: '/whatsapp-notifications'
+      path: '/whatsapp-notifications'
+      fullPath: '/whatsapp-notifications'
+      preLoaderRoute: typeof WhatsappNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/wallet-balances': {
       id: '/wallet-balances'
       path: '/wallet-balances'
@@ -1290,6 +1310,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsRoute: TransactionsRoute,
   WalletRoute: WalletRoute,
   WalletBalancesRoute: WalletBalancesRoute,
+  WhatsappNotificationsRoute: WhatsappNotificationsRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
