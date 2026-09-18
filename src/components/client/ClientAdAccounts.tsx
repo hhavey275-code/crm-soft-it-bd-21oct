@@ -1256,10 +1256,12 @@ export function ClientAdAccounts() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
-                                <Pencil className="h-3.5 w-3.5 mr-2" />
-                                Rename
-                              </DropdownMenuItem>
+                              {canRename && (
+                                <DropdownMenuItem data-tutorial={idx === 0 ? "ad-account-rename" : undefined} onClick={() => { setRenameAccount(a); setRenameName(a.account_name); }}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                                 Request BM Access
                               </DropdownMenuItem>
