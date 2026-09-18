@@ -55,6 +55,8 @@ export function ClientAdAccounts() {
   const wallets = useWallets(user?.id);
 
   const queryClient = useQueryClient();
+  // Live "Updating your limit..." indicators for external top-up requests.
+  const limitWatches = useLimitWatches();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
