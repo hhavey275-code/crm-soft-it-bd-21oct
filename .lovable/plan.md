@@ -1,73 +1,64 @@
-# Auto-pilot: external top-up requests approved and topped up without a click
+# WhatsApp স্বয়ংক্রিয় নোটিফিকেশন পরিকল্পনা
 
-## The one hard limit
+## লক্ষ্য
+এক্সটেনশন ছাড়া অফিসিয়াল WhatsApp Business সংযোগ দিয়ে ক্লায়েন্টের সংরক্ষিত WhatsApp নম্বরে স্বয়ংক্রিয় বার্তা পাঠানো।
 
-Admiki (and the other CRMs) have no API. The top-up only works inside a browser
-that is already logged in to that CRM. So the top-up can never run on our
-server — it always needs one logged-in Chrome window somewhere.
+## বর্তমান সমস্যার নিশ্চিত কারণ
+- Wallet top-up অনুমোদনের বার্তা পাঠানোর পুরোনো ব্যবস্থা আছে, কিন্তু সেটি এই রিমিক্সড প্রজেক্টের বদলে আগের প্রজেক্টের ঠিকানায় পাঠাচ্ছে।
+- বর্তমান ডাটাবেসে WhatsApp পাঠানোর সক্রিয় সংযোগ নেই, তাই অনুমোদনের পর কোনো বার্তা যাচ্ছে না।
+- বার্তা পাঠানোর ফল, পৌঁছেছে কি না, বা ব্যর্থতার কারণ স্থায়ীভাবে সংরক্ষণ করার ব্যবস্থাও নেই।
 
-What we can remove is the human click. Plan: turn the helper into an
-**auto-pilot** that watches for new requests by itself and runs the whole
-"Approve & Top-Up" flow automatically, as long as one Chrome window with the
-helper is open and logged in to the CRM. Best used on one PC that stays on
-(office desktop or a cheap always-on machine). If no such window is open,
-requests simply wait, exactly like today, and any admin can still press
-Approve & Top-Up manually.
+## কী তৈরি হবে
 
-## What the admin sees
+### ১. অফিসিয়াল WhatsApp সংযোগ
+- বর্তমান সরাসরি Meta API ব্যবস্থার বদলে Lovable-এর WhatsApp Business সংযোগ ব্যবহার করা হবে।
+- এক্সটেনশন বা সবসময় খোলা কম্পিউটার লাগবে না।
+- Meta অনুমোদিত তিনটি বার্তার নমুনা থাকবে:
+  1. Wallet top-up অনুমোদন: যোগ হওয়া ডলার এবং নতুন wallet balance।
+  2. কম balance: account-এর অবশিষ্ট ডলার $20 এবং পরে $5-এর নিচে নামলে সতর্কতা।
+  3. নিষ্ক্রিয় account: ৭ দিন ব্যবহার না হলে মনে করিয়ে দেওয়া।
 
-- A new **Auto-pilot** card on the External Top-Up page with an on/off switch,
-  the CRM it is watching, and a live status line ("watching — last checked 12s
-  ago" / "topping up $50 for AU784…" / "off").
-- Turning it on once on that PC is enough; it keeps running after page close
-  and after Chrome restarts (until switched off).
-- Every automatic top-up is written to the request history and the system log
-  with "auto-pilot" as the actor, so it is auditable.
-- If a CRM top-up fails, auto-pilot stops touching that request, marks it for
-  manual handling and shows a Chrome notification, so nothing silently hangs.
+### ২. নির্ভরযোগ্য পাঠানো ও ফলাফল
+- প্রতিটি পাঠানোর চেষ্টা, প্রাপকের নম্বর, বার্তার ধরন এবং WhatsApp message ID সংরক্ষণ হবে।
+- `accepted`, `sent`, `delivered`, `read`, `failed` অবস্থা রাখা হবে।
+- WhatsApp থেকে আসা delivery update নিরাপদভাবে গ্রহণ ও সংরক্ষণ হবে।
+- একই ঘটনা থেকে একই বার্তা দুইবার পাঠানো আটকানো হবে; সাময়িক ব্যর্থতা হলে সীমিত পুনঃচেষ্টা থাকবে।
 
-## How it works
+### ৩. Wallet top-up অনুমোদনের বার্তা
+- Main অথবা Secondary wallet-এ টাকা অনুমোদন হয়ে ledger-এ সফলভাবে যোগ হওয়ার পরেই বার্তা যাবে।
+- বার্তায় ক্লায়েন্টের নাম, যোগ হওয়া ডলার, wallet-এর ধরন এবং অনুমোদনের পর balance থাকবে।
+- Phone না থাকলে বা ভুল হলে Admin তালিকায় পরিষ্কার কারণ দেখা যাবে; approval আটকাবে না।
 
-1. **Enable once:** dashboard mints a long-lived (30 day) auto-pilot token for
-   the chosen CRM host and hands it plus the CRM URL to the extension, which
-   stores it in `chrome.storage.local`.
-2. **Watch:** the extension service worker polls our endpoint every ~20 seconds
-   (`chrome.alarms`). One job at a time, never in parallel.
-3. **Claim:** the endpoint picks the oldest pending request for that CRM host,
-   marks it approved/completed with `complete_external_topup` (same as the
-   manual button does now), stamps `automation_started_at`, and returns a
-   short-lived top-up token — so the same request can never be claimed twice.
-4. **Run:** the worker opens the CRM in a background tab with
-   `#crmtopup=<token>`; the existing `content.js` automation does search →
-   "+" → amount → Increase Spend Cap → Yes, increase it!, then the tab closes.
-5. **Repeat** with the next pending request.
+### ৪. কম Ad Account balance সতর্কতা
+- সর্বশেষ sync-এর `spend cap − amount spent` ব্যবহার করে অবশিষ্ট balance নির্ধারণ করা হবে।
+- $20-এর নিচে প্রথমবার নামলে একটি বার্তা, পরে $5-এর নিচে নামলে জরুরি বার্তা যাবে।
+- Account-এ top-up হয়ে balance আবার $20-এর ওপরে উঠলে পরেরবারের জন্য দুইটি সতর্কতা পুনরায় চালু হবে।
+- একই সীমার জন্য বারবার বার্তা যাবে না।
 
-## Technical changes
+### ৫. ৭ দিনের নিষ্ক্রিয় Account বার্তা
+- সর্বশেষ খরচের তারিখ থেকে টানা ৭ দিন ব্যবহার না হলে একবার বার্তা যাবে।
+- খরচ আবার শুরু হলে নিষ্ক্রিয় অবস্থা স্বয়ংক্রিয়ভাবে শেষ হবে। পরবর্তীতে আবার ৭ দিন নিষ্ক্রিয় হলে নতুন বার্তা যেতে পারবে।
+- দিনে একবার সব account পরীক্ষা হবে, তাই অপ্রয়োজনীয় ঘন ঘন পরীক্ষা হবে না।
 
-- `src/routes/api/public/crm-topup.ts`
-  - `create_autopilot`: admin-authenticated, verifies admin/superadmin, returns
-    a signed token with `scope: "autopilot"`, `host`, `actorId`, 30-day expiry.
-  - `poll`: accepts an autopilot token, selects the oldest `pending`
-    `external_topup_requests` row whose resolved external CRM URL matches the
-    token host, resolves the ad account ID, calls `complete_external_topup`,
-    then mints and returns a `scope: "topup"` token + accountId + amount +
-    the CRM URL to open. Returns `{ ok: true, job: null }` when nothing pending.
-    Claim guarded by the existing status check so double-claim is impossible.
-- `src/lib/crmToken.server.ts` — allow the `autopilot` scope in the payload type.
-- `crm-topup-extension/manifest.json` — add `alarms` + `tabs` permissions,
-  version bump to **v1.2.0**.
-- `crm-topup-extension/background.js` — real service worker: alarm-driven poll
-  loop, single-flight lock, tab open/close per job, failure notification, plus
-  message handlers for enable/disable/status.
-- `crm-topup-extension/content.js` — accept `#crmauto=<token>&api=<base>&crm=<url>`
-  to hand the auto-pilot token to the worker; after a job finishes in an
-  auto-pilot tab, tell the worker so it can close the tab and continue.
-- `crm-topup-extension/popup.html` / `popup.js` — show auto-pilot status and a
-  stop switch.
-- `src/components/admin/AdminExternalTopUpRequests.tsx` — Auto-pilot card
-  (enable/disable, CRM selector defaulting to the taught host, status text),
-  download button label updated to **v1.2.0**.
-- Repackage `public/crm-topup-extension.zip`.
+### ৬. Admin নিয়ন্ত্রণ
+- Settings-এ আলাদা টগল থাকবে: Wallet approval, $20 alert, $5 alert, ৭ দিনের inactivity।
+- অনুমোদিত WhatsApp template-এর নাম/ভাষা এবং বার্তার নমুনা Admin দেখতে ও নির্বাচন করতে পারবে। Meta অনুমোদনের বাইরে সরাসরি লেখা বদলে পাঠানো হবে না।
+- Notification History-তে Client, Account, Type, Time, Delivery Status এবং Error দেখা যাবে; failed বার্তা পুনরায় পাঠানোর ব্যবস্থা থাকবে।
 
-Manual Approve & Top-Up, Teach, Mark completed and reject/refund all stay
-exactly as they are.
+## প্রযুক্তিগত বিবরণ
+- নতুন সুরক্ষিত outbound message table, webhook inbox এবং per-account alert state যোগ হবে; শুধু Admin/Superadmin history দেখতে ও retry করতে পারবে।
+- Wallet ledger entry event-এর পর নতুন server endpoint-এ তাৎক্ষণিক পাঠানো হবে।
+- Account sync শেষ হলে low-balance rule চালবে; ৭ দিনের inactivity check প্রতিদিন একবার চলবে।
+- WhatsApp callback endpoint signature যাচাই করে delivery status সংরক্ষণ করবে।
+- পুরোনো hard-coded project URL ও secret-ভিত্তিক sender সরিয়ে বর্তমান project-এর official connector ব্যবহার হবে।
+
+## যাচাই
+- একটি test client-এর WhatsApp নম্বরে অনুমোদিত template পাঠিয়ে Meta acceptance এবং delivery callback যাচাই।
+- Wallet top-up approval-এ সঠিক নতুন balance আসে কি না পরীক্ষা।
+- $20, $5, balance reset এবং duplicate suppression পরীক্ষা।
+- ৭ দিনের inactivity, resumed spending এবং পরের inactivity cycle পরীক্ষা।
+- Admin টগল বন্ধ থাকলে কোনো বার্তা না যাওয়া এবং History-তে ব্যর্থতার কারণ দেখা পরীক্ষা।
+
+## প্রয়োজনীয় বাহ্যিক ধাপ
+- WhatsApp Business নম্বরটি প্রজেক্টে সংযুক্ত করতে হবে।
+- তিনটি template Meta-তে জমা দিয়ে অনুমোদন নিতে হবে; অনুমোদনে সাধারণত কিছু সময় লাগতে পারে। অনুমোদনের আগে production client-দের প্রথম বার্তা পাঠানো যাবে না।
