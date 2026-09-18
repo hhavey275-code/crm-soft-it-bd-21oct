@@ -218,7 +218,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.2.1.zip";
+        a.download = "crm-topup-helper-v1.3.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
