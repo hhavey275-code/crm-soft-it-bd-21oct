@@ -971,6 +971,13 @@ export function ClientAdAccounts() {
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
+                      {limitWatches[a.id] && (
+                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                          <LimitUpdateIndicator state={limitWatches[a.id]} />
+                        </div>
+                      )}
+
+
 
                       {/* Insights row */}
                       {ins && (
