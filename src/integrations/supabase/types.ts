@@ -2256,6 +2256,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_rename_enabled: boolean
           agency_id: string | null
           business_address: string | null
           campaign_management_enabled: boolean
@@ -2294,6 +2295,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_rename_enabled?: boolean
           agency_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
@@ -2332,6 +2334,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_rename_enabled?: boolean
           agency_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
