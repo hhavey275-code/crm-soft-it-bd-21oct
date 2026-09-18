@@ -86,3 +86,26 @@ document.getElementById("disableBtn").addEventListener("click", () => {
 });
 
 load();
+
+const waNowBtn = document.getElementById("waNowBtn");
+const waMsgEl = document.getElementById("waMsg");
+if (waNowBtn) {
+  waNowBtn.addEventListener("click", () => {
+    waMsgEl.textContent = "চেক হচ্ছে…";
+    chrome.runtime.sendMessage({ type: "crm-autopilot-control", command: "wa-now" }, (res) => {
+      if (chrome.runtime.lastError) {
+        waMsgEl.textContent = "এক্সটেনশন সাড়া দেয়নি — reload করুন।";
+        return;
+      }
+      if (!res || !res.ok) {
+        waMsgEl.textContent = "সমস্যা: " + ((res && res.error) || "অজানা");
+        return;
+      }
+      waMsgEl.textContent =
+        res.pending > 0
+          ? res.pending + "টি বার্তা পাওয়া গেছে — পাঠানো শুরু হয়েছে।"
+          : "সারিতে কোনো বার্তা নেই।";
+      setTimeout(load, 4000);
+    });
+  });
+}
