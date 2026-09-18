@@ -242,3 +242,98 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   })();
   return true;
 });
+
+// ============================================================
+//  WhatsApp notifications — send queued messages via WhatsApp Web
+// ============================================================
+async function waApi(body) {
+  const { autopilot } = await getState();
+  if (!autopilot || !autopilot.token) throw new Error("Auto-pilot token not set");
+  const res = await fetch(WA_API, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(Object.assign({ token: autopilot.token }, body)),
+  });
+  return res.json();
+}
+
+function setWaLast(patch) {
+  chrome.storage.local.get(["waLast"], (r) => {
+    chrome.storage.local.set({ waLast: Object.assign({}, r.waLast || {}, patch) });
+  });
+}
+
+async function processWaQueue() {
+  if (waRunning) return;
+  waRunning = true;
+  try {
+    const list = await waApi({ action: "list_pending" });
+    if (!list || !list.ok) return;
+    for (const item of list.items || []) {
+      let claim;
+      try {
+        claim = await waApi({ action: "claim", id: item.id });
+      } catch {
+        return;
+      }
+      if (!claim || !claim.ok) {
+        // busy (gap not over) / daily limit reached / another PC took it
+        if (claim && (claim.reason === "busy" || claim.reason === "limit")) return;
+        continue;
+      }
+      let ok = false;
+      let err = null;
+      try {
+        await sendWhatsApp(claim.phone, claim.body);
+        ok = true;
+      } catch (e) {
+        err = e && e.message ? e.message : String(e);
+      }
+      try {
+        await waApi({ action: "result", id: claim.id, success: ok, error: err });
+      } catch {}
+      setWaLast({ at: Date.now(), ok, phone: claim.phone, error: err });
+      if (!ok) notify("WhatsApp বার্তা ব্যর্থ", `${claim.phone}: ${err}`);
+      // Server also enforces the gap; pause here so the next claim succeeds.
+      await sleep(45000);
+    }
+  } catch {
+    // network hiccup — next wake-up retries
+  } finally {
+    waRunning = false;
+  }
+}
+
+async function sendWhatsApp(phone, text) {
+  const url =
+    "https://web.whatsapp.com/send?phone=" +
+    encodeURIComponent(phone) +
+    "&text=" +
+    encodeURIComponent(text) +
+    "&type=phone_number&app_absent=0";
+  const tab = await chrome.tabs.create({ url, active: false });
+  const result = await new Promise((resolve) => {
+    waWaiters.set(tab.id, { resolve });
+    setTimeout(() => {
+      if (waWaiters.has(tab.id)) {
+        waWaiters.delete(tab.id);
+        resolve({ success: false, error: "সময় শেষ — WhatsApp Web সাড়া দেয়নি" });
+      }
+    }, 120000);
+  });
+  try {
+    await chrome.tabs.remove(tab.id);
+  } catch {}
+  if (!result.success) throw new Error(result.error || "send failed");
+}
+
+// The WhatsApp content script reports the outcome of its tab.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (!msg || msg.type !== "wa-send-done") return;
+  const tabId = sender && sender.tab ? sender.tab.id : null;
+  const waiter = tabId != null ? waWaiters.get(tabId) : null;
+  if (waiter) {
+    waWaiters.delete(tabId);
+    waiter.resolve({ success: !!msg.success, error: msg.error || null });
+  }
+});
