@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.3)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.4)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -249,16 +249,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       processWaQueue();
       sendResponse({ ok: true });
     } else if (msg.command === "wa-now") {
-      // Diagnostic: report what the server says, then run the queue.
+      // Run one complete queue pass and report the actual outcome.
       try {
-        const list = await waApi({ action: "list_pending" });
-        if (!list || !list.ok) {
-          sendResponse({ ok: false, error: (list && list.error) || "সার্ভার সাড়া দেয়নি" });
-          return;
-        }
-        const n = (list.items || []).length;
-        processWaQueue();
-        sendResponse({ ok: true, pending: n });
+        const result = await processWaQueue();
+        sendResponse(result || { ok: false, error: "WhatsApp কাজটি চালু করা যায়নি" });
       } catch (e) {
         sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
       }
@@ -298,22 +292,32 @@ function setWaLast(patch) {
 }
 
 async function processWaQueue() {
-  if (waRunning) return;
+  if (waRunning) return { ok: false, error: "WhatsApp কাজটি ইতিমধ্যে চলছে — একটু পরে আবার দেখুন" };
   waRunning = true;
   try {
     const list = await waApi({ action: "list_pending" });
-    if (!list || !list.ok) return;
+    if (!list || !list.ok) {
+      return { ok: false, error: (list && list.error) || "WhatsApp সারি পাওয়া যায়নি" };
+    }
+    const items = list.items || [];
+    if (items.length === 0) return { ok: true, pending: 0, sent: 0 };
+    let sent = 0;
     for (const item of list.items || []) {
       let claim;
       try {
         claim = await waApi({ action: "claim", id: item.id });
-      } catch {
-        return;
+      } catch (e) {
+        const message = e && e.message ? e.message : String(e);
+        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: message });
+        return { ok: false, pending: items.length, sent, error: message };
       }
       if (!claim || !claim.ok) {
-        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: (claim && claim.error) || "claim failed" });
+        const message = (claim && claim.error) || "বার্তাটি নেওয়া যায়নি";
+        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: message });
         // busy (gap not over) / daily limit reached / another PC took it
-        if (claim && (claim.reason === "busy" || claim.reason === "limit")) return;
+        if (claim && (claim.reason === "busy" || claim.reason === "limit")) {
+          return { ok: false, pending: items.length, sent, error: message };
+        }
         continue;
       }
       let ok = false;
@@ -329,11 +333,16 @@ async function processWaQueue() {
       } catch {}
       setWaLast({ at: Date.now(), ok, phone: claim.phone, error: err });
       if (!ok) notify("WhatsApp বার্তা ব্যর্থ", `${claim.phone}: ${err}`);
+      if (!ok) return { ok: false, pending: items.length, sent, error: err || "বার্তা পাঠানো যায়নি" };
+      sent += 1;
       // Server also enforces the gap; pause here so the next claim succeeds.
-      await sleep(45000);
+      if (sent < items.length) await sleep(45000);
     }
-  } catch {
-    // network hiccup — next wake-up retries
+    return { ok: true, pending: items.length, sent };
+  } catch (e) {
+    const message = e && e.message ? e.message : String(e);
+    setWaLast({ at: Date.now(), ok: false, phone: "", error: message });
+    return { ok: false, error: message };
   } finally {
     waRunning = false;
   }

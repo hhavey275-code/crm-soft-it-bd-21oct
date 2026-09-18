@@ -110,10 +110,9 @@ if (waNowBtn) {
         waMsgEl.textContent = "সমস্যা: " + ((res && res.error) || "অজানা");
         return;
       }
-      waMsgEl.textContent =
-        res.pending > 0
-          ? res.pending + "টি বার্তা পাওয়া গেছে — পাঠানো শুরু হয়েছে।"
-          : "সারিতে কোনো বার্তা নেই।";
+      waMsgEl.textContent = res.sent > 0
+        ? res.sent + "টি WhatsApp বার্তা পাঠানো হয়েছে।"
+        : "সারিতে কোনো বার্তা নেই।";
       setTimeout(load, 4000);
     });
   });
