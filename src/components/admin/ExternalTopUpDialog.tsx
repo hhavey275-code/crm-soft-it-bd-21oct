@@ -70,17 +70,19 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
       }
       let newBalance: number | null = null;
 
-      // Create the request as already completed (admin will perform the action manually in the partner CRM)
+      // Auto mode: leave the request pending so the CRM Helper (Auto-pilot)
+      // picks it up and completes the top-up in the partner CRM by itself.
+      // Manual mode: mark it done right away and open the CRM for the admin.
+      const nowIso = new Date().toISOString();
       const { data, error } = await (supabase as any)
         .from("external_topup_requests")
         .insert({
           ad_account_id: account.id,
           user_id: targetUserId,
           amount: amt,
-          status: "completed",
+          status: mode === "auto" ? "pending" : "completed",
           initiated_by: user!.id,
-          completed_by: user!.id,
-          completed_at: new Date().toISOString(),
+          ...(mode === "auto" ? {} : { completed_by: user!.id, completed_at: nowIso }),
           wallet_deducted: !!targetUserId,
           notes: notes || null,
           external_crm_name: crmName,
