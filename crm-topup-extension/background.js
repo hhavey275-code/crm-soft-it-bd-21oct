@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.5)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.6)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -15,6 +15,7 @@ const SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s";
 const BASE = "https://crm-korbo-plan.lovable.app";
 const API = BASE + "/api/public/crm-topup";
+const WA_API = BASE + "/api/public/wa-jobs";
 
 let ws = null;
 let wsRef = 0;
@@ -276,13 +277,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 async function waApi(body) {
   const { autopilot } = await getState();
   if (!autopilot || !autopilot.token) throw new Error("Auto-pilot token not set");
-  const waBody = Object.assign({}, body, { action: `wa_${body.action}` });
-  const res = await fetch(API, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(Object.assign({ token: autopilot.token }, waBody)),
-  });
-  return readJsonResponse(res, "WhatsApp");
+  const request = async (url, action) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(Object.assign({ token: autopilot.token, action }, body)),
+    });
+    return readJsonResponse(res, "WhatsApp");
+  };
+
+  // Prefer the dedicated queue route. Fall back to the shared CRM route so
+  // either deployment generation works without another extension update.
+  try {
+    const direct = await request(WA_API, body.action);
+    if (!direct || !/unknown action/i.test(direct.error || "")) return direct;
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    if (!/webpage|ওয়েবপেজ|সঠিক উত্তর|unknown action/i.test(message)) throw error;
+  }
+  return request(API, `wa_${body.action}`);
 }
 
 function setWaLast(patch) {
