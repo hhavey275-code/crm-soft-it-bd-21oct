@@ -1182,6 +1182,11 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
+                        {limitWatches[a.id] && (
+                          <div className="mt-1.5">
+                            <LimitUpdateIndicator state={limitWatches[a.id]} />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
