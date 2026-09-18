@@ -784,6 +784,7 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
+                <LimitUpdateIndicator state={limitWatches[acc.id]} />
                 <div
                   className={cn(
                     "mt-2 grid gap-2",
