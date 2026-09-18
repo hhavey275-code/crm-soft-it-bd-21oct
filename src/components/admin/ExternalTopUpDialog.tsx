@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
+import { ExternalLink, Copy, Check, AlertCircle, Zap } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
+import { startLimitWatch } from "@/hooks/useLimitUpdateWatch";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ interface Props {
     external_topup_url?: string | null;
     external_topup_url_secondary?: string | null;
     external_crm_name?: string | null;
+    spend_cap?: number | string | null;
     user_id?: string | null;
   };
   /** Which client wallet to deduct from. Defaults to the main wallet. */
