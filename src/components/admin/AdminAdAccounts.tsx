@@ -31,6 +31,8 @@ import { logSystemAction } from "@/lib/systemLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
+import { useLimitWatches } from "@/hooks/useLimitUpdateWatch";
+import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { AdminUnusedAccountsView } from "@/components/AdminUnusedAccountsView";
 import { useBillingVisits, formatVisitAge, type BillingVisit } from "@/lib/billingVisitTracker";
@@ -99,6 +101,7 @@ export function AdminAdAccounts() {
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [externalTopUpAccount, setExternalTopUpAccount] = useState<any>(null);
+  const limitWatches = useLimitWatches();
   const [sortField, setSortField] = useState<string>(() => sessionStorage.getItem("adAccountsSortField") || "account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1060,6 +1063,7 @@ export function AdminAdAccounts() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground min-w-0">
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                      <LimitUpdateIndicator state={limitWatches[a.id]} />
                     </div>
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {a.external_topup_required ? (
@@ -1334,6 +1338,7 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
+                        <LimitUpdateIndicator state={limitWatches[a.id]} />
                         {a.external_topup_required ? (
                           <Button
                             size="icon"

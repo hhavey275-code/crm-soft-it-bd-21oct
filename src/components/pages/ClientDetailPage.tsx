@@ -8,6 +8,8 @@ import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
 import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
+import { useLimitWatches } from "@/hooks/useLimitUpdateWatch";
+import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
 
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -143,6 +145,7 @@ export default function ClientDetailPage() {
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   // External CRM top-up (per ad account, per wallet)
   const [extTopUp, setExtTopUp] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
+  const limitWatches = useLimitWatches();
 
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -781,6 +784,7 @@ export default function ClientDetailPage() {
                     </span>
                   </span>
                 </div>
+                <LimitUpdateIndicator state={limitWatches[acc.id]} />
                 <div
                   className={cn(
                     "mt-2 grid gap-2",
@@ -2921,6 +2925,7 @@ export default function ClientDetailPage() {
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1">
+                                      <LimitUpdateIndicator state={limitWatches[acc.id]} />
                                       <Button
                                         size="icon"
                                         variant="default"

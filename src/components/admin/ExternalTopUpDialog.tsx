@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
+import { ExternalLink, Copy, Check, AlertCircle, Zap } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
+import { startLimitWatch } from "@/hooks/useLimitUpdateWatch";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ interface Props {
     external_topup_url?: string | null;
     external_topup_url_secondary?: string | null;
     external_crm_name?: string | null;
+    spend_cap?: number | string | null;
     user_id?: string | null;
   };
   /** Which client wallet to deduct from. Defaults to the main wallet. */
@@ -47,7 +49,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
   const cleanAccountId = account.account_id.replace(/^act_/, "");
 
   const initiateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: "auto" | "manual") => {
       const amt = parseFloat(amount);
       if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
       if (!url) throw new Error("External CRM URL not configured for this account");
@@ -68,17 +70,19 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
       }
       let newBalance: number | null = null;
 
-      // Create the request as already completed (admin will perform the action manually in the partner CRM)
+      // Auto mode: leave the request pending so the CRM Helper (Auto-pilot)
+      // picks it up and completes the top-up in the partner CRM by itself.
+      // Manual mode: mark it done right away and open the CRM for the admin.
+      const nowIso = new Date().toISOString();
       const { data, error } = await (supabase as any)
         .from("external_topup_requests")
         .insert({
           ad_account_id: account.id,
           user_id: targetUserId,
           amount: amt,
-          status: "completed",
+          status: mode === "auto" ? "pending" : "completed",
           initiated_by: user!.id,
-          completed_by: user!.id,
-          completed_at: new Date().toISOString(),
+          ...(mode === "auto" ? {} : { completed_by: user!.id, completed_at: nowIso }),
           wallet_deducted: !!targetUserId,
           notes: notes || null,
           external_crm_name: crmName,
@@ -134,10 +138,9 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
         setCopied(true);
       } catch {}
 
-      // Open external CRM — use anchor click to preserve Chrome profile session cookies.
-      // Drop "noreferrer" so the destination receives the Referer header and treats the
-      // navigation as user-initiated, allowing existing logged-in session to carry over.
-      {
+      // Manual mode only: open external CRM — anchor click preserves the Chrome
+      // profile session cookies so the existing login carries over.
+      if (mode === "manual") {
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -149,14 +152,23 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
       await logSystemAction(
         "External Top-up Initiated",
-        `Account ${account.account_name} (${cleanAccountId}) — $${amt} via ${crmName}${targetUserId ? " (wallet deducted)" : ""}`,
+        `Account ${account.account_name} (${cleanAccountId}) — $${amt} via ${crmName}${targetUserId ? " (wallet deducted)" : ""}${mode === "auto" ? " [auto-pilot]" : " [manual]"}`,
         user?.id,
         user?.email
       );
-      return data;
+      return { row: data, mode };
     },
-    onSuccess: () => {
-      toast.success("Wallet deducted & external CRM opened. Complete the top-up in the partner CRM.");
+    onSuccess: (res: any) => {
+      if (res?.mode === "auto") {
+        toast.success("Wallet deducted. Helper is completing the top-up in the CRM…");
+        // Blink "Updating your limit…" beside the account until Meta reports the new cap.
+        startLimitWatch(account.id, Number(account.spend_cap ?? 0), () => {
+          qc.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+          qc.invalidateQueries({ queryKey: ["client-detail-ad-accounts"] });
+        });
+      } else {
+        toast.success("Wallet deducted & external CRM opened. Complete the top-up there.");
+      }
       qc.invalidateQueries({ queryKey: ["external-topup-history", account.id] });
       qc.invalidateQueries({ queryKey: ["admin-wallets"] });
       qc.invalidateQueries({ queryKey: ["wallet"] });
@@ -243,21 +255,29 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             <p className="font-semibold text-amber-700 dark:text-amber-300">What happens next:</p>
             <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
               <li>Client's <strong>{walletLabel.toLowerCase()}</strong> will be <strong>deducted immediately</strong>.</li>
-              <li>Partner CRM opens in a new tab with Account ID + amount copied.</li>
-              <li>Login & complete the top-up there manually.</li>
+              <li>The CRM Helper (Auto-pilot) completes the top-up in the partner CRM automatically.</li>
+              <li>A live "Updating your limit…" indicator shows beside the account until the new limit arrives.</li>
             </ol>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={() => initiateMutation.mutate()}
+            variant="outline"
+            onClick={() => initiateMutation.mutate("manual")}
             disabled={!amount || !url || initiateMutation.isPending}
           >
             <ExternalLink className="h-4 w-4 mr-1" />
-            {initiateMutation.isPending ? "Processing..." : "Deduct & Open CRM"}
+            Deduct & Open CRM
+          </Button>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => initiateMutation.mutate("auto")}
+            disabled={!amount || !url || initiateMutation.isPending}
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            {initiateMutation.isPending ? "Processing..." : "Deduct & Auto Top-Up"}
           </Button>
         </DialogFooter>
       </DialogContent>
