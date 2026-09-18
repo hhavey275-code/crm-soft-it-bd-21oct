@@ -431,26 +431,7 @@ export function ClientDashboard() {
         </Card>
       )}
 
-      {/* PWA Install */}
-      {!isInstalled && !dismissedInstall && (
-        <Card className="border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 relative overflow-hidden">
-          <button onClick={() => { setDismissedInstall(true); localStorage.setItem("pwa-install-dismissed", "true"); }} className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted/60">
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <Smartphone className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">📱 Download Our App</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{isIOS ? "Install on your iPhone" : "Install for quick access"}</p>
-            </div>
-            <Button size="sm" className="gap-1.5 rounded-full px-4 flex-shrink-0" onClick={async () => { if (isIOS) setShowIOSGuide(true); else await promptInstall(); }}>
-              <Download className="h-4 w-4" />Install
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {/* PWA install prompt removed — available from Settings instead */}
 
       {/* iOS Guide */}
       {showIOSGuide && (
