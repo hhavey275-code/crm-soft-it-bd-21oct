@@ -138,10 +138,9 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
         setCopied(true);
       } catch {}
 
-      // Open external CRM — use anchor click to preserve Chrome profile session cookies.
-      // Drop "noreferrer" so the destination receives the Referer header and treats the
-      // navigation as user-initiated, allowing existing logged-in session to carry over.
-      {
+      // Manual mode only: open external CRM — anchor click preserves the Chrome
+      // profile session cookies so the existing login carries over.
+      if (mode === "manual") {
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -153,14 +152,23 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
       await logSystemAction(
         "External Top-up Initiated",
-        `Account ${account.account_name} (${cleanAccountId}) — $${amt} via ${crmName}${targetUserId ? " (wallet deducted)" : ""}`,
+        `Account ${account.account_name} (${cleanAccountId}) — $${amt} via ${crmName}${targetUserId ? " (wallet deducted)" : ""}${mode === "auto" ? " [auto-pilot]" : " [manual]"}`,
         user?.id,
         user?.email
       );
-      return data;
+      return { row: data, mode };
     },
-    onSuccess: () => {
-      toast.success("Wallet deducted & external CRM opened. Complete the top-up in the partner CRM.");
+    onSuccess: (res: any) => {
+      if (res?.mode === "auto") {
+        toast.success("Wallet deducted. Helper is completing the top-up in the CRM…");
+        // Blink "Updating your limit…" beside the account until Meta reports the new cap.
+        startLimitWatch(account.id, Number(account.spend_cap ?? 0), () => {
+          qc.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+          qc.invalidateQueries({ queryKey: ["client-detail-ad-accounts"] });
+        });
+      } else {
+        toast.success("Wallet deducted & external CRM opened. Complete the top-up there.");
+      }
       qc.invalidateQueries({ queryKey: ["external-topup-history", account.id] });
       qc.invalidateQueries({ queryKey: ["admin-wallets"] });
       qc.invalidateQueries({ queryKey: ["wallet"] });
