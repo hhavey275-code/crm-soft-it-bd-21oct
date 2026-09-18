@@ -54,7 +54,8 @@ export const Route = createFileRoute("/api/public/wa-jobs")({
 
         const action = String(body?.action ?? "");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const defaultCc = process.env["WHATSAPP_DEFAULT_COUNTRY_CODE"] || "880";
+        const ccRaw = String(process.env["WHATSAPP_DEFAULT_COUNTRY_CODE"] ?? "").replace(/[^\d]/g, "");
+        const defaultCc = ccRaw || "880";
 
         async function settings() {
           const { data } = await supabaseAdmin
