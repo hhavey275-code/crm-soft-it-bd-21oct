@@ -687,8 +687,18 @@ export function ClientAdAccounts() {
     onSuccess: () => {
       toast.success("Top-up request submitted! Our team will process it shortly.");
       setExternalCooldownUntil(Date.now() + 30_000);
+      const watchedId = topUpAccount?.id;
+      const watchedCap = Number(topUpAccount?.spend_cap ?? 0);
       setTopUpAccount(null);
       setTopUpAmount("");
+      // Watch Meta for the new spending limit at 10s / 30s / 60s.
+      if (watchedId) {
+        startLimitWatch(watchedId, watchedCap, () => {
+          queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["client-insights-cache"] });
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
