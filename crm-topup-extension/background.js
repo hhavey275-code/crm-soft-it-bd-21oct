@@ -292,6 +292,7 @@ async function processWaQueue() {
         return;
       }
       if (!claim || !claim.ok) {
+        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: (claim && claim.error) || "claim failed" });
         // busy (gap not over) / daily limit reached / another PC took it
         if (claim && (claim.reason === "busy" || claim.reason === "limit")) return;
         continue;
