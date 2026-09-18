@@ -132,6 +132,140 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           return json({ ok: false, error: msg, reason }, 401);
         }
 
+        // WhatsApp queue actions share this proven extension endpoint. Some
+        // Chromium/network setups reject requests to a second API path even
+        // though the CRM Auto-pilot path is already allowed.
+        if (action.startsWith("wa_")) {
+          if (payload.scope !== "autopilot") return json({ ok: false, error: "Auto-pilot token required" }, 403);
+          const MAX_WA_ATTEMPTS = 3;
+          const normalizePhone = (raw: unknown, defaultCc: string) => {
+            let digits = String(raw ?? "").replace(/[^\d]/g, "");
+            if (!digits) return "";
+            if (digits.startsWith("00")) digits = digits.slice(2);
+            if (digits.startsWith("0")) digits = defaultCc + digits.slice(1);
+            else if (digits.length <= 10) digits = defaultCc + digits;
+            return digits;
+          };
+          const ccRaw = String(process.env["WHATSAPP_DEFAULT_COUNTRY_CODE"] ?? "").replace(/[^\d]/g, "");
+          const defaultCc = ccRaw || "880";
+          const releaseStale = async () => {
+            const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            await supabaseAdmin
+              .from("wa_messages" as any)
+              .update({ status: "pending", claimed_at: null, claimed_by: null })
+              .eq("status", "sending")
+              .lt("claimed_at", staleBefore);
+          };
+
+          if (action === "wa_list_pending") {
+            await releaseStale();
+            const { data, error } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .select("id, phone, body")
+              .eq("status", "pending")
+              .lt("attempts", MAX_WA_ATTEMPTS)
+              .order("created_at", { ascending: true })
+              .limit(10);
+            if (error) return json({ ok: false, error: error.message }, 400);
+            return json({
+              ok: true,
+              items: (data ?? []).map((row: any) => ({
+                id: row.id,
+                phone: normalizePhone(row.phone, defaultCc),
+                body: row.body,
+              })),
+            });
+          }
+
+          if (action === "wa_claim") {
+            const id = String(body?.id ?? "");
+            if (!id) return json({ ok: false, error: "id is required" }, 400);
+            await releaseStale();
+            const { data: settingRows } = await supabaseAdmin
+              .from("wa_notify_settings" as any)
+              .select("key, num_value");
+            const settingMap = new Map<string, any>((settingRows ?? []).map((row: any) => [row.key, row]));
+            const gapSeconds = Number(settingMap.get("gap_seconds")?.num_value ?? 45);
+            const dailyLimit = Number(settingMap.get("daily_limit")?.num_value ?? 150);
+            const dayStart = new Date();
+            dayStart.setUTCHours(0, 0, 0, 0);
+            const { count: sentToday } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .select("id", { count: "exact", head: true })
+              .eq("status", "sent")
+              .gte("sent_at", dayStart.toISOString());
+            if ((sentToday ?? 0) >= dailyLimit) {
+              return json({ ok: false, error: "Daily limit reached", reason: "limit" }, 409);
+            }
+            const gapBefore = new Date(Date.now() - gapSeconds * 1000).toISOString();
+            const { data: recent } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .select("id")
+              .or(`sent_at.gte.${gapBefore},and(status.eq.sending,claimed_at.gte.${gapBefore})`)
+              .limit(1);
+            if (recent && recent.length > 0) {
+              return json({ ok: false, error: "Too soon — waiting for the gap", reason: "busy" }, 409);
+            }
+            const { data: current } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .select("attempts")
+              .eq("id", id)
+              .maybeSingle();
+            const now = new Date().toISOString();
+            const { data: claimed, error } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .update({
+                status: "sending",
+                claimed_at: now,
+                claimed_by: String(body?.client ?? "helper").slice(0, 60),
+                attempts: Number((current as any)?.attempts ?? 0) + 1,
+              })
+              .eq("id", id)
+              .eq("status", "pending")
+              .select("id, phone, body")
+              .maybeSingle();
+            if (error) return json({ ok: false, error: error.message }, 400);
+            if (!claimed) return json({ ok: false, error: "Already claimed", reason: "claimed" }, 409);
+            return json({
+              ok: true,
+              id: (claimed as any).id,
+              phone: normalizePhone((claimed as any).phone, defaultCc),
+              body: (claimed as any).body,
+            });
+          }
+
+          if (action === "wa_result") {
+            const id = String(body?.id ?? "");
+            if (!id) return json({ ok: false, error: "id is required" }, 400);
+            if (body?.success) {
+              const { error } = await supabaseAdmin
+                .from("wa_messages" as any)
+                .update({ status: "sent", sent_at: new Date().toISOString(), last_error: null })
+                .eq("id", id);
+              return error ? json({ ok: false, error: error.message }, 400) : json({ ok: true });
+            }
+            const { data: row } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .select("attempts")
+              .eq("id", id)
+              .maybeSingle();
+            const attempts = Number((row as any)?.attempts ?? 0);
+            const { error } = await supabaseAdmin
+              .from("wa_messages" as any)
+              .update({
+                status: attempts >= MAX_WA_ATTEMPTS ? "failed" : "pending",
+                claimed_at: null,
+                claimed_by: null,
+                last_error: String(body?.error ?? "Send failed").slice(0, 500),
+              })
+              .eq("id", id);
+            if (error) return json({ ok: false, error: error.message }, 400);
+            return json({ ok: true, retrying: attempts < MAX_WA_ATTEMPTS });
+          }
+
+          return json({ ok: false, error: "Unknown WhatsApp action" }, 400);
+        }
+
         // ---- layout the helper learned / needs -------------------------
         if (action === "get_config") {
           const { data } = await supabaseAdmin
