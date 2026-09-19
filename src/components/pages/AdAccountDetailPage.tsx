@@ -473,14 +473,26 @@ export default function AdAccountDetailPage() {
               </span>
             )}
             {isAdmin && account?.external_topup_required && (
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white h-8 text-xs"
-                onClick={() => setShowExternalTopUp(true)}
-              >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Ext. Top-Up
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 text-xs"
+                  onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                  Ext. Top-Up
+                </Button>
+                {account?.external_topup_url_secondary && (
+                  <Button
+                    size="sm"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white h-8 text-xs"
+                    onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Ext. Secondary
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
