@@ -224,8 +224,8 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span className="min-w-0 break-words">
-                {isSecondary
-                  ? "No external CRM URL is configured for this account (secondary or main). Please set it in Account Settings first."
+                {isSecondary || isCreditLine
+                  ? `No external CRM URL is configured for this account (${isCreditLine ? "credit line" : "secondary"} or main). Please set it in Account Settings first.`
                   : "External CRM URL is not configured for this account. Please set it in Account Settings first."}
               </span>
             </div>
