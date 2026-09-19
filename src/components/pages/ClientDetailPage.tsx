@@ -2930,11 +2930,6 @@ export default function ClientDetailPage() {
                                       ) : (
                                         <span className="text-muted-foreground">—</span>
                                       )}
-                                      {limitWatches[acc.id] && (
-                                        <div className="mt-1 max-w-[130px] whitespace-normal">
-                                          <LimitUpdateIndicator state={limitWatches[acc.id]} />
-                                        </div>
-                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
