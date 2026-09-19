@@ -115,7 +115,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
         });
         if (convErr || (conv && conv.ok === false)) {
           await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
-          throw new Error(convErr?.message || conv?.error || "Secondary wallet funding failed");
+          throw new Error(convErr?.message || conv?.error || `${walletLabel} funding failed`);
         }
       }
 
@@ -214,7 +214,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
                 Top up <strong className="text-foreground">{account.account_name}</strong> via
               </span>
               <Badge variant="outline" className="max-w-full truncate">{crmName}</Badge>
-              <Badge variant={isSecondary ? "secondary" : "outline"} className="max-w-full truncate">{walletLabel}</Badge>
+              <Badge variant={isSecondary || isCreditLine ? "secondary" : "outline"} className="max-w-full truncate">{walletLabel}</Badge>
             </div>
           </DialogDescription>
         </DialogHeader>
