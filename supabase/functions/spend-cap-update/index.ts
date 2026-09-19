@@ -297,7 +297,9 @@ Deno.serve(async (req)=>{
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
-    const walletKind = walletKindRaw === "secondary" ? "secondary" : "primary";
+    const walletKind = walletKindRaw === "secondary"
+      ? "secondary"
+      : walletKindRaw === "credit_line" ? "credit_line" : "primary";
 
 
     // ============================================
