@@ -1746,7 +1746,8 @@ export function AdminAdAccounts() {
         <ExternalTopUpDialog
           open={!!externalTopUpAccount}
           onOpenChange={(o) => { if (!o) setExternalTopUpAccount(null); }}
-          account={externalTopUpAccount}
+          account={externalTopUpAccount.account}
+          walletKind={externalTopUpAccount.wallet}
         />
       )}
     </div>
