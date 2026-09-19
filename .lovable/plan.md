@@ -3,10 +3,11 @@
 ## কী হবে
 
 - প্রতিটি ক্লায়েন্টের জন্য তৃতীয় একটি ওয়ালেট: **Credit Line Wallet**, নিজস্ব রেট (যেমন ৳১৩২)।
-- টগল দিয়ে চালু — শুধু যাদের অন করা হবে তারাই এটি দেখবে; বাকিদের কাছে আগের মতোই Main + Secondary থাকবে।
+- **প্রতি ক্লায়েন্টে আলাদা কম্বিনেশন:** Secondary ও Credit Line — দুটোরই আলাদা টগল। কারও শুধু Main, কারও Main + Secondary, কারও Main + Credit Line, কারও তিনটাই।
 - রেট প্রতি ক্লায়েন্টে আলাদা করে সেট করা যাবে (Main ৳১২৮ / Secondary ৳১২৪ / Credit Line ৳১৩২)।
-- ক্লায়েন্ট একবারে টাকা পাঠালে সেটি স্বয়ংক্রিয়ভাবে ভাগ হবে: **আগে Main, তারপর Secondary, শেষে Credit Line** — প্রতিটি ওয়ালেটের নিজের রেটে ডলারে রূপান্তর হয়ে।
+- ক্লায়েন্ট একবারে টাকা পাঠালে সেটি **শুধু তার চালু থাকা ওয়ালেটগুলোর মধ্যেই** ভাগ হবে, এই ক্রমে: **Main → Secondary → Credit Line** (বন্ধ ওয়ালেট বাদ), প্রতিটির নিজের রেটে ডলারে রূপান্তর হয়ে।
 - অ্যাড অ্যাকাউন্টের সাথে তৃতীয় ওয়ালেটের জন্য আলাদা external CRM লিংক দেওয়া যাবে। ওই লিংকের বোতাম দিয়ে টপ-আপ দিলে Credit Line Wallet থেকেই ব্যালেন্স কাটবে।
+- অ্যাড অ্যাকাউন্ট সেটিংসে External Top-Up টগল অন করলে এখন **তিনটি বক্স** থাকবে: Main wallet CRM link, Secondary CRM link, Credit Line CRM link। যে বক্সে লিংক দেওয়া থাকবে শুধু সেই বোতামই দেখাবে, আর সেই ওয়ালেট থেকেই কাটবে।
 - Credit Line Wallet-এ ব্যালেন্স কম পড়লে Main Wallet থেকে রেট-অনুযায়ী স্বয়ংক্রিয় কনভার্ট হয়ে ঘাটতি পূরণ হবে (যেমন Secondary-তে এখন হয়)।
 
 ## কোথায় দেখা যাবে
@@ -24,7 +25,7 @@ Database (migration):
 - `ad_accounts`-এ `external_topup_url_credit_line text`।
 - `wallet_kind`-এর বৈধ মানে `'credit_line'` যোগ (`validate_wallet_kind` trigger function আপডেট); `transactions`, `external_topup_requests`, `top_up_requests.target_wallet` একই মান ব্যবহার করবে।
 - ফাংশন আপডেট/নতুন:
-  - `distribute_deposit_bdt` — তৃতীয় ধাপ যোগ (Main due → Secondary due → Credit Line due → অবশিষ্ট Main-এ advance হিসেবে), প্রতিটি নিজের রেটে।
+  - `distribute_deposit_bdt` — শুধু চালু ওয়ালেটগুলোর মধ্যে ধাপে ধাপে (Main due → Secondary due → Credit Line due → অবশিষ্ট Main-এ advance), প্রতিটি নিজের রেটে; বন্ধ ওয়ালেট সম্পূর্ণ বাদ।
   - `deduct_wallet_for_topup_v2` — `p_wallet_kind='credit_line'` সাপোর্ট, একই advisory lock/ধার-সীমা নিয়মে।
   - `ensure_credit_line_funds` — ঘাটতি হলে Main থেকে রেট-কনভার্ট করে টানবে (`ensure_secondary_funds`-এর অনুরূপ)।
   - `admin_adjust_credit_line_wallet`, `admin_convert_main_to_credit_line` — অ্যাডমিন-only, `admin_adjust_secondary_wallet` / `admin_convert_main_to_secondary`-এর অনুরূপ।
