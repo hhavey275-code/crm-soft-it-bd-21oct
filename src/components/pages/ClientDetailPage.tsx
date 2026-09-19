@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
-import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle } from "@/components/admin/SecondaryWalletPanel";
+import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle, CreditLineWalletCard, CreditLineWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
 import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
@@ -2131,6 +2131,7 @@ export default function ClientDetailPage() {
                   </div>
                   {/* Secondary (sheet-rate) wallet on/off + rate */}
                   {userId && <SecondaryWalletToggle userId={userId} />}
+                  {userId && <CreditLineWalletToggle userId={userId} />}
                   {/* Client-side spend cap withdraw permission */}
                   {userId && <SpendCapWithdrawToggle userId={userId} />}
                   {userId && <SecondaryDepositToggle userId={userId} />}
@@ -2487,6 +2488,7 @@ export default function ClientDetailPage() {
 
                   {/* Secondary (sheet-rate) wallet + combined total — admin controlled */}
                   {userId && <SecondaryWalletCard userId={userId} />}
+                  {userId && <CreditLineWalletCard userId={userId} />}
                   {userId && <CombinedTotalCard userId={userId} />}
 
                   {/* Account stat cards */}
