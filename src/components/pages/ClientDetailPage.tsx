@@ -2860,6 +2860,11 @@ export default function ClientDetailPage() {
                                         (acc as any).balance_after_topup ?? 0,
                                       )}
                                     />
+                                    {limitWatches[acc.id] && (
+                                      <div className="mt-1 max-w-[130px] whitespace-normal">
+                                        <LimitUpdateIndicator state={limitWatches[acc.id]} />
+                                      </div>
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     <StatusBadge status={acc.status} />
