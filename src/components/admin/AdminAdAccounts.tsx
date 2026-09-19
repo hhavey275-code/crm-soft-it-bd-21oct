@@ -1359,7 +1359,6 @@ export function AdminAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                        <LimitUpdateIndicator state={limitWatches[a.id]} />
                         {a.external_topup_required ? (
                           <>
                             {a.external_topup_url && (
