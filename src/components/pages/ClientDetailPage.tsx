@@ -788,31 +788,35 @@ export default function ClientDetailPage() {
                 <div
                   className={cn(
                     "mt-2 grid gap-2",
-                    wallets.secondaryEnabled
-                      ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                    (acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled)
+                      ? ((acc.external_topup_required ? !!acc.external_topup_url : true)
+                          ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                          : "grid-cols-[minmax(0,1fr)_auto]")
                       : "grid-cols-[minmax(0,1fr)_auto]"
                   )}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Button
-                    size="sm"
-                    className="w-full min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
-                    onClick={() => {
-                      if (acc.external_topup_required) {
-                        setExtTopUp({ account: acc, wallet: "primary" });
-                        return;
-                      }
-                      setSelectedAccountId(acc.id);
-                      setTopUpWallet("primary");
-                      setTopUpDialogOpen(true);
-                      setTopUpAmount("");
-                      setDialogTab("topup");
-                    }}
-                  >
-                    <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{acc.external_topup_required ? "Ext. Top Up" : "Top Up"}</span>
-                  </Button>
-                  {wallets.secondaryEnabled && (
+                  {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
+                    <Button
+                      size="sm"
+                      className="w-full min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
+                      onClick={() => {
+                        if (acc.external_topup_required) {
+                          setExtTopUp({ account: acc, wallet: "primary" });
+                          return;
+                        }
+                        setSelectedAccountId(acc.id);
+                        setTopUpWallet("primary");
+                        setTopUpDialogOpen(true);
+                        setTopUpAmount("");
+                        setDialogTab("topup");
+                      }}
+                    >
+                      <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{acc.external_topup_required ? "Ext. Top Up" : "Top Up"}</span>
+                    </Button>
+                  )}
+                  {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                     <Button
                       size="sm"
                       className="w-full min-w-0 gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
@@ -2926,6 +2930,7 @@ export default function ClientDetailPage() {
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1">
                                       <LimitUpdateIndicator state={limitWatches[acc.id]} />
+                                      {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
                                       <Button
                                         size="icon"
                                         variant="default"
@@ -2945,7 +2950,8 @@ export default function ClientDetailPage() {
                                       >
                                         <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
-                                      {wallets.secondaryEnabled && (
+                                      )}
+                                      {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
                                           size="icon"
                                           className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
