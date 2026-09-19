@@ -542,6 +542,7 @@ export type Database = {
           external_crm_name: string | null
           external_topup_required: boolean
           external_topup_url: string | null
+          external_topup_url_credit_line: string | null
           external_topup_url_secondary: string | null
           fraud_flag: boolean
           id: string
@@ -569,6 +570,7 @@ export type Database = {
           external_crm_name?: string | null
           external_topup_required?: boolean
           external_topup_url?: string | null
+          external_topup_url_credit_line?: string | null
           external_topup_url_secondary?: string | null
           fraud_flag?: boolean
           id?: string
@@ -596,6 +598,7 @@ export type Database = {
           external_crm_name?: string | null
           external_topup_required?: boolean
           external_topup_url?: string | null
+          external_topup_url_credit_line?: string | null
           external_topup_url_secondary?: string | null
           fraud_flag?: boolean
           id?: string
@@ -1753,6 +1756,36 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_line_wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          drift_allowance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          drift_allowance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          drift_allowance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crm_automation_configs: {
         Row: {
           auto_confirm: boolean
@@ -2265,6 +2298,11 @@ export type Database = {
           color_theme: string
           company: string | null
           created_at: string
+          credit_line_due_limit: number
+          credit_line_due_limit_expires_at: string | null
+          credit_line_due_limit_set_at: string | null
+          credit_line_usd_rate: number | null
+          credit_line_wallet_enabled: boolean
           default_usd_rate: number | null
           due_limit: number | null
           due_limit_expires_at: string | null
@@ -2304,6 +2342,11 @@ export type Database = {
           color_theme?: string
           company?: string | null
           created_at?: string
+          credit_line_due_limit?: number
+          credit_line_due_limit_expires_at?: string | null
+          credit_line_due_limit_set_at?: string | null
+          credit_line_usd_rate?: number | null
+          credit_line_wallet_enabled?: boolean
           default_usd_rate?: number | null
           due_limit?: number | null
           due_limit_expires_at?: string | null
@@ -2343,6 +2386,11 @@ export type Database = {
           color_theme?: string
           company?: string | null
           created_at?: string
+          credit_line_due_limit?: number
+          credit_line_due_limit_expires_at?: string | null
+          credit_line_due_limit_set_at?: string | null
+          credit_line_usd_rate?: number | null
+          credit_line_wallet_enabled?: boolean
           default_usd_rate?: number | null
           due_limit?: number | null
           due_limit_expires_at?: string | null
@@ -3966,6 +4014,7 @@ export type Database = {
           bank_account_id: string | null
           bdt_amount: number | null
           created_at: string
+          credit_line_due_bdt: number | null
           forward_dismissed_at: string | null
           forward_dismissed_by: string | null
           id: string
@@ -3997,6 +4046,7 @@ export type Database = {
           bank_account_id?: string | null
           bdt_amount?: number | null
           created_at?: string
+          credit_line_due_bdt?: number | null
           forward_dismissed_at?: string | null
           forward_dismissed_by?: string | null
           id?: string
@@ -4028,6 +4078,7 @@ export type Database = {
           bank_account_id?: string | null
           bdt_amount?: number | null
           created_at?: string
+          credit_line_due_bdt?: number | null
           forward_dismissed_at?: string | null
           forward_dismissed_by?: string | null
           id?: string
@@ -4378,8 +4429,16 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_adjust_credit_line_wallet: {
+        Args: { p_amount: number; p_reason: string; p_user_id: string }
+        Returns: Json
+      }
       admin_adjust_secondary_wallet: {
         Args: { p_amount: number; p_reason: string; p_user_id: string }
+        Returns: Json
+      }
+      admin_convert_main_to_credit_line: {
+        Args: { p_reason?: string; p_usd_amount: number; p_user_id: string }
         Returns: Json
       }
       admin_convert_main_to_secondary: {
@@ -4477,6 +4536,16 @@ export type Database = {
       effective_due_limit: {
         Args: { p_user_id: string; p_wallet_kind?: string }
         Returns: number
+      }
+      ensure_credit_line_funds: {
+        Args: {
+          p_allow_negative?: boolean
+          p_due_limit?: number
+          p_needed_usd: number
+          p_processed_by?: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       ensure_secondary_funds: {
         Args: {
