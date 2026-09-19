@@ -42,10 +42,18 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
   const [copied, setCopied] = useState(false);
 
   const isSecondary = walletKind === "secondary";
-  const url = (isSecondary
-    ? account.external_topup_url_secondary || account.external_topup_url
-    : account.external_topup_url) || "";
-  const walletLabel = isSecondary ? "Secondary wallet" : "Main wallet";
+  const isCreditLine = walletKind === "credit_line";
+  const url =
+    (isCreditLine
+      ? account.external_topup_url_credit_line || account.external_topup_url
+      : isSecondary
+        ? account.external_topup_url_secondary || account.external_topup_url
+        : account.external_topup_url) || "";
+  const walletLabel = isCreditLine
+    ? "Credit line wallet"
+    : isSecondary
+      ? "Secondary wallet"
+      : "Main wallet";
   const crmName = account.external_crm_name || "External CRM";
   const cleanAccountId = account.account_id.replace(/^act_/, "");
 
@@ -96,8 +104,9 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
       // Secondary wallet is funded from the main wallet at the rate difference.
       // Pull whatever is short first so the ledger reflects the conversion.
-      if (walletKind === "secondary") {
-        const { data: conv, error: convErr } = await (supabase as any).rpc("ensure_secondary_funds", {
+      if (walletKind === "secondary" || walletKind === "credit_line") {
+        const rpcName = walletKind === "credit_line" ? "ensure_credit_line_funds" : "ensure_secondary_funds";
+        const { data: conv, error: convErr } = await (supabase as any).rpc(rpcName, {
           p_user_id: targetUserId,
           p_needed_usd: amt,
           p_processed_by: `admin:${user!.id}`,
