@@ -2859,13 +2859,8 @@ export default function ClientDetailPage() {
                                       balanceAfterTopup={Number(
                                         (acc as any).balance_after_topup ?? 0,
                                       )}
-                                     />
-                                     {limitWatches[acc.id] && (
-                                       <div className="mt-1">
-                                         <LimitUpdateIndicator state={limitWatches[acc.id]} />
-                                       </div>
-                                     )}
-                                   </TableCell>
+                                    />
+                                  </TableCell>
                                   <TableCell>
                                     <StatusBadge status={acc.status} />
                                   </TableCell>
@@ -2929,6 +2924,11 @@ export default function ClientDetailPage() {
                                         ))
                                       ) : (
                                         <span className="text-muted-foreground">—</span>
+                                      )}
+                                      {limitWatches[acc.id] && (
+                                        <div className="mt-1 max-w-[130px] whitespace-normal">
+                                          <LimitUpdateIndicator state={limitWatches[acc.id]} />
+                                        </div>
                                       )}
                                     </div>
                                   </TableCell>
