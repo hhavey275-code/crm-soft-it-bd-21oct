@@ -54,6 +54,7 @@ export default function AdAccountDetailPage() {
   const [newSpendCap, setNewSpendCap] = useState("");
   const [showLimitHistory, setShowLimitHistory] = useState(false);
   const [showExternalTopUp, setShowExternalTopUp] = useState(false);
+  const [externalTopUpWallet, setExternalTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [showSilentRecovery, setShowSilentRecovery] = useState(false);
 
   // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
