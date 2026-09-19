@@ -3041,6 +3041,8 @@ export type Database = {
           note: string | null
           resolved_at: string | null
           reviewed_by: string | null
+          spend_cap_after: number | null
+          spend_cap_before: number | null
           status: string
           updated_at: string
           user_id: string
@@ -3054,6 +3056,8 @@ export type Database = {
           note?: string | null
           resolved_at?: string | null
           reviewed_by?: string | null
+          spend_cap_after?: number | null
+          spend_cap_before?: number | null
           status?: string
           updated_at?: string
           user_id: string
@@ -3067,6 +3071,8 @@ export type Database = {
           note?: string | null
           resolved_at?: string | null
           reviewed_by?: string | null
+          spend_cap_after?: number | null
+          spend_cap_before?: number | null
           status?: string
           updated_at?: string
           user_id?: string
