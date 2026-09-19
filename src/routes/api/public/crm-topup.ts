@@ -29,6 +29,9 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         }
 
         const action = String(body?.action ?? "");
+        // Diagnostics: helper calls that fail are hard to trace from the
+        // browser, so every request records its action in the server log.
+        console.log(`[crm-topup] action=${action || "(none)"} hasToken=${!!body?.token}`);
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // Mint and verify on this same deployment. This avoids invalid
@@ -472,7 +475,8 @@ export const Route = createFileRoute("/api/public/crm-topup")({
 
         }
 
-        return json({ ok: false, error: "Unknown action" }, 400);
+        console.warn(`[crm-topup] UNKNOWN ACTION: ${JSON.stringify(action)} keys=${Object.keys(body ?? {}).join(",")}`);
+        return json({ ok: false, error: `Unknown action: ${action || "(empty)"}` }, 400);
       },
     },
   },
