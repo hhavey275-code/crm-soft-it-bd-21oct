@@ -74,6 +74,8 @@ export function AdminWithdrawRequests() {
     if (!active) return;
     const { row, decision } = active;
     setBusy(true);
+    let capBefore: number | null = null;
+    let capAfter: number | null = null;
     try {
       if (decision === "approved") {
         // Actually perform the withdraw on Meta + credit the client's wallet.
@@ -85,6 +87,8 @@ export function AdminWithdrawRequests() {
         if ((data as any)?.wallet_credited === false) {
           throw new Error((data as any)?.wallet_credit_error || "Spend cap lowered but wallet credit failed");
         }
+        capBefore = (data as any)?.old_spend_cap != null ? Number((data as any).old_spend_cap) : null;
+        capAfter = (data as any)?.new_spend_cap != null ? Number((data as any).new_spend_cap) : null;
       }
 
       const { error: updErr } = await (supabase as any)
@@ -93,6 +97,8 @@ export function AdminWithdrawRequests() {
           status: decision,
           admin_note: adminNote || null,
           reviewed_by: user!.id,
+          spend_cap_before: capBefore,
+          spend_cap_after: capAfter,
           resolved_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -105,7 +111,11 @@ export function AdminWithdrawRequests() {
         title: decision === "approved" ? "Withdraw Request Approved" : "Withdraw Request Rejected",
         message:
           decision === "approved"
-            ? `$${Number(row.amount_usd).toFixed(2)} has been moved back to your wallet from ${getAccount(row.ad_account_id)?.account_name ?? "your ad account"}.`
+            ? `$${Number(row.amount_usd).toFixed(2)} has been moved back to your wallet from ${getAccount(row.ad_account_id)?.account_name ?? "your ad account"}.${
+                capBefore != null && capAfter != null
+                  ? ` Limit: $${capBefore.toLocaleString()} → $${capAfter.toLocaleString()}.`
+                  : ""
+              }`
             : `Your $${Number(row.amount_usd).toFixed(2)} withdraw request was rejected.${adminNote ? ` Note: ${adminNote}` : ""}`,
         reference_id: row.id,
       });
@@ -117,7 +127,13 @@ export function AdminWithdrawRequests() {
         user!.email
       );
 
-      toast.success(decision === "approved" ? "Withdraw approved and wallet credited" : "Request rejected");
+      toast.success(
+        decision === "approved"
+          ? capBefore != null && capAfter != null
+            ? `Approved — limit $${capBefore.toLocaleString()} → $${capAfter.toLocaleString()}, wallet credited`
+            : "Withdraw approved and wallet credited"
+          : "Request rejected",
+      );
       setActive(null);
       setAdminNote("");
       qc.invalidateQueries({ queryKey: ["admin-withdraw-requests"] });
@@ -182,6 +198,14 @@ export function AdminWithdrawRequests() {
                       <p className="text-[10px] uppercase text-muted-foreground">Date</p>
                       <p>{format(new Date(r.created_at), "MMM d")}</p>
                     </div>
+                    {r.spend_cap_before != null && r.spend_cap_after != null && (
+                      <div className="col-span-2">
+                        <p className="text-[10px] uppercase text-muted-foreground">Limit Change</p>
+                        <p className="font-medium">
+                          ${Number(r.spend_cap_before).toLocaleString()} → ${Number(r.spend_cap_after).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
                     {r.note && (
                       <div className="col-span-2">
                         <p className="text-[10px] uppercase text-muted-foreground">Note</p>
@@ -204,6 +228,7 @@ export function AdminWithdrawRequests() {
                   <TableHead>Client</TableHead>
                   <TableHead>Ad Account</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Limit Change</TableHead>
                   <TableHead>Note</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
@@ -212,7 +237,7 @@ export function AdminWithdrawRequests() {
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No withdraw requests</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No withdraw requests</TableCell></TableRow>
                 ) : rows.map((r) => {
                   const p = getProfile(r.user_id);
                   return (
@@ -228,6 +253,15 @@ export function AdminWithdrawRequests() {
                         )}
                       </TableCell>
                       <TableCell className="font-semibold">${Number(r.amount_usd).toFixed(2)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {r.spend_cap_before != null && r.spend_cap_after != null ? (
+                          <span className="font-medium">
+                            ${Number(r.spend_cap_before).toLocaleString()} <span className="text-muted-foreground">→</span> ${Number(r.spend_cap_after).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate">{r.note || "—"}</TableCell>
                       <TableCell><StatusBadge status={r.status} /></TableCell>
                       <TableCell className="text-sm text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>

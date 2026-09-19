@@ -217,7 +217,13 @@ export function ClientAdAccounts() {
           user!.id,
           profile?.full_name || user!.email,
         );
-        toast.success(`$${amount} moved back to your wallet`);
+        const capFrom = (data as any)?.old_spend_cap;
+        const capTo = (data as any)?.new_spend_cap;
+        toast.success(
+          capFrom != null && capTo != null
+            ? `$${amount} moved back to your wallet — limit $${Number(capFrom).toLocaleString()} → $${Number(capTo).toLocaleString()}`
+            : `$${amount} moved back to your wallet`,
+        );
         queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user!.id] });
         queryClient.invalidateQueries({ queryKey: ["client-wallet", user!.id] });
         queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
