@@ -315,7 +315,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           const { data, error } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select(
-              "id, amount, wallet_kind, external_topup_url, created_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary)"
+              "id, amount, wallet_kind, external_topup_url, created_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line)"
             )
             .eq("status", "pending")
             .order("created_at", { ascending: true })
@@ -324,9 +324,11 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           const items = (data ?? []).map((r: any) => {
             const a = r.ad_accounts ?? {};
             const url =
-              r.wallet_kind === "secondary"
-                ? a.external_topup_url_secondary || a.external_topup_url || r.external_topup_url || ""
-                : a.external_topup_url || r.external_topup_url || "";
+              r.wallet_kind === "credit_line"
+                ? a.external_topup_url_credit_line || a.external_topup_url || r.external_topup_url || ""
+                : r.wallet_kind === "secondary"
+                  ? a.external_topup_url_secondary || a.external_topup_url || r.external_topup_url || ""
+                  : a.external_topup_url || r.external_topup_url || "";
             return {
               id: r.id,
               amount: Number(r.amount),
@@ -377,14 +379,16 @@ export const Route = createFileRoute("/api/public/crm-topup")({
 
           const { data: acct } = await supabaseAdmin
             .from("ad_accounts")
-            .select("account_id, external_topup_url, external_topup_url_secondary")
+            .select("account_id, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line")
             .eq("id", (claimed as any).ad_account_id)
             .maybeSingle();
           const accountId = String(acct?.account_id ?? "").replace(/^act_/, "");
           const url =
-            (claimed as any).wallet_kind === "secondary"
-              ? acct?.external_topup_url_secondary || acct?.external_topup_url || (claimed as any).external_topup_url || ""
-              : acct?.external_topup_url || (claimed as any).external_topup_url || "";
+            (claimed as any).wallet_kind === "credit_line"
+              ? (acct as any)?.external_topup_url_credit_line || acct?.external_topup_url || (claimed as any).external_topup_url || ""
+              : (claimed as any).wallet_kind === "secondary"
+                ? acct?.external_topup_url_secondary || acct?.external_topup_url || (claimed as any).external_topup_url || ""
+                : acct?.external_topup_url || (claimed as any).external_topup_url || "";
           if (!accountId || !url) {
             return json({ ok: false, error: "Ad account ID or CRM URL missing" }, 400);
           }

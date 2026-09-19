@@ -84,7 +84,7 @@ export function AdminExternalTopUpRequests() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("ad_accounts")
-        .select("id, account_id, account_name, external_topup_url, external_topup_url_secondary, external_crm_name")
+        .select("id, account_id, account_name, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line, external_crm_name")
         .in("id", accountIds);
       return data ?? [];
     },
@@ -105,10 +105,14 @@ export function AdminExternalTopUpRequests() {
   const pending = requests.filter((r) => r.status === "pending");
   const history = requests.filter((r) => r.status !== "pending");
 
+  const walletName = (k?: string | null) =>
+    k === "credit_line" ? "Credit Line" : k === "secondary" ? "Secondary" : "Main";
+
   const cleanId = (r: Req) => (acc(r.ad_account_id)?.account_id ?? "").replace(/^act_/, "");
 
   const resolveUrl = (r: Req) => {
     const a = acc(r.ad_account_id);
+    if (r.wallet_kind === "credit_line") return a?.external_topup_url_credit_line || a?.external_topup_url || r.external_topup_url || "";
     if (r.wallet_kind === "secondary") return a?.external_topup_url_secondary || a?.external_topup_url || r.external_topup_url || "";
     return a?.external_topup_url || r.external_topup_url || "";
   };
@@ -162,7 +166,7 @@ export function AdminExternalTopUpRequests() {
       toast.success("Request approved — CRM opened, helper is filling the top-up form");
       await logSystemAction(
         "External Top-up Automation Started",
-        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${walletName(r.wallet_kind).toLowerCase()} wallet)`,
         user?.id,
         user?.email
       );
@@ -250,7 +254,7 @@ export function AdminExternalTopUpRequests() {
 
       await logSystemAction(
         "External Top-up Completed",
-        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${walletName(r.wallet_kind).toLowerCase()} wallet)`,
         user?.id,
         user?.email
       );
@@ -274,7 +278,7 @@ export function AdminExternalTopUpRequests() {
       if (!data?.ok) throw new Error(data?.error || "Failed to complete");
       await logSystemAction(
         "External Top-up Marked Completed",
-        `Account ${cleanId(r)} — $${Number(r.amount)} (${r.wallet_kind === "secondary" ? "secondary" : "main"} wallet)`,
+        `Account ${cleanId(r)} — $${Number(r.amount)} (${walletName(r.wallet_kind).toLowerCase()} wallet)`,
         user?.id,
         user?.email
       );
@@ -352,8 +356,8 @@ export function AdminExternalTopUpRequests() {
           </button>
         </TableCell>
         <TableCell>
-          <Badge variant={r.wallet_kind === "secondary" ? "secondary" : "outline"}>
-            {r.wallet_kind === "secondary" ? "Secondary" : "Main"}
+          <Badge variant={r.wallet_kind && r.wallet_kind !== "primary" ? "secondary" : "outline"}>
+            {walletName(r.wallet_kind)}
           </Badge>
         </TableCell>
         <TableCell className="text-xs text-muted-foreground">
@@ -445,8 +449,8 @@ export function AdminExternalTopUpRequests() {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="font-semibold">${Number(r.amount).toLocaleString()}</span>
-            <Badge variant={r.wallet_kind === "secondary" ? "secondary" : "outline"}>
-              {r.wallet_kind === "secondary" ? "Secondary" : "Main"}
+            <Badge variant={r.wallet_kind && r.wallet_kind !== "primary" ? "secondary" : "outline"}>
+              {walletName(r.wallet_kind)}
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground">
@@ -597,7 +601,7 @@ export function AdminExternalTopUpRequests() {
             <DialogTitle>Reject top-up request</DialogTitle>
             <DialogDescription>
               ${Number(rejectReq?.amount ?? 0).toLocaleString()} will be refunded to the client's{" "}
-              {rejectReq?.wallet_kind === "secondary" ? "secondary" : "main"} wallet.
+              {walletName(rejectReq?.wallet_kind).toLowerCase()} wallet.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">

@@ -21,12 +21,13 @@ interface Props {
     account_name: string;
     external_topup_url?: string | null;
     external_topup_url_secondary?: string | null;
+    external_topup_url_credit_line?: string | null;
     external_crm_name?: string | null;
     spend_cap?: number | string | null;
     user_id?: string | null;
   };
   /** Which client wallet to deduct from. Defaults to the main wallet. */
-  walletKind?: "primary" | "secondary";
+  walletKind?: "primary" | "secondary" | "credit_line";
 }
 
 /**
@@ -41,10 +42,18 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
   const [copied, setCopied] = useState(false);
 
   const isSecondary = walletKind === "secondary";
-  const url = (isSecondary
-    ? account.external_topup_url_secondary || account.external_topup_url
-    : account.external_topup_url) || "";
-  const walletLabel = isSecondary ? "Secondary wallet" : "Main wallet";
+  const isCreditLine = walletKind === "credit_line";
+  const url =
+    (isCreditLine
+      ? account.external_topup_url_credit_line || account.external_topup_url
+      : isSecondary
+        ? account.external_topup_url_secondary || account.external_topup_url
+        : account.external_topup_url) || "";
+  const walletLabel = isCreditLine
+    ? "Credit line wallet"
+    : isSecondary
+      ? "Secondary wallet"
+      : "Main wallet";
   const crmName = account.external_crm_name || "External CRM";
   const cleanAccountId = account.account_id.replace(/^act_/, "");
 
@@ -95,8 +104,9 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
       // Secondary wallet is funded from the main wallet at the rate difference.
       // Pull whatever is short first so the ledger reflects the conversion.
-      if (walletKind === "secondary") {
-        const { data: conv, error: convErr } = await (supabase as any).rpc("ensure_secondary_funds", {
+      if (walletKind === "secondary" || walletKind === "credit_line") {
+        const rpcName = walletKind === "credit_line" ? "ensure_credit_line_funds" : "ensure_secondary_funds";
+        const { data: conv, error: convErr } = await (supabase as any).rpc(rpcName, {
           p_user_id: targetUserId,
           p_needed_usd: amt,
           p_processed_by: `admin:${user!.id}`,
@@ -105,7 +115,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
         });
         if (convErr || (conv && conv.ok === false)) {
           await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
-          throw new Error(convErr?.message || conv?.error || "Secondary wallet funding failed");
+          throw new Error(convErr?.message || conv?.error || `${walletLabel} funding failed`);
         }
       }
 
@@ -204,7 +214,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
                 Top up <strong className="text-foreground">{account.account_name}</strong> via
               </span>
               <Badge variant="outline" className="max-w-full truncate">{crmName}</Badge>
-              <Badge variant={isSecondary ? "secondary" : "outline"} className="max-w-full truncate">{walletLabel}</Badge>
+              <Badge variant={isSecondary || isCreditLine ? "secondary" : "outline"} className="max-w-full truncate">{walletLabel}</Badge>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -214,8 +224,8 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span className="min-w-0 break-words">
-                {isSecondary
-                  ? "No external CRM URL is configured for this account (secondary or main). Please set it in Account Settings first."
+                {isSecondary || isCreditLine
+                  ? `No external CRM URL is configured for this account (${isCreditLine ? "credit line" : "secondary"} or main). Please set it in Account Settings first.`
                   : "External CRM URL is not configured for this account. Please set it in Account Settings first."}
               </span>
             </div>
