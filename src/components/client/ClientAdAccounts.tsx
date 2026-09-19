@@ -1404,7 +1404,7 @@ export function ClientAdAccounts() {
                 ${activeWalletBalance.toLocaleString()}
               </span>
             </div>
-            {isSecondaryTopUp && (
+            {isAltTopUp && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/60">
                 <span className="text-muted-foreground">Main Wallet (usable here)</span>
                 <span className="font-medium">
@@ -1418,7 +1418,7 @@ export function ClientAdAccounts() {
             {activeDueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">
-                  {isSecondaryTopUp ? "Secondary Due Limit" : "Due Limit"}
+                  {isCreditLineTopUp ? "Credit Line Due Limit" : isSecondaryTopUp ? "Secondary Due Limit" : "Due Limit"}
                 </span>
                 <span className="font-semibold text-amber-700 dark:text-amber-400">${activeDueLimit.toLocaleString()}</span>
               </div>
@@ -1442,16 +1442,16 @@ export function ClientAdAccounts() {
               {exceedsBalance && parsedAmount > 0 && (
                 <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{activeDueLimit > 0 ? " + due limit" : ""}</p>
               )}
-              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0.009 && parsedAmount > 0 && (
+              {isAltTopUp && !exceedsBalance && convertFromMain > 0.009 && parsedAmount > 0 && (
                 <p className="text-sm text-blue-600">
                   ${convertFromMain.toFixed(2)} will be moved from your Main Wallet
-                  {mainRate > 0 && secRate > 0 && mainRate !== secRate && ` (rate ${mainRate} → ${secRate})`}
+                  {mainRate > 0 && altRate > 0 && mainRate !== altRate && ` (rate ${mainRate} → ${altRate})`}
                 </p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">
-                  ⚠️ Using ${(isSecondaryTopUp ? secondaryDueUsed : parsedAmount - activeWalletBalance).toFixed(2)} from
-                  {isSecondaryTopUp ? " secondary" : ""} due limit
+                  ⚠️ Using ${(isAltTopUp ? secondaryDueUsed : parsedAmount - activeWalletBalance).toFixed(2)} from
+                  {isCreditLineTopUp ? " credit line" : isSecondaryTopUp ? " secondary" : ""} due limit
                 </p>
               )}
             </div>
