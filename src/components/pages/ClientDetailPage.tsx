@@ -3601,7 +3601,7 @@ export default function ClientDetailPage() {
                         ).toLocaleString()}
                       </span>
                     </div>
-                    {!(wallets.secondaryEnabled && topUpWallet === "secondary") && (
+                    {topUpWallet === "primary" && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Main Wallet After</span>
                         <span
@@ -3611,6 +3611,19 @@ export default function ClientDetailPage() {
                           )}
                         >
                           ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {topUpWallet === "credit_line" && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Credit Line Wallet After</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            wallets.creditLineBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          ${(wallets.creditLineBalance - parseFloat(topUpAmount)).toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -3633,7 +3646,20 @@ export default function ClientDetailPage() {
                   <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>
                     Cancel
                   </Button>
-                  {wallets.secondaryEnabled && topUpWallet === "secondary" ? (
+                  {topUpWallet === "credit_line" ? (
+                    <Button
+                      className="bg-sky-600 hover:bg-sky-700 text-white"
+                      onClick={() => topUpMutation.mutate("credit_line")}
+                      disabled={
+                        !selectedAccountId ||
+                        !topUpAmount ||
+                        parseFloat(topUpAmount) <= 0 ||
+                        topUpMutation.isPending
+                      }
+                    >
+                      {topUpMutation.isPending ? "Processing..." : "Top Up (Credit Line)"}
+                    </Button>
+                  ) : wallets.secondaryEnabled && topUpWallet === "secondary" ? (
                     <Button
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       onClick={() => topUpMutation.mutate("secondary")}
