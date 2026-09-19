@@ -1357,15 +1357,17 @@ export function AdminAdAccounts() {
                         <LimitUpdateIndicator state={limitWatches[a.id]} />
                         {a.external_topup_required ? (
                           <>
-                            <Button
-                              size="icon"
-                              className="h-8 w-8 bg-amber-600 hover:bg-amber-700 text-white"
-                              onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
-                              title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                            {hasSecondaryWallet(getAssignedUserId(a.id)) && (
+                            {a.external_topup_url && (
+                              <Button
+                                size="icon"
+                                className="h-8 w-8 bg-amber-600 hover:bg-amber-700 text-white"
+                                onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
+                                title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {a.external_topup_url_secondary && (
                               <Button
                                 size="icon"
                                 className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
