@@ -16,6 +16,7 @@ interface Props {
     external_topup_required?: boolean | null;
     external_topup_url?: string | null;
     external_topup_url_secondary?: string | null;
+    external_topup_url_credit_line?: string | null;
     external_crm_name?: string | null;
   };
 }
