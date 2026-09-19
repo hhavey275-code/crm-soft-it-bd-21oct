@@ -59,7 +59,7 @@ export function ClientAdAccounts() {
   const limitWatches = useLimitWatches();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
-  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary" | "credit_line">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -1058,7 +1058,18 @@ export function ClientAdAccounts() {
                                 Secondary Top Up
                               </Button>
                             )}
-                            {!a.external_topup_url && !a.external_topup_url_secondary && (
+                            {a.external_topup_url_credit_line && (
+                              <Button
+                                size="sm"
+                                className="flex-1 text-xs h-8 bg-sky-600 hover:bg-sky-700 text-white"
+                                disabled={isInactive}
+                                onClick={() => { setTopUpAccount(a); setTopUpWallet("credit_line"); setTopUpAmount(""); }}
+                              >
+                                <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                                Credit Line Top Up
+                              </Button>
+                            )}
+                            {!a.external_topup_url && !a.external_topup_url_secondary && !a.external_topup_url_credit_line && (
                               <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
                                 Admin Top-Up Only
                               </Button>
@@ -1252,7 +1263,19 @@ export function ClientAdAccounts() {
                                   Secondary
                                 </Button>
                               )}
-                              {!a.external_topup_url && !a.external_topup_url_secondary && (
+                              {a.external_topup_url_credit_line && (
+                                <Button
+                                  size="sm"
+                                  className="bg-sky-600 hover:bg-sky-700 text-white"
+                                  disabled={isInactive}
+                                  title="Request top-up (Credit line wallet)"
+                                  onClick={() => { setTopUpAccount(a); setTopUpWallet("credit_line"); setTopUpAmount(""); }}
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                  Credit Line
+                                </Button>
+                              )}
+                              {!a.external_topup_url && !a.external_topup_url_secondary && !a.external_topup_url_credit_line && (
                                 <Button size="sm" variant="outline" disabled title="Admin top-up only">
                                   <LockIcon className="h-4 w-4 mr-1" />
                                   Admin Only
