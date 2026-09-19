@@ -100,7 +100,7 @@ export function AdminAdAccounts() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [externalTopUpAccount, setExternalTopUpAccount] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
+  const [externalTopUpAccount, setExternalTopUpAccount] = useState<{ account: any; wallet: "primary" | "secondary" | "credit_line" } | null>(null);
   const limitWatches = useLimitWatches();
   const [sortField, setSortField] = useState<string>(() => sessionStorage.getItem("adAccountsSortField") || "account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
@@ -1090,6 +1090,17 @@ export function AdminAdAccounts() {
                               Ext. Secondary
                             </Button>
                           )}
+                          {a.external_topup_url_credit_line && (
+                            <Button
+                              size="sm"
+                              className="gap-1 rounded-full px-4 font-semibold text-xs h-8 bg-sky-600 hover:bg-sky-700 text-white"
+                              title="Ext. Top-Up (Credit Line Wallet)"
+                              onClick={() => setExternalTopUpAccount({ account: a, wallet: "credit_line" })}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Ext. Credit Line
+                            </Button>
+                          )}
                         </>
                       ) : (
                         <>
@@ -1377,6 +1388,16 @@ export function AdminAdAccounts() {
                                 className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                 onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
                                 title="Ext. Top-Up (Secondary Wallet)"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {a.external_topup_url_credit_line && (
+                              <Button
+                                size="icon"
+                                className="h-8 w-8 bg-sky-600 hover:bg-sky-700 text-white"
+                                onClick={() => setExternalTopUpAccount({ account: a, wallet: "credit_line" })}
+                                title="Ext. Top-Up (Credit Line Wallet)"
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
