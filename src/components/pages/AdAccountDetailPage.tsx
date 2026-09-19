@@ -538,14 +538,16 @@ export default function AdAccountDetailPage() {
             </Button>
             {isAdmin && account?.external_topup_required && (
               <>
-                <Button
-                  size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                  onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
-                >
-                  <ExternalLink className="h-4 w-4 mr-1" />
-                  Top-Up via {account.external_crm_name || "External CRM"}
-                </Button>
+                {account?.external_topup_url && (
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Top-Up via {account.external_crm_name || "External CRM"}
+                  </Button>
+                )}
                 {account?.external_topup_url_secondary && (
                   <Button
                     size="sm"
