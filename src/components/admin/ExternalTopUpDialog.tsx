@@ -192,7 +192,7 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[85vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+      <DialogContent className="block w-[min(28rem,calc(100vw-2rem))] max-w-[min(28rem,calc(100vw-2rem))] max-h-[85vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4">
         <DialogHeader className="text-left">
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <ExternalLink className="h-4 w-4 shrink-0 text-amber-600" />
