@@ -562,7 +562,7 @@ export default function ClientDetailPage() {
   });
 
   const topUpMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line" = "primary") => {
       const amt = parseFloat(topUpAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {

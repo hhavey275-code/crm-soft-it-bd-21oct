@@ -657,7 +657,7 @@ export function ClientAdAccounts() {
     : 0;
 
   const externalRequestMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line") => {
       const { data, error } = await (supabase as any).rpc("request_external_topup", {
         p_ad_account_id: topUpAccount.id,
         p_amount: parsedAmount,
@@ -716,7 +716,7 @@ export function ClientAdAccounts() {
   });
 
   const topUpMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line" = "primary") => {
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
         body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
       });
