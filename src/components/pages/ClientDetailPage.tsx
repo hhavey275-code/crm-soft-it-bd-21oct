@@ -2930,6 +2930,7 @@ export default function ClientDetailPage() {
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1">
                                       <LimitUpdateIndicator state={limitWatches[acc.id]} />
+                                      {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
                                       <Button
                                         size="icon"
                                         variant="default"
@@ -2949,7 +2950,8 @@ export default function ClientDetailPage() {
                                       >
                                         <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
-                                      {wallets.secondaryEnabled && (
+                                      )}
+                                      {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
                                           size="icon"
                                           className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
