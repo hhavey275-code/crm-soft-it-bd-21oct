@@ -21,12 +21,13 @@ interface Props {
     account_name: string;
     external_topup_url?: string | null;
     external_topup_url_secondary?: string | null;
+    external_topup_url_credit_line?: string | null;
     external_crm_name?: string | null;
     spend_cap?: number | string | null;
     user_id?: string | null;
   };
   /** Which client wallet to deduct from. Defaults to the main wallet. */
-  walletKind?: "primary" | "secondary";
+  walletKind?: "primary" | "secondary" | "credit_line";
 }
 
 /**
