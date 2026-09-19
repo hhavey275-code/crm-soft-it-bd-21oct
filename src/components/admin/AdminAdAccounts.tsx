@@ -1346,11 +1346,6 @@ export function AdminAdAccounts() {
                               </div>
                             );
                           })()}
-                          {limitWatches[a.id] && (
-                            <div className="mt-1 max-w-[130px] whitespace-normal">
-                              <LimitUpdateIndicator state={limitWatches[a.id]} />
-                            </div>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
