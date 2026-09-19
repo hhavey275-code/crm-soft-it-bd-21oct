@@ -281,7 +281,7 @@ async function waApi(body) {
   const res = await fetch(API, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(Object.assign({ token: autopilot.token, action: `wa_${body.action}` }, body)),
+    body: JSON.stringify(Object.assign({}, body, { token: autopilot.token, action: `wa_${body.action}` })),
   });
   return readJsonResponse(res, "WhatsApp");
 }
