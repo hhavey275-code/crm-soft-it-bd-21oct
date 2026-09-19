@@ -1068,23 +1068,26 @@ export function AdminAdAccounts() {
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {a.external_topup_required ? (
                         <>
-                          <Button
-                            size="sm"
-                            className="gap-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-4 font-semibold text-xs h-8"
-                            title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
-                            onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Ext. Top-Up
-                          </Button>
-                          {hasSecondaryWallet(uid) && (
+                          {a.external_topup_url && (
                             <Button
-                              size="icon"
-                              className="h-8 w-8 shrink-0 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                              size="sm"
+                              className="gap-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-4 font-semibold text-xs h-8"
+                              title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
+                              onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Ext. Top-Up
+                            </Button>
+                          )}
+                          {a.external_topup_url_secondary && (
+                            <Button
+                              size="sm"
+                              className="gap-1 rounded-full px-4 font-semibold text-xs h-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                               title="Ext. Top-Up (Secondary Wallet)"
                               onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
+                              Ext. Secondary
                             </Button>
                           )}
                         </>
