@@ -535,14 +535,26 @@ export default function AdAccountDetailPage() {
               Update from {isTikTok ? "BC" : "Meta"}
             </Button>
             {isAdmin && account?.external_topup_required && (
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                onClick={() => setShowExternalTopUp(true)}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                Top-Up via {account.external_crm_name || "External CRM"}
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Top-Up via {account.external_crm_name || "External CRM"}
+                </Button>
+                {account?.external_topup_url_secondary && (
+                  <Button
+                    size="sm"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                    onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Secondary Wallet Top-Up
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
