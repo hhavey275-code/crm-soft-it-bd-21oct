@@ -84,7 +84,7 @@ export function AdminExternalTopUpRequests() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("ad_accounts")
-        .select("id, account_id, account_name, external_topup_url, external_topup_url_secondary, external_crm_name")
+        .select("id, account_id, account_name, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line, external_crm_name")
         .in("id", accountIds);
       return data ?? [];
     },
@@ -109,6 +109,7 @@ export function AdminExternalTopUpRequests() {
 
   const resolveUrl = (r: Req) => {
     const a = acc(r.ad_account_id);
+    if (r.wallet_kind === "credit_line") return a?.external_topup_url_credit_line || a?.external_topup_url || r.external_topup_url || "";
     if (r.wallet_kind === "secondary") return a?.external_topup_url_secondary || a?.external_topup_url || r.external_topup_url || "";
     return a?.external_topup_url || r.external_topup_url || "";
   };
