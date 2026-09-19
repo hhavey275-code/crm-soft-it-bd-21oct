@@ -122,6 +122,18 @@ export function ExternalTopUpConfigSection({ account }: Props) {
                 Used when topping up from the client's secondary wallet. Leave empty to reuse the main URL.
               </p>
             </div>
+            <div>
+              <Label className="text-xs">Credit Line Wallet Top-Up URL (optional)</Label>
+              <Input
+                type="url"
+                placeholder="https://partner-crm.example.com/topup-credit-line"
+                value={urlCreditLine}
+                onChange={(e) => setUrlCreditLine(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Used when topping up from the client's credit line wallet. Leave empty to reuse the main URL.
+              </p>
+            </div>
           </div>
         )}
 
