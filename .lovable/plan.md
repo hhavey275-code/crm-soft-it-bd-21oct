@@ -25,7 +25,7 @@ Database (migration):
 - `ad_accounts`-এ `external_topup_url_credit_line text`।
 - `wallet_kind`-এর বৈধ মানে `'credit_line'` যোগ (`validate_wallet_kind` trigger function আপডেট); `transactions`, `external_topup_requests`, `top_up_requests.target_wallet` একই মান ব্যবহার করবে।
 - ফাংশন আপডেট/নতুন:
-  - `distribute_deposit_bdt` — তৃতীয় ধাপ যোগ (Main due → Secondary due → Credit Line due → অবশিষ্ট Main-এ advance হিসেবে), প্রতিটি নিজের রেটে।
+  - `distribute_deposit_bdt` — শুধু চালু ওয়ালেটগুলোর মধ্যে ধাপে ধাপে (Main due → Secondary due → Credit Line due → অবশিষ্ট Main-এ advance), প্রতিটি নিজের রেটে; বন্ধ ওয়ালেট সম্পূর্ণ বাদ।
   - `deduct_wallet_for_topup_v2` — `p_wallet_kind='credit_line'` সাপোর্ট, একই advisory lock/ধার-সীমা নিয়মে।
   - `ensure_credit_line_funds` — ঘাটতি হলে Main থেকে রেট-কনভার্ট করে টানবে (`ensure_secondary_funds`-এর অনুরূপ)।
   - `admin_adjust_credit_line_wallet`, `admin_convert_main_to_credit_line` — অ্যাডমিন-only, `admin_adjust_secondary_wallet` / `admin_convert_main_to_secondary`-এর অনুরূপ।
