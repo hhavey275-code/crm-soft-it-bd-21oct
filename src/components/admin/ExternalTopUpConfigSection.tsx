@@ -27,6 +27,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const [crmName, setCrmName] = useState(account.external_crm_name || "");
   const [url, setUrl] = useState(account.external_topup_url || "");
   const [urlSecondary, setUrlSecondary] = useState(account.external_topup_url_secondary || "");
+  const [urlCreditLine, setUrlCreditLine] = useState(account.external_topup_url_credit_line || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -34,18 +35,20 @@ export function ExternalTopUpConfigSection({ account }: Props) {
     setCrmName(account.external_crm_name || "");
     setUrl(account.external_topup_url || "");
     setUrlSecondary(account.external_topup_url_secondary || "");
-  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url, account.external_topup_url_secondary]);
+    setUrlCreditLine(account.external_topup_url_credit_line || "");
+  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url, account.external_topup_url_secondary, account.external_topup_url_credit_line]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (enabled && !url.trim() && !urlSecondary.trim())
-        throw new Error("Add at least one CRM URL (main or secondary)");
+      if (enabled && !url.trim() && !urlSecondary.trim() && !urlCreditLine.trim())
+        throw new Error("Add at least one CRM URL (main, secondary or credit line)");
       const { error } = await (supabase as any)
         .from("ad_accounts")
         .update({
           external_topup_required: enabled,
           external_topup_url: enabled ? (url.trim() || null) : null,
           external_topup_url_secondary: enabled ? (urlSecondary.trim() || null) : null,
+          external_topup_url_credit_line: enabled ? (urlCreditLine.trim() || null) : null,
           external_crm_name: enabled ? (crmName.trim() || "External CRM") : null,
         })
         .eq("id", account.id);
@@ -63,7 +66,8 @@ export function ExternalTopUpConfigSection({ account }: Props) {
     enabled !== !!account.external_topup_required ||
     crmName !== (account.external_crm_name || "") ||
     url !== (account.external_topup_url || "") ||
-    urlSecondary !== (account.external_topup_url_secondary || "");
+    urlSecondary !== (account.external_topup_url_secondary || "") ||
+    urlCreditLine !== (account.external_topup_url_credit_line || "");
 
   return (
     <Card>
