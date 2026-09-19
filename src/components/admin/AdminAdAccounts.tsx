@@ -100,7 +100,7 @@ export function AdminAdAccounts() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [externalTopUpAccount, setExternalTopUpAccount] = useState<any>(null);
+  const [externalTopUpAccount, setExternalTopUpAccount] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
   const limitWatches = useLimitWatches();
   const [sortField, setSortField] = useState<string>(() => sessionStorage.getItem("adAccountsSortField") || "account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
