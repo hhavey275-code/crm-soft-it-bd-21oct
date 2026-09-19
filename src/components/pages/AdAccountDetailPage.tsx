@@ -54,6 +54,7 @@ export default function AdAccountDetailPage() {
   const [newSpendCap, setNewSpendCap] = useState("");
   const [showLimitHistory, setShowLimitHistory] = useState(false);
   const [showExternalTopUp, setShowExternalTopUp] = useState(false);
+  const [externalTopUpWallet, setExternalTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [showSilentRecovery, setShowSilentRecovery] = useState(false);
 
   // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
@@ -472,14 +473,26 @@ export default function AdAccountDetailPage() {
               </span>
             )}
             {isAdmin && account?.external_topup_required && (
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white h-8 text-xs"
-                onClick={() => setShowExternalTopUp(true)}
-              >
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Ext. Top-Up
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 text-xs"
+                  onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                  Ext. Top-Up
+                </Button>
+                {account?.external_topup_url_secondary && (
+                  <Button
+                    size="sm"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white h-8 text-xs"
+                    onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Ext. Secondary
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
@@ -522,14 +535,26 @@ export default function AdAccountDetailPage() {
               Update from {isTikTok ? "BC" : "Meta"}
             </Button>
             {isAdmin && account?.external_topup_required && (
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                onClick={() => setShowExternalTopUp(true)}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                Top-Up via {account.external_crm_name || "External CRM"}
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => { setExternalTopUpWallet("primary"); setShowExternalTopUp(true); }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Top-Up via {account.external_crm_name || "External CRM"}
+                </Button>
+                {account?.external_topup_url_secondary && (
+                  <Button
+                    size="sm"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                    onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Secondary Wallet Top-Up
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1075,6 +1100,7 @@ export default function AdAccountDetailPage() {
             open={showExternalTopUp}
             onOpenChange={setShowExternalTopUp}
             account={account}
+            walletKind={externalTopUpWallet}
           />
         )}
 

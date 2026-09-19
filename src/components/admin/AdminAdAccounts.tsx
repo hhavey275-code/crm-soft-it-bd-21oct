@@ -100,7 +100,7 @@ export function AdminAdAccounts() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [externalTopUpAccount, setExternalTopUpAccount] = useState<any>(null);
+  const [externalTopUpAccount, setExternalTopUpAccount] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
   const limitWatches = useLimitWatches();
   const [sortField, setSortField] = useState<string>(() => sessionStorage.getItem("adAccountsSortField") || "account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (sessionStorage.getItem("adAccountsSortDir") as "asc" | "desc") || "asc");
@@ -1067,14 +1067,27 @@ export function AdminAdAccounts() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {a.external_topup_required ? (
-                        <Button
-                          size="sm"
-                          className="gap-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-4 font-semibold text-xs h-8"
-                          onClick={() => setExternalTopUpAccount(a)}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          Ext. Top-Up
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            className="gap-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-4 font-semibold text-xs h-8"
+                            title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
+                            onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Ext. Top-Up
+                          </Button>
+                          {hasSecondaryWallet(uid) && (
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 shrink-0 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                              title="Ext. Top-Up (Secondary Wallet)"
+                              onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <Button
@@ -1340,14 +1353,26 @@ export function AdminAdAccounts() {
                         <div className="flex items-center gap-1">
                         <LimitUpdateIndicator state={limitWatches[a.id]} />
                         {a.external_topup_required ? (
-                          <Button
-                            size="icon"
-                            className="h-8 w-8 bg-amber-600 hover:bg-amber-700 text-white"
-                            onClick={() => setExternalTopUpAccount(a)}
-                            title={`Top-up via ${a.external_crm_name || "External CRM"}`}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 bg-amber-600 hover:bg-amber-700 text-white"
+                              onClick={() => setExternalTopUpAccount({ account: a, wallet: "primary" })}
+                              title={`Top-up via ${a.external_crm_name || "External CRM"} (Main wallet)`}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            {hasSecondaryWallet(getAssignedUserId(a.id)) && (
+                              <Button
+                                size="icon"
+                                className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
+                                title="Ext. Top-Up (Secondary Wallet)"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
                         ) : (
                           <>
                             <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
@@ -1721,7 +1746,8 @@ export function AdminAdAccounts() {
         <ExternalTopUpDialog
           open={!!externalTopUpAccount}
           onOpenChange={(o) => { if (!o) setExternalTopUpAccount(null); }}
-          account={externalTopUpAccount}
+          account={externalTopUpAccount.account}
+          walletKind={externalTopUpAccount.wallet}
         />
       )}
     </div>
