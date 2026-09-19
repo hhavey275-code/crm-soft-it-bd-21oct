@@ -192,25 +192,28 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4 text-amber-600" />
-            External CRM Top-Up
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[85vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        <DialogHeader className="text-left">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <ExternalLink className="h-4 w-4 shrink-0 text-amber-600" />
+            <span className="truncate">External CRM Top-Up</span>
           </DialogTitle>
-          <DialogDescription>
-            Top up <strong>{account.account_name}</strong> via{" "}
-            <Badge variant="outline" className="ml-1">{crmName}</Badge>
-            {" "}
-            <Badge variant={isSecondary ? "secondary" : "outline"} className="ml-1">{walletLabel}</Badge>
+          <DialogDescription asChild>
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+              <span className="min-w-0 break-words">
+                Top up <strong className="text-foreground">{account.account_name}</strong> via
+              </span>
+              <Badge variant="outline" className="max-w-full truncate">{crmName}</Badge>
+              <Badge variant={isSecondary ? "secondary" : "outline"} className="max-w-full truncate">{walletLabel}</Badge>
+            </div>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="space-y-3 py-2 min-w-0">
           {!url && (
             <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>
+              <span className="min-w-0 break-words">
                 {isSecondary
                   ? "No external CRM URL is configured for this account (secondary or main). Please set it in Account Settings first."
                   : "External CRM URL is not configured for this account. Please set it in Account Settings first."}
@@ -218,20 +221,21 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             </div>
           )}
 
-          <div className="rounded-md border p-3 bg-muted/30 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Account ID to paste</span>
-              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={copyAccountId}>
+          <div className="rounded-md border p-3 bg-muted/30 space-y-2 min-w-0">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground truncate">Account ID to paste</span>
+              <Button size="sm" variant="ghost" className="h-6 px-2 shrink-0" onClick={copyAccountId}>
                 {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
             </div>
-            <div className="font-mono text-sm font-semibold">{cleanAccountId}</div>
+            <div className="font-mono text-sm font-semibold break-all">{cleanAccountId}</div>
           </div>
 
-          <div>
+          <div className="space-y-1.5 min-w-0">
             <Label>Amount (USD)</Label>
             <Input
+              className="w-full"
               type="number"
               min="1"
               step="0.01"
@@ -242,18 +246,19 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
             />
           </div>
 
-          <div>
+          <div className="space-y-1.5 min-w-0">
             <Label>Notes (optional)</Label>
             <Input
+              className="w-full"
               placeholder="Reference, batch, comments..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 
-          <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1">
+          <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1 min-w-0">
             <p className="font-semibold text-amber-700 dark:text-amber-300">What happens next:</p>
-            <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
+            <ol className="list-decimal pl-4 text-amber-700 dark:text-amber-300/90 space-y-0.5 break-words">
               <li>Client's <strong>{walletLabel.toLowerCase()}</strong> will be <strong>deducted immediately</strong>.</li>
               <li>The CRM Helper (Auto-pilot) completes the top-up in the partner CRM automatically.</li>
               <li>A live "Updating your limit…" indicator shows beside the account until the new limit arrives.</li>
@@ -261,23 +266,24 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
           </div>
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => initiateMutation.mutate("manual")}
             disabled={!amount || !url || initiateMutation.isPending}
           >
-            <ExternalLink className="h-4 w-4 mr-1" />
-            Deduct & Open CRM
+            <ExternalLink className="h-4 w-4 mr-1 shrink-0" />
+            <span className="truncate">Deduct &amp; Open CRM</span>
           </Button>
           <Button
-            className="bg-amber-600 hover:bg-amber-700 text-white"
+            className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white"
             onClick={() => initiateMutation.mutate("auto")}
             disabled={!amount || !url || initiateMutation.isPending}
           >
-            <Zap className="h-4 w-4 mr-1" />
-            {initiateMutation.isPending ? "Processing..." : "Deduct & Auto Top-Up"}
+            <Zap className="h-4 w-4 mr-1 shrink-0" />
+            <span className="truncate">{initiateMutation.isPending ? "Processing..." : "Deduct & Auto Top-Up"}</span>
           </Button>
         </DialogFooter>
       </DialogContent>
