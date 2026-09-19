@@ -1100,6 +1100,7 @@ export default function AdAccountDetailPage() {
             open={showExternalTopUp}
             onOpenChange={setShowExternalTopUp}
             account={account}
+            walletKind={externalTopUpWallet}
           />
         )}
 
