@@ -297,7 +297,9 @@ Deno.serve(async (req)=>{
     if (!ad_account_id || !amount) return json({
       error: "ad_account_id and amount required"
     }, 400);
-    const walletKind = walletKindRaw === "secondary" ? "secondary" : "primary";
+    const walletKind = walletKindRaw === "secondary"
+      ? "secondary"
+      : walletKindRaw === "credit_line" ? "credit_line" : "primary";
 
 
     // ============================================
@@ -402,7 +404,7 @@ Deno.serve(async (req)=>{
       let dueLimit = 0;
       const { data: prof } = await supabase
         .from("profiles")
-        .select("due_limit, due_limit_expires_at, secondary_due_limit, secondary_due_limit_expires_at, secondary_wallet_enabled")
+        .select("due_limit, due_limit_expires_at, secondary_due_limit, secondary_due_limit_expires_at, secondary_wallet_enabled, credit_line_due_limit, credit_line_due_limit_expires_at, credit_line_wallet_enabled")
         .eq("user_id", walletUserId)
         .single();
       // Each wallet has its own due limit; an expired limit counts as zero and
@@ -411,17 +413,23 @@ Deno.serve(async (req)=>{
       if (!isAdmin) {
         dueLimit = walletKind === "secondary"
           ? (notExpired((prof as any)?.secondary_due_limit_expires_at) ? Number((prof as any)?.secondary_due_limit ?? 0) : 0)
-          : (notExpired((prof as any)?.due_limit_expires_at) ? Number(prof?.due_limit ?? 0) : 0);
+          : walletKind === "credit_line"
+            ? (notExpired((prof as any)?.credit_line_due_limit_expires_at) ? Number((prof as any)?.credit_line_due_limit ?? 0) : 0)
+            : (notExpired((prof as any)?.due_limit_expires_at) ? Number(prof?.due_limit ?? 0) : 0);
       }
       if (walletKind === "secondary" && !prof?.secondary_wallet_enabled) {
         return json({ error: "Secondary wallet is not enabled for this client" }, 400);
       }
+      if (walletKind === "credit_line" && !(prof as any)?.credit_line_wallet_enabled) {
+        return json({ error: "Credit line wallet is not enabled for this client" }, 400);
+      }
 
-      // Secondary wallet is funded from the main wallet's POSITIVE balance at the
-      // rate difference. Anything still short is covered by the secondary
-      // wallet's own due limit below.
-      if (walletKind === "secondary") {
-        const { data: convRes, error: convErr } = await supabaseUser.rpc("ensure_secondary_funds", {
+      // Secondary / credit line wallets are funded from the main wallet's
+      // POSITIVE balance at the rate difference. Anything still short is
+      // covered by that wallet's own due limit below.
+      if (walletKind === "secondary" || walletKind === "credit_line") {
+        const fundFn = walletKind === "secondary" ? "ensure_secondary_funds" : "ensure_credit_line_funds";
+        const { data: convRes, error: convErr } = await supabaseUser.rpc(fundFn, {
           p_user_id: walletUserId,
           p_needed_usd: amount,
           p_processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
@@ -429,13 +437,13 @@ Deno.serve(async (req)=>{
           p_due_limit: 0,
         });
         if (convErr) {
-          console.error("ensure_secondary_funds failed", convErr);
-          return json({ error: "Secondary wallet funding failed. Please try again." }, 500);
+          console.error(`${fundFn} failed`, convErr);
+          return json({ error: "Wallet funding failed. Please try again." }, 500);
         }
         const cr: any = convRes;
         if (!cr?.ok) {
           if (cr?.error === "insufficient_balance") return json({ error: "Insufficient wallet balance" }, 400);
-          return json({ error: "Secondary wallet funding failed" }, 400);
+          return json({ error: "Wallet funding failed" }, 400);
         }
       }
 
@@ -455,7 +463,9 @@ Deno.serve(async (req)=>{
       });
 
 
-      const walletLabel = walletKind === "secondary" ? "Secondary wallet" : "Wallet";
+      const walletLabel = walletKind === "secondary"
+        ? "Secondary wallet"
+        : walletKind === "credit_line" ? "Credit line wallet" : "Wallet";
       if (deductErr) {
         console.error("deduct_wallet_for_topup_v2 failed", deductErr);
         return json({ error: `${walletLabel} deduction failed. Please try again.` }, 500);
@@ -463,7 +473,7 @@ Deno.serve(async (req)=>{
       const res: any = deductRes;
       if (!res?.ok) {
         if (res?.error === "wallet_not_found") return json({ error: `${walletLabel} not found for user` }, 404);
-        if (res?.error === "insufficient_balance") return json({ error: `Insufficient ${walletKind === "secondary" ? "secondary wallet" : "wallet"} balance` }, 400);
+        if (res?.error === "insufficient_balance") return json({ error: `Insufficient ${walletLabel.toLowerCase()} balance` }, 400);
         return json({ error: `${walletLabel} deduction failed` }, 400);
       }
 

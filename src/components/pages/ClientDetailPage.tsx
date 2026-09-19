@@ -144,10 +144,10 @@ export default function ClientDetailPage() {
   // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   // External CRM top-up (per ad account, per wallet)
-  const [extTopUp, setExtTopUp] = useState<{ account: any; wallet: "primary" | "secondary" } | null>(null);
+  const [extTopUp, setExtTopUp] = useState<{ account: any; wallet: "primary" | "secondary" | "credit_line" } | null>(null);
   const limitWatches = useLimitWatches();
 
-  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary" | "credit_line">("primary");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -562,7 +562,7 @@ export default function ClientDetailPage() {
   });
 
   const topUpMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line" = "primary") => {
       const amt = parseFloat(topUpAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
@@ -786,20 +786,13 @@ export default function ClientDetailPage() {
                 </div>
                 <LimitUpdateIndicator state={limitWatches[acc.id]} />
                 <div
-                  className={cn(
-                    "mt-2 grid gap-2",
-                    (acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled)
-                      ? ((acc.external_topup_required ? !!acc.external_topup_url : true)
-                          ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                          : "grid-cols-[minmax(0,1fr)_auto]")
-                      : "grid-cols-[minmax(0,1fr)_auto]"
-                  )}
+                  className="mt-2 flex flex-wrap items-center gap-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
                     <Button
                       size="sm"
-                      className="w-full min-w-0 gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
+                      className="flex-1 min-w-[110px] gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full font-semibold text-xs h-8"
                       onClick={() => {
                         if (acc.external_topup_required) {
                           setExtTopUp({ account: acc, wallet: "primary" });
@@ -819,7 +812,7 @@ export default function ClientDetailPage() {
                   {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                     <Button
                       size="sm"
-                      className="w-full min-w-0 gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
+                      className="flex-1 min-w-[110px] gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         if (acc.external_topup_required) {
@@ -835,6 +828,27 @@ export default function ClientDetailPage() {
                     >
                       <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{acc.external_topup_required ? "Ext. Secondary" : "Secondary"}</span>
+                    </Button>
+                  )}
+                  {(acc.external_topup_required ? !!acc.external_topup_url_credit_line : wallets.creditLineEnabled) && (
+                    <Button
+                      size="sm"
+                      className="flex-1 min-w-[110px] gap-1 rounded-full bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs h-8"
+                      title="Top Up (Credit Line Wallet)"
+                      onClick={() => {
+                        if (acc.external_topup_required) {
+                          setExtTopUp({ account: acc, wallet: "credit_line" });
+                          return;
+                        }
+                        setSelectedAccountId(acc.id);
+                        setTopUpWallet("credit_line");
+                        setTopUpDialogOpen(true);
+                        setTopUpAmount("");
+                        setDialogTab("topup");
+                      }}
+                    >
+                      <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{acc.external_topup_required ? "Ext. Credit Line" : "Credit Line"}</span>
                     </Button>
                   )}
                   <Button
@@ -3587,7 +3601,7 @@ export default function ClientDetailPage() {
                         ).toLocaleString()}
                       </span>
                     </div>
-                    {!(wallets.secondaryEnabled && topUpWallet === "secondary") && (
+                    {topUpWallet === "primary" && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Main Wallet After</span>
                         <span
@@ -3597,6 +3611,19 @@ export default function ClientDetailPage() {
                           )}
                         >
                           ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {topUpWallet === "credit_line" && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Credit Line Wallet After</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            wallets.creditLineBalance - parseFloat(topUpAmount) < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          ${(wallets.creditLineBalance - parseFloat(topUpAmount)).toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -3619,7 +3646,20 @@ export default function ClientDetailPage() {
                   <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>
                     Cancel
                   </Button>
-                  {wallets.secondaryEnabled && topUpWallet === "secondary" ? (
+                  {topUpWallet === "credit_line" ? (
+                    <Button
+                      className="bg-sky-600 hover:bg-sky-700 text-white"
+                      onClick={() => topUpMutation.mutate("credit_line")}
+                      disabled={
+                        !selectedAccountId ||
+                        !topUpAmount ||
+                        parseFloat(topUpAmount) <= 0 ||
+                        topUpMutation.isPending
+                      }
+                    >
+                      {topUpMutation.isPending ? "Processing..." : "Top Up (Credit Line)"}
+                    </Button>
+                  ) : wallets.secondaryEnabled && topUpWallet === "secondary" ? (
                     <Button
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       onClick={() => topUpMutation.mutate("secondary")}

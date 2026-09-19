@@ -59,7 +59,7 @@ export function ClientAdAccounts() {
   const limitWatches = useLimitWatches();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
-  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary">("primary");
+  const [topUpWallet, setTopUpWallet] = useState<"primary" | "secondary" | "credit_line">("primary");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -289,6 +289,9 @@ export function ClientAdAccounts() {
     : 0;
   const secondaryDueLimit = notExpired((profile as any)?.secondary_due_limit_expires_at)
     ? Number((profile as any)?.secondary_due_limit ?? 0)
+    : 0;
+  const creditLineDueLimit = notExpired((profile as any)?.credit_line_due_limit_expires_at)
+    ? Number((profile as any)?.credit_line_due_limit ?? 0)
     : 0;
   // Renaming an ad account is an admin-granted permission (off by default).
   const canRename = !!(profile as any)?.account_rename_enabled;
@@ -616,30 +619,39 @@ export function ClientAdAccounts() {
   // External CRM accounts (no API connection) go through a request flow instead
   const isExternalTopUp = !!topUpAccount?.external_topup_required;
   const isSecondaryTopUp = topUpWallet === "secondary";
+  const isCreditLineTopUp = topUpWallet === "credit_line";
+  // Secondary and credit line wallets behave the same way: they hold their own
+  // balance, can be funded from the main wallet at the rate difference, and
+  // have their own due limit.
+  const isAltTopUp = isSecondaryTopUp || isCreditLineTopUp;
   const secondaryBalance = Number(wallets.secondaryBalance ?? 0);
+  const creditLineBalance = Number(wallets.creditLineBalance ?? 0);
   const mainRate = Number(wallets.mainRate ?? 0);
-  const secRate = Number(wallets.secondaryRate ?? 0) || mainRate;
-  // Secondary top-ups draw on: secondary balance → main wallet's POSITIVE
-  // balance (rate converted) → secondary wallet's own due limit.
-  // The main wallet's due limit is never usable on a secondary top-up.
-  const mainToSecondaryFactor = secRate > 0 && mainRate > 0 ? mainRate / secRate : 1;
-  const activeDueLimit = isSecondaryTopUp ? secondaryDueLimit : dueLimit;
+  const altRate =
+    Number(isCreditLineTopUp ? wallets.creditLineRate : wallets.secondaryRate ?? 0) || mainRate;
+  const altBalance = isCreditLineTopUp ? creditLineBalance : secondaryBalance;
+  const altDueLimit = isCreditLineTopUp ? creditLineDueLimit : secondaryDueLimit;
+  // Alt top-ups draw on: their own balance → main wallet's POSITIVE balance
+  // (rate converted) → that wallet's own due limit. The main wallet's due
+  // limit is never usable on an alt top-up.
+  const mainToSecondaryFactor = altRate > 0 && mainRate > 0 ? mainRate / altRate : 1;
+  const activeDueLimit = isAltTopUp ? altDueLimit : dueLimit;
   const mainSurplusAsSecondary = Math.max(0, walletBalance) * mainToSecondaryFactor;
-  const activeWalletBalance = isSecondaryTopUp ? secondaryBalance : walletBalance;
-  const effectiveBalance = isSecondaryTopUp
-    ? secondaryBalance + mainSurplusAsSecondary + secondaryDueLimit
+  const activeWalletBalance = isAltTopUp ? altBalance : walletBalance;
+  const effectiveBalance = isAltTopUp
+    ? altBalance + mainSurplusAsSecondary + altDueLimit
     : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
-  const secondaryShortfall = isSecondaryTopUp ? Math.max(0, parsedAmount - secondaryBalance) : 0;
+  const secondaryShortfall = isAltTopUp ? Math.max(0, parsedAmount - altBalance) : 0;
   const convertFromMain =
     secondaryShortfall > 0 && mainToSecondaryFactor > 0
       ? Math.min(secondaryShortfall / mainToSecondaryFactor, Math.max(0, walletBalance))
       : 0;
-  const secondaryDueUsed = isSecondaryTopUp
+  const secondaryDueUsed = isAltTopUp
     ? Math.max(0, secondaryShortfall - convertFromMain * mainToSecondaryFactor)
     : 0;
-  const usingDueLimit = isSecondaryTopUp
+  const usingDueLimit = isAltTopUp
     ? secondaryDueUsed > 0.01 && !exceedsBalance
     : parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
@@ -657,7 +669,7 @@ export function ClientAdAccounts() {
     : 0;
 
   const externalRequestMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line") => {
       const { data, error } = await (supabase as any).rpc("request_external_topup", {
         p_ad_account_id: topUpAccount.id,
         p_amount: parsedAmount,
@@ -716,7 +728,7 @@ export function ClientAdAccounts() {
   });
 
   const topUpMutation = useMutation({
-    mutationFn: async (walletKind: "primary" | "secondary" = "primary") => {
+    mutationFn: async (walletKind: "primary" | "secondary" | "credit_line" = "primary") => {
       const { data, error } = await supabase.functions.invoke("spend-cap-update", {
         body: { ad_account_id: topUpAccount.id, amount: parsedAmount, deduct_wallet: true, wallet_kind: walletKind },
       });
@@ -1058,7 +1070,18 @@ export function ClientAdAccounts() {
                                 Secondary Top Up
                               </Button>
                             )}
-                            {!a.external_topup_url && !a.external_topup_url_secondary && (
+                            {a.external_topup_url_credit_line && (
+                              <Button
+                                size="sm"
+                                className="flex-1 text-xs h-8 bg-sky-600 hover:bg-sky-700 text-white"
+                                disabled={isInactive}
+                                onClick={() => { setTopUpAccount(a); setTopUpWallet("credit_line"); setTopUpAmount(""); }}
+                              >
+                                <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                                Credit Line Top Up
+                              </Button>
+                            )}
+                            {!a.external_topup_url && !a.external_topup_url_secondary && !a.external_topup_url_credit_line && (
                               <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
                                 Admin Top-Up Only
                               </Button>
@@ -1252,7 +1275,19 @@ export function ClientAdAccounts() {
                                   Secondary
                                 </Button>
                               )}
-                              {!a.external_topup_url && !a.external_topup_url_secondary && (
+                              {a.external_topup_url_credit_line && (
+                                <Button
+                                  size="sm"
+                                  className="bg-sky-600 hover:bg-sky-700 text-white"
+                                  disabled={isInactive}
+                                  title="Request top-up (Credit line wallet)"
+                                  onClick={() => { setTopUpAccount(a); setTopUpWallet("credit_line"); setTopUpAmount(""); }}
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                  Credit Line
+                                </Button>
+                              )}
+                              {!a.external_topup_url && !a.external_topup_url_secondary && !a.external_topup_url_credit_line && (
                                 <Button size="sm" variant="outline" disabled title="Admin top-up only">
                                   <LockIcon className="h-4 w-4 mr-1" />
                                   Admin Only
@@ -1363,13 +1398,13 @@ export function ClientAdAccounts() {
             <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
               <span className="flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
-                {topUpWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}
+                {topUpWallet === "secondary" ? "Secondary Wallet" : topUpWallet === "credit_line" ? "Credit Line Wallet" : "Main Wallet"}
               </span>
               <span className={`font-semibold ${activeWalletBalance < 0 ? 'text-destructive' : ''}`}>
                 ${activeWalletBalance.toLocaleString()}
               </span>
             </div>
-            {isSecondaryTopUp && (
+            {isAltTopUp && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/60">
                 <span className="text-muted-foreground">Main Wallet (usable here)</span>
                 <span className="font-medium">
@@ -1383,7 +1418,7 @@ export function ClientAdAccounts() {
             {activeDueLimit > 0 && (
               <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <span className="text-amber-700 dark:text-amber-400">
-                  {isSecondaryTopUp ? "Secondary Due Limit" : "Due Limit"}
+                  {isCreditLineTopUp ? "Credit Line Due Limit" : isSecondaryTopUp ? "Secondary Due Limit" : "Due Limit"}
                 </span>
                 <span className="font-semibold text-amber-700 dark:text-amber-400">${activeDueLimit.toLocaleString()}</span>
               </div>
@@ -1407,16 +1442,16 @@ export function ClientAdAccounts() {
               {exceedsBalance && parsedAmount > 0 && (
                 <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{activeDueLimit > 0 ? " + due limit" : ""}</p>
               )}
-              {isSecondaryTopUp && !exceedsBalance && convertFromMain > 0.009 && parsedAmount > 0 && (
+              {isAltTopUp && !exceedsBalance && convertFromMain > 0.009 && parsedAmount > 0 && (
                 <p className="text-sm text-blue-600">
                   ${convertFromMain.toFixed(2)} will be moved from your Main Wallet
-                  {mainRate > 0 && secRate > 0 && mainRate !== secRate && ` (rate ${mainRate} → ${secRate})`}
+                  {mainRate > 0 && altRate > 0 && mainRate !== altRate && ` (rate ${mainRate} → ${altRate})`}
                 </p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
                 <p className="text-sm text-amber-600">
-                  ⚠️ Using ${(isSecondaryTopUp ? secondaryDueUsed : parsedAmount - activeWalletBalance).toFixed(2)} from
-                  {isSecondaryTopUp ? " secondary" : ""} due limit
+                  ⚠️ Using ${(isAltTopUp ? secondaryDueUsed : parsedAmount - activeWalletBalance).toFixed(2)} from
+                  {isCreditLineTopUp ? " credit line" : isSecondaryTopUp ? " secondary" : ""} due limit
                 </p>
               )}
             </div>
@@ -1436,7 +1471,7 @@ export function ClientAdAccounts() {
               <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs space-y-1">
                 <p className="font-semibold text-amber-700 dark:text-amber-300">How this works:</p>
                 <ol className="list-decimal ml-4 text-amber-700 dark:text-amber-300/90 space-y-0.5">
-                  <li>Amount is deducted from your {topUpWallet === "secondary" ? "secondary" : "main"} wallet right away.</li>
+                  <li>Amount is deducted from your {topUpWallet === "secondary" ? "secondary" : topUpWallet === "credit_line" ? "credit line" : "main"} wallet right away.</li>
                   <li>Our team gets the request instantly and tops up your ad account.</li>
                   <li>If it can't be processed, the amount is refunded automatically.</li>
                 </ol>

@@ -54,7 +54,7 @@ export default function AdAccountDetailPage() {
   const [newSpendCap, setNewSpendCap] = useState("");
   const [showLimitHistory, setShowLimitHistory] = useState(false);
   const [showExternalTopUp, setShowExternalTopUp] = useState(false);
-  const [externalTopUpWallet, setExternalTopUpWallet] = useState<"primary" | "secondary">("primary");
+  const [externalTopUpWallet, setExternalTopUpWallet] = useState<"primary" | "secondary" | "credit_line">("primary");
   const [showSilentRecovery, setShowSilentRecovery] = useState(false);
 
   // Daily Spending Limit (on-demand, button-triggered Meta call via proxy)
@@ -494,6 +494,16 @@ export default function AdAccountDetailPage() {
                     Ext. Secondary
                   </Button>
                 )}
+                {account?.external_topup_url_credit_line && (
+                  <Button
+                    size="sm"
+                    className="bg-sky-600 hover:bg-sky-700 text-white h-8 text-xs"
+                    onClick={() => { setExternalTopUpWallet("credit_line"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Ext. Credit Line
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -556,6 +566,16 @@ export default function AdAccountDetailPage() {
                   >
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Secondary Wallet Top-Up
+                  </Button>
+                )}
+                {account?.external_topup_url_credit_line && (
+                  <Button
+                    size="sm"
+                    className="bg-sky-600 hover:bg-sky-700 text-white"
+                    onClick={() => { setExternalTopUpWallet("credit_line"); setShowExternalTopUp(true); }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Credit Line Wallet Top-Up
                   </Button>
                 )}
               </>

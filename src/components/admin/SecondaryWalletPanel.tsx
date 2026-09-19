@@ -362,13 +362,343 @@ export function SecondaryWalletCard({ userId }: { userId: string }) {
   );
 }
 
-/** Compact combined (main + secondary) BDT due/advance card. */
+/**
+ * Info-tab control: enable/disable the credit line wallet (third wallet) for
+ * this client and set its own USD rate.
+ */
+export function CreditLineWalletToggle({ userId }: { userId: string }) {
+  const wallets = useWallets(userId);
+  const invalidate = useInvalidate(userId);
+  const [rateInput, setRateInput] = useState("");
+  const [editingRate, setEditingRate] = useState(false);
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await (supabase as any)
+        .from("profiles")
+        .update({ credit_line_wallet_enabled: enabled })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Credit line wallet updated");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to update"),
+  });
+
+  const rateMutation = useMutation({
+    mutationFn: async () => {
+      const parsed = parseFloat(rateInput);
+      if (!parsed || parsed <= 0) throw new Error("Enter a valid rate");
+      const { error } = await (supabase as any)
+        .from("profiles")
+        .update({ credit_line_usd_rate: parsed })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Credit line wallet rate saved");
+      setRateInput("");
+      setEditingRate(false);
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to save rate"),
+  });
+
+  return (
+    <div className="pt-3 border-t space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Credit Line Wallet
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Third wallet with its own USD rate (for credit line ad accounts)
+          </p>
+        </div>
+        <Switch
+          checked={wallets.creditLineEnabled}
+          onCheckedChange={(v) => toggleMutation.mutate(v)}
+          disabled={toggleMutation.isPending}
+        />
+      </div>
+
+      {wallets.creditLineEnabled && (
+        <div className="flex items-center gap-3 rounded-xl border border-sky-200/60 bg-sky-50/40 dark:bg-sky-950/20 dark:border-sky-800/40 p-4 transition-colors hover:bg-sky-50/60">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/10">
+            <DollarSign className="h-4 w-4 text-sky-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Credit Line Rate
+            </p>
+            {editingRate ? (
+              <div className="flex items-center gap-1 mt-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-20 h-7 text-sm"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder={String(wallets.creditLineRate || "132")}
+                  autoFocus
+                />
+                <Button size="icon" className="h-7 w-7" onClick={() => rateMutation.mutate()} disabled={rateMutation.isPending}>
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
+                  <XCircle className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <p
+                className="font-semibold text-sm text-sky-700 dark:text-sky-400 cursor-pointer hover:text-sky-500 transition-colors"
+                onClick={() => {
+                  setRateInput(String(wallets.creditLineRate ?? ""));
+                  setEditingRate(true);
+                }}
+              >
+                ৳{wallets.creditLineRate}/USD
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Compact credit-line-wallet balance card. Renders nothing when the feature is
+ * off for this client.
+ */
+export function CreditLineWalletCard({ userId }: { userId: string }) {
+  const wallets = useWallets(userId);
+  const invalidate = useInvalidate(userId);
+  const [adjustType, setAdjustType] = useState<"credit" | "debit" | null>(null);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertNote, setConvertNote] = useState("");
+
+  const adjustMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(amount);
+      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
+      const signed = adjustType === "credit" ? amt : -amt;
+      const { data, error } = await (supabase as any).rpc("admin_adjust_credit_line_wallet", {
+        p_user_id: userId,
+        p_amount: signed,
+        p_reason: note.trim() || (adjustType === "credit" ? "Admin added credit line balance" : "Admin deducted credit line balance"),
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(adjustType === "credit" ? "Credit line balance added!" : "Credit line balance deducted!");
+      setAdjustType(null);
+      setAmount("");
+      setNote("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Adjustment failed"),
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(convertAmount);
+      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
+      const { data, error } = await (supabase as any).rpc("admin_convert_main_to_credit_line", {
+        p_user_id: userId,
+        p_usd_amount: amt,
+        p_reason: convertNote.trim() || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Main wallet balance converted to Credit line wallet");
+      setConvertOpen(false);
+      setConvertAmount("");
+      setConvertNote("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Conversion failed"),
+  });
+
+  if (!wallets.creditLineEnabled) return null;
+
+  const convertUsd = parseFloat(convertAmount) > 0 ? parseFloat(convertAmount) : 0;
+  const convertedCredit =
+    convertUsd > 0 && wallets.creditLineRate > 0
+      ? (convertUsd * wallets.mainRate) / wallets.creditLineRate
+      : 0;
+
+  return (
+    <>
+      <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-sky-500/20">
+              <Wallet className="h-4.5 w-4.5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">Credit Line Wallet</p>
+              <p className="text-[10px] text-sky-700/80 dark:text-sky-400/80">৳{wallets.creditLineRate}/USD</p>
+            </div>
+            <div className="flex items-center gap-0.5 ml-auto shrink-0">
+              <button
+                className="h-6 w-6 rounded-md flex items-center justify-center text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors"
+                onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+                title="Convert main wallet balance to credit line (rate converted)"
+              >
+                <ArrowRightLeft className="h-3 w-3" />
+              </button>
+              <button
+                className="h-6 w-6 rounded-md flex items-center justify-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                onClick={() => { setAdjustType("credit"); setAmount(""); setNote(""); }}
+                title="Add credit line balance"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+              <button
+                className="h-6 w-6 rounded-md flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                onClick={() => { setAdjustType("debit"); setAmount(""); setNote(""); }}
+                title="Deduct credit line balance"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+          <p className="flex items-baseline gap-2 text-2xl font-bold tracking-tight text-sky-700 dark:text-sky-300">
+            ${wallets.creditLineBalance.toLocaleString()}
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-700/70 dark:text-sky-400/70">
+              {wallets.creditLineBalance < 0 ? "Due" : "Adv"}
+            </span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full h-8 text-xs"
+            onClick={() => { setConvertOpen(true); setConvertAmount(""); setConvertNote(""); }}
+            disabled={wallets.mainBalance <= 0}
+          >
+            <ArrowRightLeft className="h-3 w-3 mr-1" />
+            Convert Main → Credit Line (rate adjusted)
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!adjustType} onOpenChange={(open) => !open && setAdjustType(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{adjustType === "credit" ? "Add Credit Line Balance" : "Deduct Credit Line Balance"}</DialogTitle>
+            <DialogDescription>
+              Current credit line balance:{" "}
+              <span className="font-semibold">${wallets.creditLineBalance.toLocaleString()}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Amount (USD)</Label>
+              <Input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100.00" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason (optional)" />
+            </div>
+            {parseFloat(amount) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Balance After</span>
+                <span className="font-semibold">
+                  ${(wallets.creditLineBalance + (adjustType === "credit" ? 1 : -1) * parseFloat(amount)).toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustType(null)}>Cancel</Button>
+            <Button
+              className="bg-sky-600 hover:bg-sky-700 text-white"
+              onClick={() => adjustMutation.mutate()}
+              disabled={adjustMutation.isPending || !(parseFloat(amount) > 0)}
+            >
+              {adjustMutation.isPending ? "Saving..." : adjustType === "credit" ? "Add Balance" : "Deduct Balance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert Main → Credit Line Wallet</DialogTitle>
+            <DialogDescription>
+              Moves main wallet balance into the credit line wallet, converted from ৳{wallets.mainRate}/USD to ৳{wallets.creditLineRate}/USD so the BDT value stays the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Main wallet balance</span>
+              <span className="font-semibold">${wallets.mainBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount to move from Main (USD)</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={convertAmount}
+                onChange={(e) => setConvertAmount(e.target.value)}
+                placeholder={String(Math.max(0, wallets.mainBalance))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input value={convertNote} onChange={(e) => setConvertNote(e.target.value)} placeholder="Reason (optional)" />
+            </div>
+            {convertUsd > 0 && (
+              <div className="rounded-lg border p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Deducted from Main</span>
+                  <span className="font-semibold">${convertUsd.toFixed(2)} ({formatBdt(convertUsd * wallets.mainRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credited to Credit Line</span>
+                  <span className="font-semibold text-sky-600">${convertedCredit.toFixed(2)} ({formatBdt(convertedCredit * wallets.creditLineRate)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credit line after</span>
+                  <span className="font-semibold">${(wallets.creditLineBalance + convertedCredit).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => convertMutation.mutate()}
+              disabled={convertMutation.isPending || !(convertUsd > 0) || convertUsd > wallets.mainBalance}
+            >
+              {convertMutation.isPending ? "Converting..." : "Convert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/** Compact combined (main + secondary + credit line) BDT due/advance card. */
 export function CombinedTotalCard({ userId }: { userId: string }) {
   const wallets = useWallets(userId);
-  if (!wallets.secondaryEnabled) return null;
+  if (!wallets.secondaryEnabled && !wallets.creditLineEnabled) return null;
   const mainBdt = wallets.mainBalance * wallets.mainRate;
-  const secondaryBdt = wallets.secondaryBalance * wallets.secondaryRate;
-  const totalBdt = mainBdt + secondaryBdt;
+  const secondaryBdt = wallets.secondaryEnabled ? wallets.secondaryBalance * wallets.secondaryRate : 0;
+  const creditLineBdt = wallets.creditLineEnabled ? wallets.creditLineBalance * wallets.creditLineRate : 0;
+  const totalBdt = mainBdt + secondaryBdt + creditLineBdt;
   const isDue = totalBdt < 0;
   return (
     <Card className="border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow">
@@ -380,7 +710,9 @@ export function CombinedTotalCard({ userId }: { userId: string }) {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">Combined Due / Adv</p>
             <p className="text-[10px] text-muted-foreground truncate">
-              Main {formatBdt(mainBdt)} ({wallets.mainBalance < 0 ? "-" : ""}${Math.abs(wallets.mainBalance).toLocaleString()} × ৳{wallets.mainRate}) + Secondary {formatBdt(secondaryBdt)} (৳{wallets.secondaryRate})
+              Main {formatBdt(mainBdt)} (৳{wallets.mainRate})
+              {wallets.secondaryEnabled && ` + Secondary ${formatBdt(secondaryBdt)} (৳${wallets.secondaryRate})`}
+              {wallets.creditLineEnabled && ` + Credit Line ${formatBdt(creditLineBdt)} (৳${wallets.creditLineRate})`}
             </p>
           </div>
         </div>
