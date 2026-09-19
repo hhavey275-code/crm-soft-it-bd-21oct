@@ -1206,17 +1206,17 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
-                        {limitWatches[a.id] && (
-                          <div className="mt-1.5">
-                            <LimitUpdateIndicator state={limitWatches[a.id]} />
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
                           {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
                         </span>
+                        {limitWatches[a.id] && (
+                          <div className="mt-1 max-w-[130px]">
+                            <LimitUpdateIndicator state={limitWatches[a.id]} />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
