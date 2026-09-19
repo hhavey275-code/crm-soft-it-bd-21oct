@@ -52,7 +52,11 @@ export const Route = createFileRoute("/api/public/wa-jobs")({
           return json({ ok: false, error: msg, reason }, 401);
         }
 
-        const action = String(body?.action ?? "");
+        // Accept both the original WhatsApp action names and the `wa_`-prefixed
+        // names used by older helper service workers. Chrome can keep an older
+        // MV3 worker alive even after the popup files have been refreshed.
+        const rawAction = String(body?.action ?? "");
+        const action = rawAction.startsWith("wa_") ? rawAction.slice(3) : rawAction;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const ccRaw = String(process.env["WHATSAPP_DEFAULT_COUNTRY_CODE"] ?? "").replace(/[^\d]/g, "");
         const defaultCc = ccRaw || "880";
