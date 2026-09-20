@@ -90,6 +90,10 @@ import {
   Trash2,
   Lock,
   Unlock,
+  Megaphone,
+  ShoppingBag,
+  PiggyBank,
+  BarChart3,
 } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
@@ -2339,9 +2343,14 @@ export default function ClientDetailPage() {
                   </Card>
                   <Card className="bg-card border border-border/60 relative">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        {totalSpendLabel}
-                      </p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-100">
+                          <BarChart3 className="h-2.5 w-2.5 text-teal-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                          {totalSpendLabel}
+                        </p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">
                         ${displayTotalSpend.toLocaleString()}
                       </p>
