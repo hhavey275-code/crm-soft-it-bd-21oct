@@ -1043,16 +1043,13 @@ export default function ClientDetailPage() {
               )}
               <Button
                 size="sm"
-                className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                onClick={() => {
-                  setTopUpDialogOpen(true);
-                  setSelectedAccountId("");
-                  setTopUpAmount("");
-                  setDialogTab("topup");
-                }}
+                variant="outline"
+                className="h-8 text-xs rounded-full"
+                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                onClick={updateAllFromMeta}
               >
-                <ArrowUpCircle className="h-3 w-3 mr-1" />
-                Top Up
+                <RefreshCw className={cn("h-3 w-3 mr-1", insightsLoading && "animate-spin")} />
+                {insightsLoading ? "Updating..." : "Update"}
               </Button>
               <Button
                 size="sm"
