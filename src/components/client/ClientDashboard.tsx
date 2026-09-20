@@ -362,7 +362,7 @@ export function ClientDashboard() {
   // Keep every wallet summary together. Desktop uses one row; smaller screens
   // wrap without changing the Main → Secondary → Credit Line → Combined order.
   const walletSummary = (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+    <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
       <MainWalletDebitCard
         data-tutorial="card-wallet"
         balanceLabel={fmt(clientWallets.mainBalance)}

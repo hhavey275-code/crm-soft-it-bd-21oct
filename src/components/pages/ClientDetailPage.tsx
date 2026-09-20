@@ -2580,7 +2580,7 @@ export default function ClientDetailPage() {
                 </div>
 
                 {/* Wallet summaries stay together before account statistics. */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+                <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
 
 
                   {/* Wallet Balance */}

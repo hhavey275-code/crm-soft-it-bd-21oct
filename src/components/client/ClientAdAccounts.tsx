@@ -817,7 +817,7 @@ export function ClientAdAccounts() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Wallet Hero + Metrics */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
         <MainWalletDebitCard
           title="Wallet Balance"
           balanceLabel={`$${walletBalance.toLocaleString()}`}
