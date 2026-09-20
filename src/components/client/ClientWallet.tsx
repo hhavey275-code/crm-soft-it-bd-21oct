@@ -261,20 +261,44 @@ export function ClientWallet() {
               id="transfer-amount"
               type="number"
               min="0"
+              max={wallets.mainBalance}
               step="0.01"
               value={transferAmount}
               onChange={(e) => setTransferAmount(e.target.value)}
               placeholder="e.g. 100"
               autoFocus
             />
-            {previewCredit > 0 && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-[11px]"
+                onClick={() => setTransferAmount((Math.floor(wallets.mainBalance * 100) / 100).toFixed(2))}
+                disabled={wallets.mainBalance <= 0}
+              >
+                Max ${(Math.floor(wallets.mainBalance * 100) / 100).toFixed(2)}
+              </Button>
+            </div>
+            {previewCredit > 0 && !transferTooManyDecimals && !transferOverBalance && (
               <p className="text-xs text-muted-foreground">
-                ${parsedTransfer.toLocaleString()} × ৳{wallets.mainRate} ÷ ৳{targetRate} ={" "}
+                ${parsedTransfer.toLocaleString()} × ৳{wallets.mainRate} = ৳{previewBdt.toLocaleString()} ÷ ৳{targetRate} ={" "}
                 <span className="font-semibold text-foreground">
                   ${previewCredit.toFixed(2)}
                 </span>{" "}
                 credited to {targetLabel}
               </p>
+            )}
+            {transferTooManyDecimals && (
+              <p className="text-xs text-destructive">সর্বোচ্চ ২ দশমিক পর্যন্ত amount দিন (যেমন 100.25)।</p>
+            )}
+            {transferOverBalance && (
+              <p className="text-xs text-destructive">
+                Main wallet-এ আছে ${wallets.mainBalance.toLocaleString()} — এর বেশি move করা যাবে না।
+              </p>
+            )}
+            {(!(targetRate > 0) || !(wallets.mainRate > 0)) && (
+              <p className="text-xs text-destructive">USD rate সেট করা নেই — admin-কে জানান।</p>
             )}
           </div>
           <DialogFooter>
@@ -283,7 +307,7 @@ export function ClientWallet() {
             </Button>
             <Button
               onClick={() => transferMutation.mutate()}
-              disabled={transferMutation.isPending || parsedTransfer <= 0}
+              disabled={transferMutation.isPending || transferBlocked}
             >
               {transferMutation.isPending ? "Moving…" : "Confirm transfer"}
             </Button>
