@@ -821,6 +821,26 @@ export function ClientAdAccounts() {
             </div>
           </div>
         )}
+        {/* Credit line wallet — shown for clients who have it enabled */}
+        {wallets.creditLineEnabled && (
+          <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-sky-700 dark:text-sky-400">Credit Line Wallet</p>
+                <p className="text-2xl font-bold tracking-tight mt-1 text-sky-700 dark:text-sky-300">
+                  ${Number(wallets.creditLineBalance ?? 0).toLocaleString()}
+                </p>
+                <p className="text-[11px] text-sky-700/70 dark:text-sky-400/70 mt-0.5">
+                  Rate ৳{wallets.creditLineRate}/USD
+                  {creditLineDueLimit > 0 && ` · Due limit: $${creditLineDueLimit.toLocaleString()}`}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-sky-500/15 flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+              </div>
+            </div>
+          </div>
+        )}
         {/* Spend & Orders */}
         <div className="grid gap-3 grid-cols-2">
           <MetricCard

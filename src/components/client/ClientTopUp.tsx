@@ -453,17 +453,8 @@ export function ClientTopUp() {
     return () => { supabase.removeChannel(channel); };
   }, [user, queryClient]);
 
-  // Card billing due check
-  const { data: cardBillDue } = useQuery({
-    queryKey: ["card-bill-due", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase.from("card_bills").select("*").eq("user_id", user!.id).eq("status", "pending").limit(1);
-      return data?.[0] || null;
-    },
-    enabled: !!user,
-  });
-
-  const cardDueBdt = cardBillDue ? Number(cardBillDue.due_amount_bdt) : 0;
+  // Google Sheet card-bill adjustment was removed — no card due is ever applied.
+  const cardDueBdt = 0;
 
   // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
   const wallets = useWallets(user?.id);

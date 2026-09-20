@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
-import { CardDueBox } from "@/components/CardDueBox";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +29,7 @@ export function ClientDashboard() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
-  const { clientCardDueVisible: cardDueVisibleForClient } = useSiteSettings();
+  useSiteSettings();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [dismissedInstall, setDismissedInstall] = useState(false);
   const isInactive = (profile as any)?.status === "inactive";
@@ -357,10 +356,12 @@ export function ClientDashboard() {
 
   const fmt = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  // Secondary wallet + combined BDT total — only when enabled for this client.
-  // On mobile it sits directly under the wallet hero; on desktop it stays on top.
-  const secondaryBlock = clientWallets.secondaryEnabled ? (
+  // Secondary + credit line wallets and the combined BDT total — each card only
+  // shows when that wallet is enabled for this client.
+  const secondaryBlock =
+    clientWallets.secondaryEnabled || clientWallets.creditLineEnabled ? (
     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+      {clientWallets.secondaryEnabled && (
       <Card className="border-border/60 bg-card">
         <CardContent className="p-4">
           <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
@@ -372,6 +373,20 @@ export function ClientDashboard() {
           </p>
         </CardContent>
       </Card>
+      )}
+      {clientWallets.creditLineEnabled && (
+      <Card className="border-border/60 bg-card">
+        <CardContent className="p-4">
+          <p className="text-xs font-medium text-sky-700 dark:text-sky-400">Credit Line Wallet</p>
+          <p className="text-2xl font-bold mt-1 text-sky-700 dark:text-sky-300">
+            ${clientWallets.creditLineBalance.toLocaleString()}
+          </p>
+          <p className="text-[11px] text-sky-700/70 dark:text-sky-400/70 mt-0.5">
+            Rate ৳{clientWallets.creditLineRate}/USD
+          </p>
+        </CardContent>
+      </Card>
+      )}
       <Card className="border-border/60 bg-card">
         <CardContent className="p-4">
           <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Combined Due / Adv</p>
@@ -382,7 +397,9 @@ export function ClientDashboard() {
             </span>
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Main ${clientWallets.mainBalance.toLocaleString()} × ৳{clientWallets.mainRate} + Secondary ${clientWallets.secondaryBalance.toLocaleString()} × ৳{clientWallets.secondaryRate}
+            Main ${clientWallets.mainBalance.toLocaleString()} × ৳{clientWallets.mainRate}
+            {clientWallets.secondaryEnabled && ` + Secondary $${clientWallets.secondaryBalance.toLocaleString()} × ৳${clientWallets.secondaryRate}`}
+            {clientWallets.creditLineEnabled && ` + Credit Line $${clientWallets.creditLineBalance.toLocaleString()} × ৳${clientWallets.creditLineRate}`}
           </p>
         </CardContent>
       </Card>
@@ -451,8 +468,6 @@ export function ClientDashboard() {
         </Dialog>
       )}
 
-      {/* Card Due Box — only shows if configured */}
-      {user && cardDueVisibleForClient && <CardDueBox userId={user.id} size="sm" />}
 
       {/* Desktop: secondary wallet block above the metric cards */}
       {!isMobile && secondaryBlock}
