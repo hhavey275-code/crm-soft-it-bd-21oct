@@ -192,7 +192,7 @@ export function AuthForm() {
       </header>
 
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
-        <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr]">
+        <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
           <div className="relative flex h-full flex-col justify-between overflow-hidden bg-foreground p-7 text-background sm:p-10">
             <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/25 blur-[110px]" />
