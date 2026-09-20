@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, MoreVertical, Pencil, Zap, Lock as LockIcon } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
+import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { Switch } from "@/components/ui/switch";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { useIsMobile } from "@/hooks/use-mobile";

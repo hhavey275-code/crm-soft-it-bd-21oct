@@ -92,6 +92,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
+import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";

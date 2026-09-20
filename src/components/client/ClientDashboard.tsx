@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
+import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
