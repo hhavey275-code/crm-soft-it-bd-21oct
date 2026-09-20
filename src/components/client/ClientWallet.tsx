@@ -137,31 +137,14 @@ export function ClientWallet() {
     <div className="space-y-4 md:space-y-6">
       <h1 className="text-xl md:text-2xl font-bold">Wallet</h1>
 
-      {/* Wallet Balance Card */}
-      {isMobile ? (
-        <div data-tutorial="wallet-balance" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">{extraWalletOn ? "Main Wallet Balance" : "Available Balance"}</p>
-              <p className="text-3xl font-bold tracking-tight mt-1">
-                ${wallets.mainBalance.toLocaleString()}
-              </p>
-              <p className="text-xs opacity-70 mt-1">{wallets.currency}</p>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-              <Wallet className="h-6 w-6" />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <Card data-tutorial="wallet-balance" className="bg-primary text-primary-foreground">
-          <CardContent className="p-8">
-            <p className="text-sm opacity-80">{extraWalletOn ? "Main Wallet Balance" : "Available Balance"}</p>
-            <p className="text-4xl font-bold mt-1">${wallets.mainBalance.toLocaleString()}</p>
-            <p className="text-sm mt-2 opacity-70">{wallets.currency}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Wallet Balance Card — same debit-card design on mobile and desktop */}
+      <MainWalletDebitCard
+        data-tutorial="wallet-balance"
+        title={extraWalletOn ? "Main Wallet" : "Available Balance"}
+        balanceLabel={`$${wallets.mainBalance.toLocaleString()}`}
+        footer={wallets.mainRate > 0 ? `${wallets.currency} · Rate ৳${wallets.mainRate}/USD` : wallets.currency}
+        className="sm:max-w-md"
+      />
 
       {/* Extra wallets (each has its own per-client toggle) */}
       {extraWalletOn && (
