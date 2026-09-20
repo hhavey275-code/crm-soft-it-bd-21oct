@@ -3108,8 +3108,9 @@ export default function ClientDetailPage() {
                                       <div className="flex items-center gap-1.5">
                                       {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
                                       <Button
-                                        size="sm"
-                                        className="h-8 gap-1 px-2.5 text-xs font-semibold"
+                                        size="icon"
+                                        variant="default"
+                                        className="h-8 w-8"
                                         onClick={() => {
                                           if (acc.external_topup_required) {
                                             setExtTopUp({ account: acc, wallet: "primary" });
@@ -3123,14 +3124,13 @@ export default function ClientDetailPage() {
                                         }}
                                         title={acc.external_topup_required ? "Top Up via External CRM (Main Wallet)" : "Top Up (Main Wallet)"}
                                       >
-                                        <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                                        <span className="truncate">{acc.external_topup_required ? "Ext. Top Up" : "Top Up"}</span>
+                                        <ArrowUpCircle className="h-4 w-4" />
                                       </Button>
                                       )}
                                       {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
-                                          size="sm"
-                                          className="h-8 gap-1 px-2.5 text-xs font-semibold bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                          size="icon"
+                                          className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                           onClick={() => {
                                             if (acc.external_topup_required) {
                                               setExtTopUp({ account: acc, wallet: "secondary" });
@@ -3144,8 +3144,7 @@ export default function ClientDetailPage() {
                                           }}
                                           title={acc.external_topup_required ? "Top Up via External CRM (Secondary Wallet)" : "Top Up (Secondary Wallet)"}
                                         >
-                                          <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                                          <span className="truncate">{acc.external_topup_required ? "Ext. Secondary" : "Secondary"}</span>
+                                          <ArrowUpCircle className="h-4 w-4" />
                                         </Button>
                                        )}
                                         {!!acc.external_topup_url_credit_line && (
