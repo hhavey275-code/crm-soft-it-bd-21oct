@@ -51,7 +51,12 @@ export function ClientWallet() {
   const { data: topUps } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("topups").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      const { data } = await (supabase as any)
+        .from("top_up_requests")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
       return (data as any[]) ?? [];
     },
     enabled: !!user,
