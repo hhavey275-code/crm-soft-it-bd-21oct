@@ -216,7 +216,7 @@ export function AuthForm() {
             <div className="relative">
               <div className="inline-flex items-center gap-3">
                 <img src={logoMark} alt="Logo" className="h-14 w-14 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="text-base font-semibold tracking-tight text-background">{displayName}</span>
+                <span className="brand-script brand-script-gradient text-xl leading-none drop-shadow-sm sm:text-2xl">{displayName}</span>
               </div>
 
               {/* Cover photo — full width of the panel */}
@@ -230,7 +230,7 @@ export function AuthForm() {
 
               <h2 className="auth-serif mt-7 text-[30px] font-semibold leading-tight sm:text-4xl">
                 {welcomeTitle || "Welcome to"}{" "}
-                <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
+                <span className="brand-script brand-script-gradient text-[38px] leading-none sm:text-5xl">
                   {displayName}
                 </span>
               </h2>
