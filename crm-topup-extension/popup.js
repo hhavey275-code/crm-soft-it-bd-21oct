@@ -36,21 +36,10 @@ function render(state) {
   } else {
     lastEl.textContent = "";
   }
-  const waEl = document.getElementById("waLast");
-  const wa = state.waLast;
-  if (waEl) {
-    if (wa && wa.at) {
-      const w = new Date(wa.at).toLocaleString();
-      waEl.textContent =
-        (wa.ok ? "WhatsApp: ✓ " : "WhatsApp: ✕ ") + `${wa.phone} (${w})` + (wa.error ? " — " + wa.error : "");
-    } else {
-      waEl.textContent = "";
-    }
-  }
 }
 
 function load() {
-  chrome.storage.local.get(["autopilot", "autopilotLast", "waLast"], render);
+  chrome.storage.local.get(["autopilot", "autopilotLast"], render);
 }
 
 document.getElementById("enableBtn").addEventListener("click", async () => {
@@ -95,25 +84,3 @@ document.getElementById("disableBtn").addEventListener("click", () => {
 });
 
 load();
-
-const waNowBtn = document.getElementById("waNowBtn");
-const waMsgEl = document.getElementById("waMsg");
-if (waNowBtn) {
-  waNowBtn.addEventListener("click", () => {
-    waMsgEl.textContent = "চেক হচ্ছে…";
-    chrome.runtime.sendMessage({ type: "crm-autopilot-control", command: "wa-now" }, (res) => {
-      if (chrome.runtime.lastError) {
-        waMsgEl.textContent = "এক্সটেনশন সাড়া দেয়নি — reload করুন।";
-        return;
-      }
-      if (!res || !res.ok) {
-        waMsgEl.textContent = "সমস্যা: " + ((res && res.error) || "অজানা");
-        return;
-      }
-      waMsgEl.textContent = res.sent > 0
-        ? res.sent + "টি WhatsApp বার্তা পাঠানো হয়েছে।"
-        : "সারিতে কোনো বার্তা নেই।";
-      setTimeout(load, 4000);
-    });
-  });
-}
