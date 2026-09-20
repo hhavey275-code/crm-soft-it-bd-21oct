@@ -468,7 +468,7 @@ export function ClientTopUp() {
   // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
   const wallets = useWallets(user?.id);
 
-  // Only clients an admin explicitly allows may deposit into the secondary wallet.
+  // Only clients an admin explicitly allows may deposit straight into the secondary wallet.
   const { data: secondaryDepositAllowed } = useQuery({
     queryKey: ["secondary-deposit-enabled", user?.id],
     enabled: !!user,
@@ -482,21 +482,49 @@ export function ClientTopUp() {
     },
   });
 
-  const canPickWallet = !!secondaryDepositAllowed && wallets.secondaryEnabled;
-  const effectiveTargetWallet: "primary" | "secondary" = canPickWallet ? targetWallet : "primary";
-  const isSecondaryDeposit = effectiveTargetWallet === "secondary";
+  // Wallets a client may deposit into: main always, plus each extra wallet
+  // that is switched on for this client.
+  const walletOptions = useMemo(() => {
+    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [
+      { kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" },
+    ];
+    if (wallets.creditLineEnabled)
+      opts.push({
+        kind: "credit_line",
+        label: "Credit line wallet",
+        rate: wallets.creditLineRate || Number(usdRate) || 0,
+        hint: "Credit line rate",
+      });
+    if (secondaryDepositAllowed && wallets.secondaryEnabled)
+      opts.push({
+        kind: "secondary",
+        label: "Secondary wallet",
+        rate: wallets.secondaryRate || Number(usdRate) || 0,
+        hint: "Sheet rate",
+      });
+    return opts;
+  }, [usdRate, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
 
-  // Deposit rate: secondary wallet deposits convert at the sheet rate.
-  const depositRate = isSecondaryDeposit
-    ? (wallets.secondaryRate || Number(usdRate) || 0)
-    : (Number(usdRate) || 0);
+  const canPickWallet = walletOptions.length > 1;
+  const effectiveTargetWallet: "primary" | "secondary" | "credit_line" =
+    walletOptions.some((o) => o.kind === targetWallet) ? targetWallet : "primary";
+  // Deposits straight into an extra wallet skip the main-wallet due / card-bill flow.
+  const isSecondaryDeposit = effectiveTargetWallet !== "primary";
+  const targetWalletLabel =
+    walletOptions.find((o) => o.kind === effectiveTargetWallet)?.label ?? "Main wallet";
 
-  // Secondary deposits are credited in full to the secondary wallet; the card
+  // Deposit rate: each wallet converts at its own USD rate.
+  const depositRate =
+    walletOptions.find((o) => o.kind === effectiveTargetWallet)?.rate || Number(usdRate) || 0;
+
+  // Extra-wallet deposits are credited in full to that wallet; the card
   // bill / main-wallet due adjustment only applies to main wallet deposits.
   const effectiveBdt = bdtAmount
     ? (isSecondaryDeposit ? parseFloat(bdtAmount) : Math.max(0, parseFloat(bdtAmount) - cardDueBdt))
     : 0;
-  const usdEquivalent = bdtAmount && depositRate ? (effectiveBdt / depositRate).toFixed(2) : "0.00";
+  // Same rounding rule as the server: round to 2 decimals so the credited USD matches exactly.
+  const usdEquivalent =
+    bdtAmount && depositRate ? (Math.round((effectiveBdt / depositRate) * 100) / 100).toFixed(2) : "0.00";
 
   const alloc = useMemo(() => {
     const total = parseFloat(bdtAmount) || 0;
