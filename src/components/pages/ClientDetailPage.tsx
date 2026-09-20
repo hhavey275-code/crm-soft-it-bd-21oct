@@ -834,7 +834,7 @@ export default function ClientDetailPage() {
                   {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                     <Button
                       size="sm"
-                      className="flex-1 min-w-[110px] gap-1 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold text-xs h-8"
+                      className="flex-1 min-w-[110px] gap-1 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white font-semibold text-xs h-8 shadow-md shadow-emerald-500/25"
                       title="Top Up (Secondary Wallet)"
                       onClick={() => {
                         if (acc.external_topup_required) {
