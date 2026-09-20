@@ -272,18 +272,18 @@ export function AuthForm() {
           </div>
 
           {/* ===== Right sign-in panel ===== */}
-          <div className="px-7 py-9 sm:px-10">
+          <div className="px-6 py-8 sm:px-9">
             <div className="flex flex-col items-center text-center">
-              <h1 className="auth-serif text-[28px] font-semibold leading-tight text-foreground">
+              <h1 className="auth-serif text-[26px] font-semibold leading-tight text-foreground">
                 {isLogin ? "Sign in" : "Create your account"}
               </h1>
               <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
                 {isLogin ? (welcomeTitle || "Welcome back") + " — enter your credentials to continue." : "Fill in the details to get started."}
               </p>
-              <div className="mt-5 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+              <div className="mt-4 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
             </div>
 
-            <div className="mt-6">
+            <div className="mt-5">
               {refCode && !isLogin ? (
                 <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                   Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
@@ -368,7 +368,7 @@ export function AuthForm() {
                   {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
                 </Button>
 
-                <div className="relative my-3">
+                <div className="relative my-2">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/70" />
                   </div>
@@ -393,7 +393,7 @@ export function AuthForm() {
                   Continue with Google
                 </Button>
 
-                <p className="pt-3 text-center text-sm text-muted-foreground">
+                <p className="pt-2 text-center text-sm text-muted-foreground">
                   {isLogin ? "Don't have an account? " : "Already have an account? "}
                   <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground/60">
                     {isLogin ? "Sign up" : "Sign in"}
@@ -401,7 +401,7 @@ export function AuthForm() {
                 </p>
               </form>
 
-              <div className="mt-6 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
+              <div className="mt-4 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure sign-in · Your credentials are encrypted
               </div>
