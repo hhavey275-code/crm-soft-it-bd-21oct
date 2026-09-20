@@ -367,17 +367,10 @@ export function ClientDashboard() {
         footer={`Rate ৳${clientWallets.mainRate}/USD`}
       />
       {clientWallets.secondaryEnabled && (
-      <Card className="border-border/60 bg-card">
-        <CardContent className="p-4">
-          <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
-          <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
-            ${clientWallets.secondaryBalance.toLocaleString()}
-          </p>
-          <p className="text-[11px] text-green-700/70 dark:text-green-400/70 mt-0.5">
-            Rate ৳{clientWallets.secondaryRate}/USD
-          </p>
-        </CardContent>
-      </Card>
+      <SecondaryWalletDebitCard
+        balanceLabel={`$${clientWallets.secondaryBalance.toLocaleString()}`}
+        footer={`Rate ৳${clientWallets.secondaryRate}/USD`}
+      />
       )}
       {clientWallets.creditLineEnabled && (
       <Card className="border-border/60 bg-card">

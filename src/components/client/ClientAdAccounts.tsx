@@ -827,23 +827,10 @@ export function ClientAdAccounts() {
         />
         {/* Secondary wallet — shown for clients who have it enabled (mobile + desktop) */}
         {wallets.secondaryEnabled && (
-          <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-green-700 dark:text-green-400">Secondary Wallet</p>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-green-700 dark:text-green-300">
-                  ${Number(wallets.secondaryBalance ?? 0).toLocaleString()}
-                </p>
-                <p className="text-[11px] text-green-700/70 dark:text-green-400/70 mt-0.5">
-                  Rate ৳{wallets.secondaryRate}/USD
-                  {secondaryDueLimit > 0 && ` · Due limit: $${secondaryDueLimit.toLocaleString()}`}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-green-500/15 flex items-center justify-center">
-                <Wallet className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </div>
+          <SecondaryWalletDebitCard
+            balanceLabel={`$${Number(wallets.secondaryBalance ?? 0).toLocaleString()}`}
+            footer={`Rate ৳${wallets.secondaryRate}/USD${secondaryDueLimit > 0 ? ` · Due limit: $${secondaryDueLimit.toLocaleString()}` : ""}`}
+          />
         )}
         {/* Credit line wallet — shown for clients who have it enabled */}
         {wallets.creditLineEnabled && (

@@ -151,15 +151,10 @@ export function ClientWallet() {
       {extraWalletOn && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {wallets.secondaryEnabled && (
-            <Card className="border-border/60 bg-card">
-              <CardContent className="p-5">
-                <p className="text-sm text-green-700 dark:text-green-400">Secondary Wallet Balance</p>
-                <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
-                  ${wallets.secondaryBalance.toLocaleString()}
-                </p>
-                <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-1">Rate ৳{wallets.secondaryRate}/USD</p>
-              </CardContent>
-            </Card>
+            <SecondaryWalletDebitCard
+              balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+              footer={`Rate ৳${wallets.secondaryRate}/USD`}
+            />
           )}
           {wallets.creditLineEnabled && (
             <Card className="border-border/60 bg-card">
