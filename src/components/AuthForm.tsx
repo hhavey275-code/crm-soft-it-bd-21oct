@@ -193,10 +193,10 @@ export function AuthForm() {
         )}
       </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
-        <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-6 pt-2">
+        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex h-full min-h-[560px] flex-col justify-between overflow-hidden p-7 text-background sm:p-10"
+          <div className="relative flex h-full min-h-[520px] flex-col justify-between overflow-hidden p-6 text-background sm:p-8"
             style={{ background: "linear-gradient(165deg, #0e2c55 0%, #14427c 55%, #0a1f42 100%)" }}>
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-[110px]" />
             <div className="pointer-events-none absolute -left-20 bottom-1/3 h-64 w-64 rounded-full bg-sky-400/15 blur-[100px]" />
