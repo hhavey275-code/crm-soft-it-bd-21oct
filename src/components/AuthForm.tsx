@@ -193,10 +193,10 @@ export function AuthForm() {
         )}
       </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
-        <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-6 pt-2">
+        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex h-full min-h-[560px] flex-col justify-between overflow-hidden p-7 text-background sm:p-10"
+          <div className="relative flex h-full min-h-[520px] flex-col justify-between overflow-hidden p-6 text-background sm:p-8"
             style={{ background: "linear-gradient(165deg, #0e2c55 0%, #14427c 55%, #0a1f42 100%)" }}>
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-[110px]" />
             <div className="pointer-events-none absolute -left-20 bottom-1/3 h-64 w-64 rounded-full bg-sky-400/15 blur-[100px]" />
@@ -215,55 +215,55 @@ export function AuthForm() {
 
             <div className="relative">
               <div className="inline-flex items-center gap-3">
-                <img src={logoMark} alt="Logo" className="h-14 w-14 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="brand-script brand-script-gradient text-xl leading-none drop-shadow-sm sm:text-2xl">{displayName}</span>
+                <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
+                <span className="brand-script brand-script-gradient text-2xl leading-none drop-shadow-sm sm:text-3xl">{displayName}</span>
               </div>
 
-              {/* Cover photo — full width of the panel */}
-              <div className="-mx-7 mt-6 sm:-mx-10">
+              {/* Cover photo — full width of the panel, compact height */}
+              <div className="-mx-6 mt-4 sm:-mx-8">
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
-                  className="block w-full object-contain"
+                  className="block h-32 w-full object-cover sm:h-40"
                 />
               </div>
 
-              <h2 className="auth-serif mt-7 text-[30px] font-semibold leading-tight sm:text-4xl">
+              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight sm:text-2xl">
                 {welcomeTitle || "Welcome to"}{" "}
-                <span className="brand-script brand-script-gradient text-[38px] leading-none sm:text-5xl">
+                <span className="brand-script brand-script-gradient text-[26px] leading-none sm:text-[30px]">
                   {displayName}
                 </span>
               </h2>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/70">
+              <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
                 {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
               </p>
-              <div className="mt-7 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
             </div>
 
-            <div className="relative mt-10 space-y-3 text-sm">
+            <div className="relative mt-6 space-y-2.5 text-sm">
               <a
                 href={HELPLINE_TEL}
-                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background/10">
                   <Phone className="h-4 w-4" />
                 </span>
                 <span className="flex flex-col">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Helpline</span>
-                  <span className="font-mono text-[15px] font-semibold tracking-wide">{HELPLINE_DISPLAY}</span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/50">Helpline</span>
+                  <span className="font-mono text-[14px] font-semibold tracking-wide">{HELPLINE_DISPLAY}</span>
                 </span>
               </a>
               <a
                 href={FACEBOOK_PAGE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background/10">
                   <Facebook className="h-4 w-4" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Facebook Page</span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/50">Facebook Page</span>
                   <span className="truncate font-semibold">{FACEBOOK_PAGE_LABEL}</span>
                 </span>
                 <ArrowUpRight className="h-4 w-4 shrink-0 text-background/50" />
@@ -272,18 +272,18 @@ export function AuthForm() {
           </div>
 
           {/* ===== Right sign-in panel ===== */}
-          <div className="px-7 py-9 sm:px-10">
+          <div className="px-6 py-8 sm:px-9">
             <div className="flex flex-col items-center text-center">
-              <h1 className="auth-serif text-[28px] font-semibold leading-tight text-foreground">
+              <h1 className="auth-serif text-[26px] font-semibold leading-tight text-foreground">
                 {isLogin ? "Sign in" : "Create your account"}
               </h1>
               <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
                 {isLogin ? (welcomeTitle || "Welcome back") + " — enter your credentials to continue." : "Fill in the details to get started."}
               </p>
-              <div className="mt-5 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+              <div className="mt-4 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
             </div>
 
-            <div className="mt-6">
+            <div className="mt-5">
               {refCode && !isLogin ? (
                 <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                   Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
@@ -368,7 +368,7 @@ export function AuthForm() {
                   {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
                 </Button>
 
-                <div className="relative my-3">
+                <div className="relative my-2">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/70" />
                   </div>
@@ -393,7 +393,7 @@ export function AuthForm() {
                   Continue with Google
                 </Button>
 
-                <p className="pt-3 text-center text-sm text-muted-foreground">
+                <p className="pt-2 text-center text-sm text-muted-foreground">
                   {isLogin ? "Don't have an account? " : "Already have an account? "}
                   <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground/60">
                     {isLogin ? "Sign up" : "Sign in"}
@@ -401,7 +401,7 @@ export function AuthForm() {
                 </p>
               </form>
 
-              <div className="mt-6 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
+              <div className="mt-4 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure sign-in · Your credentials are encrypted
               </div>
