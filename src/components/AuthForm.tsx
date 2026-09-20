@@ -13,6 +13,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff, Phone, Facebook, ArrowUpRight, ShieldCh
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import softitbdLogo from "@/assets/softitbd-logo.png.asset.json";
+import softitbdBanner from "@/assets/softitbd-banner.png.asset.json";
 
 const LOGIN_TIMEOUT_MS = 20_000;
 
