@@ -194,7 +194,7 @@ export function AuthForm() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
         <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr]">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex flex-col justify-between overflow-hidden bg-foreground p-7 text-background sm:p-10 lg:min-h-[680px]">
+          <div className="relative flex h-full flex-col justify-between overflow-hidden bg-foreground p-7 text-background sm:p-10">
             <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/25 blur-[110px]" />
             <div className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-primary/15 blur-[120px]" />
             <div className="pointer-events-none absolute right-6 top-1/2 h-[560px] w-[560px] -translate-y-1/2 rounded-full border border-background/[0.07]" />
