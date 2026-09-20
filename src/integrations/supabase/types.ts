@@ -4489,6 +4489,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      convert_main_wallet: {
+        Args: { p_target: string; p_usd_amount: number; p_user_id?: string }
+        Returns: Json
+      }
       credit_missing_approved_topup: {
         Args: { p_processed_by: string; p_request_id: string }
         Returns: Json
