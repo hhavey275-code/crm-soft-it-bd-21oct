@@ -607,7 +607,7 @@ export function ClientTopUp() {
           </div>
         ))}
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
-          <span className="text-muted-foreground">{isSecondaryDeposit ? "Secondary wallet-এ জমা হবে" : "Main wallet-এ জমা হবে"}</span>
+          <span className="text-muted-foreground">{`${targetWalletLabel}-এ জমা হবে`}</span>
           <span className="font-bold text-primary">
             ${alloc.creditUsd.toFixed(2)} <span className="font-normal text-muted-foreground">({bdt(alloc.creditBdt)})</span>
           </span>
@@ -1177,9 +1177,9 @@ export function ClientTopUp() {
                   <AllocationBreakdown />
 
                   <div className="rounded-lg bg-primary/10 p-4 text-center">
-                    <p className="text-xs text-muted-foreground">{isSecondaryDeposit ? 'Secondary wallet-এ জমা হবে' : cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
+                    <p className="text-xs text-muted-foreground">{isSecondaryDeposit ? `${targetWalletLabel}-এ জমা হবে` : cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
                     <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
-                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? " (Secondary wallet)" : ""}</p>
+                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? ` (${targetWalletLabel})` : ""}</p>
                   </div>
                 </div>
               )}
