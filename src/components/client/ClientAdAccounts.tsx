@@ -1320,9 +1320,21 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
-                        </span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xs text-muted-foreground">
+                            {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                            title="Update this account from Meta"
+                            disabled={singleRefreshingId === a.id}
+                            onClick={() => refreshSingleMutation.mutate(a.id)}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
                         {limitWatches[a.id] && (
                           <div className="mt-1 max-w-[130px]">
                             <LimitUpdateIndicator state={limitWatches[a.id]} />
