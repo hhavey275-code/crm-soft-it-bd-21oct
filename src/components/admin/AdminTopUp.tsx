@@ -1106,7 +1106,7 @@ export function AdminTopUp() {
                     ? `এটি ৳${Number(row?._original_amount || 0).toLocaleString()} subscription payment। Approve করলে ${row?._duration_months || 1} মাস subscription extend হবে।`
                     : `এটি ৳${Number(row?._original_amount || 0).toLocaleString()} limit purchase। Approve করলে system limit বাড়বে।`;
                 }
-                const wk = (row as any)?.target_wallet === "secondary" ? "Secondary (Sheet rate)" : "Main";
+                const wk = (row as any)?.target_wallet === "secondary" ? "Secondary (Sheet rate)" : (row as any)?.target_wallet === "credit_line" ? "Credit Line" : "Main";
                 return `This will add $${actionDialog?.amount?.toLocaleString()} USD to the client's ${wk} wallet${actionDialog?.bdtAmount ? ` (৳${Number(actionDialog.bdtAmount).toLocaleString()} BDT @ ৳${actionDialog.usdRate}/USD)` : ""}.`;
 
               }
