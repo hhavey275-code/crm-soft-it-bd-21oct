@@ -528,6 +528,33 @@ export function ClientAdAccounts() {
     },
   });
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      if (!checkCooldown()) throw new Error("cooldown");
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: (data) => {
+      setLastMetaUpdate(Date.now());
+      const rl = data?.rate_limited;
+      if (rl && rl.length > 0) {
+        toast.warning("⚠️ Account rate-limited. Please retry after a few minutes.");
+      } else {
+        toast.success("Account updated from Meta");
+      }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
+      refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+    },
+    onError: (err: any) => {
+      if (err.message !== "cooldown") toast.error(err.message || "Failed to refresh");
+    },
+    onSettled: () => setSingleRefreshingId(null),
+  });
+
 
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
