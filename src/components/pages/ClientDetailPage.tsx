@@ -92,6 +92,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
+import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -1328,22 +1329,12 @@ export default function ClientDetailPage() {
                 footer={wallet?.currency ?? "USD"}
               />
 
-              {/* Secondary Wallet — green gradient (only when enabled) */}
+              {/* Secondary Wallet — Chime-style green card (only when enabled) */}
               {wallets.secondaryEnabled && (
-                <div className="rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-500/85 to-emerald-500/65 p-3.5 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs opacity-90">Secondary Wallet</p>
-                      <p className="mt-0.5 text-2xl font-bold tracking-tight">
-                        ${wallets.secondaryBalance.toLocaleString()}
-                      </p>
-                      <p className="mt-0.5 text-[10px] opacity-70">৳{wallets.secondaryRate}/USD</p>
-                    </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-                      <Wallet className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                </div>
+                <SecondaryWalletDebitCard
+                  balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+                  footer={`Rate ৳${wallets.secondaryRate}/USD`}
+                />
               )}
 
               {wallets.creditLineEnabled && (
