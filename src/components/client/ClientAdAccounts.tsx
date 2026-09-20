@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, MoreVertical, Pencil, Zap, Lock as LockIcon } from "lucide-react";
+import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { Switch } from "@/components/ui/switch";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -815,19 +816,15 @@ export function ClientAdAccounts() {
     <div className="space-y-4 md:space-y-6">
       {/* Wallet Hero + Metrics */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
-        {/* Wallet Balance Hero Card */}
-        <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Wallet Balance</p>
-              <p className="text-3xl font-bold tracking-tight mt-1">${walletBalance.toLocaleString()}</p>
-              {dueLimit > 0 && <p className="text-xs opacity-70 mt-1">Due limit: ${dueLimit.toLocaleString()}</p>}
-            </div>
-            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-              <Wallet className="h-6 w-6" />
-            </div>
-          </div>
-        </div>
+        <MainWalletDebitCard
+          title="Wallet Balance"
+          balanceLabel={`$${walletBalance.toLocaleString()}`}
+          footer={
+            dueLimit > 0
+              ? `Due limit: $${dueLimit.toLocaleString()} · Rate ৳${wallets.mainRate}/USD`
+              : `Rate ৳${wallets.mainRate}/USD`
+          }
+        />
         {/* Secondary wallet — shown for clients who have it enabled (mobile + desktop) */}
         {wallets.secondaryEnabled && (
           <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-4">
