@@ -1082,7 +1082,7 @@ export function AdminAdAccounts() {
                           {a.external_topup_url_secondary && (
                             <Button
                               size="sm"
-                              className="gap-1 rounded-full px-4 font-semibold text-xs h-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                              className="gap-1 rounded-full px-4 font-semibold text-xs h-8 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                               title="Ext. Top-Up (Secondary Wallet)"
                               onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
                             >
@@ -1115,7 +1115,7 @@ export function AdminAdAccounts() {
                           {hasSecondaryWallet(uid) && (
                             <Button
                               size="icon"
-                              className="h-8 w-8 shrink-0 rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                              className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                               title="Top Up (Secondary Wallet)"
                               onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
                             >
@@ -1385,7 +1385,7 @@ export function AdminAdAccounts() {
                             {a.external_topup_url_secondary && (
                               <Button
                                 size="icon"
-                                className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                className="h-8 w-8 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                                 onClick={() => setExternalTopUpAccount({ account: a, wallet: "secondary" })}
                                 title="Ext. Top-Up (Secondary Wallet)"
                               >
@@ -1411,7 +1411,7 @@ export function AdminAdAccounts() {
                             {hasSecondaryWallet(getAssignedUserId(a.id)) && (
                               <Button
                                 size="icon"
-                                className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                className="h-8 w-8 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                                 title="Top Up (Secondary Wallet)"
                                 onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); setDialogTab("topup"); }}
                               >
