@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WhatsappNotificationsRouteImport } from './routes/whatsapp-notifications'
 import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as TransactionsRouteImport } from './routes/transactions'
@@ -65,15 +64,9 @@ import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-link
 import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
-import { Route as ApiPublicWaJobsRouteImport } from './routes/api/public/wa-jobs'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
-const WhatsappNotificationsRoute = WhatsappNotificationsRouteImport.update({
-  id: '/whatsapp-notifications',
-  path: '/whatsapp-notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
   id: '/wallet-balances',
   path: '/wallet-balances',
@@ -349,11 +342,6 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
-const ApiPublicWaJobsRoute = ApiPublicWaJobsRouteImport.update({
-  id: '/api/public/wa-jobs',
-  path: '/api/public/wa-jobs',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
   id: '/api/public/crm-topup',
   path: '/api/public/crm-topup',
@@ -409,7 +397,6 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
-  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -424,7 +411,6 @@ export interface FileRoutesByFullPath {
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
-  '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -469,7 +455,6 @@ export interface FileRoutesByTo {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
-  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -484,7 +469,6 @@ export interface FileRoutesByTo {
   '/tenants': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
-  '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -531,7 +515,6 @@ export interface FileRoutesById {
   '/transactions': typeof TransactionsRoute
   '/wallet': typeof WalletRoute
   '/wallet-balances': typeof WalletBalancesRoute
-  '/whatsapp-notifications': typeof WhatsappNotificationsRoute
   '/ad-accounts/$id': typeof AdAccountsIdRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/problem-accounts': typeof AdminProblemAccountsRoute
@@ -546,7 +529,6 @@ export interface FileRoutesById {
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
-  '/api/public/wa-jobs': typeof ApiPublicWaJobsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -594,7 +576,6 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
-    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -609,7 +590,6 @@ export interface FileRouteTypes {
     | '/tenants/'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
-    | '/api/public/wa-jobs'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -654,7 +634,6 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
-    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -669,7 +648,6 @@ export interface FileRouteTypes {
     | '/tenants'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
-    | '/api/public/wa-jobs'
   id:
     | '__root__'
     | '/'
@@ -715,7 +693,6 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallet'
     | '/wallet-balances'
-    | '/whatsapp-notifications'
     | '/ad-accounts/$id'
     | '/admin/performance'
     | '/admin/problem-accounts'
@@ -730,7 +707,6 @@ export interface FileRouteTypes {
     | '/tenants/'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
-    | '/api/public/wa-jobs'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -777,7 +753,6 @@ export interface RootRouteChildren {
   TransactionsRoute: typeof TransactionsRoute
   WalletRoute: typeof WalletRoute
   WalletBalancesRoute: typeof WalletBalancesRoute
-  WhatsappNotificationsRoute: typeof WhatsappNotificationsRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
@@ -788,18 +763,10 @@ export interface RootRouteChildren {
   ClientsIndexRoute: typeof ClientsIndexRoute
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
-  ApiPublicWaJobsRoute: typeof ApiPublicWaJobsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/whatsapp-notifications': {
-      id: '/whatsapp-notifications'
-      path: '/whatsapp-notifications'
-      fullPath: '/whatsapp-notifications'
-      preLoaderRoute: typeof WhatsappNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/wallet-balances': {
       id: '/wallet-balances'
       path: '/wallet-balances'
@@ -1185,13 +1152,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
-    '/api/public/wa-jobs': {
-      id: '/api/public/wa-jobs'
-      path: '/api/public/wa-jobs'
-      fullPath: '/api/public/wa-jobs'
-      preLoaderRoute: typeof ApiPublicWaJobsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/crm-topup': {
       id: '/api/public/crm-topup'
       path: '/api/public/crm-topup'
@@ -1290,7 +1250,6 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsRoute: TransactionsRoute,
   WalletRoute: WalletRoute,
   WalletBalancesRoute: WalletBalancesRoute,
-  WhatsappNotificationsRoute: WhatsappNotificationsRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
@@ -1301,7 +1260,6 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIndexRoute: ClientsIndexRoute,
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
-  ApiPublicWaJobsRoute: ApiPublicWaJobsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
