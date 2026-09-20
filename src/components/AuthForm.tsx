@@ -186,9 +186,9 @@ export function AuthForm() {
         <div className="auth-rise-bg auth-bg-rise-10" />
       </div>
 
-      <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
+      <header className="relative z-10 flex items-center gap-3 px-5 py-3 sm:px-10 sm:py-5">
         {displayLogo ? (
-          <img src={displayLogo} alt="Logo" className="h-10 w-10 rounded-xl object-contain ring-1 ring-foreground/10" />
+          <img src={displayLogo} alt="Logo" className="h-9 w-9 rounded-xl object-contain ring-1 ring-foreground/10 sm:h-10 sm:w-10" />
         ) : (
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground/[0.06] ring-1 ring-foreground/10">
             <LogIn className="h-4 w-4 text-foreground" />
@@ -199,10 +199,10 @@ export function AuthForm() {
         )}
       </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-6 pt-2">
-        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-4 pt-1 sm:pb-6 sm:pt-2">
+        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[24px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl sm:rounded-[28px] lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex h-full min-h-[520px] flex-col justify-between overflow-hidden p-6 text-background sm:p-8"
+          <div className="relative flex h-full min-h-0 flex-col justify-between overflow-hidden p-4 text-background sm:p-6 lg:min-h-[520px] lg:p-8"
             style={{ background: "linear-gradient(165deg, #0e2c55 0%, #14427c 55%, #0a1f42 100%)" }}>
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-[110px]" />
             <div className="pointer-events-none absolute -left-20 bottom-1/3 h-64 w-64 rounded-full bg-sky-400/15 blur-[100px]" />
@@ -220,13 +220,13 @@ export function AuthForm() {
             </div>
 
             <div className="relative">
-              <div className="inline-flex items-center gap-3">
-                <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="auth-serif text-lg font-semibold tracking-wide text-white sm:text-xl">Unlimited spend without hassle</span>
+              <div className="inline-flex items-center gap-2.5 sm:gap-3">
+                <img src={logoMark} alt="Logo" className="h-9 w-9 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)] sm:h-12 sm:w-12" />
+                <span className="auth-serif text-base font-semibold tracking-wide text-white sm:text-xl">Unlimited spend without hassle</span>
               </div>
 
-              {/* Cover photo — full width of the panel, compact height */}
-              <div className="-mx-6 mt-4 sm:-mx-8">
+              {/* Cover photo — full width of the panel, compact height (desktop only) */}
+              <div className="-mx-6 mt-4 hidden sm:-mx-8 lg:block">
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
@@ -234,17 +234,19 @@ export function AuthForm() {
                 />
               </div>
 
-              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight text-white sm:text-2xl">
-                {welcomeTitle || "Welcome to"}{" "}
-                <span className="font-bold">{displayName}</span>
-              </h2>
-              <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
-                {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
-              </p>
-              <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              <div className="hidden lg:block">
+                <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight text-white sm:text-2xl">
+                  {welcomeTitle || "Welcome to"}{" "}
+                  <span className="font-bold">{displayName}</span>
+                </h2>
+                <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
+                  {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
+                </p>
+                <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              </div>
             </div>
 
-            <div className="relative mt-6 space-y-2.5 text-sm">
+            <div className="relative mt-6 hidden space-y-2.5 text-sm lg:block">
               <a
                 href={HELPLINE_TEL}
                 className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
@@ -276,33 +278,33 @@ export function AuthForm() {
           </div>
 
           {/* ===== Right sign-in panel ===== */}
-          <div className="px-6 py-8 sm:px-9">
+          <div className="px-5 py-4 sm:px-9 sm:py-8">
             <div className="flex flex-col items-center text-center">
-              <h1 className="auth-serif text-[26px] font-semibold leading-tight text-foreground">
+              <h1 className="auth-serif text-[22px] font-semibold leading-tight text-foreground sm:text-[26px]">
                 {isLogin ? "Sign in" : "Create your account"}
               </h1>
-              <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-muted-foreground sm:mt-2 sm:text-sm">
                 {isLogin ? (welcomeTitle || "Welcome back") + " — enter your credentials to continue." : "Fill in the details to get started."}
               </p>
-              <div className="mt-4 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+              <div className="mt-3 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent sm:mt-4" />
             </div>
 
-            <div className="mt-5">
+            <div className="mt-3 sm:mt-5">
               {refCode && !isLogin ? (
                 <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                   Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
                 </div>
               ) : null}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 {!isLogin && (
                   <>
                     <div className="space-y-1.5">
                       <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground">Full Name</Label>
-                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="businessName" className="text-xs font-medium text-muted-foreground">Business Name</Label>
-                      <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                   </>
                 )}
@@ -311,14 +313,14 @@ export function AuthForm() {
                   {!isLogin && <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>}
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 focus-visible:ring-primary/20" />
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 pl-11 focus-visible:ring-primary/20" />
                   </div>
                 </div>
 
                 {!isLogin && (
                   <div className="space-y-1.5">
                     <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">Phone Number</Label>
-                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                   </div>
                 )}
 
@@ -326,7 +328,7 @@ export function AuthForm() {
                   {!isLogin && <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>}
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 pr-11 focus-visible:ring-primary/20" />
+                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 pl-11 pr-11 focus-visible:ring-primary/20" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 transition-colors hover:text-foreground">
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -337,12 +339,12 @@ export function AuthForm() {
                   <>
                     <div className="space-y-1.5">
                       <Label htmlFor="businessAddress" className="text-xs font-medium text-muted-foreground">Business Address</Label>
-                      <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="monthlySpend" className="text-xs font-medium text-muted-foreground">Monthly Spend (USD)</Label>
                       <Select value={monthlySpend} onValueChange={setMonthlySpend}>
-                        <SelectTrigger className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20"><SelectValue placeholder="Select range" /></SelectTrigger>
+                        <SelectTrigger className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20"><SelectValue placeholder="Select range" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="$0 - $500">$0 - $500</SelectItem>
                           <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
@@ -368,11 +370,11 @@ export function AuthForm() {
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading} className="h-12 w-full rounded-2xl bg-foreground text-base font-medium tracking-wide text-background shadow-[0_12px_28px_-10px_rgba(15,23,42,0.45)] transition-all hover:bg-foreground/90 active:scale-[0.99]">
+                <Button type="submit" disabled={loading} className="h-11 w-full rounded-2xl bg-foreground sm:h-12 text-base font-medium tracking-wide text-background shadow-[0_12px_28px_-10px_rgba(15,23,42,0.45)] transition-all hover:bg-foreground/90 active:scale-[0.99]">
                   {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
                 </Button>
 
-                <div className="relative my-2">
+                <div className="relative my-1 sm:my-2">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/70" />
                   </div>
@@ -386,7 +388,7 @@ export function AuthForm() {
                   onClick={handleGoogleSignIn}
                   disabled={loading}
                   variant="outline"
-                  className="h-12 w-full gap-2.5 rounded-2xl border-border/70 bg-white/70 font-medium text-foreground/90 transition-all hover:bg-white active:scale-[0.99]"
+                  className="h-11 w-full gap-2.5 rounded-2xl sm:h-12 border-border/70 bg-white/70 font-medium text-foreground/90 transition-all hover:bg-white active:scale-[0.99]"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -397,7 +399,7 @@ export function AuthForm() {
                   Continue with Google
                 </Button>
 
-                <p className="pt-2 text-center text-sm text-muted-foreground">
+                <p className="pt-1 text-center text-[13px] text-muted-foreground sm:pt-2 sm:text-sm">
                   {isLogin ? "Don't have an account? " : "Already have an account? "}
                   <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground/60">
                     {isLogin ? "Sign up" : "Sign in"}
@@ -405,7 +407,7 @@ export function AuthForm() {
                 </p>
               </form>
 
-              <div className="mt-4 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
+              <div className="mt-2.5 hidden items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70 sm:mt-4 sm:flex">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure sign-in · Your credentials are encrypted
               </div>
@@ -414,7 +416,7 @@ export function AuthForm() {
         </div>
       </main>
 
-      <footer className="relative z-10 pb-6 text-center text-xs tracking-wide text-muted-foreground/70">
+      <footer className="relative z-10 pb-3 text-center text-[11px] tracking-wide text-muted-foreground/70 sm:pb-6 sm:text-xs">
         © {new Date().getFullYear()} || {displayName} || All Rights Reserved.
       </footer>
     </div>
