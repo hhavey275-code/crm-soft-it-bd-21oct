@@ -1108,11 +1108,23 @@ export function ClientAdAccounts() {
                       )}
 
                       {/* Last Refreshed */}
-                      {ins?.updated_at && (
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Last Refreshed: {formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}
-                        </p>
-                      )}
+                      <div className="mt-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {ins?.updated_at && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Last Refreshed: {formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}
+                          </p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                          title="Update this account from Meta"
+                          disabled={singleRefreshingId === a.id}
+                          onClick={() => refreshSingleMutation.mutate(a.id)}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
 
                       {/* Top Up + Actions */}
                       <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
