@@ -162,6 +162,7 @@ export default function InvoicePage() {
   const { invoice, request, profile } = data;
   const secondaryUsd = Number((data as any)?.secondaryUsd ?? 0);
   const secondaryRate = Number((profile as any)?.secondary_usd_rate ?? 0);
+  const creditLineRate = Number((profile as any)?.credit_line_usd_rate ?? 0);
 
   const accent = "#0066CC";
   const accentLight = "#E8F0FE";
@@ -326,22 +327,32 @@ export default function InvoicePage() {
 
                   const rows: Array<{ desc: string; rate: string; qty: string; total: number }> = [];
 
-                  // Dual-wallet split stored at approval time (main due →
-                  // secondary due at its own rate → main wallet deposit).
+                  // Wallet split stored at approval time (main due → credit line
+                  // due → secondary due, each at its own rate → main deposit).
                   const splitMainDue = Number((request as any)?.main_due_bdt ?? 0);
+                  const splitClDue = Number((request as any)?.credit_line_due_bdt ?? 0);
                   const splitSecDue = Number((request as any)?.secondary_due_bdt ?? 0);
                   const splitMainDep = Number((request as any)?.main_deposit_bdt ?? 0);
-                  const hasSplit = splitMainDue + splitSecDue + splitMainDep > 0.5;
+                  const hasSplit = splitMainDue + splitClDue + splitSecDue + splitMainDep > 0.5;
 
                   if (hasSplit) {
                     const rateStr = rate > 0 ? `৳${rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—";
                     const secRateStr = secondaryRate > 0 ? `৳${secondaryRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—";
+                    const clRateStr = creditLineRate > 0 ? `৳${creditLineRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—";
                     if (splitMainDue > 0.5) {
                       rows.push({
                         desc: "Main Wallet Due Adjustment",
                         rate: rateStr,
                         qty: (rate > 0 ? splitMainDue / rate : 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
                         total: splitMainDue,
+                      });
+                    }
+                    if (splitClDue > 0.5) {
+                      rows.push({
+                        desc: "Credit Line Wallet Due Adjustment",
+                        rate: clRateStr,
+                        qty: (creditLineRate > 0 ? splitClDue / creditLineRate : 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                        total: splitClDue,
                       });
                     }
                     if (splitSecDue > 0.5) {

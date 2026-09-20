@@ -106,12 +106,17 @@ export function ExternalTopUpDialog({ open, onOpenChange, account, walletKind = 
       // Pull whatever is short first so the ledger reflects the conversion.
       if (walletKind === "secondary" || walletKind === "credit_line") {
         const rpcName = walletKind === "credit_line" ? "ensure_credit_line_funds" : "ensure_secondary_funds";
+        // Honour the client's own due limit for this wallet (expired limit = 0).
+        const { data: limitData } = await (supabase as any).rpc("effective_due_limit", {
+          p_user_id: targetUserId,
+          p_wallet_kind: walletKind,
+        });
         const { data: conv, error: convErr } = await (supabase as any).rpc(rpcName, {
           p_user_id: targetUserId,
           p_needed_usd: amt,
           p_processed_by: `admin:${user!.id}`,
           p_allow_negative: true,
-          p_due_limit: 0,
+          p_due_limit: Number(limitData ?? 0) || 0,
         });
         if (convErr || (conv && conv.ok === false)) {
           await (supabase as any).from("external_topup_requests").delete().eq("id", data.id);
