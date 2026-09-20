@@ -209,8 +209,11 @@ export function AppSidebar() {
   } else {
     // Client: filter out permission-gated items like ads-manager
     const permGatedKeys = ["ads-manager"];
+    // Referral menu only for clients the admin has enabled it for
+    const referralOn = referralGlobalOn !== false && !!(profile as any)?.referral_enabled;
     navItems = clientNavItems.filter(item =>
-      !permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key))
+      (item.key !== "referral" || referralOn) &&
+      (!permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key)))
     );
   }
 
