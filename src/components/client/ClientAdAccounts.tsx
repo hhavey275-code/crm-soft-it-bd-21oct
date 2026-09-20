@@ -1122,8 +1122,7 @@ export function ClientAdAccounts() {
                             {a.external_topup_url_secondary && (
                               <Button
                                 size="sm"
-                                variant="secondary"
-                                className="flex-1 text-xs h-8"
+                                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white text-xs h-8 shadow-md shadow-emerald-500/25"
                                 disabled={isInactive}
                                 onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}
                               >
@@ -1339,7 +1338,7 @@ export function ClientAdAccounts() {
                               {a.external_topup_url_secondary && (
                                 <Button
                                   size="sm"
-                                  variant="secondary"
+                                  className="bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white shadow-md shadow-emerald-500/25"
                                   disabled={isInactive}
                                   title="Request top-up (Secondary wallet)"
                                   onClick={() => { setTopUpAccount(a); setTopUpWallet("secondary"); setTopUpAmount(""); }}

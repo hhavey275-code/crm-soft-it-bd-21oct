@@ -2586,9 +2586,21 @@ export default function ClientDetailPage() {
                     }
                   />
 
-                  {/* Extra wallets + combined total — admin controlled */}
-                  {userId && <SecondaryWalletCard userId={userId} />}
-                  {userId && <CreditLineWalletCard userId={userId} />}
+                  {/* Extra wallets use the same debit-card design on desktop and mobile. */}
+                  {wallets.secondaryEnabled && (
+                    <SecondaryWalletDebitCard
+                      balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+                      footer={`Rate ৳${wallets.secondaryRate}/USD`}
+                      actions={<WalletQuickActions userId={userId} kind="secondary" inline />}
+                    />
+                  )}
+                  {wallets.creditLineEnabled && (
+                    <CreditLineWalletDebitCard
+                      balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+                      footer={`Rate ৳${wallets.creditLineRate}/USD`}
+                      actions={<WalletQuickActions userId={userId} kind="credit_line" inline />}
+                    />
+                  )}
                   {userId && <CombinedTotalCard userId={userId} />}
                 </div>
 
@@ -3070,7 +3082,7 @@ export default function ClientDetailPage() {
                                       {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
                                           size="icon"
-                                          className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                          className="h-8 w-8 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                                           onClick={() => {
                                             if (acc.external_topup_required) {
                                               setExtTopUp({ account: acc, wallet: "secondary" });
