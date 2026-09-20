@@ -96,7 +96,6 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { fetchPeriodSpendFromMeta } from "@/lib/fetchPeriodSpend";
-import { CardDueBox } from "@/components/CardDueBox";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
 import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
@@ -2446,8 +2445,6 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
                 </div>
-                {/* Card Due Box - mobile */}
-                {userId && <CardDueBox userId={userId} size="sm" />}
               </div>
             ) : (
               /* Desktop Metrics */
@@ -2694,8 +2691,6 @@ export default function ClientDetailPage() {
                   </Card>
                 </div>
 
-                {/* Card Due Box - desktop */}
-                {userId && <CardDueBox userId={userId} />}
               </div>
             )}
 
