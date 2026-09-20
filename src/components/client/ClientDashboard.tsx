@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
+import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -374,17 +375,10 @@ export function ClientDashboard() {
       />
       )}
       {clientWallets.creditLineEnabled && (
-      <Card className="border-border/60 bg-card">
-        <CardContent className="p-4">
-          <p className="text-xs font-medium text-sky-700 dark:text-sky-400">Credit Line Wallet</p>
-          <p className="text-2xl font-bold mt-1 text-sky-700 dark:text-sky-300">
-            ${clientWallets.creditLineBalance.toLocaleString()}
-          </p>
-          <p className="text-[11px] text-sky-700/70 dark:text-sky-400/70 mt-0.5">
-            Rate ৳{clientWallets.creditLineRate}/USD
-          </p>
-        </CardContent>
-      </Card>
+      <CreditLineWalletDebitCard
+        balanceLabel={`$${clientWallets.creditLineBalance.toLocaleString()}`}
+        footer={`Rate ৳${clientWallets.creditLineRate}/USD`}
+      />
       )}
       <Card className="border-border/60 bg-card">
         <CardContent className="p-4">

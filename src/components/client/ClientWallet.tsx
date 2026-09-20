@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
+import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
 import { Wallet, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
@@ -158,15 +159,10 @@ export function ClientWallet() {
             />
           )}
           {wallets.creditLineEnabled && (
-            <Card className="border-border/60 bg-card">
-              <CardContent className="p-5">
-                <p className="text-sm text-sky-700 dark:text-sky-400">Credit Line Wallet Balance</p>
-                <p className="text-2xl font-bold mt-1 text-sky-700 dark:text-sky-300">
-                  ${wallets.creditLineBalance.toLocaleString()}
-                </p>
-                <p className="text-xs text-sky-700/70 dark:text-sky-400/70 mt-1">Rate ৳{wallets.creditLineRate}/USD</p>
-              </CardContent>
-            </Card>
+            <CreditLineWalletDebitCard
+              balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+              footer={`Rate ৳${wallets.creditLineRate}/USD`}
+            />
           )}
           <Card className="border-border/60 bg-card">
             <CardContent className="p-5">
