@@ -3,7 +3,7 @@ import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, TrendingDown, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity, PiggyBank } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
@@ -478,15 +478,20 @@ export function ClientDashboard() {
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
-              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining" },
-              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
-              { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
-              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
+              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts", icon: Megaphone, bg: "bg-blue-100", text: "text-blue-600" },
+              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining", icon: Wallet, bg: "bg-emerald-100", text: "text-emerald-600" },
+              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend", icon: TrendingDown, bg: "bg-orange-100", text: "text-orange-600" },
+              { label: "Today Orders", value: String(todayOrders), key: "today-orders", icon: ShoppingCart, bg: "bg-violet-100", text: "text-violet-600" },
+              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup", icon: PiggyBank, bg: "bg-pink-100", text: "text-pink-600" },
             ].map((m) => (
               <Card key={m.label} data-tutorial={`card-${m.key}`} className="bg-card border border-border/60">
                 <CardContent className="p-2.5 text-center">
-                  <p className="text-[10px] text-muted-foreground font-medium truncate">{m.label}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium truncate flex items-center justify-center gap-1">
+                    <span className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${m.bg}`}>
+                      <m.icon className={`h-2.5 w-2.5 ${m.text}`} />
+                    </span>
+                    {m.label}
+                  </p>
                   <p className="text-base font-bold text-foreground">{m.value}</p>
                 </CardContent>
               </Card>
@@ -494,7 +499,12 @@ export function ClientDashboard() {
             {/* Total Spend inside grid */}
             <Card data-tutorial="card-total-spend" className="bg-card border border-border/60">
               <CardContent className="p-2.5 text-center relative">
-                <p className="text-[10px] text-muted-foreground font-medium truncate">{totalSpendLabel}</p>
+                <p className="text-[10px] text-muted-foreground font-medium truncate flex items-center justify-center gap-1">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-teal-100">
+                    <BarChart3 className="h-2.5 w-2.5 text-teal-600" />
+                  </span>
+                  {totalSpendLabel}
+                </p>
                 <p className="text-base font-bold text-foreground">{fmt(displayTotalSpend)}</p>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -526,16 +536,16 @@ export function ClientDashboard() {
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           {[
-            { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone, key: "ad-accounts" },
-            { title: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },
-            { title: "Today Spend", value: fmt(todaySpend), icon: DollarSign, key: "today-spend" },
-            { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart, key: "today-orders" },
-            { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: ArrowUpCircle, key: "total-topup" },
+            { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: Megaphone, key: "ad-accounts", bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-600" },
+            { title: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), icon: Wallet, key: "remaining", bg: "bg-emerald-100 dark:bg-emerald-900/40", text: "text-emerald-600" },
+            { title: "Today Spend", value: fmt(todaySpend), icon: TrendingDown, key: "today-spend", bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-600" },
+            { title: "Today Orders", value: String(todayOrders), icon: ShoppingCart, key: "today-orders", bg: "bg-violet-100 dark:bg-violet-900/40", text: "text-violet-600" },
+            { title: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), icon: PiggyBank, key: "total-topup", bg: "bg-pink-100 dark:bg-pink-900/40", text: "text-pink-600" },
           ].map((m) => (
             <Card key={m.title} data-tutorial={`card-${m.key}`} className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 dark:bg-primary/20">
-                  <m.icon className="h-4 w-4 text-primary" />
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${m.bg}`}>
+                  <m.icon className={`h-4 w-4 ${m.text}`} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[11px] text-muted-foreground font-medium truncate">{m.title}</p>
@@ -548,8 +558,8 @@ export function ClientDashboard() {
           {/* Total Spending with Calendar — inside grid */}
           <Card data-tutorial="card-total-spend" className="border border-border/40 bg-primary/[0.04] dark:bg-primary/[0.08]">
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 dark:bg-primary/20">
-                <Activity className="h-4 w-4 text-primary" />
+              <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-teal-100 dark:bg-teal-900/40">
+                <BarChart3 className="h-4 w-4 text-teal-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] text-muted-foreground font-medium truncate">{totalSpendLabel}</p>
