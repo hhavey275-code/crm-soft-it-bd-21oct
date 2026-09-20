@@ -2317,6 +2317,8 @@ export type Database = {
           phone: string | null
           referral_code: string | null
           referral_code_at: string | null
+          referral_enabled: boolean
+          referral_rate_bdt: number
           referral_rate_usd: number | null
           referred_by: string | null
           secondary_deposit_enabled: boolean
@@ -2361,6 +2363,8 @@ export type Database = {
           phone?: string | null
           referral_code?: string | null
           referral_code_at?: string | null
+          referral_enabled?: boolean
+          referral_rate_bdt?: number
           referral_rate_usd?: number | null
           referred_by?: string | null
           secondary_deposit_enabled?: boolean
@@ -2405,6 +2409,8 @@ export type Database = {
           phone?: string | null
           referral_code?: string | null
           referral_code_at?: string | null
+          referral_enabled?: boolean
+          referral_rate_bdt?: number
           referral_rate_usd?: number | null
           referred_by?: string | null
           secondary_deposit_enabled?: boolean
@@ -2454,6 +2460,66 @@ export type Database = {
           id?: string
           p256dh?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      referral_account_earnings: {
+        Row: {
+          account_name: string | null
+          account_ref: string | null
+          ad_account_id: string
+          commission_bdt: number
+          created_at: string
+          eligible: boolean
+          id: string
+          min_spend_usd: number
+          period_month: string
+          rate_bdt: number
+          referred_name: string | null
+          referred_user_id: string
+          referrer_id: string
+          spend_usd: number
+          status: string
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_ref?: string | null
+          ad_account_id: string
+          commission_bdt?: number
+          created_at?: string
+          eligible?: boolean
+          id?: string
+          min_spend_usd?: number
+          period_month: string
+          rate_bdt?: number
+          referred_name?: string | null
+          referred_user_id: string
+          referrer_id: string
+          spend_usd?: number
+          status?: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          account_ref?: string | null
+          ad_account_id?: string
+          commission_bdt?: number
+          created_at?: string
+          eligible?: boolean
+          id?: string
+          min_spend_usd?: number
+          period_month?: string
+          rate_bdt?: number
+          referred_name?: string | null
+          referred_user_id?: string
+          referrer_id?: string
+          spend_usd?: number
+          status?: string
+          synced_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2511,6 +2577,7 @@ export type Database = {
       referral_payout_requests: {
         Row: {
           admin_note: string | null
+          amount_bdt: number
           amount_usd: number
           created_at: string
           id: string
@@ -2523,7 +2590,8 @@ export type Database = {
         }
         Insert: {
           admin_note?: string | null
-          amount_usd: number
+          amount_bdt?: number
+          amount_usd?: number
           created_at?: string
           id?: string
           referrer_id: string
@@ -2535,6 +2603,7 @@ export type Database = {
         }
         Update: {
           admin_note?: string | null
+          amount_bdt?: number
           amount_usd?: number
           created_at?: string
           id?: string
@@ -4603,6 +4672,7 @@ export type Database = {
         Args: { p_referrer: string }
         Returns: number
       }
+      referral_available_bdt: { Args: { p_referrer: string }; Returns: number }
       refund_failed_topup: {
         Args: { p_failed_topup_id: string; p_processed_by: string }
         Returns: Json
@@ -4637,8 +4707,17 @@ export type Database = {
         Returns: Json
       }
       request_referral_payout: { Args: { p_amount: number }; Returns: Json }
+      request_referral_payout_bdt: { Args: { p_amount: number }; Returns: Json }
       review_referral_payout: {
         Args: { p_approve: boolean; p_id: string; p_note?: string }
+        Returns: Json
+      }
+      review_referral_payout_bdt: {
+        Args: { p_approve: boolean; p_id: string; p_note?: string }
+        Returns: Json
+      }
+      set_client_referral: {
+        Args: { p_enabled: boolean; p_rate_bdt: number; p_user_id: string }
         Returns: Json
       }
       settle_secondary_from_main: { Args: { p_user_id: string }; Returns: Json }
@@ -4654,6 +4733,19 @@ export type Database = {
           p_id: string
           p_movement_type: string
           p_reason: string
+        }
+        Returns: Json
+      }
+      upsert_referral_account_spend: {
+        Args: {
+          p_account_name: string
+          p_account_ref: string
+          p_ad_account: string
+          p_month: string
+          p_referred: string
+          p_referred_name: string
+          p_referrer: string
+          p_spend: number
         }
         Returns: Json
       }

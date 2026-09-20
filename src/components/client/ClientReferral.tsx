@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,11 +18,14 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Copy, Download, Gift, Users, Wallet, TrendingUp } from "lucide-react";
+import { Copy, Download, Gift, Users, Wallet, TrendingUp, RefreshCw } from "lucide-react";
 import { buildReferralLink } from "@/lib/referral";
 
-const money = (n: number) =>
+const usd = (n: number) =>
   `$${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const bdt = (n: number) =>
+  `৳${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const monthLabel = (d: string) => format(new Date(`${d}T00:00:00`), "MMMM yyyy");
 
@@ -32,6 +35,8 @@ export function ClientReferral() {
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
 
   const { data: settings } = useQuery({
     queryKey: ["referral-settings"],
@@ -39,29 +44,28 @@ export function ClientReferral() {
       const { data } = await supabase
         .from("site_settings")
         .select("key, value")
-        .in("key", ["referral_default_rate", "referral_min_monthly_spend", "referral_enabled"]);
+        .in("key", ["referral_min_monthly_spend", "referral_enabled"]);
       const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value ?? ""]));
       return {
-        defaultRate: Number(map["referral_default_rate"] ?? 0.1) || 0.1,
         minSpend: Number(map["referral_min_monthly_spend"] ?? 3000) || 3000,
         enabled: (map["referral_enabled"] ?? "on") !== "off",
       };
     },
   });
 
-  const { data: earnings = [], isLoading } = useQuery({
-    queryKey: ["referral-earnings", user?.id],
+  const enabledForMe = !!(profile as any)?.referral_enabled;
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["referral-account-earnings", user?.id],
     queryFn: async () => {
-      // Refresh the running month before reading.
-      await supabase.rpc("recalc_referral_earnings", {});
       const { data } = await supabase
-        .from("referral_monthly_earnings")
+        .from("referral_account_earnings")
         .select("*")
         .eq("referrer_id", user!.id)
         .order("period_month", { ascending: false });
       return data ?? [];
     },
-    enabled: !!user,
+    enabled: !!user && enabledForMe,
   });
 
   const { data: payouts = [] } = useQuery({
@@ -74,50 +78,36 @@ export function ClientReferral() {
         .order("created_at", { ascending: false });
       return data ?? [];
     },
-    enabled: !!user,
+    enabled: !!user && enabledForMe,
   });
 
   const { data: available = 0 } = useQuery({
-    queryKey: ["referral-available", user?.id, payouts.length, earnings.length],
+    queryKey: ["referral-available-bdt", user?.id, payouts.length, rows.length],
     queryFn: async () => {
-      const { data } = await supabase.rpc("referral_available_balance", { p_referrer: user!.id });
+      const { data } = await supabase.rpc("referral_available_bdt", { p_referrer: user!.id });
       return Number(data ?? 0);
     },
-    enabled: !!user,
+    enabled: !!user && enabledForMe,
   });
 
   const code = (profile as any)?.referral_code as string | undefined;
-  const rate = Number((profile as any)?.referral_rate_usd ?? settings?.defaultRate ?? 0.1);
+  const rate = Number((profile as any)?.referral_rate_bdt ?? 0);
   const minSpend = settings?.minSpend ?? 3000;
   const link = code ? buildReferralLink(code) : "";
+  const selectedMonth = `${month}-01`;
 
-  const currentMonth = format(new Date(), "yyyy-MM-01");
+  const monthRows = useMemo(
+    () => (rows as any[]).filter((r) => r.period_month === selectedMonth),
+    [rows, selectedMonth],
+  );
 
   const stats = useMemo(() => {
-    const referred = new Set(earnings.map((e: any) => e.referred_user_id)).size;
-    const totalEarned = earnings.reduce((s: number, e: any) => s + Number(e.commission_usd || 0), 0);
-    const paid = payouts
-      .filter((p: any) => p.status === "approved")
-      .reduce((s: number, p: any) => s + Number(p.amount_usd || 0), 0);
-    const thisMonthSpend = earnings
-      .filter((e: any) => e.period_month === currentMonth)
-      .reduce((s: number, e: any) => s + Number(e.spend_usd || 0), 0);
-    return { referred, totalEarned, paid, thisMonthSpend };
-  }, [earnings, payouts, currentMonth]);
-
-  const byMonth = useMemo(() => {
-    const map = new Map<string, { month: string; spend: number; eligibleSpend: number; commission: number; rows: any[] }>();
-    for (const e of earnings as any[]) {
-      const key = e.period_month;
-      const cur = map.get(key) ?? { month: key, spend: 0, eligibleSpend: 0, commission: 0, rows: [] };
-      cur.spend += Number(e.spend_usd || 0);
-      if (e.eligible) cur.eligibleSpend += Number(e.spend_usd || 0);
-      cur.commission += Number(e.commission_usd || 0);
-      (cur.rows as any[]).push(e);
-      map.set(key, cur);
-    }
-    return [...map.values()].sort((a, b) => (a.month < b.month ? 1 : -1));
-  }, [earnings]);
+    const clients = new Set(monthRows.map((r) => r.referred_user_id)).size;
+    const qualified = monthRows.filter((r) => r.eligible).length;
+    const spend = monthRows.reduce((s, r) => s + Number(r.spend_usd || 0), 0);
+    const commission = monthRows.reduce((s, r) => s + Number(r.commission_bdt || 0), 0);
+    return { clients, qualified, spend, commission };
+  }, [monthRows]);
 
   const copyLink = async () => {
     try {
@@ -128,20 +118,49 @@ export function ClientReferral() {
     }
   };
 
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Session পাওয়া যায়নি — আবার login করুন");
+
+      const res = await fetch("/api/referral-refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ month }),
+      });
+      const json = (await res.json().catch(() => ({}))) as any;
+      if (!res.ok) throw new Error(json?.error || "Update করা যায়নি");
+
+      toast.success(`${json.updated ?? 0} টি ad account update হয়েছে`);
+      if ((json.failed ?? []).length > 0) {
+        toast.warning(`কিছু account পড়া যায়নি: ${json.failed.join(", ")}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["referral-account-earnings"] });
+      queryClient.invalidateQueries({ queryKey: ["referral-available-bdt"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Update করা যায়নি");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const downloadCsv = () => {
-    const rows = [
-      ["Month", "Referred Client", "Spend (USD)", "Minimum Met", "Rate per $1", "Commission (USD)", "Status"],
-      ...(earnings as any[]).map((e) => [
-        monthLabel(e.period_month),
-        e.referred_name ?? "",
-        Number(e.spend_usd || 0).toFixed(2),
-        e.eligible ? "Yes" : "No",
-        Number(e.rate_used || 0).toFixed(4),
-        Number(e.commission_usd || 0).toFixed(2),
-        e.status,
+    const csvRows = [
+      ["Month", "Client", "Ad account", "Account ID", "Spend (USD)", "Qualified", "Rate (৳ per $1)", "Commission (৳)"],
+      ...(rows as any[]).map((r) => [
+        monthLabel(r.period_month),
+        r.referred_name ?? "",
+        r.account_name ?? "",
+        r.account_ref ?? "",
+        Number(r.spend_usd || 0).toFixed(2),
+        r.eligible ? "Yes" : "No",
+        Number(r.rate_bdt || 0).toFixed(2),
+        Number(r.commission_bdt || 0).toFixed(2),
       ]),
     ];
-    const csv = rows
+    const csv = csvRows
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" }));
@@ -153,22 +172,22 @@ export function ClientReferral() {
   };
 
   const submitPayout = async () => {
-    const amount = Number(payoutAmount);
+    const amount = Math.round(Number(payoutAmount) * 100) / 100;
     if (!amount || amount <= 0) {
       toast.error("সঠিক amount দিন");
       return;
     }
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.rpc("request_referral_payout", { p_amount: amount });
+      const { data, error } = await supabase.rpc("request_referral_payout_bdt", { p_amount: amount });
       if (error) throw error;
-      const res = data as { ok?: boolean } | null;
-      if (!res?.ok) throw new Error("Request তৈরি হয়নি");
-      toast.success("Payout request পাঠানো হয়েছে — admin approve করলে wallet-এ যোগ হবে");
+      const res = data as { ok?: boolean; error?: string } | null;
+      if (!res?.ok) throw new Error(res?.error === "insufficient_balance" ? "Available balance-এর বেশি" : "Request তৈরি হয়নি");
+      toast.success("Payout request পাঠানো হয়েছে");
       setPayoutOpen(false);
       setPayoutAmount("");
       queryClient.invalidateQueries({ queryKey: ["referral-payouts"] });
-      queryClient.invalidateQueries({ queryKey: ["referral-available"] });
+      queryClient.invalidateQueries({ queryKey: ["referral-available-bdt"] });
     } catch (err: any) {
       toast.error(err?.message || "Request পাঠানো যায়নি");
     } finally {
@@ -176,11 +195,11 @@ export function ClientReferral() {
     }
   };
 
-  if (settings && !settings.enabled) {
+  if (!enabledForMe || settings?.enabled === false) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-muted-foreground">
-          Referral program এখন বন্ধ আছে।
+          আপনার account-এ referral program চালু নেই।
         </CardContent>
       </Card>
     );
@@ -193,15 +212,15 @@ export function ClientReferral() {
           <Gift className="h-6 w-6 text-primary" /> Referral Program
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          আপনার link দিয়ে নতুন client join করলে তার ad spend-এর প্রতি $1-এ {money(rate)} commission পাবেন —
-          শুধু সেই মাসে, যেই মাসে সে কমপক্ষে {money(minSpend)} spend করে।
+          আপনার link দিয়ে আসা client-এর যেই ad account-এ মাসে {usd(minSpend)} বা তার বেশি spend হবে, সেই account-এর
+          পুরো spend-এর প্রতি $1-এ {bdt(rate)} commission পাবেন — মাস শেষে payment।
         </p>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Your referral link</CardTitle>
-          <CardDescription>এই link শেয়ার করুন — এই link দিয়ে signup করলেই client আপনার সাথে যুক্ত হবে</CardDescription>
+          <CardDescription>এই link দিয়ে signup করলেই client আপনার সাথে যুক্ত হবে</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
@@ -212,83 +231,88 @@ export function ClientReferral() {
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">Code: {code ?? "—"}</Badge>
-            <Badge variant="secondary">Rate: {money(rate)} per $1 spend</Badge>
-            <Badge variant="secondary">Minimum: {money(minSpend)} / month</Badge>
+            <Badge variant="secondary">Rate: {bdt(rate)} per $1 spend</Badge>
+            <Badge variant="secondary">Minimum: {usd(minSpend)} per ad account / month</Badge>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<Users className="h-4 w-4" />} label="Referred clients" value={String(stats.referred)} />
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="This month spend" value={money(stats.thisMonthSpend)} />
-        <StatCard icon={<Gift className="h-4 w-4" />} label="Total commission" value={money(stats.totalEarned)} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Available to withdraw" value={money(available)} />
+        <StatCard icon={<Users className="h-4 w-4" />} label="Referred clients" value={String(stats.clients)} />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Month spend" value={usd(stats.spend)} />
+        <StatCard icon={<Gift className="h-4 w-4" />} label="Qualified accounts" value={String(stats.qualified)} />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Month commission" value={bdt(stats.commission)} />
       </div>
 
       <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+        <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <CardTitle className="text-base">Month-wise commission</CardTitle>
-            <CardDescription>চলতি মাস running হিসাব, মাস শেষ হলে withdraw করা যাবে</CardDescription>
+            <CardTitle className="text-base">Ad account wise commission</CardTitle>
+            <CardDescription>
+              Update চাপলে ওই মাসের connected ad account গুলো থেকে spend আবার আনা হবে
+            </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={downloadCsv} disabled={earnings.length === 0}>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Month</Label>
+              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9" />
+            </div>
+            <Button size="sm" onClick={refresh} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Update
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadCsv} disabled={rows.length === 0}>
               <Download className="h-4 w-4 mr-2" /> CSV
             </Button>
-            <Button size="sm" onClick={() => setPayoutOpen(true)} disabled={available <= 0}>
-              <Wallet className="h-4 w-4 mr-2" /> Withdraw to wallet
+            <Button size="sm" variant="secondary" onClick={() => setPayoutOpen(true)} disabled={available <= 0}>
+              <Wallet className="h-4 w-4 mr-2" /> Withdraw {bdt(available)}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {isLoading ? (
             <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
-          ) : earnings.length === 0 ? (
+          ) : monthRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              এখনো কোনো referral নেই — link শেয়ার করে শুরু করুন।
+              এই মাসের কোনো data নেই — Update চাপুন।
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Referred client</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Ad account</TableHead>
                   <TableHead className="text-right">Spend</TableHead>
-                  <TableHead className="text-right">Eligible</TableHead>
+                  <TableHead className="text-right">Qualified</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
                   <TableHead className="text-right">Commission</TableHead>
-                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {byMonth.map((m) => (
-                  <Fragment key={m.month}>
-                    {m.rows.map((e: any) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="whitespace-nowrap">{monthLabel(e.period_month)}</TableCell>
-                        <TableCell>{e.referred_name ?? "—"}</TableCell>
-                        <TableCell className="text-right">{money(e.spend_usd)}</TableCell>
-                        <TableCell className="text-right">
-                          {e.eligible ? (
-                            <Badge className="bg-emerald-600 hover:bg-emerald-600">Yes</Badge>
-                          ) : (
-                            <Badge variant="outline">No</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{money(e.rate_used)}</TableCell>
-                        <TableCell className="text-right font-medium">{money(e.commission_usd)}</TableCell>
-                        <TableCell className="capitalize">{e.status}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/50">
-                      <TableCell colSpan={5} className="font-semibold">
-                        {monthLabel(m.month)} total
-                      </TableCell>
-                      <TableCell className="text-right font-bold">{money(m.commission)}</TableCell>
-                      <TableCell />
-                    </TableRow>
-                  </Fragment>
+                {monthRows.map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.referred_name ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{r.account_name ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{r.account_ref ?? ""}</div>
+                    </TableCell>
+                    <TableCell className="text-right">{usd(r.spend_usd)}</TableCell>
+                    <TableCell className="text-right">
+                      {r.eligible ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600">Yes</Badge>
+                      ) : (
+                        <Badge variant="outline">No</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">{bdt(r.rate_bdt)}</TableCell>
+                    <TableCell className="text-right font-medium">{bdt(r.commission_bdt)}</TableCell>
+                  </TableRow>
                 ))}
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={5} className="font-semibold">
+                    {monthLabel(selectedMonth)} total
+                  </TableCell>
+                  <TableCell className="text-right font-bold">{bdt(stats.commission)}</TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           )}
@@ -298,6 +322,7 @@ export function ClientReferral() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Payout requests</CardTitle>
+          <CardDescription>মাস শেষ হওয়া commission withdraw করা যাবে</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {payouts.length === 0 ? (
@@ -318,7 +343,9 @@ export function ClientReferral() {
                     <TableCell className="whitespace-nowrap">
                       {format(new Date(p.created_at), "dd MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-right">{money(p.amount_usd)}</TableCell>
+                    <TableCell className="text-right">
+                      {Number(p.amount_bdt || 0) > 0 ? bdt(p.amount_bdt) : usd(p.amount_usd)}
+                    </TableCell>
                     <TableCell className="capitalize">{p.status}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{p.admin_note ?? "—"}</TableCell>
                   </TableRow>
@@ -333,12 +360,10 @@ export function ClientReferral() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Withdraw referral commission</DialogTitle>
-            <DialogDescription>
-              Available: {money(available)} — admin approve করলে এই USD আপনার main wallet-এ যোগ হবে।
-            </DialogDescription>
+            <DialogDescription>Available: {bdt(available)} — admin approve করলে payment দেওয়া হবে।</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="payout-amount">Amount (USD)</Label>
+            <Label htmlFor="payout-amount">Amount (BDT)</Label>
             <Input
               id="payout-amount"
               type="number"

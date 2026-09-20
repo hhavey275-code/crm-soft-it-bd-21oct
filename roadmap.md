@@ -6,3 +6,4 @@
 - [ ] Update remaining 6 secrets (WHATSAPP_ACCESS_TOKEN, WHATSAPP_DEFAULT_COUNTRY_CODE, WHATSAPP_NOTIFY_SECRET, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_LANG, WHATSAPP_TEMPLATE_NAME). Blocker: user said they will provide these later.
 - [x] Credit Line wallet: due limit (admin control + client view), payment order Main → Credit Line → Secondary, invoice split row, client Main→Credit Line/Secondary transfer (2026-09-20).
 - [x] Group Main, Secondary, Credit Line and Combined wallet summaries into one responsive row across client dashboard, Ad Accounts and admin client overview (2026-09-20).
+- [x] Referral: per-client enable + taka (BDT) commission rate, hidden menu when off, ad-account wise $3000 monthly qualification with Meta "Update" fetch (2026-09-20).

@@ -135,6 +135,21 @@ export function AppSidebar() {
     enabled: !!user && (role === "admin" || role === "client"),
   });
 
+  // Referral program is off globally unless site settings say otherwise
+  const { data: referralGlobalOn } = useQuery({
+    queryKey: ["referral-global-enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "referral_enabled")
+        .maybeSingle();
+      return ((data as any)?.value ?? "on") !== "off";
+    },
+  });
+
+
+
   // Check if tenant mode (is_tenant flag OR test mode enabled)
   const { data: isTenantMode } = useQuery({
     queryKey: ["is-tenant-mode-sidebar"],
@@ -194,8 +209,11 @@ export function AppSidebar() {
   } else {
     // Client: filter out permission-gated items like ads-manager
     const permGatedKeys = ["ads-manager"];
+    // Referral menu only for clients the admin has enabled it for
+    const referralOn = referralGlobalOn !== false && !!(profile as any)?.referral_enabled;
     navItems = clientNavItems.filter(item =>
-      !permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key))
+      (item.key !== "referral" || referralOn) &&
+      (!permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key)))
     );
   }
 
