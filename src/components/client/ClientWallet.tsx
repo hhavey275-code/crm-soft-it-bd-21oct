@@ -65,8 +65,12 @@ export function ClientWallet() {
   const transferMutation = useMutation({
     mutationFn: async () => {
       const amount = parseFloat(transferAmount);
-      if (!amount || amount <= 0) throw new Error("Enter a valid amount");
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter a valid amount");
+      // Strict: the server only accepts amounts with at most 2 decimals.
+      if (Math.round(amount * 100) / 100 !== amount) throw new Error("সর্বোচ্চ ২ দশমিক পর্যন্ত amount দিন");
       if (amount > wallets.mainBalance) throw new Error("Main wallet balance is not enough");
+      const rate = transferTarget === "credit_line" ? wallets.creditLineRate : wallets.secondaryRate;
+      if (!(wallets.mainRate > 0) || !(rate > 0)) throw new Error("USD rate সেট করা নেই — admin-কে জানান");
       const { data, error } = await (supabase as any).rpc("convert_main_wallet", {
         p_target: transferTarget,
         p_usd_amount: amount,
