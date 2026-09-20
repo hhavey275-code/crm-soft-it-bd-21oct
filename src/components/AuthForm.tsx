@@ -159,7 +159,6 @@ export function AuthForm() {
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
         <div className="absolute -bottom-48 -left-32 h-[480px] w-[480px] rounded-full opacity-[0.05] blur-[110px]"
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
-ecursive
       </div>
 
       <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
