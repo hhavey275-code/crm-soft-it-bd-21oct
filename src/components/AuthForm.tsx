@@ -230,7 +230,7 @@ export function AuthForm() {
 
               <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight sm:text-2xl">
                 {welcomeTitle || "Welcome to"}{" "}
-                <span className="brand-script brand-script-gradient text-[28px] leading-none sm:text-[34px]">
+                <span className="brand-script brand-script-gradient text-[26px] leading-none sm:text-[30px]">
                   {displayName}
                 </span>
               </h2>
