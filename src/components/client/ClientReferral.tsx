@@ -35,7 +35,6 @@ export function ClientReferral() {
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
 
   const { data: settings } = useQuery({
@@ -254,7 +253,7 @@ export function ClientReferral() {
             <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
           ) : monthRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              এই মাসের কোনো data নেই — Update চাপুন।
+              এই মাসের কোনো data এখনো আসেনি — রাত ১২টার update-এর পর দেখা যাবে।
             </p>
           ) : (
             <Table>
