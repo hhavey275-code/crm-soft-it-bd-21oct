@@ -9,11 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, Phone, Facebook, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import softitbdLogo from "@/assets/softitbd-logo.png.asset.json";
 
 const LOGIN_TIMEOUT_MS = 20_000;
+
+const HELPLINE_DISPLAY = "01629344993";
+const HELPLINE_TEL = "tel:+8801629344993";
+const FACEBOOK_PAGE_URL = "https://www.facebook.com/SoftitBDDigitalMarket";
+const FACEBOOK_PAGE_LABEL = "SoftITBD Digital Market";
 
 function isTransientNetworkError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -77,8 +83,8 @@ export function AuthForm() {
     }
   }, [user, authLoading, navigate]);
 
-  const displayLogo = agencyBranding.logoUrl || logoUrl;
-  const displayName = agencyBranding.name || siteName;
+  const displayLogo = agencyBranding.logoUrl || logoUrl || softitbdLogo.url;
+  const displayName = agencyBranding.name || siteName || "SOFT IT BD";
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -153,15 +159,14 @@ export function AuthForm() {
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
         <div className="absolute -bottom-48 -left-32 h-[480px] w-[480px] rounded-full opacity-[0.05] blur-[110px]"
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
-        <div className="absolute top-1/3 left-1/2 h-[720px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/[0.045]" />
-        <div className="absolute top-1/3 left-1/2 h-[980px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/[0.025]" />
+ecursive
       </div>
 
       <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
         {displayLogo ? (
-          <img src={displayLogo} alt="Logo" className="h-8 w-8 rounded object-contain" />
+          <img src={displayLogo} alt="Logo" className="h-10 w-10 rounded-xl object-contain ring-1 ring-foreground/10" />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.06] ring-1 ring-foreground/10">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground/[0.06] ring-1 ring-foreground/10">
             <LogIn className="h-4 w-4 text-foreground" />
           </div>
         )}
@@ -170,32 +175,82 @@ export function AuthForm() {
         )}
       </header>
 
-      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-16 pt-4">
-        <div className="auth-fade-up w-full max-w-md">
-          <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white/80 shadow-[0_24px_70px_-20px_rgba(15,23,42,0.14),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl">
-            {/* Brand / welcome */}
-            <div className="relative px-8 pb-7 pt-9 sm:px-10">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-70"
-                style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--primary) / 0.07), transparent)" }} />
-              <div className="relative flex flex-col items-center text-center">
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground shadow-[0_10px_24px_-8px_rgba(15,23,42,0.5)]">
-                  {displayLogo ? (
-                    <img src={displayLogo} alt="Logo" className="h-7 w-7 rounded object-contain brightness-0 invert" />
-                  ) : (
-                    <LogIn className="h-6 w-6 text-background" />
-                  )}
-                </div>
-                <h1 className="auth-serif text-[28px] font-semibold leading-tight text-foreground">
-                  {isLogin ? (welcomeTitle || "Welcome back") : "Create your account"}
-                </h1>
-                <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
-                  {welcomeNote || (isLogin ? "Enter your credentials to access your dashboard." : "Fill in the details to get started.")}
-                </p>
-                <div className="mt-6 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
+        <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr]">
+          {/* ===== Left brand panel ===== */}
+          <div className="relative flex flex-col justify-between overflow-hidden bg-foreground p-7 text-background sm:p-10 lg:min-h-[680px]">
+            <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/25 blur-[110px]" />
+            <div className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-primary/15 blur-[120px]" />
+            <div className="pointer-events-none absolute right-6 top-1/2 h-[560px] w-[560px] -translate-y-1/2 rounded-full border border-background/[0.07]" />
+
+            <div className="relative">
+              <div className="inline-flex items-center gap-3 rounded-2xl bg-background px-4 py-3 shadow-[0_14px_34px_-14px_rgba(0,0,0,0.55)]">
+                {displayLogo ? (
+                  <img src={displayLogo} alt="Logo" className="h-11 w-11 rounded-lg object-contain" />
+                ) : (
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-foreground/[0.06]">
+                    <LogIn className="h-5 w-5 text-foreground" />
+                  </div>
+                )}
+                <span className="text-base font-semibold tracking-tight text-foreground">{displayName}</span>
               </div>
+
+              <h2 className="auth-serif mt-8 text-[30px] font-semibold leading-tight sm:mt-12 sm:text-4xl">
+                {welcomeTitle || "Welcome to"}{" "}
+                <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
+                  {displayName}
+                </span>
+              </h2>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/65">
+                {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
+              </p>
+              <div className="mt-7 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
             </div>
 
-            <div className="px-8 pb-9 sm:px-10">
+            <div className="relative mt-10 space-y-3 text-sm">
+              <a
+                href={HELPLINE_TEL}
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                  <Phone className="h-4 w-4" />
+                </span>
+                <span className="flex flex-col">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Helpline</span>
+                  <span className="font-mono text-[15px] font-semibold tracking-wide">{HELPLINE_DISPLAY}</span>
+                </span>
+              </a>
+              <a
+                href={FACEBOOK_PAGE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                  <Facebook className="h-4 w-4" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Facebook Page</span>
+                  <span className="truncate font-semibold">{FACEBOOK_PAGE_LABEL}</span>
+                </span>
+                <ArrowUpRight className="h-4 w-4 shrink-0 text-background/50" />
+              </a>
+            </div>
+          </div>
+
+          {/* ===== Right sign-in panel ===== */}
+          <div className="px-7 py-9 sm:px-10">
+            <div className="flex flex-col items-center text-center">
+              <h1 className="auth-serif text-[28px] font-semibold leading-tight text-foreground">
+                {isLogin ? "Sign in" : "Create your account"}
+              </h1>
+              <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
+                {isLogin ? (welcomeTitle || "Welcome back") + " — enter your credentials to continue." : "Fill in the details to get started."}
+              </p>
+              <div className="mt-5 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+            </div>
+
+            <div className="mt-6">
               {refCode && !isLogin ? (
                 <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                   Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
@@ -285,7 +340,7 @@ export function AuthForm() {
                     <span className="w-full border-t border-border/70" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white/80 px-4 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/80">or continue with</span>
+                    <span className="bg-white/85 px-4 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/80">or continue with</span>
                   </div>
                 </div>
 
@@ -312,14 +367,19 @@ export function AuthForm() {
                   </button>
                 </p>
               </form>
+
+              <div className="mt-6 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Secure sign-in · Your credentials are encrypted
+              </div>
             </div>
           </div>
-
-          <p className="auth-fade-up auth-fade-up-2 mt-6 text-center text-xs tracking-wide text-muted-foreground/70">
-            Secure sign-in · Your credentials are encrypted
-          </p>
         </div>
-      </div>
+      </main>
+
+      <footer className="relative z-10 pb-6 text-center text-xs tracking-wide text-muted-foreground/70">
+        © {new Date().getFullYear()} || {displayName} || All Rights Reserved.
+      </footer>
     </div>
   );
 }
