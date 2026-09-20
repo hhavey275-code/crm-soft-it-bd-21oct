@@ -84,7 +84,7 @@ export function AuthForm() {
     }
   }, [user, authLoading, navigate]);
 
-  const displayLogo = agencyBranding.logoUrl || logoUrl || softitbdLogo.url;
+  const displayLogo = agencyBranding.logoUrl || logoUrl || softitbdLogo;
   const displayName = agencyBranding.name || siteName || "SOFT IT BD";
 
   const handleGoogleSignIn = async () => {
@@ -213,7 +213,7 @@ export function AuthForm() {
 
               <div className="mt-6 overflow-hidden rounded-2xl border border-background/10 bg-background shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]">
                 <img
-                  src={softitbdBanner.url}
+                  src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
                   className="w-full object-cover"
                   loading="lazy"
