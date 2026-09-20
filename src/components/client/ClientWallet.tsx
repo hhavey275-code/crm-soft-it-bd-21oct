@@ -18,6 +18,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { Wallet, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
