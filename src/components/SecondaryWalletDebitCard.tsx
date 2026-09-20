@@ -62,8 +62,8 @@ export function SecondaryWalletDebitCard({
 
         <div className="flex items-end justify-end">
           <div className="text-right leading-none">
-            <p className="text-base font-black italic tracking-wide text-white/90">WALLET</p>
-            <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
+            <p className="text-sm font-black italic tracking-wide text-white/90">WALLET</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
           </div>
         </div>
       </div>
