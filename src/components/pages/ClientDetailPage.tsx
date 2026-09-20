@@ -101,7 +101,7 @@ import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { fetchPeriodSpendFromMeta } from "@/lib/fetchPeriodSpend";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
-import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
+import { WalletQuickActions } from "@/components/admin/WalletQuickActions";
 import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
 import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
 import { openProof } from "@/lib/proofUrl";
