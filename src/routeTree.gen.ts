@@ -57,6 +57,7 @@ import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as ApiReferralRefreshRouteImport } from './routes/api.referral-refresh'
 import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
@@ -307,6 +308,11 @@ const ClientsIdRoute = ClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReferralRefreshRoute = ApiReferralRefreshRouteImport.update({
+  id: '/api/referral-refresh',
+  path: '/api/referral-refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaProxyRoute = ApiMetaProxyRouteImport.update({
   id: '/api/meta-proxy',
   path: '/api/meta-proxy',
@@ -404,6 +410,7 @@ export interface FileRoutesByFullPath {
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
+  '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -462,6 +469,7 @@ export interface FileRoutesByTo {
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
+  '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -522,6 +530,7 @@ export interface FileRoutesById {
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
+  '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
   '/invoice/$requestId': typeof InvoiceRequestIdRoute
   '/tenants/$id': typeof TenantsIdRoute
@@ -583,6 +592,7 @@ export interface FileRouteTypes {
     | '/ads-manager/$accountId'
     | '/agencies/$id'
     | '/api/meta-proxy'
+    | '/api/referral-refresh'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -641,6 +651,7 @@ export interface FileRouteTypes {
     | '/ads-manager/$accountId'
     | '/agencies/$id'
     | '/api/meta-proxy'
+    | '/api/referral-refresh'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -700,6 +711,7 @@ export interface FileRouteTypes {
     | '/ads-manager/$accountId'
     | '/agencies/$id'
     | '/api/meta-proxy'
+    | '/api/referral-refresh'
     | '/clients/$id'
     | '/invoice/$requestId'
     | '/tenants/$id'
@@ -758,6 +770,7 @@ export interface RootRouteChildren {
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
   ApiMetaProxyRoute: typeof ApiMetaProxyRoute
+  ApiReferralRefreshRoute: typeof ApiReferralRefreshRoute
   ClientsIdRoute: typeof ClientsIdRoute
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
@@ -1103,6 +1116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/referral-refresh': {
+      id: '/api/referral-refresh'
+      path: '/api/referral-refresh'
+      fullPath: '/api/referral-refresh'
+      preLoaderRoute: typeof ApiReferralRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/meta-proxy': {
       id: '/api/meta-proxy'
       path: '/api/meta-proxy'
@@ -1255,6 +1275,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminStripeLinksRoute: AdminStripeLinksRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
   ApiMetaProxyRoute: ApiMetaProxyRoute,
+  ApiReferralRefreshRoute: ApiReferralRefreshRoute,
   ClientsIdRoute: ClientsIdRoute,
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
