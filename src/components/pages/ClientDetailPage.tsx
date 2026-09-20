@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
-import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle, CreditLineWalletCard, CreditLineWalletToggle } from "@/components/admin/SecondaryWalletPanel";
+import { CombinedTotalCard, SecondaryWalletToggle, CreditLineWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
 import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
@@ -2591,14 +2591,14 @@ export default function ClientDetailPage() {
                     <SecondaryWalletDebitCard
                       balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
                       footer={`Rate ৳${wallets.secondaryRate}/USD`}
-                      actions={<WalletQuickActions userId={userId} kind="secondary" inline />}
+                      actions={userId ? <WalletQuickActions userId={userId} kind="secondary" inline /> : undefined}
                     />
                   )}
                   {wallets.creditLineEnabled && (
                     <CreditLineWalletDebitCard
                       balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
                       footer={`Rate ৳${wallets.creditLineRate}/USD`}
-                      actions={<WalletQuickActions userId={userId} kind="credit_line" inline />}
+                      actions={userId ? <WalletQuickActions userId={userId} kind="credit_line" inline /> : undefined}
                     />
                   )}
                   {userId && <CombinedTotalCard userId={userId} />}
