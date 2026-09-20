@@ -121,8 +121,17 @@ export function ClientWallet() {
   const targetLabel = transferTarget === "credit_line" ? "Credit Line Wallet" : "Secondary Wallet";
   const targetRate = transferTarget === "credit_line" ? wallets.creditLineRate : wallets.secondaryRate;
   const parsedTransfer = parseFloat(transferAmount) || 0;
+  // Mirrors the server rule exactly: ROUND(amount * mainRate / targetRate, 2)
   const previewCredit =
-    parsedTransfer > 0 && targetRate > 0 ? (parsedTransfer * wallets.mainRate) / targetRate : 0;
+    parsedTransfer > 0 && targetRate > 0
+      ? Math.round(((parsedTransfer * wallets.mainRate) / targetRate) * 100) / 100
+      : 0;
+  const previewBdt = parsedTransfer > 0 ? Math.round(parsedTransfer * wallets.mainRate * 100) / 100 : 0;
+  const transferTooManyDecimals =
+    parsedTransfer > 0 && Math.round(parsedTransfer * 100) / 100 !== parsedTransfer;
+  const transferOverBalance = parsedTransfer > wallets.mainBalance;
+  const transferBlocked =
+    parsedTransfer <= 0 || transferTooManyDecimals || transferOverBalance || !(targetRate > 0) || !(wallets.mainRate > 0);
 
   return (
     <div className="space-y-4 md:space-y-6">
