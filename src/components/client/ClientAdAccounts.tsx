@@ -2,7 +2,6 @@ import { matchesSearch } from "@/lib/searchNormalize";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { friendlyEdgeError } from "@/lib/utils";
-import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
