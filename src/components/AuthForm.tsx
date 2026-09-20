@@ -91,7 +91,7 @@ export function AuthForm() {
         },
       });
       if (error) throw error;
-      if (!data.url) throw new Error("Google login link পাওয়া যায়নি");
+      if (!data.url) throw new Error("Google login link পাওয়া যায়নি");
       window.location.assign(data.url);
     } catch (err: any) {
       toast.error(err?.message || "Google sign-in failed");
@@ -109,7 +109,7 @@ export function AuthForm() {
         }
         const { data, error } = await signInWithNetworkRecovery(email.trim(), password);
         if (error) throw error;
-        if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
+        if (!data.session) throw new Error("Login session তৈরি হয়নি। আবার চেষ্টা করুন।");
         toast.success("Welcome back!");
         navigate({ to: "/dashboard", replace: true });
         return;
@@ -136,7 +136,7 @@ export function AuthForm() {
       const message = err?.message || "Something went wrong";
       toast.error(
         isTransientNetworkError(err)
-          ? "Network দুর্বল বা সংযোগ বিচ্ছিন্ন হয়েছে। একটু পরে আবার চেষ্টা করুন।"
+          ? "Network দুর্বল বা সংযোগ বিচ্ছিন্ন হয়েছে। একটু পরে আবার চেষ্টা করুন।"
           : message,
       );
     } finally {
@@ -146,156 +146,178 @@ export function AuthForm() {
 
   return (
     <div className="light relative flex min-h-screen flex-col overflow-hidden"
-      style={{ background: "linear-gradient(180deg, hsl(200 80% 90%) 0%, hsl(200 50% 93%) 35%, hsl(200 30% 96%) 65%, hsl(200 20% 97%) 100%)" }}>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-[800px] w-[800px] rounded-full border border-white/30" />
-        <div className="absolute h-[1100px] w-[1100px] rounded-full border border-white/15" />
+      style={{ background: "linear-gradient(180deg, hsl(220 25% 97%) 0%, hsl(220 18% 95%) 40%, hsl(220 14% 96%) 100%)" }}>
+      {/* Soft ambient tints */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 h-[560px] w-[880px] -translate-x-1/2 rounded-full opacity-[0.07] blur-[120px]"
+          style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
+        <div className="absolute -bottom-48 -left-32 h-[480px] w-[480px] rounded-full opacity-[0.05] blur-[110px]"
+          style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
+        <div className="absolute top-1/3 left-1/2 h-[720px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/[0.045]" />
+        <div className="absolute top-1/3 left-1/2 h-[980px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/[0.025]" />
       </div>
 
-      <header className="relative z-10 h-14 flex items-center gap-3 px-6">
+      <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
         {displayLogo ? (
           <img src={displayLogo} alt="Logo" className="h-8 w-8 rounded object-contain" />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/10 backdrop-blur-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.06] ring-1 ring-foreground/10">
             <LogIn className="h-4 w-4 text-foreground" />
           </div>
         )}
-        {displayName && <span className="font-semibold text-foreground">{displayName}</span>}
+        {displayName && (
+          <span className="text-sm font-semibold tracking-wide text-foreground/90">{displayName}</span>
+        )}
       </header>
 
-      <div className="relative z-10 flex flex-1 items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-[0_8px_60px_-12px_rgba(0,0,0,0.08)] overflow-hidden">
-          <div className="px-8 pt-8 pb-6"
-            style={{ background: "linear-gradient(180deg, hsl(195 60% 90% / 0.6) 0%, transparent 100%)" }}>
-            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-white/80 shadow-sm backdrop-blur-sm">
-              <LogIn className="h-6 w-6 text-foreground" />
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-16 pt-4">
+        <div className="auth-fade-up w-full max-w-md">
+          <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white/80 shadow-[0_24px_70px_-20px_rgba(15,23,42,0.14),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl">
+            {/* Brand / welcome */}
+            <div className="relative px-8 pb-7 pt-9 sm:px-10">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-70"
+                style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--primary) / 0.07), transparent)" }} />
+              <div className="relative flex flex-col items-center text-center">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground shadow-[0_10px_24px_-8px_rgba(15,23,42,0.5)]">
+                  {displayLogo ? (
+                    <img src={displayLogo} alt="Logo" className="h-7 w-7 rounded object-contain brightness-0 invert" />
+                  ) : (
+                    <LogIn className="h-6 w-6 text-background" />
+                  )}
+                </div>
+                <h1 className="auth-serif text-[28px] font-semibold leading-tight text-foreground">
+                  {isLogin ? (welcomeTitle || "Welcome back") : "Create your account"}
+                </h1>
+                <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
+                  {welcomeNote || (isLogin ? "Enter your credentials to access your dashboard." : "Fill in the details to get started.")}
+                </p>
+                <div className="mt-6 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+              </div>
             </div>
-            <h1 className="text-center text-xl font-bold text-foreground mb-1">
-              {isLogin ? (welcomeTitle || "Sign in with email") : "Create your account"}
-            </h1>
-            <p className="text-center text-sm text-muted-foreground">
-              {welcomeNote || (isLogin ? "Welcome back! Enter your credentials." : "Fill in the details to get started.")}
-            </p>
-          </div>
 
-          <div className="px-8 pb-8">
-            {refCode && !isLogin ? (
-              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
-              </div>
-            ) : null}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fullName" className="text-xs text-muted-foreground">Full Name</Label>
-                    <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-11 rounded-xl bg-muted/50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="businessName" className="text-xs text-muted-foreground">Business Name</Label>
-                    <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-11 rounded-xl bg-muted/50" />
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-1.5">
-                {!isLogin && <Label htmlFor="email" className="text-xs text-muted-foreground">Email</Label>}
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-11 pl-10 rounded-xl bg-muted/50" />
+            <div className="px-8 pb-9 sm:px-10">
+              {refCode && !isLogin ? (
+                <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                  Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
                 </div>
-              </div>
+              ) : null}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!isLogin && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground">Full Name</Label>
+                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="businessName" className="text-xs font-medium text-muted-foreground">Business Name</Label>
+                      <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                    </div>
+                  </>
+                )}
 
-              {!isLogin && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone" className="text-xs text-muted-foreground">Phone Number</Label>
-                  <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-11 rounded-xl bg-muted/50" />
+                  {!isLogin && <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>}
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 focus-visible:ring-primary/20" />
+                  </div>
                 </div>
-              )}
 
-              <div className="space-y-1.5">
-                {!isLogin && <Label htmlFor="password" className="text-xs text-muted-foreground">Password</Label>}
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                  <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-11 pl-10 pr-10 rounded-xl bg-muted/50" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-muted-foreground">
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {!isLogin && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">Phone Number</Label>
+                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  {!isLogin && <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>}
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 pr-11 focus-visible:ring-primary/20" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 transition-colors hover:text-foreground">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {!isLogin && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="businessAddress" className="text-xs font-medium text-muted-foreground">Business Address</Label>
+                      <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="monthlySpend" className="text-xs font-medium text-muted-foreground">Monthly Spend (USD)</Label>
+                      <Select value={monthlySpend} onValueChange={setMonthlySpend}>
+                        <SelectTrigger className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20"><SelectValue placeholder="Select range" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="$0 - $500">$0 - $500</SelectItem>
+                          <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
+                          <SelectItem value="$2,000 - $5,000">$2,000 - $5,000</SelectItem>
+                          <SelectItem value="$5,000 - $10,000">$5,000 - $10,000</SelectItem>
+                          <SelectItem value="$10,000+">$10,000+</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button type="button" onClick={async () => {
+                      if (!email) { toast.error("Enter email first"); return; }
+                      try {
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+                        if (error) throw error;
+                        toast.success("Reset link sent!");
+                      } catch (err: any) { toast.error(err?.message || "Failed"); }
+                    }} className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline underline-offset-4">Forgot password?</button>
+                  </div>
+                )}
+
+                <Button type="submit" disabled={loading} className="h-12 w-full rounded-2xl bg-foreground text-base font-medium tracking-wide text-background shadow-[0_12px_28px_-10px_rgba(15,23,42,0.45)] transition-all hover:bg-foreground/90 active:scale-[0.99]">
+                  {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
+                </Button>
+
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/70" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white/80 px-4 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/80">or continue with</span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  variant="outline"
+                  className="h-12 w-full gap-2.5 rounded-2xl border-border/70 bg-white/70 font-medium text-foreground/90 transition-all hover:bg-white active:scale-[0.99]"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Continue with Google
+                </Button>
+
+                <p className="pt-3 text-center text-sm text-muted-foreground">
+                  {isLogin ? "Don't have an account? " : "Already have an account? "}
+                  <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground/60">
+                    {isLogin ? "Sign up" : "Sign in"}
                   </button>
-                </div>
-              </div>
-
-              {!isLogin && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="businessAddress" className="text-xs text-muted-foreground">Business Address</Label>
-                    <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-11 rounded-xl bg-muted/50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="monthlySpend" className="text-xs text-muted-foreground">Monthly Spend (USD)</Label>
-                    <Select value={monthlySpend} onValueChange={setMonthlySpend}>
-                      <SelectTrigger className="h-11 rounded-xl bg-muted/50"><SelectValue placeholder="Select range" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="$0 - $500">$0 - $500</SelectItem>
-                        <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
-                        <SelectItem value="$2,000 - $5,000">$2,000 - $5,000</SelectItem>
-                        <SelectItem value="$5,000 - $10,000">$5,000 - $10,000</SelectItem>
-                        <SelectItem value="$10,000+">$10,000+</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button type="button" onClick={async () => {
-                    if (!email) { toast.error("Enter email first"); return; }
-                    try {
-                      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
-                      if (error) throw error;
-                      toast.success("Reset link sent!");
-                    } catch (err: any) { toast.error(err?.message || "Failed"); }
-                  }} className="text-xs font-medium text-primary hover:underline">Forgot password?</button>
-                </div>
-              )}
-
-              <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90 font-semibold">
-                {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
-              </Button>
-
-              <div className="relative my-2">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-white/80 px-2 text-muted-foreground">or continue with</span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                variant="outline"
-                className="w-full h-11 rounded-xl bg-white hover:bg-muted/40 font-medium gap-2"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Continue with Google
-              </Button>
-
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-medium text-primary hover:underline">
-                  {isLogin ? "Sign up" : "Sign in"}
-                </button>
-              </p>
-            </form>
+                </p>
+              </form>
+            </div>
           </div>
+
+          <p className="auth-fade-up auth-fade-up-2 mt-6 text-center text-xs tracking-wide text-muted-foreground/70">
+            Secure sign-in · Your credentials are encrypted
+          </p>
         </div>
       </div>
     </div>
