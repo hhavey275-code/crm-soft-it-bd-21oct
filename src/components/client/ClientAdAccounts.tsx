@@ -787,7 +787,7 @@ export function ClientAdAccounts() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Wallet Hero + Metrics */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
         {/* Wallet Balance Hero Card */}
         <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
           <div className="flex items-center justify-between">
