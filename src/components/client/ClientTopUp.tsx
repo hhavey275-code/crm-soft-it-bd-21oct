@@ -104,7 +104,7 @@ export function ClientTopUp() {
 
   // Wizard state
   const [step, setStep] = useState(0);
-  const [targetWallet, setTargetWallet] = useState<"primary" | "secondary">("primary");
+  const [targetWallet, setTargetWallet] = useState<"primary" | "secondary" | "credit_line">("primary");
 
   const [category, setCategory] = useState<PaymentCategory | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
@@ -468,7 +468,7 @@ export function ClientTopUp() {
   // Payment allocation preview: main wallet due → sheet bill → secondary wallet due → wallet credit
   const wallets = useWallets(user?.id);
 
-  // Only clients an admin explicitly allows may deposit into the secondary wallet.
+  // Only clients an admin explicitly allows may deposit straight into the secondary wallet.
   const { data: secondaryDepositAllowed } = useQuery({
     queryKey: ["secondary-deposit-enabled", user?.id],
     enabled: !!user,
@@ -482,21 +482,49 @@ export function ClientTopUp() {
     },
   });
 
-  const canPickWallet = !!secondaryDepositAllowed && wallets.secondaryEnabled;
-  const effectiveTargetWallet: "primary" | "secondary" = canPickWallet ? targetWallet : "primary";
-  const isSecondaryDeposit = effectiveTargetWallet === "secondary";
+  // Wallets a client may deposit into: main always, plus each extra wallet
+  // that is switched on for this client.
+  const walletOptions = useMemo(() => {
+    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [
+      { kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" },
+    ];
+    if (wallets.creditLineEnabled)
+      opts.push({
+        kind: "credit_line",
+        label: "Credit line wallet",
+        rate: wallets.creditLineRate || Number(usdRate) || 0,
+        hint: "Credit line rate",
+      });
+    if (secondaryDepositAllowed && wallets.secondaryEnabled)
+      opts.push({
+        kind: "secondary",
+        label: "Secondary wallet",
+        rate: wallets.secondaryRate || Number(usdRate) || 0,
+        hint: "Sheet rate",
+      });
+    return opts;
+  }, [usdRate, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
 
-  // Deposit rate: secondary wallet deposits convert at the sheet rate.
-  const depositRate = isSecondaryDeposit
-    ? (wallets.secondaryRate || Number(usdRate) || 0)
-    : (Number(usdRate) || 0);
+  const canPickWallet = walletOptions.length > 1;
+  const effectiveTargetWallet: "primary" | "secondary" | "credit_line" =
+    walletOptions.some((o) => o.kind === targetWallet) ? targetWallet : "primary";
+  // Deposits straight into an extra wallet skip the main-wallet due / card-bill flow.
+  const isSecondaryDeposit = effectiveTargetWallet !== "primary";
+  const targetWalletLabel =
+    walletOptions.find((o) => o.kind === effectiveTargetWallet)?.label ?? "Main wallet";
 
-  // Secondary deposits are credited in full to the secondary wallet; the card
+  // Deposit rate: each wallet converts at its own USD rate.
+  const depositRate =
+    walletOptions.find((o) => o.kind === effectiveTargetWallet)?.rate || Number(usdRate) || 0;
+
+  // Extra-wallet deposits are credited in full to that wallet; the card
   // bill / main-wallet due adjustment only applies to main wallet deposits.
   const effectiveBdt = bdtAmount
     ? (isSecondaryDeposit ? parseFloat(bdtAmount) : Math.max(0, parseFloat(bdtAmount) - cardDueBdt))
     : 0;
-  const usdEquivalent = bdtAmount && depositRate ? (effectiveBdt / depositRate).toFixed(2) : "0.00";
+  // Same rounding rule as the server: round to 2 decimals so the credited USD matches exactly.
+  const usdEquivalent =
+    bdtAmount && depositRate ? (Math.round((effectiveBdt / depositRate) * 100) / 100).toFixed(2) : "0.00";
 
   const alloc = useMemo(() => {
     const total = parseFloat(bdtAmount) || 0;
@@ -579,7 +607,7 @@ export function ClientTopUp() {
           </div>
         ))}
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-1.5 text-xs">
-          <span className="text-muted-foreground">{isSecondaryDeposit ? "Secondary wallet-এ জমা হবে" : "Main wallet-এ জমা হবে"}</span>
+          <span className="text-muted-foreground">{`${targetWalletLabel}-এ জমা হবে`}</span>
           <span className="font-bold text-primary">
             ${alloc.creditUsd.toFixed(2)} <span className="font-normal text-muted-foreground">({bdt(alloc.creditBdt)})</span>
           </span>
@@ -1090,30 +1118,36 @@ export function ClientTopUp() {
               {canPickWallet && (
                 <div className="space-y-2">
                   <Label>Deposit To</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTargetWallet("primary")}
-                      className={cn(
-                        "rounded-lg border p-2.5 text-left transition-colors",
-                        targetWallet === "primary" ? "border-primary bg-primary/10" : "border-border/60 hover:bg-muted/50"
-                      )}
-                    >
-                      <p className="text-xs font-semibold">Main wallet</p>
-                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.mainRate || usdRate}/USD</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTargetWallet("secondary")}
-                      className={cn(
-                        "rounded-lg border p-2.5 text-left transition-colors",
-                        targetWallet === "secondary" ? "border-fuchsia-500 bg-fuchsia-500/10" : "border-border/60 hover:bg-muted/50"
-                      )}
-                    >
-                      <p className="text-xs font-semibold">Secondary wallet</p>
-                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.secondaryRate || usdRate}/USD (sheet rate)</p>
-                    </button>
+                  <div className={cn("grid gap-2", walletOptions.length > 2 ? "grid-cols-3" : "grid-cols-2")}>
+                    {walletOptions.map((o) => (
+                      <button
+                        key={o.kind}
+                        type="button"
+                        onClick={() => setTargetWallet(o.kind)}
+                        className={cn(
+                          "rounded-lg border p-2.5 text-left transition-colors",
+                          effectiveTargetWallet === o.kind
+                            ? o.kind === "primary"
+                              ? "border-primary bg-primary/10"
+                              : o.kind === "credit_line"
+                                ? "border-sky-500 bg-sky-500/10"
+                                : "border-fuchsia-500 bg-fuchsia-500/10"
+                            : "border-border/60 hover:bg-muted/50"
+                        )}
+                      >
+                        <p className="text-xs font-semibold">{o.label}</p>
+                        <p className="text-[11px] text-muted-foreground">@ ৳{o.rate}/USD ({o.hint})</p>
+                        {bdtAmount && parseFloat(bdtAmount) > 0 && o.rate > 0 && (
+                          <p className="text-[11px] font-semibold text-foreground mt-0.5">
+                            = ${(Math.round((parseFloat(bdtAmount) / o.rate) * 100) / 100).toFixed(2)}
+                          </p>
+                        )}
+                      </button>
+                    ))}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    যে wallet select করবেন, সেই wallet-এর নিজস্ব rate-এ হিসাব হবে।
+                  </p>
                 </div>
               )}
 
@@ -1143,9 +1177,9 @@ export function ClientTopUp() {
                   <AllocationBreakdown />
 
                   <div className="rounded-lg bg-primary/10 p-4 text-center">
-                    <p className="text-xs text-muted-foreground">{isSecondaryDeposit ? 'Secondary wallet-এ জমা হবে' : cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
+                    <p className="text-xs text-muted-foreground">{isSecondaryDeposit ? `${targetWalletLabel}-এ জমা হবে` : cardDueBdt > 0 ? 'ওয়ালেটে জমা হবে' : 'USD Equivalent'}</p>
                     <p className="text-3xl font-bold text-primary">${usdEquivalent}</p>
-                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? " (Secondary wallet)" : ""}</p>
+                    <p className="text-xs text-muted-foreground">@ ৳{depositRate}/USD{isSecondaryDeposit ? ` (${targetWalletLabel})` : ""}</p>
                   </div>
                 </div>
               )}

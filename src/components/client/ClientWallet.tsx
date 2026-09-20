@@ -65,8 +65,12 @@ export function ClientWallet() {
   const transferMutation = useMutation({
     mutationFn: async () => {
       const amount = parseFloat(transferAmount);
-      if (!amount || amount <= 0) throw new Error("Enter a valid amount");
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter a valid amount");
+      // Strict: the server only accepts amounts with at most 2 decimals.
+      if (Math.round(amount * 100) / 100 !== amount) throw new Error("সর্বোচ্চ ২ দশমিক পর্যন্ত amount দিন");
       if (amount > wallets.mainBalance) throw new Error("Main wallet balance is not enough");
+      const rate = transferTarget === "credit_line" ? wallets.creditLineRate : wallets.secondaryRate;
+      if (!(wallets.mainRate > 0) || !(rate > 0)) throw new Error("USD rate সেট করা নেই — admin-কে জানান");
       const { data, error } = await (supabase as any).rpc("convert_main_wallet", {
         p_target: transferTarget,
         p_usd_amount: amount,
@@ -117,8 +121,17 @@ export function ClientWallet() {
   const targetLabel = transferTarget === "credit_line" ? "Credit Line Wallet" : "Secondary Wallet";
   const targetRate = transferTarget === "credit_line" ? wallets.creditLineRate : wallets.secondaryRate;
   const parsedTransfer = parseFloat(transferAmount) || 0;
+  // Mirrors the server rule exactly: ROUND(amount * mainRate / targetRate, 2)
   const previewCredit =
-    parsedTransfer > 0 && targetRate > 0 ? (parsedTransfer * wallets.mainRate) / targetRate : 0;
+    parsedTransfer > 0 && targetRate > 0
+      ? Math.round(((parsedTransfer * wallets.mainRate) / targetRate) * 100) / 100
+      : 0;
+  const previewBdt = parsedTransfer > 0 ? Math.round(parsedTransfer * wallets.mainRate * 100) / 100 : 0;
+  const transferTooManyDecimals =
+    parsedTransfer > 0 && Math.round(parsedTransfer * 100) / 100 !== parsedTransfer;
+  const transferOverBalance = parsedTransfer > wallets.mainBalance;
+  const transferBlocked =
+    parsedTransfer <= 0 || transferTooManyDecimals || transferOverBalance || !(targetRate > 0) || !(wallets.mainRate > 0);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -248,20 +261,44 @@ export function ClientWallet() {
               id="transfer-amount"
               type="number"
               min="0"
+              max={wallets.mainBalance}
               step="0.01"
               value={transferAmount}
               onChange={(e) => setTransferAmount(e.target.value)}
               placeholder="e.g. 100"
               autoFocus
             />
-            {previewCredit > 0 && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-[11px]"
+                onClick={() => setTransferAmount((Math.floor(wallets.mainBalance * 100) / 100).toFixed(2))}
+                disabled={wallets.mainBalance <= 0}
+              >
+                Max ${(Math.floor(wallets.mainBalance * 100) / 100).toFixed(2)}
+              </Button>
+            </div>
+            {previewCredit > 0 && !transferTooManyDecimals && !transferOverBalance && (
               <p className="text-xs text-muted-foreground">
-                ${parsedTransfer.toLocaleString()} × ৳{wallets.mainRate} ÷ ৳{targetRate} ={" "}
+                ${parsedTransfer.toLocaleString()} × ৳{wallets.mainRate} = ৳{previewBdt.toLocaleString()} ÷ ৳{targetRate} ={" "}
                 <span className="font-semibold text-foreground">
                   ${previewCredit.toFixed(2)}
                 </span>{" "}
                 credited to {targetLabel}
               </p>
+            )}
+            {transferTooManyDecimals && (
+              <p className="text-xs text-destructive">সর্বোচ্চ ২ দশমিক পর্যন্ত amount দিন (যেমন 100.25)।</p>
+            )}
+            {transferOverBalance && (
+              <p className="text-xs text-destructive">
+                Main wallet-এ আছে ${wallets.mainBalance.toLocaleString()} — এর বেশি move করা যাবে না।
+              </p>
+            )}
+            {(!(targetRate > 0) || !(wallets.mainRate > 0)) && (
+              <p className="text-xs text-destructive">USD rate সেট করা নেই — admin-কে জানান।</p>
             )}
           </div>
           <DialogFooter>
@@ -270,7 +307,7 @@ export function ClientWallet() {
             </Button>
             <Button
               onClick={() => transferMutation.mutate()}
-              disabled={transferMutation.isPending || parsedTransfer <= 0}
+              disabled={transferMutation.isPending || transferBlocked}
             >
               {transferMutation.isPending ? "Moving…" : "Confirm transfer"}
             </Button>
