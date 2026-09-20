@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import softitbdLogo from "@/assets/softitbd-logo.png";
 import softitbdBanner from "@/assets/softitbd-banner.png";
+import softitbdLogoClear from "@/assets/softitbd-logo-clear.png";
 
 const LOGIN_TIMEOUT_MS = 20_000;
 
@@ -84,6 +85,7 @@ export function AuthForm() {
     }
   }, [user, authLoading, navigate]);
 
+  const logoMark = agencyBranding.logoUrl || logoUrl || softitbdLogoClear;
   const displayLogo = agencyBranding.logoUrl || logoUrl || softitbdLogo;
   const displayName = agencyBranding.name || siteName || "SOFT IT BD";
 
@@ -194,38 +196,32 @@ export function AuthForm() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-10 pt-2">
         <div className="auth-fade-up grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex h-full flex-col justify-between overflow-hidden bg-foreground p-7 text-background sm:p-10">
-            <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/25 blur-[110px]" />
-            <div className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-primary/15 blur-[120px]" />
-            <div className="pointer-events-none absolute right-6 top-1/2 h-[560px] w-[560px] -translate-y-1/2 rounded-full border border-background/[0.07]" />
+          <div className="relative flex h-full min-h-[560px] flex-col justify-between overflow-hidden p-7 text-background sm:p-10"
+            style={{ backgroundColor: "#000" }}>
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/20 blur-[110px]" />
 
             <div className="relative">
-              <div className="inline-flex items-center gap-3 rounded-2xl bg-background px-4 py-3 shadow-[0_14px_34px_-14px_rgba(0,0,0,0.55)]">
-                {displayLogo ? (
-                  <img src={displayLogo} alt="Logo" className="h-11 w-11 rounded-lg object-contain" />
-                ) : (
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-foreground/[0.06]">
-                    <LogIn className="h-5 w-5 text-foreground" />
-                  </div>
-                )}
-                <span className="text-base font-semibold tracking-tight text-foreground">{displayName}</span>
+              <div className="inline-flex items-center gap-3">
+                <img src={logoMark} alt="Logo" className="h-14 w-14 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
+                <span className="text-base font-semibold tracking-tight text-background">{displayName}</span>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-2xl border border-background/10 bg-background shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]">
+              {/* Cover photo — full width of the panel */}
+              <div className="-mx-7 mt-6 sm:-mx-10">
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
-                  className="block aspect-[25/9] w-full object-contain"
+                  className="block w-full object-contain"
                 />
               </div>
 
-              <h2 className="auth-serif mt-6 text-[30px] font-semibold leading-tight sm:text-4xl">
+              <h2 className="auth-serif mt-7 text-[30px] font-semibold leading-tight sm:text-4xl">
                 {welcomeTitle || "Welcome to"}{" "}
                 <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
                   {displayName}
                 </span>
               </h2>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/65">
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/70">
                 {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
               </p>
               <div className="mt-7 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
