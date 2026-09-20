@@ -31,7 +31,7 @@ import { logSystemAction } from "@/lib/systemLog";
 import { InactiveBadge } from "@/components/InactiveBadge";
 import { tenantForward, isTenantInstance } from "@/lib/tenantForward";
 import { ArrowDownCircle } from "lucide-react";
-import { useWallets } from "@/hooks/useWallets";
+import { formatBdt, useWallets } from "@/hooks/useWallets";
 import { startLimitWatch, useLimitWatches } from "@/hooks/useLimitUpdateWatch";
 import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
 
@@ -787,7 +787,7 @@ export function ClientAdAccounts() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Wallet Hero + Metrics */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Wallet Balance Hero Card */}
         <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
           <div className="flex items-center justify-between">
@@ -841,6 +841,26 @@ export function ClientAdAccounts() {
             </div>
           </div>
         )}
+        {(wallets.secondaryEnabled || wallets.creditLineEnabled) && (
+          <div className="rounded-lg border border-border/60 bg-card p-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-accent-foreground">Combined Due / Adv</p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-accent-foreground">
+                {wallets.totalBdt < 0 ? "-" : ""}{formatBdt(wallets.totalBdt)}
+                <span className="ml-2 text-[10px] font-semibold uppercase text-muted-foreground">
+                  {wallets.totalBdt < 0 ? "Due" : "Adv"}
+                </span>
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                Main ${wallets.mainBalance.toLocaleString()} × ৳{wallets.mainRate}
+                {wallets.secondaryEnabled && ` + Secondary $${wallets.secondaryBalance.toLocaleString()} × ৳${wallets.secondaryRate}`}
+                {wallets.creditLineEnabled && ` + Credit Line $${wallets.creditLineBalance.toLocaleString()} × ৳${wallets.creditLineRate}`}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="space-y-3">
         {/* Spend & Orders */}
         <div className="grid gap-3 grid-cols-2">
           <MetricCard
