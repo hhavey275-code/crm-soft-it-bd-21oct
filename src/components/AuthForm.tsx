@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LogIn, Mail, Lock, Eye, EyeOff, Phone, Facebook, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import softitbdLogo from "@/assets/softitbd-logo.png.asset.json";
-import softitbdBanner from "@/assets/softitbd-banner.png.asset.json";
+import softitbdLogo from "@/assets/softitbd-logo.png";
+import softitbdBanner from "@/assets/softitbd-banner.png";
 
 const LOGIN_TIMEOUT_MS = 20_000;
 
