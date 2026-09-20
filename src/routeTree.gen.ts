@@ -65,6 +65,7 @@ import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-link
 import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
+import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
@@ -348,6 +349,11 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
+const ApiPublicReferralCronRoute = ApiPublicReferralCronRouteImport.update({
+  id: '/api/public/referral-cron',
+  path: '/api/public/referral-cron',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
   id: '/api/public/crm-topup',
   path: '/api/public/crm-topup',
@@ -418,6 +424,7 @@ export interface FileRoutesByFullPath {
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -477,6 +484,7 @@ export interface FileRoutesByTo {
   '/tenants': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -538,6 +546,7 @@ export interface FileRoutesById {
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -600,6 +609,7 @@ export interface FileRouteTypes {
     | '/tenants/'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
+    | '/api/public/referral-cron'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -659,6 +669,7 @@ export interface FileRouteTypes {
     | '/tenants'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
+    | '/api/public/referral-cron'
   id:
     | '__root__'
     | '/'
@@ -719,6 +730,7 @@ export interface FileRouteTypes {
     | '/tenants/'
     | '/api/ads-manager/campaigns'
     | '/api/public/crm-topup'
+    | '/api/public/referral-cron'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -776,6 +788,7 @@ export interface RootRouteChildren {
   ClientsIndexRoute: typeof ClientsIndexRoute
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
+  ApiPublicReferralCronRoute: typeof ApiPublicReferralCronRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1172,6 +1185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
+    '/api/public/referral-cron': {
+      id: '/api/public/referral-cron'
+      path: '/api/public/referral-cron'
+      fullPath: '/api/public/referral-cron'
+      preLoaderRoute: typeof ApiPublicReferralCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/crm-topup': {
       id: '/api/public/crm-topup'
       path: '/api/public/crm-topup'
@@ -1281,6 +1301,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIndexRoute: ClientsIndexRoute,
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
+  ApiPublicReferralCronRoute: ApiPublicReferralCronRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
