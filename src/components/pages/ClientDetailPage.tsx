@@ -1321,21 +1321,12 @@ export default function ClientDetailPage() {
           {isMobile && userId && mainTab === "overview" && (
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {/* Main Wallet — themed blue gradient */}
-              <div className="rounded-xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-3.5 text-primary-foreground shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs opacity-90">Wallet Balance</p>
-                    <p className="mt-0.5 text-2xl font-bold tracking-tight">
-                      ${walletBalance.toLocaleString()}
-                    </p>
-                    <p className="mt-0.5 text-[10px] opacity-70">{wallet?.currency ?? "USD"}</p>
-                  </div>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-                    <Wallet className="h-4.5 w-4.5" />
-                  </div>
-                </div>
-              </div>
+              {/* Main Wallet — keep the same debit-card view used everywhere else */}
+              <MainWalletDebitCard
+                title="Wallet Balance"
+                balanceLabel={`$${walletBalance.toLocaleString()}`}
+                footer={wallet?.currency ?? "USD"}
+              />
 
               {/* Secondary Wallet — green gradient (only when enabled) */}
               {wallets.secondaryEnabled && (
