@@ -649,6 +649,8 @@ export function ClientAdAccounts() {
     : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
+  // External CRM top-ups have a hard $50 minimum (server-enforced too).
+  const belowMinExternal = isExternalTopUp && parsedAmount > 0 && parsedAmount < 50;
   const secondaryShortfall = isAltTopUp ? Math.max(0, parsedAmount - altBalance) : 0;
   const convertFromMain =
     secondaryShortfall > 0 && mainToSecondaryFactor > 0
