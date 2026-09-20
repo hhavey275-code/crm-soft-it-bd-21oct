@@ -315,3 +315,33 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-box-a, .auth-box-b, .auth-box-c { animation: none; }
 }
+
+/* Auth panel rising boxes — continuous bottom → top */
+@keyframes auth-rise {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  8% { opacity: var(--rise-o, 0.45); }
+  85% { opacity: var(--rise-o, 0.45); }
+  100% { transform: translateY(-720px) rotate(38deg); opacity: 0; }
+}
+.auth-rise {
+  position: absolute;
+  bottom: -80px;
+  border-radius: 26%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.04);
+  animation: auth-rise linear infinite;
+  will-change: transform, opacity;
+}
+.auth-rise-1 { left: 8%;  width: 88px; height: 88px; animation-duration: 17s; animation-delay: -4s;  --rise-o: 0.4; }
+.auth-rise-2 { left: 56%; width: 18px; height: 18px; animation-duration: 11s; animation-delay: -7s;  --rise-o: 0.55; }
+.auth-rise-3 { left: 30%; width: 46px; height: 46px; animation-duration: 19s; animation-delay: -12s; --rise-o: 0.35; }
+.auth-rise-4 { left: 74%; width: 10px; height: 10px; animation-duration: 9s;  animation-delay: -5s;  --rise-o: 0.6; }
+.auth-rise-5 { left: 16%; width: 30px; height: 30px; animation-duration: 14s; animation-delay: -9s;  --rise-o: 0.45; }
+.auth-rise-6 { left: 86%; width: 62px; height: 62px; animation-duration: 21s; animation-delay: -15s; --rise-o: 0.3; }
+.auth-rise-7 { left: 44%; width: 14px; height: 14px; animation-duration: 12s; animation-delay: -2s;  --rise-o: 0.55; }
+.auth-rise-8 { left: 64%; width: 36px; height: 36px; animation-duration: 15s; animation-delay: -17s; --rise-o: 0.4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-rise { animation: none; }
+}
