@@ -1312,6 +1312,35 @@ export default function ClientDetailPage() {
             </div>
           )}
 
+          {isMobile && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-full px-2.5 text-[11px]"
+                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                onClick={async () => {
+                  if (!adAccounts || adAccounts.length === 0) return;
+                  setInsightsLoading(true);
+                  try {
+                    const ids = adAccounts.map((a: any) => a.id);
+                    const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+                    await chunkedMetaSync(ids);
+                    await Promise.all([refetchInsights(), refetchAdAccounts()]);
+                    toast.success("Insights updated from Meta!");
+                  } catch {
+                    toast.error("Failed to update from Meta");
+                  } finally {
+                    setInsightsLoading(false);
+                  }
+                }}
+              >
+                <RefreshCw className={cn("mr-1 h-3 w-3", insightsLoading && "animate-spin")} />
+                {insightsLoading ? "Updating..." : "Update"}
+              </Button>
+            </div>
+          )}
+
           {/* Client Info Tab */}
           <TabsContent value="info" className="mt-0">
             <Card
