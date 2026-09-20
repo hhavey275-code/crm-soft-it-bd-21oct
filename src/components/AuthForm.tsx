@@ -215,55 +215,55 @@ export function AuthForm() {
 
             <div className="relative">
               <div className="inline-flex items-center gap-3">
-                <img src={logoMark} alt="Logo" className="h-14 w-14 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="brand-script brand-script-gradient text-xl leading-none drop-shadow-sm sm:text-2xl">{displayName}</span>
+                <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
+                <span className="brand-script brand-script-gradient text-2xl leading-none drop-shadow-sm sm:text-3xl">{displayName}</span>
               </div>
 
-              {/* Cover photo — full width of the panel */}
-              <div className="-mx-7 mt-6 sm:-mx-10">
+              {/* Cover photo — full width of the panel, compact height */}
+              <div className="-mx-6 mt-4 sm:-mx-8">
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
-                  className="block w-full object-contain"
+                  className="block h-32 w-full object-cover sm:h-40"
                 />
               </div>
 
-              <h2 className="auth-serif mt-7 text-[30px] font-semibold leading-tight sm:text-4xl">
+              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight sm:text-2xl">
                 {welcomeTitle || "Welcome to"}{" "}
-                <span className="brand-script brand-script-gradient text-[38px] leading-none sm:text-5xl">
+                <span className="brand-script brand-script-gradient text-[28px] leading-none sm:text-[34px]">
                   {displayName}
                 </span>
               </h2>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/70">
+              <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
                 {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
               </p>
-              <div className="mt-7 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
             </div>
 
-            <div className="relative mt-10 space-y-3 text-sm">
+            <div className="relative mt-6 space-y-2.5 text-sm">
               <a
                 href={HELPLINE_TEL}
-                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background/10">
                   <Phone className="h-4 w-4" />
                 </span>
                 <span className="flex flex-col">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Helpline</span>
-                  <span className="font-mono text-[15px] font-semibold tracking-wide">{HELPLINE_DISPLAY}</span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/50">Helpline</span>
+                  <span className="font-mono text-[14px] font-semibold tracking-wide">{HELPLINE_DISPLAY}</span>
                 </span>
               </a>
               <a
                 href={FACEBOOK_PAGE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-3.5 transition-colors hover:bg-background/[0.12]"
+                className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/10">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background/10">
                   <Facebook className="h-4 w-4" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-background/50">Facebook Page</span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/50">Facebook Page</span>
                   <span className="truncate font-semibold">{FACEBOOK_PAGE_LABEL}</span>
                 </span>
                 <ArrowUpRight className="h-4 w-4 shrink-0 text-background/50" />
