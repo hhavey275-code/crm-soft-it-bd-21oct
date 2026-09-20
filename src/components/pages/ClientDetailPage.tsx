@@ -93,6 +93,7 @@ import {
 } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
+import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -1338,20 +1339,10 @@ export default function ClientDetailPage() {
               )}
 
               {wallets.creditLineEnabled && (
-                <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0">
-                      <p className="text-xs text-sky-700 dark:text-sky-400">Credit Line Wallet</p>
-                      <p className="mt-0.5 truncate text-2xl font-bold tracking-tight text-sky-700 dark:text-sky-300">
-                        ${wallets.creditLineBalance.toLocaleString()}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">৳{wallets.creditLineRate}/USD</p>
-                    </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/15">
-                      <Wallet className="h-4.5 w-4.5 text-sky-600 dark:text-sky-400" />
-                    </div>
-                  </div>
-                </div>
+                <CreditLineWalletDebitCard
+                  balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+                  footer={`Rate ৳${wallets.creditLineRate}/USD`}
+                />
               )}
 
               {/* Combined Due / Adv — purple gradient (only when enabled) */}
