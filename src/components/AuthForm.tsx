@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import softitbdLogo from "@/assets/softitbd-logo.png";
 import softitbdBanner from "@/assets/softitbd-banner.png";
+import softitbdLogoClear from "@/assets/softitbd-logo-clear.png";
 
 const LOGIN_TIMEOUT_MS = 20_000;
 
@@ -84,6 +85,7 @@ export function AuthForm() {
     }
   }, [user, authLoading, navigate]);
 
+  const logoMark = agencyBranding.logoUrl || logoUrl || softitbdLogoClear;
   const displayLogo = agencyBranding.logoUrl || logoUrl || softitbdLogo;
   const displayName = agencyBranding.name || siteName || "SOFT IT BD";
 
