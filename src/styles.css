@@ -295,3 +295,23 @@
   font-family: 'Playfair Display', Georgia, serif;
   letter-spacing: -0.01em;
 }
+
+/* Auth page floating boxes */
+@keyframes auth-float-a {
+  0%, 100% { transform: translate3d(0,0,0) rotate(12deg); }
+  50% { transform: translate3d(18px,-26px,0) rotate(24deg); }
+}
+@keyframes auth-float-b {
+  0%, 100% { transform: translate3d(0,0,0) rotate(-8deg); }
+  50% { transform: translate3d(-24px,20px,0) rotate(-20deg); }
+}
+@keyframes auth-float-c {
+  0%, 100% { transform: translate3d(0,0,0) rotate(28deg); }
+  50% { transform: translate3d(14px,24px,0) rotate(6deg); }
+}
+.auth-box-a { animation: auth-float-a 14s ease-in-out infinite; }
+.auth-box-b { animation: auth-float-b 18s ease-in-out infinite; }
+.auth-box-c { animation: auth-float-c 22s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .auth-box-a, .auth-box-b, .auth-box-c { animation: none; }
+}
