@@ -1,0 +1,2 @@
+ALTER TABLE public.external_topup_requests DROP CONSTRAINT IF EXISTS external_topup_requests_wallet_kind_check;
+ALTER TABLE public.external_topup_requests ADD CONSTRAINT external_topup_requests_wallet_kind_check CHECK (wallet_kind = ANY (ARRAY['primary'::text, 'secondary'::text, 'credit_line'::text]));
