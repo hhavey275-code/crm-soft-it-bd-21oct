@@ -222,7 +222,7 @@ export function AuthForm() {
             <div className="relative">
               <div className="inline-flex items-center gap-3">
                 <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="text-2xl font-bold tracking-wide text-white sm:text-3xl">{displayName}</span>
+                <span className="text-base font-semibold tracking-wide text-white sm:text-lg">Unlimited spend without hassle</span>
               </div>
 
               {/* Cover photo — full width of the panel, compact height */}
