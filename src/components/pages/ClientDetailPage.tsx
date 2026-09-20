@@ -664,6 +664,23 @@ export default function ClientDetailPage() {
     onSettled: () => setSingleRefreshingId(null),
   });
 
+  const updateAllFromMeta = async () => {
+    if (!adAccounts || adAccounts.length === 0 || insightsLoading) return;
+    setInsightsLoading(true);
+    try {
+      const ids = adAccounts.map((a: any) => a.id);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      await chunkedMetaSync(ids);
+      await Promise.all([refetchInsights(), refetchAdAccounts()]);
+      toast.success("Insights updated from Meta!");
+    } catch {
+      toast.error("Failed to update from Meta");
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining =
@@ -1026,16 +1043,13 @@ export default function ClientDetailPage() {
               )}
               <Button
                 size="sm"
-                className="bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                onClick={() => {
-                  setTopUpDialogOpen(true);
-                  setSelectedAccountId("");
-                  setTopUpAmount("");
-                  setDialogTab("topup");
-                }}
+                variant="outline"
+                className="h-8 text-xs rounded-full"
+                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                onClick={updateAllFromMeta}
               >
-                <ArrowUpCircle className="h-3 w-3 mr-1" />
-                Top Up
+                <RefreshCw className={cn("h-3 w-3 mr-1", insightsLoading && "animate-spin")} />
+                {insightsLoading ? "Updating..." : "Update"}
               </Button>
               <Button
                 size="sm"
@@ -1303,35 +1317,6 @@ export default function ClientDetailPage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {isMobile && (
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 rounded-full px-2.5 text-[11px]"
-                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
-                onClick={async () => {
-                  if (!adAccounts || adAccounts.length === 0) return;
-                  setInsightsLoading(true);
-                  try {
-                    const ids = adAccounts.map((a: any) => a.id);
-                    const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-                    await chunkedMetaSync(ids);
-                    await Promise.all([refetchInsights(), refetchAdAccounts()]);
-                    toast.success("Insights updated from Meta!");
-                  } catch {
-                    toast.error("Failed to update from Meta");
-                  } finally {
-                    setInsightsLoading(false);
-                  }
-                }}
-              >
-                <RefreshCw className={cn("mr-1 h-3 w-3", insightsLoading && "animate-spin")} />
-                {insightsLoading ? "Updating..." : "Update"}
-              </Button>
             </div>
           )}
 
@@ -2263,21 +2248,7 @@ export default function ClientDetailPage() {
                   size="sm"
                   className="rounded-full"
                   disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
-                  onClick={async () => {
-                    if (!adAccounts || adAccounts.length === 0) return;
-                    setInsightsLoading(true);
-                    try {
-                      const ids = adAccounts.map((a: any) => a.id);
-                      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-                      await chunkedMetaSync(ids);
-                      await Promise.all([refetchInsights(), refetchAdAccounts()]);
-                      toast.success("Insights updated from Meta!");
-                    } catch {
-                      toast.error("Failed to update from Meta");
-                    } finally {
-                      setInsightsLoading(false);
-                    }
-                  }}
+                  onClick={updateAllFromMeta}
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")} />
                   {insightsLoading ? "Updating..." : "Update from Meta"}
