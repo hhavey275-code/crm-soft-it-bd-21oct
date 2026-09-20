@@ -478,15 +478,20 @@ export function ClientDashboard() {
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts" },
-              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining" },
-              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend" },
-              { label: "Today Orders", value: String(todayOrders), key: "today-orders" },
-              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup" },
+              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts", icon: Megaphone, color: "blue" },
+              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining", icon: Wallet, color: "emerald" },
+              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend", icon: TrendingDown, color: "orange" },
+              { label: "Today Orders", value: String(todayOrders), key: "today-orders", icon: ShoppingCart, color: "violet" },
+              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup", icon: PiggyBank, color: "pink" },
             ].map((m) => (
               <Card key={m.label} data-tutorial={`card-${m.key}`} className="bg-card border border-border/60">
                 <CardContent className="p-2.5 text-center">
-                  <p className="text-[10px] text-muted-foreground font-medium truncate">{m.label}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium truncate flex items-center justify-center gap-1">
+                    <span className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-${m.color}-100`}>
+                      <m.icon className={`h-2.5 w-2.5 text-${m.color}-600`} />
+                    </span>
+                    {m.label}
+                  </p>
                   <p className="text-base font-bold text-foreground">{m.value}</p>
                 </CardContent>
               </Card>
@@ -494,7 +499,12 @@ export function ClientDashboard() {
             {/* Total Spend inside grid */}
             <Card data-tutorial="card-total-spend" className="bg-card border border-border/60">
               <CardContent className="p-2.5 text-center relative">
-                <p className="text-[10px] text-muted-foreground font-medium truncate">{totalSpendLabel}</p>
+                <p className="text-[10px] text-muted-foreground font-medium truncate flex items-center justify-center gap-1">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-teal-100">
+                    <BarChart3 className="h-2.5 w-2.5 text-teal-600" />
+                  </span>
+                  {totalSpendLabel}
+                </p>
                 <p className="text-base font-bold text-foreground">{fmt(displayTotalSpend)}</p>
                 <Popover>
                   <PopoverTrigger asChild>
