@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
-import { SecondaryWalletCard, CombinedTotalCard, SecondaryWalletToggle, CreditLineWalletCard, CreditLineWalletToggle } from "@/components/admin/SecondaryWalletPanel";
+import { CombinedTotalCard, SecondaryWalletToggle, CreditLineWalletToggle } from "@/components/admin/SecondaryWalletPanel";
 import { SpendCapWithdrawToggle } from "@/components/admin/SpendCapWithdrawToggle";
 import { SecondaryDepositToggle } from "@/components/admin/SecondaryDepositToggle";
 import { ExternalTopUpDialog } from "@/components/admin/ExternalTopUpDialog";
@@ -2586,9 +2586,21 @@ export default function ClientDetailPage() {
                     }
                   />
 
-                  {/* Extra wallets + combined total — admin controlled */}
-                  {userId && <SecondaryWalletCard userId={userId} />}
-                  {userId && <CreditLineWalletCard userId={userId} />}
+                  {/* Extra wallets use the same debit-card design on desktop and mobile. */}
+                  {wallets.secondaryEnabled && (
+                    <SecondaryWalletDebitCard
+                      balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+                      footer={`Rate ৳${wallets.secondaryRate}/USD`}
+                      actions={userId ? <WalletQuickActions userId={userId} kind="secondary" inline /> : undefined}
+                    />
+                  )}
+                  {wallets.creditLineEnabled && (
+                    <CreditLineWalletDebitCard
+                      balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+                      footer={`Rate ৳${wallets.creditLineRate}/USD`}
+                      actions={userId ? <WalletQuickActions userId={userId} kind="credit_line" inline /> : undefined}
+                    />
+                  )}
                   {userId && <CombinedTotalCard userId={userId} />}
                 </div>
 
@@ -3070,7 +3082,7 @@ export default function ClientDetailPage() {
                                       {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
                                           size="icon"
-                                          className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                          className="h-8 w-8 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                                           onClick={() => {
                                             if (acc.external_topup_required) {
                                               setExtTopUp({ account: acc, wallet: "secondary" });
