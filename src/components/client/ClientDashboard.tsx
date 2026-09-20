@@ -422,8 +422,16 @@ export function ClientDashboard() {
         </div>
       </div>
 
-      {/* Tutorial */}
-      <TutorialButton />
+      {/* Tutorial + quick Ad Accounts */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <TutorialButton />
+        <Button variant="outline" size="sm" className="gap-2" asChild>
+          <Link to="/ad-accounts">
+            <MonitorSmartphone className="h-4 w-4" />
+            Ad Accounts
+          </Link>
+        </Button>
+      </div>
 
       {/* Warnings */}
       {isInactive && (
