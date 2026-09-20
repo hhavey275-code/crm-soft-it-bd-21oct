@@ -664,6 +664,23 @@ export default function ClientDetailPage() {
     onSettled: () => setSingleRefreshingId(null),
   });
 
+  const updateAllFromMeta = async () => {
+    if (!adAccounts || adAccounts.length === 0 || insightsLoading) return;
+    setInsightsLoading(true);
+    try {
+      const ids = adAccounts.map((a: any) => a.id);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      await chunkedMetaSync(ids);
+      await Promise.all([refetchInsights(), refetchAdAccounts()]);
+      toast.success("Insights updated from Meta!");
+    } catch {
+      toast.error("Failed to update from Meta");
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining =
