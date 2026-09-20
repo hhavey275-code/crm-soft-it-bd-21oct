@@ -300,11 +300,11 @@ export function AuthForm() {
                   <>
                     <div className="space-y-1.5">
                       <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground">Full Name</Label>
-                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="businessName" className="text-xs font-medium text-muted-foreground">Business Name</Label>
-                      <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                   </>
                 )}
@@ -313,14 +313,14 @@ export function AuthForm() {
                   {!isLogin && <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>}
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 focus-visible:ring-primary/20" />
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 pl-11 focus-visible:ring-primary/20" />
                   </div>
                 </div>
 
                 {!isLogin && (
                   <div className="space-y-1.5">
                     <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">Phone Number</Label>
-                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                    <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                   </div>
                 )}
 
@@ -328,7 +328,7 @@ export function AuthForm() {
                   {!isLogin && <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>}
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-12 rounded-2xl border-border/70 bg-background/60 pl-11 pr-11 focus-visible:ring-primary/20" />
+                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6} className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 pl-11 pr-11 focus-visible:ring-primary/20" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 transition-colors hover:text-foreground">
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -339,12 +339,12 @@ export function AuthForm() {
                   <>
                     <div className="space-y-1.5">
                       <Label htmlFor="businessAddress" className="text-xs font-medium text-muted-foreground">Business Address</Label>
-                      <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20" />
+                      <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City" required className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="monthlySpend" className="text-xs font-medium text-muted-foreground">Monthly Spend (USD)</Label>
                       <Select value={monthlySpend} onValueChange={setMonthlySpend}>
-                        <SelectTrigger className="h-12 rounded-2xl border-border/70 bg-background/60 focus-visible:ring-primary/20"><SelectValue placeholder="Select range" /></SelectTrigger>
+                        <SelectTrigger className="h-11 rounded-2xl border-border/70 sm:h-12 bg-background/60 focus-visible:ring-primary/20"><SelectValue placeholder="Select range" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="$0 - $500">$0 - $500</SelectItem>
                           <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
@@ -370,7 +370,7 @@ export function AuthForm() {
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading} className="h-12 w-full rounded-2xl bg-foreground text-base font-medium tracking-wide text-background shadow-[0_12px_28px_-10px_rgba(15,23,42,0.45)] transition-all hover:bg-foreground/90 active:scale-[0.99]">
+                <Button type="submit" disabled={loading} className="h-11 w-full rounded-2xl bg-foreground sm:h-12 text-base font-medium tracking-wide text-background shadow-[0_12px_28px_-10px_rgba(15,23,42,0.45)] transition-all hover:bg-foreground/90 active:scale-[0.99]">
                   {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
                 </Button>
 
@@ -388,7 +388,7 @@ export function AuthForm() {
                   onClick={handleGoogleSignIn}
                   disabled={loading}
                   variant="outline"
-                  className="h-12 w-full gap-2.5 rounded-2xl border-border/70 bg-white/70 font-medium text-foreground/90 transition-all hover:bg-white active:scale-[0.99]"
+                  className="h-11 w-full gap-2.5 rounded-2xl sm:h-12 border-border/70 bg-white/70 font-medium text-foreground/90 transition-all hover:bg-white active:scale-[0.99]"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
