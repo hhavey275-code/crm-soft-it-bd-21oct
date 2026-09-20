@@ -4653,6 +4653,19 @@ export type Database = {
       }
       is_vault_owner: { Args: { _user_id: string }; Returns: boolean }
       money_health_report: { Args: never; Returns: Json }
+      my_referred_clients: {
+        Args: { p_month?: string }
+        Returns: {
+          ad_accounts: number
+          email: string
+          full_name: string
+          joined_at: string
+          month_commission: number
+          month_spend: number
+          status: string
+          user_id: string
+        }[]
+      }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
       recalc_referral_earnings: { Args: { p_month?: string }; Returns: Json }
