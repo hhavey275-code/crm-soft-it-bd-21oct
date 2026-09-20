@@ -211,7 +211,16 @@ export function AuthForm() {
                 <span className="text-base font-semibold tracking-tight text-foreground">{displayName}</span>
               </div>
 
-              <h2 className="auth-serif mt-8 text-[30px] font-semibold leading-tight sm:mt-12 sm:text-4xl">
+              <div className="mt-6 overflow-hidden rounded-2xl border border-background/10 bg-background shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]">
+                <img
+                  src={softitbdBanner.url}
+                  alt={`${displayName} — We handle the ads, you scale the business`}
+                  className="w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+
+              <h2 className="auth-serif mt-6 text-[30px] font-semibold leading-tight sm:text-4xl">
                 {welcomeTitle || "Welcome to"}{" "}
                 <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
                   {displayName}
