@@ -278,24 +278,24 @@ export function AuthForm() {
           </div>
 
           {/* ===== Right sign-in panel ===== */}
-          <div className="px-6 py-8 sm:px-9">
+          <div className="px-5 py-4 sm:px-9 sm:py-8">
             <div className="flex flex-col items-center text-center">
-              <h1 className="auth-serif text-[26px] font-semibold leading-tight text-foreground">
+              <h1 className="auth-serif text-[22px] font-semibold leading-tight text-foreground sm:text-[26px]">
                 {isLogin ? "Sign in" : "Create your account"}
               </h1>
-              <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-muted-foreground sm:mt-2 sm:text-sm">
                 {isLogin ? (welcomeTitle || "Welcome back") + " — enter your credentials to continue." : "Fill in the details to get started."}
               </p>
-              <div className="mt-4 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+              <div className="mt-3 h-px w-16 bg-gradient-to-r from-transparent via-foreground/20 to-transparent sm:mt-4" />
             </div>
 
-            <div className="mt-5">
+            <div className="mt-3 sm:mt-5">
               {refCode && !isLogin ? (
                 <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                   Referral code <span className="font-mono font-semibold text-foreground">{refCode}</span> applied
                 </div>
               ) : null}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 {!isLogin && (
                   <>
                     <div className="space-y-1.5">
