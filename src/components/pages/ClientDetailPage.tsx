@@ -101,7 +101,7 @@ import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { fetchPeriodSpendFromMeta } from "@/lib/fetchPeriodSpend";
 import { UnusedAccountsView } from "@/components/UnusedAccountsView";
 import { logSystemAction } from "@/lib/systemLog";
-import { StripeLinkDialog } from "@/components/admin/StripeLinkDialog";
+import { WalletQuickActions } from "@/components/admin/WalletQuickActions";
 import { TransactionHistoryPanel } from "@/components/TransactionHistoryPanel";
 import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
 import { openProof } from "@/lib/proofUrl";
@@ -980,10 +980,10 @@ export default function ClientDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className={cn("space-y-5", isMobile && "space-y-4")}>
+      <div className={cn("space-y-5", isMobile && "space-y-2")}>
         {/* Header */}
         {isMobile ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
                 <User className="h-5 w-5 text-primary" />
@@ -1036,44 +1036,6 @@ export default function ClientDetailPage() {
               >
                 <ArrowUpCircle className="h-3 w-3 mr-1" />
                 Top Up
-              </Button>
-              {(isAdmin || isSuperAdmin) && userId && (
-                <StripeLinkDialog
-                  targetUserId={userId}
-                  targetUserName={profile?.full_name || profile?.email}
-                  trigger={
-                    <Button size="sm" variant="outline" className="h-8 text-xs rounded-full">
-                      <CreditCard className="h-3 w-3 mr-1" />
-                      Stripe Link
-                    </Button>
-                  }
-                />
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs rounded-full"
-                onClick={() => {
-                  setWalletDialogType("credit");
-                  setWalletAmount("");
-                  setWalletNote("");
-                }}
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs rounded-full text-destructive"
-                onClick={() => {
-                  setWalletDialogType("debit");
-                  setWalletAmount("");
-                  setWalletNote("");
-                }}
-              >
-                <Minus className="h-3 w-3 mr-1" />
-                Deduct
               </Button>
               <Button
                 size="sm"
@@ -1162,7 +1124,7 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+        <Tabs value={mainTab} onValueChange={setMainTab} className={cn("space-y-4", isMobile && "space-y-2")}>
           <div
             className={cn(
               "flex items-center gap-3 flex-wrap",
@@ -1292,58 +1254,41 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {isMobile && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 w-full rounded-lg"
-              disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
-              onClick={async () => {
-                if (!adAccounts || adAccounts.length === 0) return;
-                setInsightsLoading(true);
-                try {
-                  const ids = adAccounts.map((a: any) => a.id);
-                  const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-                  await chunkedMetaSync(ids);
-                  await Promise.all([refetchInsights(), refetchAdAccounts()]);
-                  toast.success("Insights updated from Meta!");
-                } catch {
-                  toast.error("Failed to update from Meta");
-                } finally {
-                  setInsightsLoading(false);
-                }
-              }}
-            >
-              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", insightsLoading && "animate-spin")} />
-              {insightsLoading ? "Updating..." : "Update from Meta"}
-            </Button>
-          )}
-
-          {/* Mobile-only colorful wallet summary — Overview tab only */}
+          {/* Mobile-only wallet summary — Overview tab only */}
           {isMobile && userId && mainTab === "overview" && (
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {/* Main Wallet — keep the same debit-card view used everywhere else */}
-              <MainWalletDebitCard
-                title="Wallet Balance"
-                balanceLabel={`$${walletBalance.toLocaleString()}`}
-                footer={wallet?.currency ?? "USD"}
-              />
+              <div>
+                <MainWalletDebitCard
+                  title="Wallet Balance"
+                  balanceLabel={`$${walletBalance.toLocaleString()}`}
+                  footer={wallet?.currency ?? "USD"}
+                />
+                <WalletQuickActions userId={userId} kind="primary" />
+              </div>
 
               {/* Secondary Wallet — Chime-style green card (only when enabled) */}
               {wallets.secondaryEnabled && (
-                <SecondaryWalletDebitCard
-                  balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
-                  footer={`Rate ৳${wallets.secondaryRate}/USD`}
-                />
+                <div>
+                  <SecondaryWalletDebitCard
+                    balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+                    footer={`Rate ৳${wallets.secondaryRate}/USD`}
+                  />
+                  <WalletQuickActions userId={userId} kind="secondary" />
+                </div>
               )}
 
               {wallets.creditLineEnabled && (
-                <CreditLineWalletDebitCard
-                  balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
-                  footer={`Rate ৳${wallets.creditLineRate}/USD`}
-                />
+                <div>
+                  <CreditLineWalletDebitCard
+                    balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+                    footer={`Rate ৳${wallets.creditLineRate}/USD`}
+                  />
+                  <WalletQuickActions userId={userId} kind="credit_line" />
+                </div>
               )}
+
 
               {/* Combined Due / Adv — purple gradient (only when enabled) */}
               {(wallets.secondaryEnabled || wallets.creditLineEnabled) && (
@@ -1364,6 +1309,35 @@ export default function ClientDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {isMobile && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-full px-2.5 text-[11px]"
+                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                onClick={async () => {
+                  if (!adAccounts || adAccounts.length === 0) return;
+                  setInsightsLoading(true);
+                  try {
+                    const ids = adAccounts.map((a: any) => a.id);
+                    const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+                    await chunkedMetaSync(ids);
+                    await Promise.all([refetchInsights(), refetchAdAccounts()]);
+                    toast.success("Insights updated from Meta!");
+                  } catch {
+                    toast.error("Failed to update from Meta");
+                  } finally {
+                    setInsightsLoading(false);
+                  }
+                }}
+              >
+                <RefreshCw className={cn("mr-1 h-3 w-3", insightsLoading && "animate-spin")} />
+                {insightsLoading ? "Updating..." : "Update"}
+              </Button>
             </div>
           )}
 
