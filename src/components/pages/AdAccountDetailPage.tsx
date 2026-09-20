@@ -487,7 +487,7 @@ export default function AdAccountDetailPage() {
                 {account?.external_topup_url_secondary && (
                   <Button
                     size="sm"
-                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white h-8 text-xs"
+                    className="bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white h-8 text-xs"
                     onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
                   >
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
@@ -561,7 +561,7 @@ export default function AdAccountDetailPage() {
                 {account?.external_topup_url_secondary && (
                   <Button
                     size="sm"
-                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                    className="bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white"
                     onClick={() => { setExternalTopUpWallet("secondary"); setShowExternalTopUp(true); }}
                   >
                     <ExternalLink className="h-4 w-4 mr-1" />
