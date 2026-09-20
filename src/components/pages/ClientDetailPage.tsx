@@ -980,10 +980,10 @@ export default function ClientDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className={cn("space-y-5", isMobile && "space-y-4")}>
+      <div className={cn("space-y-5", isMobile && "space-y-2")}>
         {/* Header */}
         {isMobile ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
                 <User className="h-5 w-5 text-primary" />
@@ -1124,7 +1124,7 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+        <Tabs value={mainTab} onValueChange={setMainTab} className={cn("space-y-4", isMobile && "space-y-2")}>
           <div
             className={cn(
               "flex items-center gap-3 flex-wrap",
