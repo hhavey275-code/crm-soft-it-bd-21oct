@@ -89,6 +89,19 @@ export function ClientReferral() {
     enabled: !!user && enabledForMe,
   });
 
+  const { data: referredClients = [] } = useQuery({
+    queryKey: ["my-referred-clients", user?.id, month],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_referred_clients" as any, {
+        p_month: `${month}-01`,
+      });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!user && enabledForMe,
+  });
+
+
   const code = (profile as any)?.referral_code as string | undefined;
   const rate = Number((profile as any)?.referral_rate_bdt ?? 0);
   const minSpend = settings?.minSpend ?? 3000;
