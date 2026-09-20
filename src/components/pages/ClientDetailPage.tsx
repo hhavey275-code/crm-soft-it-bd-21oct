@@ -1259,34 +1259,28 @@ export default function ClientDetailPage() {
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {/* Main Wallet — keep the same debit-card view used everywhere else */}
-              <div>
-                <MainWalletDebitCard
-                  title="Wallet Balance"
-                  balanceLabel={`$${walletBalance.toLocaleString()}`}
-                  footer={wallet?.currency ?? "USD"}
-                />
-                <WalletQuickActions userId={userId} kind="primary" />
-              </div>
+              <MainWalletDebitCard
+                title="Wallet Balance"
+                balanceLabel={`$${walletBalance.toLocaleString()}`}
+                footer={wallet?.currency ?? "USD"}
+                actions={<WalletQuickActions userId={userId} kind="primary" inline />}
+              />
 
               {/* Secondary Wallet — Chime-style green card (only when enabled) */}
               {wallets.secondaryEnabled && (
-                <div>
-                  <SecondaryWalletDebitCard
-                    balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
-                    footer={`Rate ৳${wallets.secondaryRate}/USD`}
-                  />
-                  <WalletQuickActions userId={userId} kind="secondary" />
-                </div>
+                <SecondaryWalletDebitCard
+                  balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}
+                  footer={`Rate ৳${wallets.secondaryRate}/USD`}
+                  actions={<WalletQuickActions userId={userId} kind="secondary" inline />}
+                />
               )}
 
               {wallets.creditLineEnabled && (
-                <div>
-                  <CreditLineWalletDebitCard
-                    balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
-                    footer={`Rate ৳${wallets.creditLineRate}/USD`}
-                  />
-                  <WalletQuickActions userId={userId} kind="credit_line" />
-                </div>
+                <CreditLineWalletDebitCard
+                  balanceLabel={`$${wallets.creditLineBalance.toLocaleString()}`}
+                  footer={`Rate ৳${wallets.creditLineRate}/USD`}
+                  actions={<WalletQuickActions userId={userId} kind="credit_line" inline />}
+                />
               )}
 
 
