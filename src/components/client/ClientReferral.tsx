@@ -35,7 +35,6 @@ export function ClientReferral() {
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
 
   const { data: settings } = useQuery({
@@ -118,33 +117,14 @@ export function ClientReferral() {
     }
   };
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Session পাওয়া যায়নি — আবার login করুন");
+  const lastSynced = useMemo(() => {
+    const times = (rows as any[])
+      .map((r) => (r.synced_at ? new Date(r.synced_at).getTime() : 0))
+      .filter((t) => t > 0);
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
+  }, [rows]);
 
-      const res = await fetch("/api/referral-refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ month }),
-      });
-      const json = (await res.json().catch(() => ({}))) as any;
-      if (!res.ok) throw new Error(json?.error || "Update করা যায়নি");
 
-      toast.success(`${json.updated ?? 0} টি ad account update হয়েছে`);
-      if ((json.failed ?? []).length > 0) {
-        toast.warning(`কিছু account পড়া যায়নি: ${json.failed.join(", ")}`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["referral-account-earnings"] });
-      queryClient.invalidateQueries({ queryKey: ["referral-available-bdt"] });
-    } catch (err: any) {
-      toast.error(err?.message || "Update করা যায়নি");
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const downloadCsv = () => {
     const csvRows = [
@@ -248,8 +228,10 @@ export function ClientReferral() {
         <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle className="text-base">Ad account wise commission</CardTitle>
-            <CardDescription>
-              Update চাপলে ওই মাসের connected ad account গুলো থেকে spend আবার আনা হবে
+            <CardDescription className="flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" />
+              প্রতিদিন রাত ১২টায় system নিজে থেকে spend আপডেট করে
+              {lastSynced ? ` — সর্বশেষ: ${format(lastSynced, "dd MMM yyyy, hh:mm a")}` : ""}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -257,9 +239,7 @@ export function ClientReferral() {
               <Label className="text-xs">Month</Label>
               <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9" />
             </div>
-            <Button size="sm" onClick={refresh} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Update
-            </Button>
+
             <Button size="sm" variant="outline" onClick={downloadCsv} disabled={rows.length === 0}>
               <Download className="h-4 w-4 mr-2" /> CSV
             </Button>
@@ -273,7 +253,7 @@ export function ClientReferral() {
             <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
           ) : monthRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              এই মাসের কোনো data নেই — Update চাপুন।
+              এই মাসের কোনো data এখনো আসেনি — রাত ১২টার update-এর পর দেখা যাবে।
             </p>
           ) : (
             <Table>
