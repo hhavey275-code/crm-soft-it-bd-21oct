@@ -528,6 +528,33 @@ export function ClientAdAccounts() {
     },
   });
 
+  const [singleRefreshingId, setSingleRefreshingId] = useState<string | null>(null);
+  const refreshSingleMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      if (!checkCooldown()) throw new Error("cooldown");
+      setSingleRefreshingId(accountId);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync([accountId]);
+    },
+    onSuccess: (data) => {
+      setLastMetaUpdate(Date.now());
+      const rl = data?.rate_limited;
+      if (rl && rl.length > 0) {
+        toast.warning("⚠️ Account rate-limited. Please retry after a few minutes.");
+      } else {
+        toast.success("Account updated from Meta");
+      }
+      if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
+      refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-ad-accounts"] });
+    },
+    onError: (err: any) => {
+      if (err.message !== "cooldown") toast.error(err.message || "Failed to refresh");
+    },
+    onSettled: () => setSingleRefreshingId(null),
+  });
+
 
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -1081,11 +1108,23 @@ export function ClientAdAccounts() {
                       )}
 
                       {/* Last Refreshed */}
-                      {ins?.updated_at && (
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Last Refreshed: {formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}
-                        </p>
-                      )}
+                      <div className="mt-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {ins?.updated_at && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Last Refreshed: {formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true })}
+                          </p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                          title="Update this account from Meta"
+                          disabled={singleRefreshingId === a.id}
+                          onClick={() => refreshSingleMutation.mutate(a.id)}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
 
                       {/* Top Up + Actions */}
                       <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1281,9 +1320,21 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell><div className="flex flex-col gap-1"><StatusBadge status={a.status} /><HoldBadge accountId={a.id} compact /></div></TableCell>
                       <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
-                        </span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xs text-muted-foreground">
+                            {ins?.updated_at ? formatDistanceToNow(new Date(ins.updated_at), { addSuffix: true }) : "—"}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground"
+                            title="Update this account from Meta"
+                            disabled={singleRefreshingId === a.id}
+                            onClick={() => refreshSingleMutation.mutate(a.id)}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${singleRefreshingId === a.id ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
                         {limitWatches[a.id] && (
                           <div className="mt-1 max-w-[130px]">
                             <LimitUpdateIndicator state={limitWatches[a.id]} />
