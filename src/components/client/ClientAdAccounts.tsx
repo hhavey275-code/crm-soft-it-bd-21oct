@@ -649,6 +649,8 @@ export function ClientAdAccounts() {
     : walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > effectiveBalance + 0.01;
+  // External CRM top-ups have a hard $50 minimum (server-enforced too).
+  const belowMinExternal = isExternalTopUp && parsedAmount > 0 && parsedAmount < 50;
   const secondaryShortfall = isAltTopUp ? Math.max(0, parsedAmount - altBalance) : 0;
   const convertFromMain =
     secondaryShortfall > 0 && mainToSecondaryFactor > 0
@@ -694,6 +696,7 @@ export function ClientAdAccounts() {
           throw err;
         }
         const map: Record<string, string> = {
+          min_amount: "Minimum external top-up is $50",
           insufficient_balance: "Insufficient fund",
           account_not_assigned: "This ad account is not assigned to you",
           crm_url_not_configured: "Top-up is not configured for this wallet",
@@ -1445,6 +1448,9 @@ export function ClientAdAccounts() {
                 onChange={(e) => setTopUpAmount(e.target.value)}
                 placeholder="500.00"
               />
+              {belowMinExternal && (
+                <p className="text-sm text-destructive">Minimum external top-up is $50</p>
+              )}
               {exceedsBalance && parsedAmount > 0 && (
                 <p className="text-sm text-destructive">Insufficient fund — amount exceeds your wallet balance{activeDueLimit > 0 ? " + due limit" : ""}</p>
               )}
@@ -1489,7 +1495,7 @@ export function ClientAdAccounts() {
             {isExternalTopUp ? (
               <Button
                 onClick={() => externalRequestMutation.mutate(topUpWallet)}
-                disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || externalRequestMutation.isPending || externalCooldownLeft > 0}
+                disabled={!topUpAmount || parsedAmount <= 0 || belowMinExternal || exceedsBalance || externalRequestMutation.isPending || externalCooldownLeft > 0}
               >
                 {externalRequestMutation.isPending
                   ? "Submitting..."
