@@ -173,11 +173,17 @@ export function AuthForm() {
           </>
         ) : null}
 
-        {/* Floating rounded boxes */}
-        <div className="auth-box-a absolute left-[6%] top-[14%] h-24 w-24 rounded-[22px] bg-primary/10 ring-1 ring-primary/15 sm:h-32 sm:w-32" />
-        <div className="auth-box-b absolute right-[8%] top-[22%] h-20 w-20 rounded-[20px] bg-primary/[0.08] ring-1 ring-primary/10 sm:h-28 sm:w-28" />
-        <div className="auth-box-c absolute bottom-[10%] left-[38%] h-28 w-28 rounded-[26px] bg-primary/[0.07] ring-1 ring-primary/10 sm:h-36 sm:w-36" />
-        <div className="auth-box-b absolute bottom-[18%] right-[14%] h-16 w-16 rounded-2xl bg-primary/[0.09] ring-1 ring-primary/10 sm:h-24 sm:w-24" />
+        {/* Floating rounded boxes — rising bottom → top across the page */}
+        <div className="auth-rise-bg auth-bg-rise-1" />
+        <div className="auth-rise-bg auth-bg-rise-2" />
+        <div className="auth-rise-bg auth-bg-rise-3" />
+        <div className="auth-rise-bg auth-bg-rise-4" />
+        <div className="auth-rise-bg auth-bg-rise-5" />
+        <div className="auth-rise-bg auth-bg-rise-6" />
+        <div className="auth-rise-bg auth-bg-rise-7" />
+        <div className="auth-rise-bg auth-bg-rise-8" />
+        <div className="auth-rise-bg auth-bg-rise-9" />
+        <div className="auth-rise-bg auth-bg-rise-10" />
       </div>
 
       <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
