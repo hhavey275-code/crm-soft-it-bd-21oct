@@ -374,7 +374,7 @@ export function AuthForm() {
                   {loading ? "Please wait..." : isLogin ? "Get Started" : "Sign Up"}
                 </Button>
 
-                <div className="relative my-2">
+                <div className="relative my-1 sm:my-2">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/70" />
                   </div>
@@ -399,7 +399,7 @@ export function AuthForm() {
                   Continue with Google
                 </Button>
 
-                <p className="pt-2 text-center text-sm text-muted-foreground">
+                <p className="pt-1 text-center text-[13px] text-muted-foreground sm:pt-2 sm:text-sm">
                   {isLogin ? "Don't have an account? " : "Already have an account? "}
                   <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground/60">
                     {isLogin ? "Sign up" : "Sign in"}
@@ -407,7 +407,7 @@ export function AuthForm() {
                 </p>
               </form>
 
-              <div className="mt-4 flex items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70">
+              <div className="mt-2.5 hidden items-center justify-center gap-2 text-[11px] tracking-wide text-muted-foreground/70 sm:mt-4 sm:flex">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure sign-in · Your credentials are encrypted
               </div>
@@ -416,7 +416,7 @@ export function AuthForm() {
         </div>
       </main>
 
-      <footer className="relative z-10 pb-6 text-center text-xs tracking-wide text-muted-foreground/70">
+      <footer className="relative z-10 pb-3 text-center text-[11px] tracking-wide text-muted-foreground/70 sm:pb-6 sm:text-xs">
         © {new Date().getFullYear()} || {displayName} || All Rights Reserved.
       </footer>
     </div>
