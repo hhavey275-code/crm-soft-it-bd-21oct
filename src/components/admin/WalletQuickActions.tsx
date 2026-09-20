@@ -26,10 +26,19 @@ const LABEL: Record<WalletKind, string> = {
 };
 
 /**
- * Compact +/- (and Main → wallet convert) actions rendered right under each
- * wallet card. Used on mobile so the admin header stays clean.
+ * Compact +/- (and Main → wallet convert) actions for each wallet card.
+ * With `inline` (mobile) the buttons render as translucent icon controls
+ * inside the card itself — matching the desktop card look.
  */
-export function WalletQuickActions({ userId, kind }: { userId: string; kind: WalletKind }) {
+export function WalletQuickActions({
+  userId,
+  kind,
+  inline = false,
+}: {
+  userId: string;
+  kind: WalletKind;
+  inline?: boolean;
+}) {
   const { user: currentUser } = useAuth();
   const wallets = useWallets(userId);
   const queryClient = useQueryClient();
@@ -115,6 +124,129 @@ export function WalletQuickActions({ userId, kind }: { userId: string; kind: Wal
   const convertedCredit =
     convertUsd > 0 && targetRate > 0 ? (convertUsd * wallets.mainRate) / targetRate : 0;
 
+  if (inline) {
+    // Translucent icon buttons rendered inside the colored card — same look as desktop.
+    const iconBtn =
+      "h-6 w-6 rounded-md flex items-center justify-center bg-white/20 text-white hover:bg-white/35 transition-colors";
+    return (
+      <>
+        <div className="flex items-center gap-1">
+          <button
+            aria-label={`Add to ${LABEL[kind]}`}
+            className={iconBtn}
+            onClick={() => { setAdjustType("credit"); setAmount(""); setNote(""); }}
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          <button
+            aria-label={`Deduct from ${LABEL[kind]}`}
+            className={iconBtn}
+            onClick={() => { setAdjustType("debit"); setAmount(""); setNote(""); }}
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          {kind !== "primary" && (
+            <button
+              aria-label={`Convert to ${LABEL[kind]}`}
+              className={iconBtn}
+              onClick={() => { setConvertOpen(true); setConvertAmount(""); }}
+            >
+              <ArrowRightLeft className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        <Dialog open={!!adjustType} onOpenChange={(o) => { if (!o) setAdjustType(null); }}>
+          <DialogContent className="max-w-[95vw] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {adjustType === "credit" ? "Add" : "Deduct"} — {LABEL[kind]}
+              </DialogTitle>
+              <DialogDescription>
+                Current balance: $
+                {(kind === "primary"
+                  ? wallets.mainBalance
+                  : kind === "secondary"
+                    ? wallets.secondaryBalance
+                    : wallets.creditLineBalance
+                ).toLocaleString()}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="wqa-amount">Amount (USD)</Label>
+              <Input
+                id="wqa-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="e.g. 100"
+                autoFocus
+              />
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAdjustType(null)}>Cancel</Button>
+              <Button
+                onClick={() => adjustMutation.mutate()}
+                disabled={adjustMutation.isPending || !(parseFloat(amount) > 0)}
+              >
+                {adjustMutation.isPending
+                  ? "Saving..."
+                  : adjustType === "credit"
+                    ? "Add Balance"
+                    : "Deduct Balance"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Convert Main → {LABEL[kind]}</DialogTitle>
+              <DialogDescription>
+                Main wallet: ${wallets.mainBalance.toLocaleString()} (৳{wallets.mainRate}/USD → ৳{targetRate}/USD)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="wqa-convert">Amount to move (USD)</Label>
+              <Input
+                id="wqa-convert"
+                type="number"
+                min="0"
+                step="0.01"
+                max={wallets.mainBalance}
+                value={convertAmount}
+                onChange={(e) => setConvertAmount(e.target.value)}
+                placeholder="e.g. 100"
+                autoFocus
+              />
+              {convertUsd > 0 && targetRate > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  ${convertUsd.toFixed(2)} ({formatBdt(convertUsd * wallets.mainRate)}) → $
+                  {convertedCredit.toFixed(2)} in {LABEL[kind]}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => convertMutation.mutate()}
+                disabled={
+                  convertMutation.isPending || !(convertUsd > 0) || convertUsd > wallets.mainBalance
+                }
+              >
+                {convertMutation.isPending ? "Converting..." : "Convert"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="mt-1 flex items-center gap-1.5">
@@ -148,6 +280,7 @@ export function WalletQuickActions({ userId, kind }: { userId: string; kind: Wal
           </Button>
         )}
       </div>
+
 
       <Dialog open={!!adjustType} onOpenChange={(o) => { if (!o) setAdjustType(null); }}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
