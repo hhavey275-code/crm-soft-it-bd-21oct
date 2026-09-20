@@ -13,6 +13,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff, Phone, Facebook, ArrowUpRight, ShieldCh
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import softitbdLogo from "@/assets/softitbd-logo.png.asset.json";
+import softitbdBanner from "@/assets/softitbd-banner.png.asset.json";
 
 const LOGIN_TIMEOUT_MS = 20_000;
 
@@ -159,6 +160,22 @@ export function AuthForm() {
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
         <div className="absolute -bottom-48 -left-32 h-[480px] w-[480px] rounded-full opacity-[0.05] blur-[110px]"
           style={{ background: "radial-gradient(closest-side, hsl(var(--primary)), transparent)" }} />
+
+        {/* Logo watermark */}
+        {displayLogo ? (
+          <>
+            <img src={displayLogo} alt="" aria-hidden
+              className="absolute -left-16 bottom-4 w-[320px] opacity-[0.05] sm:w-[440px]" />
+            <img src={displayLogo} alt="" aria-hidden
+              className="absolute -right-20 top-10 w-[280px] rotate-12 opacity-[0.04] sm:w-[380px]" />
+          </>
+        ) : null}
+
+        {/* Floating rounded boxes */}
+        <div className="auth-box-a absolute left-[6%] top-[14%] h-24 w-24 rounded-[22px] bg-primary/10 ring-1 ring-primary/15 sm:h-32 sm:w-32" />
+        <div className="auth-box-b absolute right-[8%] top-[22%] h-20 w-20 rounded-[20px] bg-primary/[0.08] ring-1 ring-primary/10 sm:h-28 sm:w-28" />
+        <div className="auth-box-c absolute bottom-[10%] left-[38%] h-28 w-28 rounded-[26px] bg-primary/[0.07] ring-1 ring-primary/10 sm:h-36 sm:w-36" />
+        <div className="auth-box-b absolute bottom-[18%] right-[14%] h-16 w-16 rounded-2xl bg-primary/[0.09] ring-1 ring-primary/10 sm:h-24 sm:w-24" />
       </div>
 
       <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
@@ -194,7 +211,16 @@ export function AuthForm() {
                 <span className="text-base font-semibold tracking-tight text-foreground">{displayName}</span>
               </div>
 
-              <h2 className="auth-serif mt-8 text-[30px] font-semibold leading-tight sm:mt-12 sm:text-4xl">
+              <div className="mt-6 overflow-hidden rounded-2xl border border-background/10 bg-background shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]">
+                <img
+                  src={softitbdBanner.url}
+                  alt={`${displayName} — We handle the ads, you scale the business`}
+                  className="w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+
+              <h2 className="auth-serif mt-6 text-[30px] font-semibold leading-tight sm:text-4xl">
                 {welcomeTitle || "Welcome to"}{" "}
                 <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
                   {displayName}
