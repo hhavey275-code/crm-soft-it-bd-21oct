@@ -1118,30 +1118,36 @@ export function ClientTopUp() {
               {canPickWallet && (
                 <div className="space-y-2">
                   <Label>Deposit To</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTargetWallet("primary")}
-                      className={cn(
-                        "rounded-lg border p-2.5 text-left transition-colors",
-                        targetWallet === "primary" ? "border-primary bg-primary/10" : "border-border/60 hover:bg-muted/50"
-                      )}
-                    >
-                      <p className="text-xs font-semibold">Main wallet</p>
-                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.mainRate || usdRate}/USD</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTargetWallet("secondary")}
-                      className={cn(
-                        "rounded-lg border p-2.5 text-left transition-colors",
-                        targetWallet === "secondary" ? "border-fuchsia-500 bg-fuchsia-500/10" : "border-border/60 hover:bg-muted/50"
-                      )}
-                    >
-                      <p className="text-xs font-semibold">Secondary wallet</p>
-                      <p className="text-[11px] text-muted-foreground">@ ৳{wallets.secondaryRate || usdRate}/USD (sheet rate)</p>
-                    </button>
+                  <div className={cn("grid gap-2", walletOptions.length > 2 ? "grid-cols-3" : "grid-cols-2")}>
+                    {walletOptions.map((o) => (
+                      <button
+                        key={o.kind}
+                        type="button"
+                        onClick={() => setTargetWallet(o.kind)}
+                        className={cn(
+                          "rounded-lg border p-2.5 text-left transition-colors",
+                          effectiveTargetWallet === o.kind
+                            ? o.kind === "primary"
+                              ? "border-primary bg-primary/10"
+                              : o.kind === "credit_line"
+                                ? "border-sky-500 bg-sky-500/10"
+                                : "border-fuchsia-500 bg-fuchsia-500/10"
+                            : "border-border/60 hover:bg-muted/50"
+                        )}
+                      >
+                        <p className="text-xs font-semibold">{o.label}</p>
+                        <p className="text-[11px] text-muted-foreground">@ ৳{o.rate}/USD ({o.hint})</p>
+                        {bdtAmount && parseFloat(bdtAmount) > 0 && o.rate > 0 && (
+                          <p className="text-[11px] font-semibold text-foreground mt-0.5">
+                            = ${(Math.round((parseFloat(bdtAmount) / o.rate) * 100) / 100).toFixed(2)}
+                          </p>
+                        )}
+                      </button>
+                    ))}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    যে wallet select করবেন, সেই wallet-এর নিজস্ব rate-এ হিসাব হবে।
+                  </p>
                 </div>
               )}
 
