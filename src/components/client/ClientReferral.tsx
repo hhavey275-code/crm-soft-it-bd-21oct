@@ -118,33 +118,14 @@ export function ClientReferral() {
     }
   };
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Session পাওয়া যায়নি — আবার login করুন");
+  const lastSynced = useMemo(() => {
+    const times = (rows as any[])
+      .map((r) => (r.synced_at ? new Date(r.synced_at).getTime() : 0))
+      .filter((t) => t > 0);
+    return times.length > 0 ? new Date(Math.max(...times)) : null;
+  }, [rows]);
 
-      const res = await fetch("/api/referral-refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ month }),
-      });
-      const json = (await res.json().catch(() => ({}))) as any;
-      if (!res.ok) throw new Error(json?.error || "Update করা যায়নি");
 
-      toast.success(`${json.updated ?? 0} টি ad account update হয়েছে`);
-      if ((json.failed ?? []).length > 0) {
-        toast.warning(`কিছু account পড়া যায়নি: ${json.failed.join(", ")}`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["referral-account-earnings"] });
-      queryClient.invalidateQueries({ queryKey: ["referral-available-bdt"] });
-    } catch (err: any) {
-      toast.error(err?.message || "Update করা যায়নি");
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const downloadCsv = () => {
     const csvRows = [
