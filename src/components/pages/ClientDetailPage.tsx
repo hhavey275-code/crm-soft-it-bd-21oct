@@ -3147,22 +3147,14 @@ export default function ClientDetailPage() {
                                           <ArrowUpCircle className="h-4 w-4" />
                                         </Button>
                                        )}
-                                       {(acc.external_topup_required ? !!acc.external_topup_url_credit_line : wallets.creditLineEnabled) && (
+                                       {!!acc.external_topup_url_credit_line && (
                                          <Button
                                            size="icon"
                                            className="h-8 w-8 bg-sky-600 hover:bg-sky-700 text-white"
                                            onClick={() => {
-                                             if (acc.external_topup_required) {
-                                               setExtTopUp({ account: acc, wallet: "credit_line" });
-                                               return;
-                                             }
-                                             setSelectedAccountId(acc.id);
-                                             setTopUpWallet("credit_line");
-                                             setTopUpDialogOpen(true);
-                                             setTopUpAmount("");
-                                             setDialogTab("topup");
+                                             setExtTopUp({ account: acc, wallet: "credit_line" });
                                            }}
-                                           title={acc.external_topup_required ? "Top Up via External CRM (Credit Line Wallet)" : "Top Up (Credit Line Wallet)"}
+                                           title="Top Up via External CRM (Credit Line Wallet)"
                                          >
                                            <ArrowUpCircle className="h-4 w-4" />
                                          </Button>
