@@ -215,8 +215,7 @@ export function AuthForm() {
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
-                  className="w-full object-cover"
-                  loading="lazy"
+                  className="block aspect-[25/9] w-full object-contain"
                 />
               </div>
 
