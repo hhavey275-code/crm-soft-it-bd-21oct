@@ -26,10 +26,19 @@ const LABEL: Record<WalletKind, string> = {
 };
 
 /**
- * Compact +/- (and Main → wallet convert) actions rendered right under each
- * wallet card. Used on mobile so the admin header stays clean.
+ * Compact +/- (and Main → wallet convert) actions for each wallet card.
+ * With `inline` (mobile) the buttons render as translucent icon controls
+ * inside the card itself — matching the desktop card look.
  */
-export function WalletQuickActions({ userId, kind }: { userId: string; kind: WalletKind }) {
+export function WalletQuickActions({
+  userId,
+  kind,
+  inline = false,
+}: {
+  userId: string;
+  kind: WalletKind;
+  inline?: boolean;
+}) {
   const { user: currentUser } = useAuth();
   const wallets = useWallets(userId);
   const queryClient = useQueryClient();
