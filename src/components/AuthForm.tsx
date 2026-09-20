@@ -198,14 +198,7 @@ export function AuthForm() {
           {/* ===== Left brand panel ===== */}
           <div className="relative flex h-full min-h-[560px] flex-col justify-between overflow-hidden p-7 text-background sm:p-10"
             style={{ backgroundColor: "#000" }}>
-            {/* Full-bleed cover photo */}
-            <img
-              src={softitbdBanner}
-              alt={`${displayName} — We handle the ads, you scale the business`}
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
-            />
-            <div className="pointer-events-none absolute inset-0"
-              style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.72) 55%, rgba(0,0,0,0.92) 100%)" }} />
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/20 blur-[110px]" />
 
             <div className="relative">
               <div className="inline-flex items-center gap-3">
@@ -213,13 +206,22 @@ export function AuthForm() {
                 <span className="text-base font-semibold tracking-tight text-background">{displayName}</span>
               </div>
 
-              <h2 className="auth-serif mt-8 text-[30px] font-semibold leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)] sm:text-4xl">
+              {/* Cover photo — full width of the panel */}
+              <div className="-mx-7 mt-6 sm:-mx-10">
+                <img
+                  src={softitbdBanner}
+                  alt={`${displayName} — We handle the ads, you scale the business`}
+                  className="block w-full object-contain"
+                />
+              </div>
+
+              <h2 className="auth-serif mt-7 text-[30px] font-semibold leading-tight sm:text-4xl">
                 {welcomeTitle || "Welcome to"}{" "}
                 <span className="bg-gradient-to-r from-background via-background to-primary/70 bg-clip-text text-transparent">
                   {displayName}
                 </span>
               </h2>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/75">
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-background/70">
                 {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
               </p>
               <div className="mt-7 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
