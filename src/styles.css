@@ -355,6 +355,33 @@
 .auth-rise-7 { left: 44%; width: 14px; height: 14px; animation-duration: 12s; animation-delay: -2s;  --rise-o: 0.55; }
 .auth-rise-8 { left: 64%; width: 36px; height: 36px; animation-duration: 15s; animation-delay: -17s; --rise-o: 0.4; }
 
+/* Page-background rising boxes — light theme, bottom → top, mixed sizes */
+@keyframes auth-rise-bg {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: var(--rise-o, 0.5); }
+  85% { opacity: var(--rise-o, 0.5); }
+  100% { transform: translateY(-115vh) rotate(42deg); opacity: 0; }
+}
+.auth-rise-bg {
+  position: absolute;
+  bottom: -90px;
+  border-radius: 26%;
+  background: hsl(var(--primary) / 0.08);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.14);
+  animation: auth-rise-bg linear infinite;
+  will-change: transform, opacity;
+}
+.auth-bg-rise-1  { left: 5%;  width: 110px; height: 110px; animation-duration: 26s; animation-delay: -6s;  --rise-o: 0.75; }
+.auth-bg-rise-2  { left: 13%; width: 26px;  height: 26px;  animation-duration: 17s; animation-delay: -11s; --rise-o: 1; }
+.auth-bg-rise-3  { left: 22%; width: 58px;  height: 58px;  animation-duration: 31s; animation-delay: -19s; --rise-o: 0.6; }
+.auth-bg-rise-4  { left: 30%; width: 14px;  height: 14px;  animation-duration: 14s; animation-delay: -4s;  --rise-o: 1; }
+.auth-bg-rise-5  { left: 41%; width: 40px;  height: 40px;  animation-duration: 24s; animation-delay: -14s; --rise-o: 0.7; }
+.auth-bg-rise-6  { left: 55%; width: 20px;  height: 20px;  animation-duration: 15s; animation-delay: -8s;  --rise-o: 1; }
+.auth-bg-rise-7  { left: 64%; width: 84px;  height: 84px;  animation-duration: 29s; animation-delay: -21s; --rise-o: 0.65; }
+.auth-bg-rise-8  { left: 74%; width: 30px;  height: 30px;  animation-duration: 18s; animation-delay: -2s;  --rise-o: 0.9; }
+.auth-bg-rise-9  { left: 84%; width: 120px; height: 120px; animation-duration: 34s; animation-delay: -16s; --rise-o: 0.6; }
+.auth-bg-rise-10 { left: 92%; width: 18px;  height: 18px;  animation-duration: 13s; animation-delay: -9s;  --rise-o: 1; }
+
 @media (prefers-reduced-motion: reduce) {
-  .auth-rise { animation: none; }
+  .auth-rise, .auth-rise-bg { animation: none; }
 }
