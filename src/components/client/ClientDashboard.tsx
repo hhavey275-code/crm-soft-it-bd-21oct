@@ -356,11 +356,22 @@ export function ClientDashboard() {
 
   const fmt = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  // Secondary + credit line wallets and the combined BDT total — each card only
-  // shows when that wallet is enabled for this client.
-  const secondaryBlock =
-    clientWallets.secondaryEnabled || clientWallets.creditLineEnabled ? (
-    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+  // Keep every wallet summary together. Desktop uses one row; smaller screens
+  // wrap without changing the Main → Secondary → Credit Line → Combined order.
+  const walletSummary = (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Card data-tutorial="card-wallet" className="bg-gradient-to-br from-primary via-primary/85 to-primary/65 text-primary-foreground border-0 shadow-lg overflow-hidden relative">
+        <CardContent className="p-4 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-primary-foreground/20 flex items-center justify-center"><Wallet className="h-5 w-5" /></div>
+            <div className="min-w-0">
+              <p className="text-xs opacity-80">Main Wallet</p>
+              <p className="text-2xl font-bold tracking-tight truncate">{fmt(clientWallets.mainBalance)}</p>
+              <p className="text-[11px] opacity-70 mt-0.5">Rate ৳{clientWallets.mainRate}/USD</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {clientWallets.secondaryEnabled && (
       <Card className="border-border/60 bg-card">
         <CardContent className="p-4">
@@ -404,7 +415,7 @@ export function ClientDashboard() {
         </CardContent>
       </Card>
     </div>
-  ) : null;
+  );
 
   return (
     <div className="space-y-5">
@@ -469,24 +480,11 @@ export function ClientDashboard() {
       )}
 
 
-      {/* Desktop: secondary wallet block above the metric cards */}
-      {!isMobile && secondaryBlock}
+      {walletSummary}
 
       {/* ========== METRIC CARDS ========== */}
       {isMobile ? (
         <div className="space-y-3">
-          {/* Wallet Hero */}
-          <div data-tutorial="card-wallet" className="rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-5 text-primary-foreground shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm opacity-90">Wallet Balance</p>
-                <p className="text-3xl font-bold tracking-tight mt-1">{fmt(clientWallets.mainBalance)}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center"><Wallet className="h-6 w-6" /></div>
-            </div>
-          </div>
-          {/* Mobile: secondary wallet then combined due, right under the wallet balance */}
-          {secondaryBlock}
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -537,21 +535,6 @@ export function ClientDashboard() {
         </div>
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {/* Wallet - spanning */}
-          <Card data-tutorial="card-wallet" className="col-span-2 lg:col-span-1 bg-gradient-to-br from-primary via-primary/85 to-primary/65 text-primary-foreground border-0 shadow-lg overflow-hidden relative">
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center"><Wallet className="h-5 w-5" /></div>
-                <div>
-                  <p className="text-xs opacity-80">Wallet Balance</p>
-                  <p className="text-2xl font-bold tracking-tight">{fmt(clientWallets.mainBalance)}</p>
-                </div>
-              </div>
-            </CardContent>
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-            <div className="absolute -right-2 -bottom-4 h-16 w-16 rounded-full bg-white/5" />
-          </Card>
-
           {[
             { title: "Ad Accounts", value: String(adAccounts?.length ?? 0), icon: MonitorSmartphone, key: "ad-accounts" },
             { title: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), icon: TrendingUp, key: "remaining" },

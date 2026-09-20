@@ -1327,7 +1327,7 @@ export default function ClientDetailPage() {
           {/* Mobile-only colorful wallet summary — Overview tab only */}
           {isMobile && userId && mainTab === "overview" && (
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {/* Main Wallet — themed blue gradient */}
               <div className="rounded-xl bg-gradient-to-br from-primary via-primary/85 to-primary/65 p-3.5 text-primary-foreground shadow-md">
                 <div className="flex items-center justify-between">
@@ -1362,21 +1362,38 @@ export default function ClientDetailPage() {
                 </div>
               )}
 
+              {wallets.creditLineEnabled && (
+                <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs text-sky-700 dark:text-sky-400">Credit Line Wallet</p>
+                      <p className="mt-0.5 truncate text-2xl font-bold tracking-tight text-sky-700 dark:text-sky-300">
+                        ${wallets.creditLineBalance.toLocaleString()}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">৳{wallets.creditLineRate}/USD</p>
+                    </div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/15">
+                      <Wallet className="h-4.5 w-4.5 text-sky-600 dark:text-sky-400" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Combined Due / Adv — purple gradient (only when enabled) */}
-              {wallets.secondaryEnabled && (
-                <div className="rounded-xl bg-gradient-to-br from-purple-600 via-purple-600/85 to-purple-600/65 p-3.5 text-white shadow-md">
+              {(wallets.secondaryEnabled || wallets.creditLineEnabled) && (
+                <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs opacity-90">Combined Due / Adv</p>
-                      <p className="mt-0.5 text-2xl font-bold tracking-tight">
+                      <p className="text-xs text-accent-foreground">Combined Due / Adv</p>
+                      <p className="mt-0.5 text-2xl font-bold tracking-tight text-accent-foreground">
                         {wallets.totalBdt < 0 ? "-" : ""}{formatBdt(wallets.totalBdt)}
                       </p>
-                      <p className="mt-0.5 text-[10px] opacity-70">
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
                         {wallets.totalBdt < 0 ? "Due" : "Advance"}
                       </p>
                     </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-                      <Scale className="h-4.5 w-4.5" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent">
+                      <Scale className="h-4.5 w-4.5 text-accent-foreground" />
                     </div>
                   </div>
                 </div>
@@ -2596,8 +2613,8 @@ export default function ClientDetailPage() {
                   })}
                 </div>
 
-                {/* Wallet row — main, secondary and combined side by side */}
-                <div className={cn("grid gap-3", wallets.secondaryEnabled ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4")}>
+                {/* Wallet summaries stay together before account statistics. */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
 
                   {/* Wallet Balance */}
@@ -2637,15 +2654,13 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Secondary (sheet-rate) wallet + combined total — admin controlled */}
+                  {/* Extra wallets + combined total — admin controlled */}
                   {userId && <SecondaryWalletCard userId={userId} />}
                   {userId && <CreditLineWalletCard userId={userId} />}
                   {userId && <CombinedTotalCard userId={userId} />}
+                </div>
 
-                  {/* Account stat cards */}
-                  {/* Total Ad Accounts */}
-
-
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
