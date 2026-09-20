@@ -135,6 +135,21 @@ export function AppSidebar() {
     enabled: !!user && (role === "admin" || role === "client"),
   });
 
+  // Referral program is off globally unless site settings say otherwise
+  const { data: referralGlobalOn } = useQuery({
+    queryKey: ["referral-global-enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "referral_enabled")
+        .maybeSingle();
+      return ((data as any)?.value ?? "on") !== "off";
+    },
+  });
+
+
+
   // Check if tenant mode (is_tenant flag OR test mode enabled)
   const { data: isTenantMode } = useQuery({
     queryKey: ["is-tenant-mode-sidebar"],
