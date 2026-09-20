@@ -3,7 +3,7 @@ import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, TrendingDown, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity, PiggyBank } from "lucide-react";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
@@ -478,17 +478,17 @@ export function ClientDashboard() {
           {/* 3x2 grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts", icon: Megaphone, color: "blue" },
-              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining", icon: Wallet, color: "emerald" },
-              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend", icon: TrendingDown, color: "orange" },
-              { label: "Today Orders", value: String(todayOrders), key: "today-orders", icon: ShoppingCart, color: "violet" },
-              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup", icon: PiggyBank, color: "pink" },
+              { label: "Ad Accounts", value: String(adAccounts?.length ?? 0), key: "ad-accounts", icon: Megaphone, bg: "bg-blue-100", text: "text-blue-600" },
+              { label: dashboardSyncing ? "Remaining (syncing)" : "Remaining", value: fmt(totalRemaining), key: "remaining", icon: Wallet, bg: "bg-emerald-100", text: "text-emerald-600" },
+              { label: "Today Spend", value: fmt(todaySpend), key: "today-spend", icon: TrendingDown, bg: "bg-orange-100", text: "text-orange-600" },
+              { label: "Today Orders", value: String(todayOrders), key: "today-orders", icon: ShoppingCart, bg: "bg-violet-100", text: "text-violet-600" },
+              { label: "Total Top-Up", value: fmt(Number(topUpTotal ?? 0)), key: "total-topup", icon: PiggyBank, bg: "bg-pink-100", text: "text-pink-600" },
             ].map((m) => (
               <Card key={m.label} data-tutorial={`card-${m.key}`} className="bg-card border border-border/60">
                 <CardContent className="p-2.5 text-center">
                   <p className="text-[10px] text-muted-foreground font-medium truncate flex items-center justify-center gap-1">
-                    <span className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-${m.color}-100`}>
-                      <m.icon className={`h-2.5 w-2.5 text-${m.color}-600`} />
+                    <span className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${m.bg}`}>
+                      <m.icon className={`h-2.5 w-2.5 ${m.text}`} />
                     </span>
                     {m.label}
                   </p>
