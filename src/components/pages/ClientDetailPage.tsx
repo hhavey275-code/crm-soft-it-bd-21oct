@@ -3105,12 +3105,11 @@ export default function ClientDetailPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1.5">
                                       {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
                                       <Button
-                                        size="icon"
-                                        variant="default"
-                                        className="h-8 w-8"
+                                        size="sm"
+                                        className="h-8 gap-1 px-2.5 text-xs font-semibold"
                                         onClick={() => {
                                           if (acc.external_topup_required) {
                                             setExtTopUp({ account: acc, wallet: "primary" });
@@ -3124,13 +3123,14 @@ export default function ClientDetailPage() {
                                         }}
                                         title={acc.external_topup_required ? "Top Up via External CRM (Main Wallet)" : "Top Up (Main Wallet)"}
                                       >
-                                        <ArrowUpCircle className="h-4 w-4" />
+                                        <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="truncate">{acc.external_topup_required ? "Ext. Top Up" : "Top Up"}</span>
                                       </Button>
                                       )}
                                       {(acc.external_topup_required ? !!acc.external_topup_url_secondary : wallets.secondaryEnabled) && (
                                         <Button
-                                          size="icon"
-                                          className="h-8 w-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                                          size="sm"
+                                          className="h-8 gap-1 px-2.5 text-xs font-semibold bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
                                           onClick={() => {
                                             if (acc.external_topup_required) {
                                               setExtTopUp({ account: acc, wallet: "secondary" });
@@ -3144,21 +3144,23 @@ export default function ClientDetailPage() {
                                           }}
                                           title={acc.external_topup_required ? "Top Up via External CRM (Secondary Wallet)" : "Top Up (Secondary Wallet)"}
                                         >
-                                          <ArrowUpCircle className="h-4 w-4" />
+                                          <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                                          <span className="truncate">{acc.external_topup_required ? "Ext. Secondary" : "Secondary"}</span>
                                         </Button>
                                        )}
-                                       {!!acc.external_topup_url_credit_line && (
-                                         <Button
-                                           size="icon"
-                                           className="h-8 w-8 bg-sky-600 hover:bg-sky-700 text-white"
-                                           onClick={() => {
-                                             setExtTopUp({ account: acc, wallet: "credit_line" });
-                                           }}
-                                           title="Top Up via External CRM (Credit Line Wallet)"
-                                         >
-                                           <ArrowUpCircle className="h-4 w-4" />
-                                         </Button>
-                                       )}
+                                        {!!acc.external_topup_url_credit_line && (
+                                          <Button
+                                            size="sm"
+                                            className="h-8 gap-1 px-2.5 text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white"
+                                            onClick={() => {
+                                              setExtTopUp({ account: acc, wallet: "credit_line" });
+                                            }}
+                                            title="Top Up via External CRM (Credit Line Wallet)"
+                                          >
+                                            <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="truncate">Credit Line</span>
+                                          </Button>
+                                        )}
                                       <Button
                                         size="icon"
                                         variant={acc.client_topup_disabled ? "destructive" : "outline"}
