@@ -216,7 +216,7 @@ export function AuthForm() {
             <div className="relative">
               <div className="inline-flex items-center gap-3">
                 <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="brand-script brand-script-gradient text-2xl leading-none drop-shadow-sm sm:text-3xl">{displayName}</span>
+                <span className="text-2xl font-bold tracking-wide text-white sm:text-3xl">{displayName}</span>
               </div>
 
               {/* Cover photo — full width of the panel, compact height */}
@@ -228,11 +228,9 @@ export function AuthForm() {
                 />
               </div>
 
-              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight sm:text-2xl">
+              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight text-white sm:text-2xl">
                 {welcomeTitle || "Welcome to"}{" "}
-                <span className="brand-script brand-script-gradient text-[26px] leading-none sm:text-[30px]">
-                  {displayName}
-                </span>
+                <span className="font-bold">{displayName}</span>
               </h2>
               <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
                 {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
