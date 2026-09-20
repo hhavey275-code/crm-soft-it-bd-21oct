@@ -58,7 +58,7 @@ export function TransactionHistoryPanel({
   secondaryEnabled = false,
   isMobile = false,
 }: TransactionHistoryPanelProps) {
-  const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary">("all");
+  const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary" | "credit_line">("all");
   const [month, setMonth] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -75,9 +75,7 @@ export function TransactionHistoryPanel({
   const walletFiltered = useMemo(() => {
     const list = transactions ?? [];
     if (walletTab === "all") return list;
-    return list.filter((tx: any) =>
-      walletTab === "secondary" ? tx.wallet_kind === "secondary" : tx.wallet_kind !== "secondary",
-    );
+    return list.filter((tx: any) => (tx.wallet_kind ?? "primary") === walletTab);
   }, [transactions, walletTab]);
 
   const months = useMemo(() => {
@@ -112,16 +110,17 @@ export function TransactionHistoryPanel({
   const breakdown = useMemo(() => {
     const map = new Map<
       string,
-      { spent: number; added: number; count: number; spentMain: number; spentSecondary: number }
+      { spent: number; added: number; count: number; spentMain: number; spentSecondary: number; spentCreditLine: number }
     >();
     rows.forEach((tx: any) => {
       const key = accountNameOf(tx);
       const cur =
-        map.get(key) ?? { spent: 0, added: 0, count: 0, spentMain: 0, spentSecondary: 0 };
+        map.get(key) ?? { spent: 0, added: 0, count: 0, spentMain: 0, spentSecondary: 0, spentCreditLine: 0 };
       const amt = Number(tx.amount) || 0;
       if (amt < 0) {
         cur.spent += Math.abs(amt);
         if (tx.wallet_kind === "secondary") cur.spentSecondary += Math.abs(amt);
+        else if (tx.wallet_kind === "credit_line") cur.spentCreditLine += Math.abs(amt);
         else cur.spentMain += Math.abs(amt);
       } else cur.added += amt;
       cur.count += 1;
@@ -135,15 +134,17 @@ export function TransactionHistoryPanel({
     let added = 0;
     let spentMain = 0;
     let spentSecondary = 0;
+    let spentCreditLine = 0;
     rows.forEach((tx: any) => {
       const amt = Number(tx.amount) || 0;
       if (amt < 0) {
         spent += Math.abs(amt);
         if (tx.wallet_kind === "secondary") spentSecondary += Math.abs(amt);
+        else if (tx.wallet_kind === "credit_line") spentCreditLine += Math.abs(amt);
         else spentMain += Math.abs(amt);
       } else added += amt;
     });
-    return { spent, added, spentMain, spentSecondary };
+    return { spent, added, spentMain, spentSecondary, spentCreditLine };
   }, [rows]);
 
 
@@ -151,8 +152,9 @@ export function TransactionHistoryPanel({
     const list = transactions ?? [];
     return {
       all: list.length,
-      primary: list.filter((t: any) => t.wallet_kind !== "secondary").length,
+      primary: list.filter((t: any) => (t.wallet_kind ?? "primary") === "primary").length,
       secondary: list.filter((t: any) => t.wallet_kind === "secondary").length,
+      creditLine: list.filter((t: any) => t.wallet_kind === "credit_line").length,
     };
   }, [transactions]);
 
@@ -165,7 +167,8 @@ export function TransactionHistoryPanel({
     const title = parts[0] || "—";
     const sub = parts[1] || null;
     const extra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
-    return { linkedAccount, title, sub, extra, cap: capOf(tx), isSecondary: tx.wallet_kind === "secondary" };
+    const walletKind = (tx.wallet_kind ?? "primary") as "primary" | "secondary" | "credit_line";
+    return { linkedAccount, title, sub, extra, cap: capOf(tx), walletKind };
   };
 
   const filters = (
@@ -234,7 +237,7 @@ export function TransactionHistoryPanel({
     <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
         <span className="font-semibold">
-          {walletTab === "secondary" ? "Secondary" : walletTab === "primary" ? "Main" : "All"} ·{" "}
+          {walletTab === "secondary" ? "Secondary" : walletTab === "credit_line" ? "Credit Line" : walletTab === "primary" ? "Main" : "All"} ·{" "}
           {dateFrom || dateTo
             ? `${dateFrom || "…"} → ${dateTo || "…"}`
             : month === "all"
@@ -249,6 +252,8 @@ export function TransactionHistoryPanel({
             Main: <span className="font-bold text-blue-600">{money(totals.spentMain)}</span>
             <span className="mx-1.5">·</span>
             Secondary: <span className="font-bold text-emerald-600">{money(totals.spentSecondary)}</span>
+            <span className="mx-1.5">·</span>
+            Credit Line: <span className="font-bold text-sky-600">{money(totals.spentCreditLine)}</span>
           </span>
         )}
         <span className="text-muted-foreground">
@@ -275,6 +280,9 @@ export function TransactionHistoryPanel({
                   <span className="text-emerald-600 font-semibold">S {money(v.spentSecondary)}</span>
                 </span>
               )}
+              {v.spentCreditLine > 0 && (
+                <span className="ml-1.5 text-[10px] font-semibold text-sky-600">CL {money(v.spentCreditLine)}</span>
+              )}
             </button>
           ))}
         </div>
@@ -298,6 +306,9 @@ export function TransactionHistoryPanel({
               </TabsTrigger>
               <TabsTrigger value="secondary" className="text-xs px-3 data-[state=active]:text-green-600">
                 Secondary <span className="ml-1 text-muted-foreground">{counts.secondary}</span>
+              </TabsTrigger>
+              <TabsTrigger value="credit_line" className="text-xs px-3 data-[state=active]:text-sky-600">
+                Credit Line <span className="ml-1 text-muted-foreground">{counts.creditLine}</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -326,7 +337,9 @@ export function TransactionHistoryPanel({
         {header}
         <div className="space-y-2">
           {rows.map((tx: any) => {
-            const { linkedAccount, title, extra, cap, isSecondary } = enrich(tx);
+            const { linkedAccount, title, extra, cap, walletKind } = enrich(tx);
+            const isSecondary = walletKind === "secondary";
+            const isCreditLine = walletKind === "credit_line";
             const isPositive = Number(tx.amount) >= 0;
             return (
               <div
@@ -335,6 +348,8 @@ export function TransactionHistoryPanel({
                   "rounded-xl border p-3",
                   isSecondary
                     ? "border-green-200/70 bg-green-50/40 dark:border-green-900/50 dark:bg-green-950/15"
+                    : isCreditLine
+                      ? "border-sky-200/70 bg-sky-50/40 dark:border-sky-900/50 dark:bg-sky-950/15"
                     : "border-border/60 bg-card",
                 )}
               >
@@ -370,10 +385,12 @@ export function TransactionHistoryPanel({
                         "mt-1 h-4 px-1.5 text-[9px] font-semibold uppercase tracking-wide",
                         isSecondary
                           ? "border-green-300 text-green-700 dark:text-green-300"
+                          : isCreditLine
+                            ? "border-sky-300 text-sky-700 dark:text-sky-300"
                           : "border-blue-300 text-blue-700 dark:text-blue-300",
                       )}
                     >
-                      {isSecondary ? "Secondary" : "Main"}
+                      {isSecondary ? "Secondary" : isCreditLine ? "Credit Line" : "Main"}
                     </Badge>
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       <ExpandableText text={linkedAccount?.account_name || title} limit={40} />
@@ -429,7 +446,9 @@ export function TransactionHistoryPanel({
             </TableHeader>
             <TableBody>
               {rows.map((tx: any) => {
-                const { linkedAccount, title, sub, extra, cap, isSecondary } = enrich(tx);
+                const { linkedAccount, title, sub, extra, cap, walletKind } = enrich(tx);
+                const isSecondary = walletKind === "secondary";
+                const isCreditLine = walletKind === "credit_line";
                 const isPositive = Number(tx.amount) >= 0;
                 return (
                   <TableRow
@@ -437,6 +456,7 @@ export function TransactionHistoryPanel({
                     className={cn(
                       "align-middle",
                       isSecondary && "bg-green-50/40 dark:bg-green-950/15",
+                      isCreditLine && "bg-sky-50/40 dark:bg-sky-950/15",
                     )}
                   >
                     <TableCell className="py-2.5 whitespace-nowrap text-[13px] text-muted-foreground">
@@ -451,10 +471,12 @@ export function TransactionHistoryPanel({
                           "mt-1 block w-fit h-4 px-1.5 text-[9px] font-semibold uppercase tracking-wide",
                           isSecondary
                             ? "border-green-300 text-green-700 dark:text-green-300"
+                            : isCreditLine
+                              ? "border-sky-300 text-sky-700 dark:text-sky-300"
                             : "border-blue-300 text-blue-700 dark:text-blue-300",
                         )}
                       >
-                        {isSecondary ? "Secondary" : "Main"}
+                        {isSecondary ? "Secondary" : isCreditLine ? "Credit Line" : "Main"}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-2.5 text-[13px] break-words">
