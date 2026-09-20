@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ArrowUpCircle, Loader2, Download, Smartphone, Share, X, Plus, RefreshCw, ShoppingCart, Megaphone, BarChart3, DollarSign, Activity } from "lucide-react";
+import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -360,18 +361,11 @@ export function ClientDashboard() {
   // wrap without changing the Main → Secondary → Credit Line → Combined order.
   const walletSummary = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
-      <Card data-tutorial="card-wallet" className="bg-gradient-to-br from-primary via-primary/85 to-primary/65 text-primary-foreground border-0 shadow-lg overflow-hidden relative">
-        <CardContent className="p-4 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 shrink-0 rounded-xl bg-primary-foreground/20 flex items-center justify-center"><Wallet className="h-5 w-5" /></div>
-            <div className="min-w-0">
-              <p className="text-xs opacity-80">Main Wallet</p>
-              <p className="text-2xl font-bold tracking-tight truncate">{fmt(clientWallets.mainBalance)}</p>
-              <p className="text-[11px] opacity-70 mt-0.5">Rate ৳{clientWallets.mainRate}/USD</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <MainWalletDebitCard
+        data-tutorial="card-wallet"
+        balanceLabel={fmt(clientWallets.mainBalance)}
+        footer={`Rate ৳${clientWallets.mainRate}/USD`}
+      />
       {clientWallets.secondaryEnabled && (
       <Card className="border-border/60 bg-card">
         <CardContent className="p-4">

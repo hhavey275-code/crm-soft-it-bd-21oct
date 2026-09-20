@@ -91,6 +91,7 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
+import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -2610,41 +2611,34 @@ export default function ClientDetailPage() {
 
 
                   {/* Wallet Balance */}
-                  <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex shrink-0 items-center justify-center rounded-xl h-9 w-9 bg-blue-100 dark:bg-blue-900/40">
-                          <Wallet className="h-4.5 w-4.5 text-blue-600" />
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">Wallet Balance</p>
-                        <div className="flex items-center gap-0.5 ml-auto shrink-0">
-                          <button
-                            className="h-6 w-6 rounded-md flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
-                            onClick={() => {
-                              setWalletDialogType("credit");
-                              setWalletAmount("");
-                              setWalletNote("");
-                            }}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          <button
-                            className="h-6 w-6 rounded-md flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
-                            onClick={() => {
-                              setWalletDialogType("debit");
-                              setWalletAmount("");
-                              setWalletNote("");
-                            }}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                        </div>
+                  <MainWalletDebitCard
+                    title="Wallet Balance"
+                    balanceLabel={`$${walletBalance.toLocaleString()}`}
+                    actions={
+                      <div className="flex items-center gap-1">
+                        <button
+                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                          onClick={() => {
+                            setWalletDialogType("credit");
+                            setWalletAmount("");
+                            setWalletNote("");
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                        <button
+                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                          onClick={() => {
+                            setWalletDialogType("debit");
+                            setWalletAmount("");
+                            setWalletNote("");
+                          }}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
                       </div>
-                      <p className="text-2xl font-bold tracking-tight text-foreground">
-                        ${walletBalance.toLocaleString()}
-                      </p>
-                    </CardContent>
-                  </Card>
+                    }
+                  />
 
                   {/* Extra wallets + combined total — admin controlled */}
                   {userId && <SecondaryWalletCard userId={userId} />}
