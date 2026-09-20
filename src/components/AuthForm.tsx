@@ -220,13 +220,13 @@ export function AuthForm() {
             </div>
 
             <div className="relative">
-              <div className="inline-flex items-center gap-3">
-                <img src={logoMark} alt="Logo" className="h-12 w-12 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-                <span className="auth-serif text-lg font-semibold tracking-wide text-white sm:text-xl">Unlimited spend without hassle</span>
+              <div className="inline-flex items-center gap-2.5 sm:gap-3">
+                <img src={logoMark} alt="Logo" className="h-9 w-9 object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)] sm:h-12 sm:w-12" />
+                <span className="auth-serif text-base font-semibold tracking-wide text-white sm:text-xl">Unlimited spend without hassle</span>
               </div>
 
-              {/* Cover photo — full width of the panel, compact height */}
-              <div className="-mx-6 mt-4 sm:-mx-8">
+              {/* Cover photo — full width of the panel, compact height (desktop only) */}
+              <div className="-mx-6 mt-4 hidden sm:-mx-8 lg:block">
                 <img
                   src={softitbdBanner}
                   alt={`${displayName} — We handle the ads, you scale the business`}
@@ -234,17 +234,19 @@ export function AuthForm() {
                 />
               </div>
 
-              <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight text-white sm:text-2xl">
-                {welcomeTitle || "Welcome to"}{" "}
-                <span className="font-bold">{displayName}</span>
-              </h2>
-              <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
-                {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
-              </p>
-              <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              <div className="hidden lg:block">
+                <h2 className="auth-serif mt-4 whitespace-nowrap text-[20px] font-semibold leading-tight text-white sm:text-2xl">
+                  {welcomeTitle || "Welcome to"}{" "}
+                  <span className="font-bold">{displayName}</span>
+                </h2>
+                <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-background/70">
+                  {welcomeNote || "Your digital success, our expertise. Sign in to manage your ad accounts and wallets."}
+                </p>
+                <div className="mt-4 h-px w-20 bg-gradient-to-r from-background/30 to-transparent" />
+              </div>
             </div>
 
-            <div className="relative mt-6 space-y-2.5 text-sm">
+            <div className="relative mt-6 hidden space-y-2.5 text-sm lg:block">
               <a
                 href={HELPLINE_TEL}
                 className="flex items-center gap-3.5 rounded-2xl border border-background/10 bg-background/[0.06] px-4 py-2.5 transition-colors hover:bg-background/[0.12]"
