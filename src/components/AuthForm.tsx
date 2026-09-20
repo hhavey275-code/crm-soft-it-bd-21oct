@@ -186,9 +186,9 @@ export function AuthForm() {
         <div className="auth-rise-bg auth-bg-rise-10" />
       </div>
 
-      <header className="relative z-10 flex items-center gap-3 px-6 py-5 sm:px-10">
+      <header className="relative z-10 flex items-center gap-3 px-5 py-3 sm:px-10 sm:py-5">
         {displayLogo ? (
-          <img src={displayLogo} alt="Logo" className="h-10 w-10 rounded-xl object-contain ring-1 ring-foreground/10" />
+          <img src={displayLogo} alt="Logo" className="h-9 w-9 rounded-xl object-contain ring-1 ring-foreground/10 sm:h-10 sm:w-10" />
         ) : (
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground/[0.06] ring-1 ring-foreground/10">
             <LogIn className="h-4 w-4 text-foreground" />
@@ -199,10 +199,10 @@ export function AuthForm() {
         )}
       </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-6 pt-2">
-        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 pb-4 pt-1 sm:pb-6 sm:pt-2">
+        <div className="auth-fade-up grid w-full max-w-4xl overflow-hidden rounded-[24px] border border-white/80 bg-white/85 shadow-[0_32px_90px_-24px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.04)] backdrop-blur-xl sm:rounded-[28px] lg:grid-cols-[1.02fr_1fr] lg:items-stretch">
           {/* ===== Left brand panel ===== */}
-          <div className="relative flex h-full min-h-[520px] flex-col justify-between overflow-hidden p-6 text-background sm:p-8"
+          <div className="relative flex h-full min-h-0 flex-col justify-between overflow-hidden p-4 text-background sm:p-6 lg:min-h-[520px] lg:p-8"
             style={{ background: "linear-gradient(165deg, #0e2c55 0%, #14427c 55%, #0a1f42 100%)" }}>
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-[110px]" />
             <div className="pointer-events-none absolute -left-20 bottom-1/3 h-64 w-64 rounded-full bg-sky-400/15 blur-[100px]" />
