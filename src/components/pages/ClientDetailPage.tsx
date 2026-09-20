@@ -2248,21 +2248,7 @@ export default function ClientDetailPage() {
                   size="sm"
                   className="rounded-full"
                   disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
-                  onClick={async () => {
-                    if (!adAccounts || adAccounts.length === 0) return;
-                    setInsightsLoading(true);
-                    try {
-                      const ids = adAccounts.map((a: any) => a.id);
-                      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
-                      await chunkedMetaSync(ids);
-                      await Promise.all([refetchInsights(), refetchAdAccounts()]);
-                      toast.success("Insights updated from Meta!");
-                    } catch {
-                      toast.error("Failed to update from Meta");
-                    } finally {
-                      setInsightsLoading(false);
-                    }
-                  }}
+                  onClick={updateAllFromMeta}
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")} />
                   {insightsLoading ? "Updating..." : "Update from Meta"}
