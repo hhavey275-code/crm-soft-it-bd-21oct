@@ -2263,7 +2263,12 @@ export default function ClientDetailPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <Card className="bg-card border border-border/60">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">Ad Accounts</p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100">
+                          <Megaphone className="h-2.5 w-2.5 text-blue-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">Ad Accounts</p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">{adAccounts?.length ?? 0}</p>
                       <p className="text-[10px] text-muted-foreground">
                         {activeAccounts.length} active
@@ -2272,7 +2277,12 @@ export default function ClientDetailPage() {
                   </Card>
                   <Card className="bg-card border border-border/60">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">Remaining</p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100">
+                          <Wallet className="h-2.5 w-2.5 text-emerald-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">Remaining</p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">
                         ${totalRemaining.toLocaleString()}
                       </p>
@@ -2280,7 +2290,12 @@ export default function ClientDetailPage() {
                   </Card>
                   <Card className="bg-card border border-border/60">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">Today Spend</p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-orange-100">
+                          <TrendingDown className="h-2.5 w-2.5 text-orange-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">Today Spend</p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">
                         ${todaySpend.toLocaleString()}
                       </p>
@@ -2291,7 +2306,12 @@ export default function ClientDetailPage() {
                   </Card>
                   <Card className="bg-card border border-border/60">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">Today Orders</p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-violet-100">
+                          <ShoppingBag className="h-2.5 w-2.5 text-violet-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">Today Orders</p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">
                         {todayOrders.toLocaleString()}
                       </p>
@@ -2306,7 +2326,12 @@ export default function ClientDetailPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <Card className="bg-card border border-border/60">
                     <CardContent className="p-3 text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">Total Top-Up</p>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-pink-100">
+                          <PiggyBank className="h-2.5 w-2.5 text-pink-600" />
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">Total Top-Up</p>
+                      </span>
                       <p className="text-lg font-bold text-foreground">
                         ${Number(topUpTotal ?? 0).toLocaleString()}
                       </p>
