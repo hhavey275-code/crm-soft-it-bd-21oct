@@ -832,25 +832,17 @@ export default function ClientDetailPage() {
                       <span className="truncate">{acc.external_topup_required ? "Ext. Secondary" : "Secondary"}</span>
                     </Button>
                   )}
-                  {(acc.external_topup_required ? !!acc.external_topup_url_credit_line : wallets.creditLineEnabled) && (
+                  {!!acc.external_topup_url_credit_line && (
                     <Button
                       size="sm"
                       className="flex-1 min-w-[110px] gap-1 rounded-full bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs h-8"
                       title="Top Up (Credit Line Wallet)"
                       onClick={() => {
-                        if (acc.external_topup_required) {
-                          setExtTopUp({ account: acc, wallet: "credit_line" });
-                          return;
-                        }
-                        setSelectedAccountId(acc.id);
-                        setTopUpWallet("credit_line");
-                        setTopUpDialogOpen(true);
-                        setTopUpAmount("");
-                        setDialogTab("topup");
+                        setExtTopUp({ account: acc, wallet: "credit_line" });
                       }}
                     >
                       <ArrowUpCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{acc.external_topup_required ? "Ext. Credit Line" : "Credit Line"}</span>
+                      <span className="truncate">Credit Line</span>
                     </Button>
                   )}
                   <Button
