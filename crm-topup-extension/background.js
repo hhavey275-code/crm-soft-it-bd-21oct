@@ -20,9 +20,7 @@ let ws = null;
 let wsRef = 0;
 let heartbeatTimer = null;
 let running = false;
-let waRunning = false;
 const tabWaiters = new Map(); // requestId -> {resolve, tabId}
-const waWaiters = new Map(); // tabId -> {resolve}
 
 // ---------- storage ----------
 function getState() {
@@ -220,7 +218,6 @@ chrome.alarms.onAlarm.addListener(async (a) => {
   connectSocket();
   // Safety net: if the worker was asleep when a ping fired, catch up here.
   processQueue();
-  processWaQueue();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -228,7 +225,6 @@ chrome.runtime.onStartup.addListener(async () => {
   if (autopilot && autopilot.token) {
     connectSocket();
     processQueue();
-    processWaQueue();
   }
 });
 
@@ -245,16 +241,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.command === "start") {
       connectSocket();
       processQueue();
-      processWaQueue();
       sendResponse({ ok: true });
-    } else if (msg.command === "wa-now") {
-      // Run one complete queue pass and report the actual outcome.
-      try {
-        const result = await processWaQueue();
-        sendResponse(result || { ok: false, error: "WhatsApp কাজটি চালু করা যায়নি" });
-      } catch (e) {
-        sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
-      }
     } else if (msg.command === "stop") {
       if (ws) {
         try {
@@ -268,117 +255,4 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
   })();
   return true;
-});
-
-// ============================================================
-//  WhatsApp notifications — send queued messages via WhatsApp Web
-// ============================================================
-async function waApi(body) {
-  const { autopilot } = await getState();
-  if (!autopilot || !autopilot.token) throw new Error("Auto-pilot token not set");
-  // Use the same endpoint already proven to work for CRM Auto-pilot. Some
-  // published-site gateways block the separate WhatsApp path in extensions.
-  const res = await fetch(API, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(Object.assign({}, body, { token: autopilot.token, action: `wa_${body.action}` })),
-  });
-  return readJsonResponse(res, "WhatsApp");
-}
-
-function setWaLast(patch) {
-  chrome.storage.local.get(["waLast"], (r) => {
-    chrome.storage.local.set({ waLast: Object.assign({}, r.waLast || {}, patch) });
-  });
-}
-
-async function processWaQueue() {
-  if (waRunning) return { ok: false, error: "WhatsApp কাজটি ইতিমধ্যে চলছে — একটু পরে আবার দেখুন" };
-  waRunning = true;
-  try {
-    const list = await waApi({ action: "list_pending" });
-    if (!list || !list.ok) {
-      return { ok: false, error: (list && list.error) || "WhatsApp সারি পাওয়া যায়নি" };
-    }
-    const items = list.items || [];
-    if (items.length === 0) return { ok: true, pending: 0, sent: 0 };
-    let sent = 0;
-    for (const item of list.items || []) {
-      let claim;
-      try {
-        claim = await waApi({ action: "claim", id: item.id });
-      } catch (e) {
-        const message = e && e.message ? e.message : String(e);
-        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: message });
-        return { ok: false, pending: items.length, sent, error: message };
-      }
-      if (!claim || !claim.ok) {
-        const message = (claim && claim.error) || "বার্তাটি নেওয়া যায়নি";
-        setWaLast({ at: Date.now(), ok: false, phone: item.phone, error: message });
-        // busy (gap not over) / daily limit reached / another PC took it
-        if (claim && (claim.reason === "busy" || claim.reason === "limit")) {
-          return { ok: false, pending: items.length, sent, error: message };
-        }
-        continue;
-      }
-      let ok = false;
-      let err = null;
-      try {
-        await sendWhatsApp(claim.phone, claim.body);
-        ok = true;
-      } catch (e) {
-        err = e && e.message ? e.message : String(e);
-      }
-      try {
-        await waApi({ action: "result", id: claim.id, success: ok, error: err });
-      } catch {}
-      setWaLast({ at: Date.now(), ok, phone: claim.phone, error: err });
-      if (!ok) notify("WhatsApp বার্তা ব্যর্থ", `${claim.phone}: ${err}`);
-      if (!ok) return { ok: false, pending: items.length, sent, error: err || "বার্তা পাঠানো যায়নি" };
-      sent += 1;
-      // Server also enforces the gap; pause here so the next claim succeeds.
-      if (sent < items.length) await sleep(45000);
-    }
-    return { ok: true, pending: items.length, sent };
-  } catch (e) {
-    const message = e && e.message ? e.message : String(e);
-    setWaLast({ at: Date.now(), ok: false, phone: "", error: message });
-    return { ok: false, error: message };
-  } finally {
-    waRunning = false;
-  }
-}
-
-async function sendWhatsApp(phone, text) {
-  const url =
-    "https://web.whatsapp.com/send?phone=" +
-    encodeURIComponent(phone) +
-    "&text=" +
-    encodeURIComponent(text) +
-    "&type=phone_number&app_absent=0";
-  const tab = await chrome.tabs.create({ url, active: false });
-  const result = await new Promise((resolve) => {
-    waWaiters.set(tab.id, { resolve });
-    setTimeout(() => {
-      if (waWaiters.has(tab.id)) {
-        waWaiters.delete(tab.id);
-        resolve({ success: false, error: "সময় শেষ — WhatsApp Web সাড়া দেয়নি" });
-      }
-    }, 120000);
-  });
-  try {
-    await chrome.tabs.remove(tab.id);
-  } catch {}
-  if (!result.success) throw new Error(result.error || "send failed");
-}
-
-// The WhatsApp content script reports the outcome of its tab.
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (!msg || msg.type !== "wa-send-done") return;
-  const tabId = sender && sender.tab ? sender.tab.id : null;
-  const waiter = tabId != null ? waWaiters.get(tabId) : null;
-  if (waiter) {
-    waWaiters.delete(tabId);
-    waiter.resolve({ success: !!msg.success, error: msg.error || null });
-  }
 });
