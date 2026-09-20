@@ -229,8 +229,10 @@ export function ClientReferral() {
         <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle className="text-base">Ad account wise commission</CardTitle>
-            <CardDescription>
-              Update চাপলে ওই মাসের connected ad account গুলো থেকে spend আবার আনা হবে
+            <CardDescription className="flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" />
+              প্রতিদিন রাত ১২টায় system নিজে থেকে spend আপডেট করে
+              {lastSynced ? ` — সর্বশেষ: ${format(lastSynced, "dd MMM yyyy, hh:mm a")}` : ""}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -238,9 +240,7 @@ export function ClientReferral() {
               <Label className="text-xs">Month</Label>
               <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9" />
             </div>
-            <Button size="sm" onClick={refresh} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Update
-            </Button>
+
             <Button size="sm" variant="outline" onClick={downloadCsv} disabled={rows.length === 0}>
               <Download className="h-4 w-4 mr-2" /> CSV
             </Button>
