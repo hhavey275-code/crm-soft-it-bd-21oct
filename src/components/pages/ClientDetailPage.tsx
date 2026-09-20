@@ -1037,44 +1037,6 @@ export default function ClientDetailPage() {
                 <ArrowUpCircle className="h-3 w-3 mr-1" />
                 Top Up
               </Button>
-              {(isAdmin || isSuperAdmin) && userId && (
-                <StripeLinkDialog
-                  targetUserId={userId}
-                  targetUserName={profile?.full_name || profile?.email}
-                  trigger={
-                    <Button size="sm" variant="outline" className="h-8 text-xs rounded-full">
-                      <CreditCard className="h-3 w-3 mr-1" />
-                      Stripe Link
-                    </Button>
-                  }
-                />
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs rounded-full"
-                onClick={() => {
-                  setWalletDialogType("credit");
-                  setWalletAmount("");
-                  setWalletNote("");
-                }}
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs rounded-full text-destructive"
-                onClick={() => {
-                  setWalletDialogType("debit");
-                  setWalletAmount("");
-                  setWalletNote("");
-                }}
-              >
-                <Minus className="h-3 w-3 mr-1" />
-                Deduct
-              </Button>
               <Button
                 size="sm"
                 variant="outline"
