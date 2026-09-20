@@ -53,32 +53,32 @@ export function MainWalletDebitCard({
       <div className="pointer-events-none absolute -left-12 -bottom-14 h-32 w-32 rounded-full bg-white/10" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40" />
 
-      <div className="relative z-10 flex h-full min-h-[136px] flex-col justify-between gap-1 p-3.5">
+      <div className="relative z-10 flex h-full min-h-[108px] flex-col justify-between gap-0.5 p-3 md:min-h-[136px] md:gap-1 md:p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {/* Silver metallic chip */}
-            <div className="shrink-0 rounded-md bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500 p-1.5 text-zinc-700 shadow-inner ring-1 ring-zinc-400/60">
-              <ChipIcon className="h-4 w-5" />
+            <div className="shrink-0 rounded-md bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500 p-1 text-zinc-700 shadow-inner ring-1 ring-zinc-400/60 md:p-1.5">
+              <ChipIcon className="h-3.5 w-4 md:h-4 md:w-5" />
             </div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/80 truncate">{title}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-primary-foreground/80 truncate md:text-[11px]">{title}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {actions}
-            <ContactlessIcon className="h-4.5 w-4.5 text-primary-foreground/70" />
+            <ContactlessIcon className="h-4 w-4 text-primary-foreground/70 md:h-4.5 md:w-4.5" />
           </div>
         </div>
 
         {/* Demo card number — subtle, like a real card */}
-        <p className="font-mono text-[13px] md:text-sm tracking-[0.18em] text-primary-foreground/60 select-none">
+        <p className="hidden font-mono text-[13px] md:block md:text-sm tracking-[0.18em] text-primary-foreground/60 select-none">
           5241&nbsp;&nbsp;8890&nbsp;&nbsp;4312&nbsp;&nbsp;7654
         </p>
 
         <div className="flex items-end justify-between gap-3 min-w-0">
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-primary-foreground/70">Balance</p>
-            <p className="text-2xl md:text-3xl font-bold tracking-tight truncate">{balanceLabel}</p>
+            <p className="text-[9px] font-medium uppercase tracking-wider text-primary-foreground/70 md:text-[10px]">Balance</p>
+            <p className="text-xl font-bold tracking-tight truncate md:text-2xl lg:text-3xl">{balanceLabel}</p>
           </div>
-          <div className="flex shrink-0 gap-3 text-right">
+          <div className="hidden shrink-0 gap-3 text-right sm:flex">
             <div>
               <p className="text-[8px] uppercase tracking-wider text-primary-foreground/60">Valid Thru</p>
               <p className="font-mono text-[11px] text-primary-foreground/80">12/29</p>
@@ -91,7 +91,7 @@ export function MainWalletDebitCard({
         </div>
 
         {footer != null && (
-          <p className="text-[11px] text-primary-foreground/80 truncate">{footer}</p>
+          <p className="text-[10px] text-primary-foreground/80 truncate md:text-[11px]">{footer}</p>
         )}
       </div>
     </div>
