@@ -53,7 +53,7 @@ export function MainWalletDebitCard({
       <div className="pointer-events-none absolute -left-12 -bottom-14 h-32 w-32 rounded-full bg-white/10" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40" />
 
-      <div className="relative z-10 flex h-full min-h-[168px] flex-col justify-between gap-1.5 p-4">
+      <div className="relative z-10 flex h-full min-h-[136px] flex-col justify-between gap-1 p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {/* Silver metallic chip */}

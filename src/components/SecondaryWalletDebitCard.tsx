@@ -40,7 +40,7 @@ export function SecondaryWalletDebitCard({
       <div className="pointer-events-none absolute -left-14 -bottom-16 h-36 w-36 rounded-full bg-emerald-300/20" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40" />
 
-      <div className="relative z-10 flex h-full min-h-[168px] flex-col justify-between gap-1.5 p-4">
+      <div className="relative z-10 flex h-full min-h-[136px] flex-col justify-between gap-1 p-3.5">
         <div className="flex items-start justify-between gap-2">
           {/* Silver metallic chip */}
           <div className="shrink-0 rounded-md bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500 p-1.5 text-zinc-700 shadow-inner ring-1 ring-zinc-400/60">
@@ -62,8 +62,8 @@ export function SecondaryWalletDebitCard({
 
         <div className="flex items-end justify-end">
           <div className="text-right leading-none">
-            <p className="text-base font-black italic tracking-wide text-white/90">WALLET</p>
-            <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
+            <p className="text-sm font-black italic tracking-wide text-white/90">WALLET</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
           </div>
         </div>
       </div>
