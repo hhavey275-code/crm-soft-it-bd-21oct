@@ -89,6 +89,19 @@ export function ClientReferral() {
     enabled: !!user && enabledForMe,
   });
 
+  const { data: referredClients = [] } = useQuery({
+    queryKey: ["my-referred-clients", user?.id, month],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_referred_clients" as any, {
+        p_month: `${month}-01`,
+      });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!user && enabledForMe,
+  });
+
+
   const code = (profile as any)?.referral_code as string | undefined;
   const rate = Number((profile as any)?.referral_rate_bdt ?? 0);
   const minSpend = settings?.minSpend ?? 3000;
@@ -218,11 +231,64 @@ export function ClientReferral() {
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<Users className="h-4 w-4" />} label="Referred clients" value={String(stats.clients)} />
+        <StatCard icon={<Users className="h-4 w-4" />} label="Referred clients" value={String(referredClients.length)} />
         <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Month spend" value={usd(stats.spend)} />
         <StatCard icon={<Gift className="h-4 w-4" />} label="Qualified accounts" value={String(stats.qualified)} />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Month commission" value={bdt(stats.commission)} />
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">আপনার referral-এ যুক্ত client</CardTitle>
+          <CardDescription>
+            আপনার link দিয়ে যারা যোগ দিয়েছে — কে active আর {monthLabel(selectedMonth)}-এ কার কত spend ও commission
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {referredClients.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              এখনো আপনার link দিয়ে কোনো client যোগ দেয়নি
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Ad accounts</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Month spend</TableHead>
+                  <TableHead className="text-right">Commission</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {referredClients.map((c: any) => (
+                  <TableRow key={c.user_id}>
+                    <TableCell>
+                      <div className="font-medium">{c.full_name ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground">{c.email ?? ""}</div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {c.joined_at ? format(new Date(c.joined_at), "dd MMM yyyy") : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">{c.ad_accounts ?? 0}</TableCell>
+                    <TableCell>
+                      {String(c.status).toLowerCase() === "active" ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600">Active</Badge>
+                      ) : (
+                        <Badge variant="outline" className="capitalize">{c.status ?? "—"}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">{usd(c.month_spend)}</TableCell>
+                    <TableCell className="text-right font-medium">{bdt(c.month_commission)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
