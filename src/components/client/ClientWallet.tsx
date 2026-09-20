@@ -151,7 +151,7 @@ export function ClientWallet() {
 
       {/* Extra wallets (each has its own per-client toggle) */}
       {extraWalletOn && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 md:gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {wallets.secondaryEnabled && (
             <SecondaryWalletDebitCard
               balanceLabel={`$${wallets.secondaryBalance.toLocaleString()}`}

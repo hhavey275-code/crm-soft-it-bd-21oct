@@ -40,30 +40,30 @@ export function SecondaryWalletDebitCard({
       <div className="pointer-events-none absolute -left-14 -bottom-16 h-36 w-36 rounded-full bg-emerald-300/20" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40" />
 
-      <div className="relative z-10 flex h-full min-h-[136px] flex-col justify-between gap-1 p-3.5">
+      <div className="relative z-10 flex h-full min-h-[108px] flex-col justify-between gap-0.5 p-3 md:min-h-[136px] md:gap-1 md:p-3.5">
         <div className="flex items-start justify-between gap-2">
           {/* Silver metallic chip */}
-          <div className="shrink-0 rounded-md bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500 p-1.5 text-zinc-700 shadow-inner ring-1 ring-zinc-400/60">
-            <ChipIcon className="h-4 w-5" />
+          <div className="shrink-0 rounded-md bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500 p-1 text-zinc-700 shadow-inner ring-1 ring-zinc-400/60 md:p-1.5">
+            <ChipIcon className="h-3.5 w-4 md:h-4 md:w-5" />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {actions}
-            <p className="text-lg font-extrabold italic tracking-tight text-white/95">secondary</p>
+            <p className="text-base font-extrabold italic tracking-tight text-white/95 md:text-lg">secondary</p>
           </div>
         </div>
 
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">Balance</p>
-          <p className="text-2xl md:text-3xl font-bold tracking-tight truncate">{balanceLabel}</p>
+          <p className="text-[9px] font-medium uppercase tracking-wider text-white/70 md:text-[10px]">Balance</p>
+          <p className="text-xl font-bold tracking-tight truncate md:text-2xl lg:text-3xl">{balanceLabel}</p>
           {footer != null && (
-            <p className="mt-0.5 text-[11px] text-white/75 truncate">{footer}</p>
+            <p className="mt-0.5 text-[10px] text-white/75 truncate md:text-[11px]">{footer}</p>
           )}
         </div>
 
-        <div className="flex items-end justify-end">
+        <div className="flex items-end justify-end md:hidden">
           <div className="text-right leading-none">
-            <p className="text-sm font-black italic tracking-wide text-white/90">WALLET</p>
-            <p className="text-[8px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
+            <p className="text-xs font-black italic tracking-wide text-white/90">WALLET</p>
+            <p className="text-[7px] font-semibold uppercase tracking-[0.3em] text-white/70">Credit</p>
           </div>
         </div>
       </div>
