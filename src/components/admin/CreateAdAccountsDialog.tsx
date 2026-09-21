@@ -134,6 +134,13 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
             </Button>
           </div>
 
+          {info?.verificationStatus && !/verified/i.test(info.verificationStatus) && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              এই BM এখনো verified না — Meta সম্ভবত নতুন ad account তৈরি করতে দেবে না। আগে
+              Business verification complete করুন।
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">কতগুলো (max 20)</Label>
