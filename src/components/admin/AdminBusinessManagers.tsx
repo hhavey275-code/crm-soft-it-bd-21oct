@@ -10,10 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck, Activity, KeyRound, Link2Off, ExternalLink, ShieldAlert, MoreHorizontal, UserPlus } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck, Activity, KeyRound, Link2Off, ExternalLink, ShieldAlert, MoreHorizontal, UserPlus, PlusSquare } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SilentRecoveryDialog } from "@/components/admin/SilentRecoveryDialog";
 import { InviteToBmDialog } from "@/components/admin/InviteToBmDialog";
+import { CreateAdAccountsDialog } from "@/components/admin/CreateAdAccountsDialog";
 import { logSystemAction } from "@/lib/systemLog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -86,6 +87,7 @@ export function AdminBusinessManagers() {
   const [revokeAllConfirm, setRevokeAllConfirm] = useState(false);
   const [recoveryDialogBmId, setRecoveryDialogBmId] = useState<string | null>(null);
   const [inviteDialogBm, setInviteDialogBm] = useState<{ id: string; name: string } | null>(null);
+  const [createAccountsBm, setCreateAccountsBm] = useState<{ id: string; name: string } | null>(null);
   const [checkingPermBmId, setCheckingPermBmId] = useState<string | null>(null);
   const [revokeSingleId, setRevokeSingleId] = useState<string | null>(null);
 
@@ -886,6 +888,10 @@ export function AdminBusinessManagers() {
                           <UserPlus className="mr-2 h-4 w-4" />
                           Invite User
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setCreateAccountsBm({ id: bm.id, name: bm.name })}>
+                          <PlusSquare className="mr-2 h-4 w-4" />
+                          Create Ad Accounts
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setRecoveryDialogBmId(bm.id)} className="text-destructive focus:text-destructive">
                           <ShieldAlert className="mr-2 h-4 w-4" />
                           Silent Recovery
@@ -993,6 +999,10 @@ export function AdminBusinessManagers() {
                         <DropdownMenuItem onClick={() => setInviteDialogBm({ id: bm.id, name: bm.name })}>
                           <UserPlus className="mr-2 h-4 w-4" />
                           Invite User
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setCreateAccountsBm({ id: bm.id, name: bm.name })}>
+                          <PlusSquare className="mr-2 h-4 w-4" />
+                          Create Ad Accounts
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setRecoveryDialogBmId(bm.id)} className="text-destructive focus:text-destructive">
                           <ShieldAlert className="mr-2 h-4 w-4" />
@@ -1478,6 +1488,13 @@ export function AdminBusinessManagers() {
         onOpenChange={(v) => !v && setInviteDialogBm(null)}
         bmId={inviteDialogBm?.id ?? null}
         bmName={inviteDialogBm?.name}
+      />
+
+      {/* Bulk create ad accounts in a BM */}
+      <CreateAdAccountsDialog
+        open={!!createAccountsBm}
+        onOpenChange={(v) => !v && setCreateAccountsBm(null)}
+        bm={createAccountsBm}
       />
     </div>
   );
