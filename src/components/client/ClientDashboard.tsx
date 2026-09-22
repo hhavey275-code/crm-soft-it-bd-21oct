@@ -372,12 +372,14 @@ export function ClientDashboard() {
       <SecondaryWalletDebitCard
         balanceLabel={`$${clientWallets.secondaryBalance.toLocaleString()}`}
         footer={`Rate ৳${clientWallets.secondaryRate}/USD`}
+        actions={<ClientWalletConvertAction userId={user?.id} target="secondary" />}
       />
       )}
       {clientWallets.creditLineEnabled && (
       <CreditLineWalletDebitCard
         balanceLabel={`$${clientWallets.creditLineBalance.toLocaleString()}`}
         footer={`Rate ৳${clientWallets.creditLineRate}/USD`}
+        actions={<ClientWalletConvertAction userId={user?.id} target="credit_line" />}
       />
       )}
       <Card className="border-border/60 bg-card">
