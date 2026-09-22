@@ -405,8 +405,8 @@ export function ClientTopUp() {
       const { data: freshProfile } = await supabase.from("profiles").select("usd_rate").eq("user_id", user!.id).single();
       const clientRate = freshProfile?.usd_rate;
       if (clientRate != null && clientRate > 0) return Number(clientRate);
-      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
-      return Number(data?.value ?? 120);
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").maybeSingle();
+      return Number(data?.value ?? 0) || 0;
     },
     enabled: !!user,
     staleTime: 60_000,

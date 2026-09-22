@@ -13,6 +13,42 @@ export function GlobalRateControl() {
   const [adjust, setAdjust] = useState<string>("1");
   const [absolute, setAbsolute] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [newClientRate, setNewClientRate] = useState<string>("");
+
+  const { data: defaultRate = 0, refetch: refetchDefaultRate } = useQuery({
+    queryKey: ["default-client-usd-rate"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "usd_rate")
+        .maybeSingle();
+      if (error) throw error;
+      return Number(data?.value ?? 0) || 0;
+    },
+  });
+
+  const saveDefaultRate = async () => {
+    const v = Number(newClientRate);
+    if (!v || v <= 0) {
+      toast.error("সঠিক rate দিন");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key: "usd_rate", value: String(v) }, { onConflict: "key" });
+      if (error) throw error;
+      toast.success(`নতুন client-দের default rate এখন ${v} ৳`);
+      setNewClientRate("");
+      await refetchDefaultRate();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save rate");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const { data: delta = 0, isLoading, refetch } = useQuery({
     queryKey: ["global-rate-delta"],
@@ -153,6 +189,32 @@ export function GlobalRateControl() {
               disabled={busy || delta === 0}
             >
               Reset to 0
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t pt-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm">New Client Default Rate</span>
+            <Badge variant="outline" className="text-xs">
+              Current: {defaultRate || "—"} ৳
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            নতুন কোনো client onboard হলে (signup বা Google sign-in) এই rate-ই তার dashboard-এ দেখাবে।
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={newClientRate}
+              onChange={(e) => setNewClientRate(e.target.value)}
+              className="w-28 h-9"
+              placeholder={String(defaultRate || 140)}
+            />
+            <Button size="sm" onClick={saveDefaultRate} disabled={busy || newClientRate === ""}>
+              Save
             </Button>
           </div>
         </div>
