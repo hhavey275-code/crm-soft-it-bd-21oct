@@ -7,6 +7,7 @@ import { Wallet, MonitorSmartphone, TrendingUp, TrendingDown, CalendarIcon, Arro
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
+import { ClientWalletConvertAction } from "@/components/client/ClientWalletConvertAction";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
