@@ -87,11 +87,23 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
           <div className="space-y-1 text-center">
             <h2 className="text-xl font-bold">Complete your profile</h2>
             <p className="text-sm text-muted-foreground">
-              আপনার phone number এবং monthly spend দিলেই dashboard ব্যবহার করতে পারবেন।
+              আপনার business name, phone number এবং monthly spend দিলেই dashboard ব্যবহার করতে পারবেন।
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-company">Business Name</Label>
+              <Input
+                id="cp-company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Your business / company name"
+                required
+                className="h-11"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="cp-phone">Phone Number</Label>
               <Input
