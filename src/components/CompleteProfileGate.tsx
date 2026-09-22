@@ -33,6 +33,7 @@ function isBlank(value: string | null | undefined) {
  */
 export function CompleteProfileGate({ children }: { children: React.ReactNode }) {
   const { user, profile, role } = useAuth();
+  const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [monthlySpend, setMonthlySpend] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,13 +42,18 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
     !!user &&
     !!profile &&
     role === "client" &&
-    (isBlank(profile.phone) || isBlank(profile.monthly_spend));
+    (isBlank(profile.company) || isBlank(profile.phone) || isBlank(profile.monthly_spend));
 
   if (!needsInfo) return <>{children}</>;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanedCompany = company.trim();
     const cleanedPhone = phone.trim();
+    if (cleanedCompany.length < 2) {
+      toast.error("Business name দিন");
+      return;
+    }
     if (cleanedPhone.replace(/\D/g, "").length < 10) {
       toast.error("সঠিক phone number দিন (কমপক্ষে ১০ ডিজিট)");
       return;
@@ -60,7 +66,7 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ phone: cleanedPhone, monthly_spend: monthlySpend })
+        .update({ company: cleanedCompany, phone: cleanedPhone, monthly_spend: monthlySpend })
         .eq("user_id", user!.id);
       if (error) throw error;
       toast.success("ধন্যবাদ! তথ্য সংরক্ষণ হয়েছে।");
