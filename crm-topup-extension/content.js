@@ -547,6 +547,21 @@
     const doSubmit = async () => {
       say("সাবমিট করছি…");
 
+      // Snapshot the page BEFORE submitting: any "success" word already on the
+      // page (e.g. an older toast, a menu label) must not count as proof.
+      const beforeText = document.body.innerText || "";
+      const newTextSince = (base) => {
+        const now = document.body.innerText || "";
+        if (now === base) return "";
+        // crude diff: keep the lines that were not there before
+        const baseLines = new Set(base.split("\n").map((l) => l.trim()));
+        return now
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l && !baseLines.has(l))
+          .join("\n");
+      };
+
       submit.click();
 
       // Second confirmation dialog (e.g. "Are you sure you want to increase spend cap by 8?")
@@ -570,14 +585,29 @@
         await sleep(600);
       }
 
-      const ok = await waitFor(() => {
-        const t = document.body.innerText || "";
+      const ERROR_RE =
+        /(error|failed|failure|not found|invalid|insufficient|denied|unauthor|forbidden|exceed|limit reached|try again|ব্যর্থ|ত্রুটি)/i;
+      const SUCCESS_RE = /(success|successful|successfully|completed|approved|সফল)/i;
+      let crmError = null;
 
-        if (sel.successIndicator && sel.successIndicator.text && t.includes(sel.successIndicator.text)) return true;
-        return /(success|successful|successfully|completed|approved|সফল)/i.test(t) ? true : null;
-      }, 20000);
+      const ok = await waitFor(() => {
+        const fresh = newTextSince(beforeText);
+        if (!fresh) return null;
+        const errLine = fresh.split("\n").find((l) => ERROR_RE.test(l));
+        if (errLine) {
+          crmError = errLine.slice(0, 200);
+          return "error";
+        }
+        if (sel.successIndicator && sel.successIndicator.text && fresh.includes(sel.successIndicator.text)) return true;
+        return SUCCESS_RE.test(fresh) ? true : null;
+      }, 25000, 400);
+
+      if (ok === "error") {
+        await reportFailure("CRM বলছে: " + (crmError || "টপ-আপ ব্যর্থ হয়েছে।"));
+        return;
+      }
       if (!ok) {
-        await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি। CRM-এ চেক করুন।");
+        await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি — CRM কোনো success মেসেজ দেয়নি। লিমিট বাড়েনি ধরে নিন, CRM-এ চেক করুন।");
         return;
       }
       await reportServer(true);
