@@ -7,6 +7,7 @@ import { Wallet, MonitorSmartphone, TrendingUp, TrendingDown, CalendarIcon, Arro
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
+import { ClientWalletConvertAction } from "@/components/client/ClientWalletConvertAction";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -372,12 +373,14 @@ export function ClientDashboard() {
       <SecondaryWalletDebitCard
         balanceLabel={`$${clientWallets.secondaryBalance.toLocaleString()}`}
         footer={`Rate ৳${clientWallets.secondaryRate}/USD`}
+        actions={<ClientWalletConvertAction userId={user?.id} target="secondary" />}
       />
       )}
       {clientWallets.creditLineEnabled && (
       <CreditLineWalletDebitCard
         balanceLabel={`$${clientWallets.creditLineBalance.toLocaleString()}`}
         footer={`Rate ৳${clientWallets.creditLineRate}/USD`}
+        actions={<ClientWalletConvertAction userId={user?.id} target="credit_line" />}
       />
       )}
       <Card className="border-border/60 bg-card">
