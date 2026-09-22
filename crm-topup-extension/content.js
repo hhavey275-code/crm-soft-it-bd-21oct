@@ -596,13 +596,13 @@
         const errLine = fresh.split("\n").find((l) => ERROR_RE.test(l));
         if (errLine) {
           crmError = errLine.slice(0, 200);
-          return false;
+          return "error";
         }
         if (sel.successIndicator && sel.successIndicator.text && fresh.includes(sel.successIndicator.text)) return true;
         return SUCCESS_RE.test(fresh) ? true : null;
       }, 25000, 400);
 
-      if (ok === false) {
+      if (ok === "error") {
         await reportFailure("CRM বলছে: " + (crmError || "টপ-আপ ব্যর্থ হয়েছে।"));
         return;
       }
