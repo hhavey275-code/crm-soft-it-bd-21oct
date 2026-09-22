@@ -25,6 +25,7 @@ import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, R
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
+import { ClientWalletConvertAction } from "@/components/client/ClientWalletConvertAction";
 import { Switch } from "@/components/ui/switch";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -838,6 +839,7 @@ export function ClientAdAccounts() {
           <CreditLineWalletDebitCard
             balanceLabel={`$${Number(wallets.creditLineBalance ?? 0).toLocaleString()}`}
             footer={`Rate ৳${wallets.creditLineRate}/USD${creditLineDueLimit > 0 ? ` · Due limit: $${creditLineDueLimit.toLocaleString()}` : ""}`}
+            actions={<ClientWalletConvertAction userId={user?.id} target="credit_line" />}
           />
         )}
         {(wallets.secondaryEnabled || wallets.creditLineEnabled) && (
