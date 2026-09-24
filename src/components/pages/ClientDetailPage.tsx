@@ -3828,23 +3828,24 @@ export default function ClientDetailPage() {
                     <div className="space-y-2">
                       <Label>Credit To Wallet</Label>
                       <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setWithdrawWallet("primary")}
-                          className={cn(
-                            "rounded-lg border p-2.5 text-left transition-colors",
-                            withdrawWallet === "primary"
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:bg-muted/60",
-                          )}
-                        >
-                          <span className="flex items-center gap-1.5 text-xs font-medium">
-                            <Wallet className="h-3.5 w-3.5" /> Main Wallet
-                          </span>
-                          <span className="mt-0.5 block text-sm font-semibold">
-                            ${walletBalance.toLocaleString()}
-                          </span>
-                        </button>
+                         <button
+                           type="button"
+                           disabled={!wallets.mainEnabled}
+                           onClick={() => setWithdrawWallet("primary")}
+                           className={cn(
+                             "rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                             withdrawWallet === "primary"
+                               ? "border-primary bg-primary/10"
+                               : "border-border hover:bg-muted/60",
+                           )}
+                         >
+                           <span className="flex items-center gap-1.5 text-xs font-medium">
+                             <Wallet className="h-3.5 w-3.5" /> Main Wallet
+                           </span>
+                           <span className="mt-0.5 block text-sm font-semibold">
+                             ${walletBalance.toLocaleString()}
+                           </span>
+                         </button>
                         <button
                           type="button"
                           disabled={!wallets.secondaryEnabled}
