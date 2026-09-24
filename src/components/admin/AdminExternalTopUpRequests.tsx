@@ -31,6 +31,9 @@ interface Req {
   completed_at: string | null;
   rejected_at: string | null;
   last_error?: string | null;
+  spend_cap_before?: number | null;
+  spend_cap_after?: number | null;
+  limit_status?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -332,6 +335,52 @@ export function AdminExternalTopUpRequests() {
     return <Badge variant="secondary">{s}</Badge>;
   };
 
+  const markManual = async (r: Req) => {
+    const v = window.prompt(
+      `নতুন spend limit (USD) লিখুন — আগের limit: $${Number(r.spend_cap_before ?? 0).toLocaleString()}`,
+      String(Number(r.spend_cap_before ?? 0) + Number(r.amount)),
+    );
+    if (v == null) return;
+    const cap = Number(v);
+    if (!cap || cap <= 0) return toast.error("সঠিক limit দিন");
+    setBusyId(r.id);
+    const { data, error } = await (supabase as any).rpc("admin_mark_external_topup_manual", {
+      p_id: r.id, p_new_cap: cap, p_note: null,
+    });
+    setBusyId(null);
+    if (error || !data?.ok) return toast.error(error?.message || data?.error || "Failed");
+    toast.success("Manually done — client এখন নতুন limit দেখতে পাবে");
+    qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+  };
+
+  const limitInfo = (r: Req) => {
+    if (r.status === "rejected") return null;
+    const stale = r.limit_status === "pending" && Date.now() - new Date(r.created_at).getTime() > 30 * 60 * 1000;
+    const bad = r.limit_status === "not_updated" || stale;
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-1 text-xs">
+        {r.spend_cap_before != null && (
+          <span className="whitespace-nowrap">
+            ${Number(r.spend_cap_before).toLocaleString()} →{" "}
+            {r.spend_cap_after != null ? (
+              <b>${Number(r.spend_cap_after).toLocaleString()}</b>
+            ) : bad ? (
+              <span className="text-destructive">Limit বাড়েনি</span>
+            ) : (
+              <span className="text-amber-600">Updating…</span>
+            )}
+          </span>
+        )}
+        {r.limit_status === "manual" && <Badge variant="secondary" className="text-[10px]">Manual</Badge>}
+        {r.spend_cap_after == null && (
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === r.id} onClick={() => markManual(r)}>
+            Manually done
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   const renderRow = (r: Req, isPending: boolean) => {
     const a = acc(r.ad_account_id);
     const p = prof(r.user_id);
@@ -423,9 +472,12 @@ export function AdminExternalTopUpRequests() {
               </Button>
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground">
-              {r.admin_note || (r.completed_at ? format(new Date(r.completed_at), "dd MMM HH:mm") : "")}
-            </span>
+            <div className="space-y-1">
+              {limitInfo(r)}
+              <span className="block text-xs text-muted-foreground">
+                {r.admin_note || (r.completed_at ? format(new Date(r.completed_at), "dd MMM HH:mm") : "")}
+              </span>
+            </div>
           )}
         </TableCell>
       </TableRow>
@@ -456,6 +508,7 @@ export function AdminExternalTopUpRequests() {
           <div className="text-xs text-muted-foreground">
             {p?.full_name ?? "—"} · {format(new Date(r.created_at), "dd MMM HH:mm")}
           </div>
+          {!isPending && limitInfo(r)}
           {isPending && (
             <div className="flex gap-2">
               <Button
