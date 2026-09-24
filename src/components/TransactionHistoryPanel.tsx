@@ -128,27 +128,27 @@ export function TransactionHistoryPanel({
     const isFundingAdjustment = (t: any) =>
       t.type === "adjustment" &&
       /^(Converted to (Secondary|Credit Line) wallet|Received from Main wallet)/.test(String(t.description || ""));
-    const adjustmentsByKey = new Map<string, any[]>();
+    const adjustments = list.filter(isFundingAdjustment);
+    const used = new Set<string>();
     const hidden = new Set<string>();
     const funding = new Map<string, FundingFlow>();
-
-    list.forEach((tx: any) => {
-      if (!isFundingAdjustment(tx)) return;
-      const key = `${tx.user_id}|${tx.created_at}`;
-      adjustmentsByKey.set(key, [...(adjustmentsByKey.get(key) ?? []), tx]);
-    });
 
     list.forEach((tx: any) => {
       if (isFundingAdjustment(tx) || Number(tx.amount) >= 0) return;
       if (tx.wallet_kind !== "secondary" && tx.wallet_kind !== "credit_line") return;
 
       const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
-      const related = (adjustmentsByKey.get(`${tx.user_id}|${tx.created_at}`) ?? []).filter(
+      const txTime = new Date(tx.created_at).getTime();
+      const related = adjustments.filter(
         (adjustment: any) =>
-          adjustment.wallet_kind === tx.wallet_kind ||
-          (adjustment.wallet_kind === "primary" && String(adjustment.description || "").includes(target)),
+          !used.has(adjustment.id) &&
+          adjustment.user_id === tx.user_id &&
+          Math.abs(new Date(adjustment.created_at).getTime() - txTime) <= 10000 &&
+          (adjustment.wallet_kind === tx.wallet_kind ||
+            (adjustment.wallet_kind === "primary" && String(adjustment.description || "").includes(target))),
       );
       if (!related.length) return;
+      related.forEach((a: any) => used.add(a.id));
 
       let mainOut = 0;
       let mainAfter = 0;
