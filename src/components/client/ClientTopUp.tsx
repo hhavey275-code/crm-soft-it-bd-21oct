@@ -494,11 +494,15 @@ export function ClientTopUp() {
         hint: "Sheet rate",
       });
     return opts;
-  }, [usdRate, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
+  }, [usdRate, wallets.mainEnabled, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
 
   const canPickWallet = walletOptions.length > 1;
+  // Fall back to the first available wallet (e.g. credit line) when the
+  // previously picked one is not offered — e.g. main wallet is switched off.
   const effectiveTargetWallet: "primary" | "secondary" | "credit_line" =
-    walletOptions.some((o) => o.kind === targetWallet) ? targetWallet : "primary";
+    walletOptions.some((o) => o.kind === targetWallet)
+      ? targetWallet
+      : (walletOptions[0]?.kind ?? "primary");
   // Deposits straight into an extra wallet skip the main-wallet due / card-bill flow.
   const isSecondaryDeposit = effectiveTargetWallet !== "primary";
   const targetWalletLabel =
