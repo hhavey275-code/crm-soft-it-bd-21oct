@@ -43,8 +43,8 @@ export function ExternalTopUpConfigSection({ account }: Props) {
         .update({
           external_topup_required: enabled,
           external_topup_url: link,
-          external_topup_url_secondary: link,
-          external_topup_url_credit_line: link,
+          external_topup_url_secondary: null,
+          external_topup_url_credit_line: null,
           external_crm_name: enabled ? crmName.trim() || "External CRM" : null,
         })
         .eq("id", account.id);
