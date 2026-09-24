@@ -364,11 +364,13 @@ export function ClientDashboard() {
   // wrap without changing the Main → Secondary → Credit Line → Combined order.
   const walletSummary = (
     <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+      {clientWallets.mainEnabled && (
       <MainWalletDebitCard
         data-tutorial="card-wallet"
         balanceLabel={fmt(clientWallets.mainBalance)}
         footer={`Rate ৳${clientWallets.mainRate}/USD`}
       />
+      )}
       {clientWallets.secondaryEnabled && (
       <SecondaryWalletDebitCard
         balanceLabel={`$${clientWallets.secondaryBalance.toLocaleString()}`}

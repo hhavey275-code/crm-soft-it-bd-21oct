@@ -820,6 +820,7 @@ export function ClientAdAccounts() {
     <div className="space-y-4 md:space-y-6">
       {/* Wallet Hero + Metrics */}
       <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+        {wallets.mainEnabled && (
         <MainWalletDebitCard
           title="Wallet Balance"
           balanceLabel={`$${walletBalance.toLocaleString()}`}
@@ -829,6 +830,7 @@ export function ClientAdAccounts() {
               : `Rate ৳${wallets.mainRate}/USD`
           }
         />
+        )}
         {/* Secondary wallet — shown for clients who have it enabled (mobile + desktop) */}
         {wallets.secondaryEnabled && (
           <SecondaryWalletDebitCard

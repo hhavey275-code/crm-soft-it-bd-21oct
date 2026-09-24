@@ -406,8 +406,40 @@ export function CreditLineWalletToggle({ userId }: { userId: string }) {
     onError: (e: any) => toast.error(e.message ?? "Failed to save rate"),
   });
 
+  const mainToggle = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await (supabase as any)
+        .from("profiles")
+        .update({ main_wallet_enabled: enabled })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Main wallet updated");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to update"),
+  });
+
   return (
     <div className="pt-3 border-t space-y-3">
+      {wallets.creditLineEnabled && (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Main Wallet
+            </p>
+            <p className="text-xs text-muted-foreground">
+              বন্ধ থাকলে Main লুকানো থাকবে, নতুন payment Credit Line-এ জমা হবে
+            </p>
+          </div>
+          <Switch
+            checked={wallets.mainEnabled}
+            onCheckedChange={(v) => mainToggle.mutate(v)}
+            disabled={mainToggle.isPending}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
