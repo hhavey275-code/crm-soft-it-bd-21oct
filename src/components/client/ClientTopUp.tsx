@@ -473,12 +473,12 @@ export function ClientTopUp() {
     },
   });
 
-  // Wallets a client may deposit into: main always, plus each extra wallet
-  // that is switched on for this client.
+  // Wallets a client may deposit into: main (when switched on for this
+  // client), plus each extra wallet that is switched on.
   const walletOptions = useMemo(() => {
-    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [
-      { kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" },
-    ];
+    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [];
+    if (wallets.mainEnabled)
+      opts.push({ kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" });
     if (wallets.creditLineEnabled)
       opts.push({
         kind: "credit_line",
