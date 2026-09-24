@@ -322,7 +322,7 @@ export function AdminAdAccounts() {
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email, company, secondary_wallet_enabled, secondary_usd_rate" as any);
+        .select("user_id, full_name, email, company, secondary_wallet_enabled, secondary_usd_rate, main_wallet_enabled" as any);
       return (data as any[]) ?? [];
     },
   });
@@ -490,6 +490,12 @@ export function AdminAdAccounts() {
   const hasSecondaryWallet = (userId: string | null) => {
     if (!userId) return false;
     return !!clients?.find((c: any) => c.user_id === userId)?.secondary_wallet_enabled;
+  };
+
+  /** True when the client's main wallet is enabled (defaults to true). */
+  const hasMainWallet = (userId: string | null) => {
+    if (!userId) return true;
+    return clients?.find((c: any) => c.user_id === userId)?.main_wallet_enabled !== false;
   };
 
   const getSecondaryBalance = (userId: string | null) => {
