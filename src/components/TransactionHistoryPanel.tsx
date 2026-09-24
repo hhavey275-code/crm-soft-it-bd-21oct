@@ -208,6 +208,56 @@ export function TransactionHistoryPanel({
     };
   }, [transactions]);
 
+  /**
+   * Group automatic Main → Secondary/Credit Line funding rows with the top-up
+   * they paid for (same user, same timestamp) so one top-up reads as one line.
+   */
+  const { displayRows, fundingByTx } = useMemo(() => {
+    const isConv = (t: any) =>
+      t.type === "adjustment" &&
+      /^(Converted to (Secondary|Credit Line) wallet|Received from Main wallet)/.test(String(t.description || ""));
+    const hidden = new Set<string>();
+    const funding = new Map<string, { mainOut: number; walletIn: number; rate: string | null }>();
+    const byKey = new Map<string, any[]>();
+    rows.forEach((t: any) => {
+      if (!isConv(t)) return;
+      const k = `${t.user_id}|${t.created_at}`;
+      byKey.set(k, [...(byKey.get(k) ?? []), t]);
+    });
+    rows.forEach((t: any) => {
+      if (isConv(t) || Number(t.amount) >= 0) return;
+      if (t.wallet_kind !== "secondary" && t.wallet_kind !== "credit_line") return;
+      const convs = byKey.get(`${t.user_id}|${t.created_at}`);
+      if (!convs?.length) return;
+      const target = t.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
+      const mine = convs.filter(
+        (c: any) =>
+          c.wallet_kind === t.wallet_kind ||
+          (c.wallet_kind === "primary" && String(c.description).includes(target)),
+      );
+      if (!mine.length) return;
+      let mainOut = 0;
+      let walletIn = 0;
+      let rate: string | null = null;
+      mine.forEach((c: any) => {
+        hidden.add(c.id);
+        if (c.wallet_kind === "primary") mainOut += Math.abs(Number(c.amount) || 0);
+        else walletIn += Math.abs(Number(c.amount) || 0);
+        const m = String(c.description).match(/rate (?:converted )?(\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)/);
+        if (m) rate = `৳${m[1]} → ৳${m[2]}`;
+      });
+      funding.set(t.id, { mainOut, walletIn, rate });
+    });
+    return { displayRows: rows.filter((t: any) => !hidden.has(t.id)), fundingByTx: funding };
+  }, [rows]);
+
+  const fundingNote = (tx: any) => {
+    const f = fundingByTx.get(tx.id);
+    if (!f) return null;
+    const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
+    return `Main থেকে ${money(f.mainOut)} কেটে ${target}-এ ${money(f.walletIn)} এনে top-up${f.rate ? ` (rate ${f.rate})` : ""}`;
+  };
+
   const enrich = (tx: any) => {
     const linkedAccount =
       tx.reference_id && tx.type === "ad_topup"
@@ -216,7 +266,9 @@ export function TransactionHistoryPanel({
     const parts = String(tx.description || "").split("\n");
     const title = parts[0] || "—";
     const sub = parts[1] || null;
-    const extra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
+    const baseExtra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
+    const fn = fundingNote(tx);
+    const extra = [fn, baseExtra].filter(Boolean).join(" · ");
     const walletKind = (tx.wallet_kind ?? "primary") as "primary" | "secondary" | "credit_line";
     return { linkedAccount, title, sub, extra, cap: capOf(tx), walletKind };
   };
