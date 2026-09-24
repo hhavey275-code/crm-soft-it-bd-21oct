@@ -473,12 +473,12 @@ export function ClientTopUp() {
     },
   });
 
-  // Wallets a client may deposit into: main always, plus each extra wallet
-  // that is switched on for this client.
+  // Wallets a client may deposit into: main (when switched on for this
+  // client), plus each extra wallet that is switched on.
   const walletOptions = useMemo(() => {
-    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [
-      { kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" },
-    ];
+    const opts: { kind: "primary" | "secondary" | "credit_line"; label: string; rate: number; hint: string }[] = [];
+    if (wallets.mainEnabled)
+      opts.push({ kind: "primary", label: "Main wallet", rate: Number(usdRate) || 0, hint: "Due adjust + advance" });
     if (wallets.creditLineEnabled)
       opts.push({
         kind: "credit_line",
@@ -494,11 +494,15 @@ export function ClientTopUp() {
         hint: "Sheet rate",
       });
     return opts;
-  }, [usdRate, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
+  }, [usdRate, wallets.mainEnabled, wallets.creditLineEnabled, wallets.creditLineRate, wallets.secondaryEnabled, wallets.secondaryRate, secondaryDepositAllowed]);
 
   const canPickWallet = walletOptions.length > 1;
+  // Fall back to the first available wallet (e.g. credit line) when the
+  // previously picked one is not offered — e.g. main wallet is switched off.
   const effectiveTargetWallet: "primary" | "secondary" | "credit_line" =
-    walletOptions.some((o) => o.kind === targetWallet) ? targetWallet : "primary";
+    walletOptions.some((o) => o.kind === targetWallet)
+      ? targetWallet
+      : (walletOptions[0]?.kind ?? "primary");
   // Deposits straight into an extra wallet skip the main-wallet due / card-bill flow.
   const isSecondaryDeposit = effectiveTargetWallet !== "primary";
   const targetWalletLabel =
