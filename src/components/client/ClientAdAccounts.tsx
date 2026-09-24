@@ -37,6 +37,7 @@ import { ArrowDownCircle } from "lucide-react";
 import { formatBdt, useWallets } from "@/hooks/useWallets";
 import { startLimitWatch, useLimitWatches } from "@/hooks/useLimitUpdateWatch";
 import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
+import { useCrmStatus } from "@/hooks/useCrmStatus";
 
 
 const PAGE_SIZE = 20;
@@ -53,6 +54,7 @@ interface InsightsData {
 }
 
 export function ClientAdAccounts() {
+  const { pausedFor: crmPausedFor } = useCrmStatus();
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const wallets = useWallets(user?.id);
@@ -1106,6 +1108,10 @@ export function ClientAdAccounts() {
                           <Button size="sm" variant="outline" className="flex-1 text-xs h-8" disabled>
                             Admin Top-Up Only
                           </Button>
+                        ) : a.external_topup_required && crmPausedFor(a.external_crm_name) ? (
+                          <div className="flex-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                            {crmPausedFor(a.external_crm_name)?.message || "Top-up সাময়িকভাবে বন্ধ আছে"}
+                          </div>
                         ) : a.external_topup_required ? (
                           <>
                             {a.external_topup_url && (
@@ -1321,6 +1327,10 @@ export function ClientAdAccounts() {
                               <LockIcon className="h-4 w-4 mr-1" />
                               Admin Only
                             </Button>
+                          ) : a.external_topup_required && crmPausedFor(a.external_crm_name) ? (
+                            <span className="text-xs text-amber-600" title={crmPausedFor(a.external_crm_name)?.message || ""}>
+                              Top-up সাময়িক বন্ধ
+                            </span>
                           ) : a.external_topup_required ? (
                             <>
                               {a.external_topup_url && (

@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
@@ -36,7 +38,15 @@ function ExpandableText({ text, limit = 60 }: { text: string; limit?: number }) 
   );
 }
 
-function capOf(tx: any): { old: number; next: number } | null {
+type Cap = { old: number; next: number | null; status?: string };
+function capOf(tx: any): Cap | null {
+  if (tx.limit_status && tx.old_spend_cap != null) {
+    return {
+      old: Number(tx.old_spend_cap),
+      next: tx.new_spend_cap != null ? Number(tx.new_spend_cap) : null,
+      status: tx.limit_status,
+    };
+  }
   if (tx.old_spend_cap != null && tx.new_spend_cap != null) {
     return { old: Number(tx.old_spend_cap), next: Number(tx.new_spend_cap) };
   }
@@ -52,12 +62,48 @@ const money = (n: number) =>
   `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
 export function TransactionHistoryPanel({
-  transactions,
+  transactions: rawTransactions,
   adAccounts,
   resolveProcessedBy,
   secondaryEnabled = false,
   isMobile = false,
 }: TransactionHistoryPanelProps) {
+  const extIds = useMemo(
+    () =>
+      [...new Set((rawTransactions ?? [])
+        .filter((t: any) => t.type === "external_topup" && t.reference_id)
+        .map((t: any) => t.reference_id as string))],
+    [rawTransactions],
+  );
+  const { data: extReqs = [] } = useQuery({
+    queryKey: ["ext-topup-limits", extIds.join(",")],
+    enabled: extIds.length > 0,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("external_topup_requests")
+        .select("id, spend_cap_before, spend_cap_after, limit_status")
+        .in("id", extIds);
+      return (data ?? []) as any[];
+    },
+  });
+  const transactions = useMemo(() => {
+    if (!extReqs.length) return rawTransactions;
+    const m = new Map(extReqs.map((r: any) => [r.id, r]));
+    return (rawTransactions ?? []).map((t: any) => {
+      const r: any = t.type === "external_topup" ? m.get(t.reference_id) : null;
+      if (!r) return t;
+      return {
+        ...t,
+        limit_status:
+          r.limit_status === "pending" && Date.now() - new Date(t.created_at).getTime() > 30 * 60 * 1000
+            ? "not_updated"
+            : r.limit_status,
+        old_spend_cap: r.spend_cap_before,
+        new_spend_cap: r.spend_cap_after,
+      };
+    });
+  }, [rawTransactions, extReqs]);
   const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary" | "credit_line">("all");
   const [month, setMonth] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
@@ -319,12 +365,21 @@ export function TransactionHistoryPanel({
     </div>
   );
 
-  const capCell = (cap: { old: number; next: number } | null) =>
+  const capCell = (cap: Cap | null) =>
     cap ? (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold">
+      <span className="inline-flex flex-wrap items-center gap-1.5 whitespace-nowrap text-sm font-bold">
         <span className="text-muted-foreground">{money(cap.old)}</span>
         <ArrowRight className="h-4 w-4 text-primary" />
-        <span className="text-foreground">{money(cap.next)}</span>
+        {cap.next != null ? (
+          <span className="text-foreground">{money(cap.next)}</span>
+        ) : cap.status === "not_updated" ? (
+          <span className="text-xs text-destructive">Limit বাড়েনি</span>
+        ) : (
+          <span className="text-xs text-amber-600 animate-pulse">Updating…</span>
+        )}
+        {cap.status === "manual" && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Admin দ্বারা সম্পন্ন</span>
+        )}
       </span>
     ) : (
       <span className="text-muted-foreground">—</span>
