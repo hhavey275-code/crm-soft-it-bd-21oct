@@ -8,7 +8,7 @@
    - **Normal account, no external link:** it works as it does now. If the client's Secondary wallet is on, the admin still sees two Top Up buttons (Main and Secondary).
 3. **One-time sorting of every external CRM account:**
    - **Credit Line wallet is on:** the link goes in the Credit Line box and the Main box is emptied. The Secondary wallet stays as it is, since it is used for other work.
-   - **Secondary wallet is on, Credit Line is off:** Credit Line is turned on with the Secondary rate and due limit, and the link goes in the Credit Line box. Secondary is then turned off and its balance (even if negative) moves to Credit Line.
+   - **Secondary wallet was connected to an external CRM, Credit Line is off:** Credit Line is turned on with the Secondary rate and due limit, and the link goes in the Credit Line box. Secondary is then turned off and its balance (even if negative) moves to Credit Line. A Secondary wallet counts as connected if the account had a link in the Secondary box or past external top-ups came from Secondary. Secondary wallets that were never connected to an external CRM are not touched.
    - **Only Main is on:** the link goes in the Main box.
 4. Each balance move is recorded in both wallets' transaction history as "Secondary → Credit Line shift".
 
