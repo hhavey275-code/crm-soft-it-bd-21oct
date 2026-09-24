@@ -141,6 +141,7 @@ export function ClientWallet() {
       <h1 className="text-xl md:text-2xl font-bold">Wallet</h1>
 
       {/* Wallet Balance Card — same debit-card design on mobile and desktop */}
+      {wallets.mainEnabled && (
       <MainWalletDebitCard
         data-tutorial="wallet-balance"
         title={extraWalletOn ? "Main Wallet" : "Available Balance"}
@@ -148,6 +149,7 @@ export function ClientWallet() {
         footer={wallets.mainRate > 0 ? `${wallets.currency} · Rate ৳${wallets.mainRate}/USD` : wallets.currency}
         className="sm:max-w-md"
       />
+      )}
 
       {/* Extra wallets (each has its own per-client toggle) */}
       {extraWalletOn && (
