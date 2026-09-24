@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
@@ -52,12 +54,45 @@ const money = (n: number) =>
   `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
 export function TransactionHistoryPanel({
-  transactions,
+  transactions: rawTransactions,
   adAccounts,
   resolveProcessedBy,
   secondaryEnabled = false,
   isMobile = false,
 }: TransactionHistoryPanelProps) {
+  const extIds = useMemo(
+    () =>
+      [...new Set((rawTransactions ?? [])
+        .filter((t: any) => t.type === "external_topup" && t.reference_id)
+        .map((t: any) => t.reference_id as string))],
+    [rawTransactions],
+  );
+  const { data: extReqs = [] } = useQuery({
+    queryKey: ["ext-topup-limits", extIds.join(",")],
+    enabled: extIds.length > 0,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("external_topup_requests")
+        .select("id, spend_cap_before, spend_cap_after, limit_status")
+        .in("id", extIds);
+      return (data ?? []) as any[];
+    },
+  });
+  const transactions = useMemo(() => {
+    if (!extReqs.length) return rawTransactions;
+    const m = new Map(extReqs.map((r: any) => [r.id, r]));
+    return (rawTransactions ?? []).map((t: any) => {
+      const r: any = t.type === "external_topup" ? m.get(t.reference_id) : null;
+      if (!r) return t;
+      return {
+        ...t,
+        limit_status: r.limit_status,
+        old_spend_cap: r.spend_cap_before,
+        new_spend_cap: r.spend_cap_after,
+      };
+    });
+  }, [rawTransactions, extReqs]);
   const [walletTab, setWalletTab] = useState<"all" | "primary" | "secondary" | "credit_line">("all");
   const [month, setMonth] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
