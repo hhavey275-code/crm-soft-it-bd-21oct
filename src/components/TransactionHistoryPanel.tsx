@@ -82,7 +82,7 @@ export function TransactionHistoryPanel({
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("external_topup_requests")
-        .select("id, spend_cap_before, spend_cap_after, limit_status")
+        .select("id, ad_account_id, spend_cap_before, spend_cap_after, limit_status")
         .in("id", extIds);
       return (data ?? []) as any[];
     },
@@ -101,6 +101,7 @@ export function TransactionHistoryPanel({
             : r.limit_status,
         old_spend_cap: r.spend_cap_before,
         new_spend_cap: r.spend_cap_after,
+        ext_ad_account_id: r.ad_account_id,
       };
     });
   }, [rawTransactions, extReqs]);
@@ -111,11 +112,14 @@ export function TransactionHistoryPanel({
   const [dateTo, setDateTo] = useState<string>("");
 
   const accountNameOf = (tx: any) => {
-    const linked =
-      tx.reference_id && tx.type === "ad_topup"
-        ? adAccounts?.find((a: any) => a.id === tx.reference_id)
-        : null;
-    return linked?.account_name || String(tx.description || "").split("\n")[0] || "—";
+    const refId = tx.ext_ad_account_id || tx.reference_id;
+    const linked = refId ? adAccounts?.find((a: any) => a.id === refId) : null;
+    if (linked?.account_name) return linked.account_name;
+    const desc = String(tx.description || "");
+    const byName = adAccounts?.find(
+      (a: any) => (a.account_name && desc.includes(a.account_name)) || (a.account_id && desc.includes(a.account_id)),
+    );
+    return byName?.account_name || String(tx.description || "").split("\n")[0] || "—";
   };
 
   const walletFiltered = useMemo(() => {
