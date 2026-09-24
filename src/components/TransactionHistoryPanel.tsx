@@ -111,6 +111,77 @@ export function TransactionHistoryPanel({
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
 
+  type FundingFlow = {
+    mainOut: number;
+    mainAfter: number;
+    walletIn: number;
+    walletAfter: number;
+    rate: string | null;
+  };
+
+  /**
+   * Keep the ledger entries intact, but present automatic funding and its
+   * resulting top-up as one event. Matching uses the shared server timestamp.
+   */
+  const { groupedTransactions, fundingByTx } = useMemo(() => {
+    const list = transactions ?? [];
+    const isFundingAdjustment = (t: any) =>
+      t.type === "adjustment" &&
+      /^(Converted to (Secondary|Credit Line) wallet|Received from Main wallet)/.test(String(t.description || ""));
+    const adjustmentsByKey = new Map<string, any[]>();
+    const hidden = new Set<string>();
+    const funding = new Map<string, FundingFlow>();
+
+    list.forEach((tx: any) => {
+      if (!isFundingAdjustment(tx)) return;
+      const key = `${tx.user_id}|${tx.created_at}`;
+      adjustmentsByKey.set(key, [...(adjustmentsByKey.get(key) ?? []), tx]);
+    });
+
+    list.forEach((tx: any) => {
+      if (isFundingAdjustment(tx) || Number(tx.amount) >= 0) return;
+      if (tx.wallet_kind !== "secondary" && tx.wallet_kind !== "credit_line") return;
+
+      const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
+      const related = (adjustmentsByKey.get(`${tx.user_id}|${tx.created_at}`) ?? []).filter(
+        (adjustment: any) =>
+          adjustment.wallet_kind === tx.wallet_kind ||
+          (adjustment.wallet_kind === "primary" && String(adjustment.description || "").includes(target)),
+      );
+      if (!related.length) return;
+
+      let mainOut = 0;
+      let mainAfter = 0;
+      let walletIn = 0;
+      let walletAfter = 0;
+      let rate: string | null = null;
+
+      related.forEach((adjustment: any) => {
+        hidden.add(adjustment.id);
+        const amount = Number(adjustment.amount) || 0;
+        const balanceAfter = Number(adjustment.balance_after) || 0;
+        if (adjustment.wallet_kind === "primary") {
+          mainOut += Math.abs(amount);
+          mainAfter = balanceAfter;
+        } else {
+          walletIn += Math.abs(amount);
+          walletAfter = balanceAfter;
+        }
+        const match = String(adjustment.description || "").match(
+          /rate (?:converted )?(\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)/,
+        );
+        if (match) rate = `৳${match[1]} → ৳${match[2]}`;
+      });
+
+      funding.set(tx.id, { mainOut, mainAfter, walletIn, walletAfter, rate });
+    });
+
+    return {
+      groupedTransactions: list.filter((tx: any) => !hidden.has(tx.id)),
+      fundingByTx: funding,
+    };
+  }, [transactions]);
+
   const accountNameOf = (tx: any) => {
     const refId = tx.ext_ad_account_id || tx.reference_id;
     const linked = refId ? adAccounts?.find((a: any) => a.id === refId) : null;
@@ -123,10 +194,10 @@ export function TransactionHistoryPanel({
   };
 
   const walletFiltered = useMemo(() => {
-    const list = transactions ?? [];
+    const list = groupedTransactions;
     if (walletTab === "all") return list;
     return list.filter((tx: any) => (tx.wallet_kind ?? "primary") === walletTab);
-  }, [transactions, walletTab]);
+  }, [groupedTransactions, walletTab]);
 
   const months = useMemo(() => {
     const set = new Map<string, string>();
@@ -199,64 +270,14 @@ export function TransactionHistoryPanel({
 
 
   const counts = useMemo(() => {
-    const list = transactions ?? [];
+    const list = groupedTransactions;
     return {
       all: list.length,
       primary: list.filter((t: any) => (t.wallet_kind ?? "primary") === "primary").length,
       secondary: list.filter((t: any) => t.wallet_kind === "secondary").length,
       creditLine: list.filter((t: any) => t.wallet_kind === "credit_line").length,
     };
-  }, [transactions]);
-
-  /**
-   * Group automatic Main → Secondary/Credit Line funding rows with the top-up
-   * they paid for (same user, same timestamp) so one top-up reads as one line.
-   */
-  const { displayRows, fundingByTx } = useMemo(() => {
-    const isConv = (t: any) =>
-      t.type === "adjustment" &&
-      /^(Converted to (Secondary|Credit Line) wallet|Received from Main wallet)/.test(String(t.description || ""));
-    const hidden = new Set<string>();
-    const funding = new Map<string, { mainOut: number; walletIn: number; rate: string | null }>();
-    const byKey = new Map<string, any[]>();
-    rows.forEach((t: any) => {
-      if (!isConv(t)) return;
-      const k = `${t.user_id}|${t.created_at}`;
-      byKey.set(k, [...(byKey.get(k) ?? []), t]);
-    });
-    rows.forEach((t: any) => {
-      if (isConv(t) || Number(t.amount) >= 0) return;
-      if (t.wallet_kind !== "secondary" && t.wallet_kind !== "credit_line") return;
-      const convs = byKey.get(`${t.user_id}|${t.created_at}`);
-      if (!convs?.length) return;
-      const target = t.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
-      const mine = convs.filter(
-        (c: any) =>
-          c.wallet_kind === t.wallet_kind ||
-          (c.wallet_kind === "primary" && String(c.description).includes(target)),
-      );
-      if (!mine.length) return;
-      let mainOut = 0;
-      let walletIn = 0;
-      let rate: string | null = null;
-      mine.forEach((c: any) => {
-        hidden.add(c.id);
-        if (c.wallet_kind === "primary") mainOut += Math.abs(Number(c.amount) || 0);
-        else walletIn += Math.abs(Number(c.amount) || 0);
-        const m = String(c.description).match(/rate (?:converted )?(\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)/);
-        if (m) rate = `৳${m[1]} → ৳${m[2]}`;
-      });
-      funding.set(t.id, { mainOut, walletIn, rate });
-    });
-    return { displayRows: rows.filter((t: any) => !hidden.has(t.id)), fundingByTx: funding };
-  }, [rows]);
-
-  const fundingNote = (tx: any) => {
-    const f = fundingByTx.get(tx.id);
-    if (!f) return null;
-    const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
-    return `Main থেকে ${money(f.mainOut)} কেটে ${target}-এ ${money(f.walletIn)} এনে top-up${f.rate ? ` (rate ${f.rate})` : ""}`;
-  };
+  }, [groupedTransactions]);
 
   const enrich = (tx: any) => {
     const linkedAccount =
@@ -267,10 +288,38 @@ export function TransactionHistoryPanel({
     const title = parts[0] || "—";
     const sub = parts[1] || null;
     const baseExtra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
-    const fn = fundingNote(tx);
-    const extra = [fn, baseExtra].filter(Boolean).join(" · ");
+    const extra = baseExtra;
     const walletKind = (tx.wallet_kind ?? "primary") as "primary" | "secondary" | "credit_line";
     return { linkedAccount, title, sub, extra, cap: capOf(tx), walletKind };
+  };
+
+  const paymentFlow = (tx: any) => {
+    const flow = fundingByTx.get(tx.id);
+    if (!flow) return null;
+    const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
+    const topupAmount = Math.abs(Number(tx.amount) || 0);
+    const topupAfter = Number(tx.balance_after) || 0;
+    const mainBefore = flow.mainAfter + flow.mainOut;
+    const walletBeforeFunding = flow.walletAfter - flow.walletIn;
+    const topupBefore = topupAfter + topupAmount;
+
+    return (
+      <div className="mt-1.5 space-y-0.5 border-l-2 border-border pl-2 text-[11px] leading-relaxed text-muted-foreground">
+        <div>
+          <span className="font-semibold text-foreground">Main Wallet:</span> {money(mainBefore)} → {money(flow.mainAfter)}
+          <span className="font-semibold text-destructive"> (-{money(flow.mainOut)})</span>
+        </div>
+        <div>
+          <span className="font-semibold text-foreground">{target}:</span> {money(walletBeforeFunding)} → {money(flow.walletAfter)}
+          <span className="font-semibold text-emerald-600"> (+{money(flow.walletIn)} converted)</span>
+          {flow.rate ? <span> · rate {flow.rate}</span> : null}
+        </div>
+        <div>
+          <span className="font-semibold text-foreground">Top-up:</span> {target} {money(topupBefore)} → {money(topupAfter)}
+          <span className="font-semibold text-destructive"> (-{money(topupAmount)})</span>
+        </div>
+      </div>
+    );
   };
 
   const filters = (
@@ -519,6 +568,7 @@ export function TransactionHistoryPanel({
                         <ExpandableText text={extra} limit={50} />
                       </p>
                     )}
+                    {paymentFlow(tx)}
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
                       <span>{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</span>
                       <span>
@@ -607,6 +657,7 @@ export function TransactionHistoryPanel({
                           <ExpandableText text={extra} limit={60} />
                         </span>
                       )}
+                      {paymentFlow(tx)}
                     </TableCell>
                     <TableCell className="py-2.5">{capCell(cap)}</TableCell>
                     <TableCell
