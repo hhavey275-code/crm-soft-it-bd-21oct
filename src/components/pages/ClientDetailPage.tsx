@@ -1277,12 +1277,14 @@ export default function ClientDetailPage() {
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {/* Main Wallet — keep the same debit-card view used everywhere else */}
-              <MainWalletDebitCard
-                title="Wallet Balance"
-                balanceLabel={`$${walletBalance.toLocaleString()}`}
-                footer={wallet?.currency ?? "USD"}
-                actions={<WalletQuickActions userId={userId} kind="primary" inline />}
-              />
+              {wallets.mainEnabled && (
+                <MainWalletDebitCard
+                  title="Wallet Balance"
+                  balanceLabel={`$${walletBalance.toLocaleString()}`}
+                  footer={wallet?.currency ?? "USD"}
+                  actions={<WalletQuickActions userId={userId} kind="primary" inline />}
+                />
+              )}
 
               {/* Secondary Wallet — Chime-style green card (only when enabled) */}
               {wallets.secondaryEnabled && (
@@ -2557,34 +2559,36 @@ export default function ClientDetailPage() {
 
 
                   {/* Wallet Balance */}
-                  <MainWalletDebitCard
-                    title="Wallet Balance"
-                    balanceLabel={`$${walletBalance.toLocaleString()}`}
-                    actions={
-                      <div className="flex items-center gap-1">
-                        <button
-                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
-                          onClick={() => {
-                            setWalletDialogType("credit");
-                            setWalletAmount("");
-                            setWalletNote("");
-                          }}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
-                          onClick={() => {
-                            setWalletDialogType("debit");
-                            setWalletAmount("");
-                            setWalletNote("");
-                          }}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                      </div>
-                    }
-                  />
+                  {wallets.mainEnabled && (
+                    <MainWalletDebitCard
+                      title="Wallet Balance"
+                      balanceLabel={`$${walletBalance.toLocaleString()}`}
+                      actions={
+                        <div className="flex items-center gap-1">
+                          <button
+                            className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                            onClick={() => {
+                              setWalletDialogType("credit");
+                              setWalletAmount("");
+                              setWalletNote("");
+                            }}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                          <button
+                            className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                            onClick={() => {
+                              setWalletDialogType("debit");
+                              setWalletAmount("");
+                              setWalletNote("");
+                            }}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                        </div>
+                      }
+                    />
+                  )}
 
                   {/* Extra wallets use the same debit-card design on desktop and mobile. */}
                   {wallets.secondaryEnabled && (
