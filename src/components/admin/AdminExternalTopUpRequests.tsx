@@ -338,21 +338,29 @@ export function AdminExternalTopUpRequests() {
   };
 
   const markManual = async (r: Req) => {
-    const v = window.prompt(
-      `নতুন spend limit (USD) লিখুন — আগের limit: $${Number(r.spend_cap_before ?? 0).toLocaleString()}`,
-      String(Number(r.spend_cap_before ?? 0) + Number(r.amount)),
-    );
-    if (v == null) return;
-    const cap = Number(v);
-    if (!cap || cap <= 0) return toast.error("সঠিক limit দিন");
     setBusyId(r.id);
-    const { data, error } = await (supabase as any).rpc("admin_mark_external_topup_manual", {
-      p_id: r.id, p_new_cap: cap, p_note: null,
-    });
-    setBusyId(null);
-    if (error || !data?.ok) return toast.error(error?.message || data?.error || "Failed");
-    toast.success("Manually done — client এখন নতুন limit দেখতে পাবে");
-    qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    try {
+      // Pull this account fresh from Meta, then verify the limit actually increased.
+      await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: [r.ad_account_id], source: "meta" },
+      }).catch(() => null);
+      const { data: accRow } = await (supabase as any)
+        .from("ad_accounts").select("spend_cap").eq("id", r.ad_account_id).maybeSingle();
+      const cap = Number(accRow?.spend_cap ?? 0);
+      const before = Number(r.spend_cap_before ?? 0);
+      if (!(cap > before + 0.01)) {
+        toast.error(`Meta-তে limit এখনো বাড়েনি (এখন $${cap.toLocaleString()}, আগে $${before.toLocaleString()})। একটু পরে আবার চেষ্টা করুন।`);
+        return;
+      }
+      const { data, error } = await (supabase as any).rpc("admin_mark_external_topup_manual", {
+        p_id: r.id, p_new_cap: cap, p_note: null,
+      });
+      if (error || !data?.ok) { toast.error(error?.message || data?.error || "Failed"); return; }
+      toast.success(`Completed — $${before.toLocaleString()} → $${cap.toLocaleString()}`);
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const limitInfo = (r: Req) => {
