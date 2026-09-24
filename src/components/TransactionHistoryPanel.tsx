@@ -216,7 +216,9 @@ export function TransactionHistoryPanel({
     const parts = String(tx.description || "").split("\n");
     const title = parts[0] || "—";
     const sub = parts[1] || null;
-    const extra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
+    const baseExtra = parts.slice(2).filter((p) => !p.trim().startsWith("Cap:")).join(" ");
+    const fn = fundingNote(tx);
+    const extra = [fn, baseExtra].filter(Boolean).join(" · ");
     const walletKind = (tx.wallet_kind ?? "primary") as "primary" | "secondary" | "credit_line";
     return { linkedAccount, title, sub, extra, cap: capOf(tx), walletKind };
   };
