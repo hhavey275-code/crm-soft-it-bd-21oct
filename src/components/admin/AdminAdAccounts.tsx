@@ -1112,14 +1112,16 @@ export function AdminAdAccounts() {
                         </>
                       ) : (
                         <>
-                          <Button
-                            size="sm"
-                            className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                            onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }}
-                          >
-                            <ArrowUpCircle className="h-3.5 w-3.5" />
-                            Top Up
-                          </Button>
+                           {hasMainWallet(uid) && (
+                             <Button
+                               size="sm"
+                               className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                               onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }}
+                             >
+                               <ArrowUpCircle className="h-3.5 w-3.5" />
+                               Top Up
+                             </Button>
+                           )}
                           {hasSecondaryWallet(uid) && (
                             <Button
                               size="icon"
@@ -1602,7 +1604,7 @@ export function AdminAdAccounts() {
                         </button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Withdrawn balance <span className="font-medium">{withdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}</span> e joma hobe.
+                        Withdrawn balance <span className="font-medium">{effectiveWithdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}</span> e joma hobe.
                       </p>
                     </div>
                   ) : (
