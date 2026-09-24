@@ -10,6 +10,7 @@ export interface WalletsInfo {
   mainRate: number;
   secondaryRate: number;
   creditLineRate: number;
+  mainEnabled: boolean;
   secondaryEnabled: boolean;
   creditLineEnabled: boolean;
   /** Combined BDT value of every enabled wallet (positive = advance, negative = due) */
@@ -47,7 +48,7 @@ export function useWallets(userId?: string | null): WalletsInfo {
         supabase
           .from("profiles")
           .select(
-            "usd_rate, secondary_usd_rate, secondary_wallet_enabled, credit_line_usd_rate, credit_line_wallet_enabled"
+            "usd_rate, main_wallet_enabled, secondary_usd_rate, secondary_wallet_enabled, credit_line_usd_rate, credit_line_wallet_enabled"
           )
           .eq("user_id", userId!)
           .maybeSingle(),
@@ -72,6 +73,7 @@ export function useWallets(userId?: string | null): WalletsInfo {
         mainRate,
         secondaryRate,
         creditLineRate,
+        mainEnabled: profile?.main_wallet_enabled !== false || !profile?.credit_line_wallet_enabled,
         secondaryEnabled: !!profile?.secondary_wallet_enabled,
         creditLineEnabled: !!profile?.credit_line_wallet_enabled,
       };
@@ -84,6 +86,7 @@ export function useWallets(userId?: string | null): WalletsInfo {
   const mainRate = data?.mainRate ?? 0;
   const secondaryRate = data?.secondaryRate ?? 0;
   const creditLineRate = data?.creditLineRate ?? 0;
+  const mainEnabled = data?.mainEnabled ?? true;
   const secondaryEnabled = data?.secondaryEnabled ?? false;
   const creditLineEnabled = data?.creditLineEnabled ?? false;
 
@@ -94,6 +97,7 @@ export function useWallets(userId?: string | null): WalletsInfo {
     mainRate,
     secondaryRate,
     creditLineRate,
+    mainEnabled,
     secondaryEnabled,
     creditLineEnabled,
     totalBdt:
