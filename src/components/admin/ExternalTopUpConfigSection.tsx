@@ -26,30 +26,26 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const [enabled, setEnabled] = useState(!!account.external_topup_required);
   const [crmName, setCrmName] = useState(account.external_crm_name || "");
   const [url, setUrl] = useState(account.external_topup_url || "");
-  const [urlSecondary, setUrlSecondary] = useState(account.external_topup_url_secondary || "");
-  const [urlCreditLine, setUrlCreditLine] = useState(account.external_topup_url_credit_line || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnabled(!!account.external_topup_required);
     setCrmName(account.external_crm_name || "");
     setUrl(account.external_topup_url || "");
-    setUrlSecondary(account.external_topup_url_secondary || "");
-    setUrlCreditLine(account.external_topup_url_credit_line || "");
-  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url, account.external_topup_url_secondary, account.external_topup_url_credit_line]);
+  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (enabled && !url.trim() && !urlSecondary.trim() && !urlCreditLine.trim())
-        throw new Error("Add at least one CRM URL (main, secondary or credit line)");
+      if (enabled && !url.trim()) throw new Error("CRM URL দিন");
+      const link = enabled ? url.trim() || null : null;
       const { error } = await (supabase as any)
         .from("ad_accounts")
         .update({
           external_topup_required: enabled,
-          external_topup_url: enabled ? (url.trim() || null) : null,
-          external_topup_url_secondary: enabled ? (urlSecondary.trim() || null) : null,
-          external_topup_url_credit_line: enabled ? (urlCreditLine.trim() || null) : null,
-          external_crm_name: enabled ? (crmName.trim() || "External CRM") : null,
+          external_topup_url: link,
+          external_topup_url_secondary: link,
+          external_topup_url_credit_line: link,
+          external_crm_name: enabled ? crmName.trim() || "External CRM" : null,
         })
         .eq("id", account.id);
       if (error) throw error;
@@ -65,9 +61,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const dirty =
     enabled !== !!account.external_topup_required ||
     crmName !== (account.external_crm_name || "") ||
-    url !== (account.external_topup_url || "") ||
-    urlSecondary !== (account.external_topup_url_secondary || "") ||
-    urlCreditLine !== (account.external_topup_url_credit_line || "");
+    url !== (account.external_topup_url || "");
 
   return (
     <Card>
@@ -92,11 +86,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
           <div className="space-y-3 border-t pt-3">
             <div>
               <Label className="text-xs">External CRM Name</Label>
-              <Input
-                placeholder="e.g. Partner CRM"
-                value={crmName}
-                onChange={(e) => setCrmName(e.target.value)}
-              />
+              <Input placeholder="e.g. SIBD" value={crmName} onChange={(e) => setCrmName(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs">External CRM Top-Up URL</Label>
@@ -107,42 +97,13 @@ export function ExternalTopUpConfigSection({ account }: Props) {
                 onChange={(e) => setUrl(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Direct link to the top-up page in the partner CRM (used for main wallet top-ups).
-              </p>
-            </div>
-            <div>
-              <Label className="text-xs">Secondary Wallet Top-Up URL (optional)</Label>
-              <Input
-                type="url"
-                placeholder="https://partner-crm.example.com/topup-secondary"
-                value={urlSecondary}
-                onChange={(e) => setUrlSecondary(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Used when topping up from the client's secondary wallet. Leave empty to reuse the main URL.
-              </p>
-            </div>
-            <div>
-              <Label className="text-xs">Credit Line Wallet Top-Up URL (optional)</Label>
-              <Input
-                type="url"
-                placeholder="https://partner-crm.example.com/topup-credit-line"
-                value={urlCreditLine}
-                onChange={(e) => setUrlCreditLine(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Used when topping up from the client's credit line wallet. Leave empty to reuse the main URL.
+                এই একটাই লিংক Main, Secondary ও Credit Line — তিনটা wallet-এর top-up-এই ব্যবহার হবে।
               </p>
             </div>
           </div>
         )}
 
-        <Button
-          onClick={() => setConfirmOpen(true)}
-          disabled={!dirty || saveMutation.isPending}
-          size="sm"
-          className="w-full"
-        >
+        <Button onClick={() => setConfirmOpen(true)} disabled={!dirty || saveMutation.isPending} size="sm" className="w-full">
           {saveMutation.isPending ? "Saving..." : "Save"}
         </Button>
       </CardContent>
@@ -151,9 +112,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Confirm external CRM settings"
-        description={
-          <>Save these external CRM settings for this ad account? This will affect how top-ups are processed.</>
-        }
+        description={<>Save these external CRM settings for this ad account? This will affect how top-ups are processed.</>}
         actionLabel="Save"
         onConfirm={() => saveMutation.mutate()}
       />
