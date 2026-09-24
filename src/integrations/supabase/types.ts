@@ -2346,6 +2346,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          main_wallet_enabled: boolean
           meta_user_token: string | null
           meta_user_token_expires_at: string | null
           monthly_spend: string | null
@@ -2392,6 +2393,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          main_wallet_enabled?: boolean
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null
@@ -2438,6 +2440,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          main_wallet_enabled?: boolean
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null
