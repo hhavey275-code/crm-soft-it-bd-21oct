@@ -290,7 +290,7 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       const amt = parseFloat(withdrawAmount);
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: topUpAccount.id, amount: amt, wallet_kind: withdrawWallet },
+        body: { ad_account_id: topUpAccount.id, amount: amt, wallet_kind: effectiveWithdrawWallet },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -322,7 +322,7 @@ export function AdminAdAccounts() {
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email, company, secondary_wallet_enabled, secondary_usd_rate" as any);
+        .select("user_id, full_name, email, company, secondary_wallet_enabled, secondary_usd_rate, main_wallet_enabled" as any);
       return (data as any[]) ?? [];
     },
   });
@@ -490,6 +490,12 @@ export function AdminAdAccounts() {
   const hasSecondaryWallet = (userId: string | null) => {
     if (!userId) return false;
     return !!clients?.find((c: any) => c.user_id === userId)?.secondary_wallet_enabled;
+  };
+
+  /** True when the client's main wallet is enabled (defaults to true). */
+  const hasMainWallet = (userId: string | null) => {
+    if (!userId) return true;
+    return clients?.find((c: any) => c.user_id === userId)?.main_wallet_enabled !== false;
   };
 
   const getSecondaryBalance = (userId: string | null) => {
@@ -676,6 +682,8 @@ export function AdminAdAccounts() {
   const clientBalance = Number(assignedWallet?.balance ?? 0);
   const assignedSecondaryEnabled = hasSecondaryWallet(assignedUserId);
   const assignedSecondaryBalance = getSecondaryBalance(assignedUserId);
+  const assignedMainEnabled = hasMainWallet(assignedUserId);
+  const effectiveWithdrawWallet = assignedMainEnabled ? withdrawWallet : "secondary";
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const willGoNegative = topUpWallet === "secondary"
     ? parsedAmount > assignedSecondaryBalance
@@ -1104,14 +1112,16 @@ export function AdminAdAccounts() {
                         </>
                       ) : (
                         <>
-                          <Button
-                            size="sm"
-                            className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                            onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }}
-                          >
-                            <ArrowUpCircle className="h-3.5 w-3.5" />
-                            Top Up
-                          </Button>
+                           {hasMainWallet(uid) && (
+                             <Button
+                               size="sm"
+                               className="gap-1 bg-gradient-to-r from-primary to-primary/75 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                               onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }}
+                             >
+                               <ArrowUpCircle className="h-3.5 w-3.5" />
+                               Top Up
+                             </Button>
+                           )}
                           {hasSecondaryWallet(uid) && (
                             <Button
                               size="icon"
@@ -1405,9 +1415,11 @@ export function AdminAdAccounts() {
                           </>
                         ) : (
                           <>
-                            <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
-                              <ArrowUpCircle className="h-4 w-4" />
-                            </Button>
+                             {hasMainWallet(getAssignedUserId(a.id)) && (
+                               <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
+                                 <ArrowUpCircle className="h-4 w-4" />
+                               </Button>
+                             )}
                             {hasSecondaryWallet(getAssignedUserId(a.id)) && (
                               <Button
                                 size="icon"
@@ -1500,10 +1512,12 @@ export function AdminAdAccounts() {
                     <span className="text-muted-foreground">Assigned Client</span>
                     <span className="font-medium">{assignedClientName}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Main Wallet Balance</span>
-                    <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
-                  </div>
+                  {assignedMainEnabled && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Main Wallet Balance</span>
+                      <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
+                    </div>
+                  )}
                   {assignedSecondaryEnabled && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400"><Wallet className="h-4 w-4" /> Secondary Wallet</span>
@@ -1574,8 +1588,9 @@ export function AdminAdAccounts() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
+                          disabled={!assignedMainEnabled}
                           onClick={() => setWithdrawWallet("primary")}
-                          className={`rounded-lg border p-2.5 text-left transition-colors ${withdrawWallet === "primary" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/60"}`}
+                          className={`rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${withdrawWallet === "primary" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/60"}`}
                         >
                           <span className="flex items-center gap-1.5 text-xs font-medium"><Wallet className="h-3.5 w-3.5" /> Main Wallet</span>
                           <span className="mt-0.5 block text-sm font-semibold">${clientBalance.toLocaleString()}</span>
@@ -1591,7 +1606,7 @@ export function AdminAdAccounts() {
                         </button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Withdrawn balance <span className="font-medium">{withdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}</span> e joma hobe.
+                        Withdrawn balance <span className="font-medium">{effectiveWithdrawWallet === "secondary" ? "Secondary Wallet" : "Main Wallet"}</span> e joma hobe.
                       </p>
                     </div>
                   ) : (

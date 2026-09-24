@@ -632,7 +632,7 @@ export default function ClientDetailPage() {
       const amt = parseFloat(withdrawAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: selectedAccountId, amount: amt, wallet_kind: withdrawWallet },
+        body: { ad_account_id: selectedAccountId, amount: amt, wallet_kind: wallets.mainEnabled ? withdrawWallet : "secondary" },
       });
 
       if (error) throw error;
@@ -1277,12 +1277,14 @@ export default function ClientDetailPage() {
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {/* Main Wallet — keep the same debit-card view used everywhere else */}
-              <MainWalletDebitCard
-                title="Wallet Balance"
-                balanceLabel={`$${walletBalance.toLocaleString()}`}
-                footer={wallet?.currency ?? "USD"}
-                actions={<WalletQuickActions userId={userId} kind="primary" inline />}
-              />
+              {wallets.mainEnabled && (
+                <MainWalletDebitCard
+                  title="Wallet Balance"
+                  balanceLabel={`$${walletBalance.toLocaleString()}`}
+                  footer={wallet?.currency ?? "USD"}
+                  actions={<WalletQuickActions userId={userId} kind="primary" inline />}
+                />
+              )}
 
               {/* Secondary Wallet — Chime-style green card (only when enabled) */}
               {wallets.secondaryEnabled && (
@@ -2557,34 +2559,36 @@ export default function ClientDetailPage() {
 
 
                   {/* Wallet Balance */}
-                  <MainWalletDebitCard
-                    title="Wallet Balance"
-                    balanceLabel={`$${walletBalance.toLocaleString()}`}
-                    actions={
-                      <div className="flex items-center gap-1">
-                        <button
-                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
-                          onClick={() => {
-                            setWalletDialogType("credit");
-                            setWalletAmount("");
-                            setWalletNote("");
-                          }}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
-                          onClick={() => {
-                            setWalletDialogType("debit");
-                            setWalletAmount("");
-                            setWalletNote("");
-                          }}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                      </div>
-                    }
-                  />
+                  {wallets.mainEnabled && (
+                    <MainWalletDebitCard
+                      title="Wallet Balance"
+                      balanceLabel={`$${walletBalance.toLocaleString()}`}
+                      actions={
+                        <div className="flex items-center gap-1">
+                          <button
+                            className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                            onClick={() => {
+                              setWalletDialogType("credit");
+                              setWalletAmount("");
+                              setWalletNote("");
+                            }}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                          <button
+                            className="h-6 w-6 rounded-md flex items-center justify-center bg-primary-foreground/20 hover:bg-primary-foreground/35 transition-colors"
+                            onClick={() => {
+                              setWalletDialogType("debit");
+                              setWalletAmount("");
+                              setWalletNote("");
+                            }}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                        </div>
+                      }
+                    />
+                  )}
 
                   {/* Extra wallets use the same debit-card design on desktop and mobile. */}
                   {wallets.secondaryEnabled && (
@@ -3058,7 +3062,7 @@ export default function ClientDetailPage() {
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center gap-1.5">
-                                      {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
+                                       {(acc.external_topup_required ? !!acc.external_topup_url : wallets.mainEnabled) && (
                                       <Button
                                         size="icon"
                                         variant="default"
@@ -3824,23 +3828,24 @@ export default function ClientDetailPage() {
                     <div className="space-y-2">
                       <Label>Credit To Wallet</Label>
                       <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setWithdrawWallet("primary")}
-                          className={cn(
-                            "rounded-lg border p-2.5 text-left transition-colors",
-                            withdrawWallet === "primary"
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:bg-muted/60",
-                          )}
-                        >
-                          <span className="flex items-center gap-1.5 text-xs font-medium">
-                            <Wallet className="h-3.5 w-3.5" /> Main Wallet
-                          </span>
-                          <span className="mt-0.5 block text-sm font-semibold">
-                            ${walletBalance.toLocaleString()}
-                          </span>
-                        </button>
+                         <button
+                           type="button"
+                           disabled={!wallets.mainEnabled}
+                           onClick={() => setWithdrawWallet("primary")}
+                           className={cn(
+                             "rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                             withdrawWallet === "primary"
+                               ? "border-primary bg-primary/10"
+                               : "border-border hover:bg-muted/60",
+                           )}
+                         >
+                           <span className="flex items-center gap-1.5 text-xs font-medium">
+                             <Wallet className="h-3.5 w-3.5" /> Main Wallet
+                           </span>
+                           <span className="mt-0.5 block text-sm font-semibold">
+                             ${walletBalance.toLocaleString()}
+                           </span>
+                         </button>
                         <button
                           type="button"
                           disabled={!wallets.secondaryEnabled}
