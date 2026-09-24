@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,6 +60,71 @@ function capOf(tx: any): Cap | null {
 
 const money = (n: number) =>
   `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+type FundingFlow = {
+  mainOut: number;
+  mainAfter: number;
+  walletIn: number;
+  walletAfter: number;
+  rate: string | null;
+};
+
+/** One-line funding summary with a small arrow toggle that expands the full 3-step flow. */
+function PaymentFlowRow({
+  flow,
+  target,
+  topupAmount,
+  topupAfter,
+}: {
+  flow: FundingFlow;
+  target: string;
+  topupAmount: number;
+  topupAfter: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const mainBefore = flow.mainAfter + flow.mainOut;
+  const walletBeforeFunding = flow.walletAfter - flow.walletIn;
+  const topupBefore = topupAfter + topupAmount;
+  const oneLine =
+    `Main ${money(mainBefore)} → ${money(flow.mainAfter)} (-${money(flow.mainOut)})` +
+    ` · ${target} +${money(flow.walletIn)} converted` +
+    (flow.rate ? ` · rate ${flow.rate}` : "") +
+    ` · Top-up -${money(topupAmount)}`;
+  return (
+    <div className="mt-1.5">
+      <div className="flex items-start gap-1.5">
+        <p className="min-w-0 flex-1 truncate text-[11px] leading-relaxed text-muted-foreground">
+          {oneLine}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? "Hide details" : "Show details"}
+          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-1 space-y-0.5 border-l-2 border-border pl-2 text-[11px] leading-relaxed text-muted-foreground">
+          <div>
+            <span className="font-semibold text-foreground">Main Wallet:</span> {money(mainBefore)} → {money(flow.mainAfter)}
+            <span className="font-semibold text-destructive"> (-{money(flow.mainOut)})</span>
+          </div>
+          <div>
+            <span className="font-semibold text-foreground">{target}:</span> {money(walletBeforeFunding)} → {money(flow.walletAfter)}
+            <span className="font-semibold text-emerald-600"> (+{money(flow.walletIn)} converted)</span>
+            {flow.rate ? <span> · rate {flow.rate}</span> : null}
+          </div>
+          <div>
+            <span className="font-semibold text-foreground">Top-up:</span> {target} {money(topupBefore)} → {money(topupAfter)}
+            <span className="font-semibold text-destructive"> (-{money(topupAmount)})</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function TransactionHistoryPanel({
   transactions: rawTransactions,
