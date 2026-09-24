@@ -25,33 +25,27 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const qc = useQueryClient();
   const [enabled, setEnabled] = useState(!!account.external_topup_required);
   const [crmName, setCrmName] = useState(account.external_crm_name || "");
-  const existingUrl =
-    account.external_topup_url || account.external_topup_url_secondary || account.external_topup_url_credit_line || "";
-  const [url, setUrl] = useState(existingUrl);
+  const [url, setUrl] = useState(account.external_topup_url || "");
+  const [clUrl, setClUrl] = useState(account.external_topup_url_credit_line || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnabled(!!account.external_topup_required);
     setCrmName(account.external_crm_name || "");
-    setUrl(existingUrl);
-  }, [account.id, account.external_topup_required, account.external_crm_name, existingUrl]);
+    setUrl(account.external_topup_url || "");
+    setClUrl(account.external_topup_url_credit_line || "");
+  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url, account.external_topup_url_credit_line]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (enabled && !url.trim()) throw new Error("CRM URL দিন");
-      const link = enabled ? url.trim() || null : null;
-      // Keep the link only in the wallet box(es) that already had one
-      const hasM = !!account.external_topup_url;
-      const hasS = !!account.external_topup_url_secondary;
-      const hasC = !!account.external_topup_url_credit_line;
-      const none = !hasM && !hasS && !hasC;
+      if (enabled && !url.trim() && !clUrl.trim()) throw new Error("Main অথবা Credit Line — একটা লিংক দিন");
       const { error } = await (supabase as any)
         .from("ad_accounts")
         .update({
           external_topup_required: enabled,
-          external_topup_url: hasM || none ? link : null,
-          external_topup_url_secondary: hasS ? link : null,
-          external_topup_url_credit_line: hasC ? link : null,
+          external_topup_url: enabled ? url.trim() || null : null,
+          external_topup_url_secondary: null,
+          external_topup_url_credit_line: enabled ? clUrl.trim() || null : null,
           external_crm_name: enabled ? crmName.trim() || "External CRM" : null,
         })
         .eq("id", account.id);
@@ -68,7 +62,8 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const dirty =
     enabled !== !!account.external_topup_required ||
     crmName !== (account.external_crm_name || "") ||
-    url !== existingUrl;
+    url !== (account.external_topup_url || "") ||
+    clUrl !== (account.external_topup_url_credit_line || "");
 
   return (
     <Card>
@@ -96,15 +91,14 @@ export function ExternalTopUpConfigSection({ account }: Props) {
               <Input placeholder="e.g. SIBD" value={crmName} onChange={(e) => setCrmName(e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs">External CRM Top-Up URL</Label>
-              <Input
-                type="url"
-                placeholder="https://partner-crm.example.com/topup"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
+              <Label className="text-xs">Main Wallet — CRM Link</Label>
+              <Input type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Credit Line Wallet — CRM Link</Label>
+              <Input type="url" placeholder="https://..." value={clUrl} onChange={(e) => setClUrl(e.target.value)} />
               <p className="text-[11px] text-muted-foreground mt-1">
-                এই একটাই লিংক Main, Secondary ও Credit Line — তিনটা wallet-এর top-up-এই ব্যবহার হবে।
+                যে বাক্সে লিংক থাকবে শুধু সেই wallet-এর Top Up বাটন দেখাবে।
               </p>
             </div>
           </div>
