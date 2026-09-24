@@ -71,7 +71,7 @@ export function TransactionHistoryPanel({
   const extIds = useMemo(
     () =>
       [...new Set((rawTransactions ?? [])
-        .filter((t: any) => t.type === "external_topup" && t.reference_id)
+        .filter((t: any) => (t.type === "external_topup" || t.type === "external_topup_request") && t.reference_id)
         .map((t: any) => t.reference_id as string))],
     [rawTransactions],
   );
@@ -91,7 +91,7 @@ export function TransactionHistoryPanel({
     if (!extReqs.length) return rawTransactions;
     const m = new Map(extReqs.map((r: any) => [r.id, r]));
     return (rawTransactions ?? []).map((t: any) => {
-      const r: any = t.type === "external_topup" ? m.get(t.reference_id) : null;
+      const r: any = (t.type === "external_topup" || t.type === "external_topup_request") ? m.get(t.reference_id) : null;
       if (!r) return t;
       return {
         ...t,
