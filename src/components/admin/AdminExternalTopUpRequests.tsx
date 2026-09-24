@@ -274,6 +274,8 @@ export function AdminExternalTopUpRequests() {
   // Manual fallback: the CRM top-up already went through, so credit the request
   // without reopening the CRM.
   const handleMarkCompleted = async (r: Req) => {
+    // Always record the new spend cap so the client sees "old → new" + Completed.
+    return markManual(r);
     setBusyId(r.id);
     try {
       const { data, error } = await (supabase as any).rpc("complete_external_topup", { p_id: r.id });

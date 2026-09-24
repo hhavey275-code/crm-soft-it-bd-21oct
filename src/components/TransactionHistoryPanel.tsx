@@ -378,7 +378,10 @@ export function TransactionHistoryPanel({
           <span className="text-xs text-amber-600 animate-pulse">Updating…</span>
         )}
         {cap.status === "manual" && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Admin দ্বারা সম্পন্ন</span>
+          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">✓ Completed (Admin)</span>
+        )}
+        {cap.status === "updated" && (
+          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">✓ Completed</span>
         )}
       </span>
     ) : (
