@@ -1415,9 +1415,11 @@ export function AdminAdAccounts() {
                           </>
                         ) : (
                           <>
-                            <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
-                              <ArrowUpCircle className="h-4 w-4" />
-                            </Button>
+                             {hasMainWallet(getAssignedUserId(a.id)) && (
+                               <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpWallet("primary"); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
+                                 <ArrowUpCircle className="h-4 w-4" />
+                               </Button>
+                             )}
                             {hasSecondaryWallet(getAssignedUserId(a.id)) && (
                               <Button
                                 size="icon"
