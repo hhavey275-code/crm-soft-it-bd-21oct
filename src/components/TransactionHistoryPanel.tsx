@@ -38,7 +38,15 @@ function ExpandableText({ text, limit = 60 }: { text: string; limit?: number }) 
   );
 }
 
-function capOf(tx: any): { old: number; next: number } | null {
+type Cap = { old: number; next: number | null; status?: string };
+function capOf(tx: any): Cap | null {
+  if (tx.limit_status && tx.old_spend_cap != null) {
+    return {
+      old: Number(tx.old_spend_cap),
+      next: tx.new_spend_cap != null ? Number(tx.new_spend_cap) : null,
+      status: tx.limit_status,
+    };
+  }
   if (tx.old_spend_cap != null && tx.new_spend_cap != null) {
     return { old: Number(tx.old_spend_cap), next: Number(tx.new_spend_cap) };
   }
@@ -354,12 +362,21 @@ export function TransactionHistoryPanel({
     </div>
   );
 
-  const capCell = (cap: { old: number; next: number } | null) =>
+  const capCell = (cap: Cap | null) =>
     cap ? (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold">
+      <span className="inline-flex flex-wrap items-center gap-1.5 whitespace-nowrap text-sm font-bold">
         <span className="text-muted-foreground">{money(cap.old)}</span>
         <ArrowRight className="h-4 w-4 text-primary" />
-        <span className="text-foreground">{money(cap.next)}</span>
+        {cap.next != null ? (
+          <span className="text-foreground">{money(cap.next)}</span>
+        ) : cap.status === "not_updated" ? (
+          <span className="text-xs text-destructive">Limit বাড়েনি</span>
+        ) : (
+          <span className="text-xs text-amber-600 animate-pulse">Updating…</span>
+        )}
+        {cap.status === "manual" && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Admin দ্বারা সম্পন্ন</span>
+        )}
       </span>
     ) : (
       <span className="text-muted-foreground">—</span>
