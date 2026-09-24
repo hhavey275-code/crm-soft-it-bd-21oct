@@ -290,7 +290,7 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       const amt = parseFloat(withdrawAmount);
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: topUpAccount.id, amount: amt, wallet_kind: withdrawWallet },
+        body: { ad_account_id: topUpAccount.id, amount: amt, wallet_kind: effectiveWithdrawWallet },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -682,6 +682,8 @@ export function AdminAdAccounts() {
   const clientBalance = Number(assignedWallet?.balance ?? 0);
   const assignedSecondaryEnabled = hasSecondaryWallet(assignedUserId);
   const assignedSecondaryBalance = getSecondaryBalance(assignedUserId);
+  const assignedMainEnabled = hasMainWallet(assignedUserId);
+  const effectiveWithdrawWallet = assignedMainEnabled ? withdrawWallet : "secondary";
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const willGoNegative = topUpWallet === "secondary"
     ? parsedAmount > assignedSecondaryBalance
