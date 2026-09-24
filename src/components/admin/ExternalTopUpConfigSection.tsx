@@ -25,26 +25,33 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const qc = useQueryClient();
   const [enabled, setEnabled] = useState(!!account.external_topup_required);
   const [crmName, setCrmName] = useState(account.external_crm_name || "");
-  const [url, setUrl] = useState(account.external_topup_url || "");
+  const existingUrl =
+    account.external_topup_url || account.external_topup_url_secondary || account.external_topup_url_credit_line || "";
+  const [url, setUrl] = useState(existingUrl);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnabled(!!account.external_topup_required);
     setCrmName(account.external_crm_name || "");
-    setUrl(account.external_topup_url || "");
-  }, [account.id, account.external_topup_required, account.external_crm_name, account.external_topup_url]);
+    setUrl(existingUrl);
+  }, [account.id, account.external_topup_required, account.external_crm_name, existingUrl]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (enabled && !url.trim()) throw new Error("CRM URL দিন");
       const link = enabled ? url.trim() || null : null;
+      // Keep the link only in the wallet box(es) that already had one
+      const hasM = !!account.external_topup_url;
+      const hasS = !!account.external_topup_url_secondary;
+      const hasC = !!account.external_topup_url_credit_line;
+      const none = !hasM && !hasS && !hasC;
       const { error } = await (supabase as any)
         .from("ad_accounts")
         .update({
           external_topup_required: enabled,
-          external_topup_url: link,
-          external_topup_url_secondary: null,
-          external_topup_url_credit_line: null,
+          external_topup_url: hasM || none ? link : null,
+          external_topup_url_secondary: hasS ? link : null,
+          external_topup_url_credit_line: hasC ? link : null,
           external_crm_name: enabled ? crmName.trim() || "External CRM" : null,
         })
         .eq("id", account.id);
@@ -61,7 +68,7 @@ export function ExternalTopUpConfigSection({ account }: Props) {
   const dirty =
     enabled !== !!account.external_topup_required ||
     crmName !== (account.external_crm_name || "") ||
-    url !== (account.external_topup_url || "");
+    url !== existingUrl;
 
   return (
     <Card>
