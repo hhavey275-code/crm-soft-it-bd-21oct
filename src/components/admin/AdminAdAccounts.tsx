@@ -1508,10 +1508,12 @@ export function AdminAdAccounts() {
                     <span className="text-muted-foreground">Assigned Client</span>
                     <span className="font-medium">{assignedClientName}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Main Wallet Balance</span>
-                    <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
-                  </div>
+                  {assignedMainEnabled && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Main Wallet Balance</span>
+                      <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
+                    </div>
+                  )}
                   {assignedSecondaryEnabled && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400"><Wallet className="h-4 w-4" /> Secondary Wallet</span>
@@ -1582,8 +1584,9 @@ export function AdminAdAccounts() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
+                          disabled={!assignedMainEnabled}
                           onClick={() => setWithdrawWallet("primary")}
-                          className={`rounded-lg border p-2.5 text-left transition-colors ${withdrawWallet === "primary" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/60"}`}
+                          className={`rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${withdrawWallet === "primary" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/60"}`}
                         >
                           <span className="flex items-center gap-1.5 text-xs font-medium"><Wallet className="h-3.5 w-3.5" /> Main Wallet</span>
                           <span className="mt-0.5 block text-sm font-semibold">${clientBalance.toLocaleString()}</span>
