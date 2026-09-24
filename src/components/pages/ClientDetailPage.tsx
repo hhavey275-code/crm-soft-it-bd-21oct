@@ -3062,7 +3062,7 @@ export default function ClientDetailPage() {
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center gap-1.5">
-                                      {(acc.external_topup_required ? !!acc.external_topup_url : true) && (
+                                       {(acc.external_topup_required ? !!acc.external_topup_url : wallets.mainEnabled) && (
                                       <Button
                                         size="icon"
                                         variant="default"
