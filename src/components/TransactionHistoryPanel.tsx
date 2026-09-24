@@ -95,7 +95,10 @@ export function TransactionHistoryPanel({
       if (!r) return t;
       return {
         ...t,
-        limit_status: r.limit_status,
+        limit_status:
+          r.limit_status === "pending" && Date.now() - new Date(t.created_at).getTime() > 30 * 60 * 1000
+            ? "not_updated"
+            : r.limit_status,
         old_spend_cap: r.spend_cap_before,
         new_spend_cap: r.spend_cap_after,
       };
