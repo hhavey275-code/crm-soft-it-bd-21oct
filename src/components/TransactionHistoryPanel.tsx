@@ -176,14 +176,6 @@ export function TransactionHistoryPanel({
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
 
-  type FundingFlow = {
-    mainOut: number;
-    mainAfter: number;
-    walletIn: number;
-    walletAfter: number;
-    rate: string | null;
-  };
-
   /**
    * Keep the ledger entries intact, but present automatic funding and its
    * resulting top-up as one event. Matching uses the shared server timestamp.
@@ -362,28 +354,13 @@ export function TransactionHistoryPanel({
     const flow = fundingByTx.get(tx.id);
     if (!flow) return null;
     const target = tx.wallet_kind === "credit_line" ? "Credit Line" : "Secondary";
-    const topupAmount = Math.abs(Number(tx.amount) || 0);
-    const topupAfter = Number(tx.balance_after) || 0;
-    const mainBefore = flow.mainAfter + flow.mainOut;
-    const walletBeforeFunding = flow.walletAfter - flow.walletIn;
-    const topupBefore = topupAfter + topupAmount;
-
     return (
-      <div className="mt-1.5 space-y-0.5 border-l-2 border-border pl-2 text-[11px] leading-relaxed text-muted-foreground">
-        <div>
-          <span className="font-semibold text-foreground">Main Wallet:</span> {money(mainBefore)} → {money(flow.mainAfter)}
-          <span className="font-semibold text-destructive"> (-{money(flow.mainOut)})</span>
-        </div>
-        <div>
-          <span className="font-semibold text-foreground">{target}:</span> {money(walletBeforeFunding)} → {money(flow.walletAfter)}
-          <span className="font-semibold text-emerald-600"> (+{money(flow.walletIn)} converted)</span>
-          {flow.rate ? <span> · rate {flow.rate}</span> : null}
-        </div>
-        <div>
-          <span className="font-semibold text-foreground">Top-up:</span> {target} {money(topupBefore)} → {money(topupAfter)}
-          <span className="font-semibold text-destructive"> (-{money(topupAmount)})</span>
-        </div>
-      </div>
+      <PaymentFlowRow
+        flow={flow}
+        target={target}
+        topupAmount={Math.abs(Number(tx.amount) || 0)}
+        topupAfter={Number(tx.balance_after) || 0}
+      />
     );
   };
 
