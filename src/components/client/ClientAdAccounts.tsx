@@ -37,6 +37,7 @@ import { ArrowDownCircle } from "lucide-react";
 import { formatBdt, useWallets } from "@/hooks/useWallets";
 import { startLimitWatch, useLimitWatches } from "@/hooks/useLimitUpdateWatch";
 import { LimitUpdateIndicator } from "@/components/client/LimitUpdateIndicator";
+import { useCrmStatus } from "@/hooks/useCrmStatus";
 
 
 const PAGE_SIZE = 20;
@@ -53,6 +54,7 @@ interface InsightsData {
 }
 
 export function ClientAdAccounts() {
+  const { pausedFor: crmPausedFor } = useCrmStatus();
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const wallets = useWallets(user?.id);
