@@ -1936,6 +1936,30 @@ export type Database = {
         }
         Relationships: []
       }
+      external_crm_status: {
+        Row: {
+          crm_name: string
+          enabled: boolean
+          message: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          crm_name: string
+          enabled?: boolean
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          crm_name?: string
+          enabled?: boolean
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       external_topup_requests: {
         Row: {
           ad_account_id: string
@@ -1953,6 +1977,8 @@ export type Database = {
           initiated_at: string
           initiated_by: string
           last_error: string | null
+          limit_status: string
+          manual_note: string | null
           notes: string | null
           proof_url: string | null
           provider_txn_id: string | null
@@ -1960,6 +1986,8 @@ export type Database = {
           rejected_at: string | null
           rejected_by: string | null
           requested_by_client: boolean
+          spend_cap_after: number | null
+          spend_cap_before: number | null
           status: string
           updated_at: string
           user_id: string | null
@@ -1982,6 +2010,8 @@ export type Database = {
           initiated_at?: string
           initiated_by: string
           last_error?: string | null
+          limit_status?: string
+          manual_note?: string | null
           notes?: string | null
           proof_url?: string | null
           provider_txn_id?: string | null
@@ -1989,6 +2019,8 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           requested_by_client?: boolean
+          spend_cap_after?: number | null
+          spend_cap_before?: number | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -2011,6 +2043,8 @@ export type Database = {
           initiated_at?: string
           initiated_by?: string
           last_error?: string | null
+          limit_status?: string
+          manual_note?: string | null
           notes?: string | null
           proof_url?: string | null
           provider_txn_id?: string | null
@@ -2018,6 +2052,8 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           requested_by_client?: boolean
+          spend_cap_after?: number | null
+          spend_cap_before?: number | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -4518,6 +4554,10 @@ export type Database = {
       }
       admin_convert_main_to_secondary: {
         Args: { p_reason?: string; p_usd_amount: number; p_user_id: string }
+        Returns: Json
+      }
+      admin_mark_external_topup_manual: {
+        Args: { p_id: string; p_new_cap: number; p_note?: string }
         Returns: Json
       }
       apply_global_rate_delta: {
