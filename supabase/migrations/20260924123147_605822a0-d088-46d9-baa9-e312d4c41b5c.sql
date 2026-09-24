@@ -1,0 +1,1 @@
+UPDATE public.profiles SET secondary_wallet_enabled=false, secondary_deposit_enabled=false, credit_line_wallet_enabled=true WHERE id='b18c4c55-b253-4591-b0a3-d8e9229dd67c';
