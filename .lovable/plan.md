@@ -20,8 +20,11 @@
 ### ৩. আটকে থাকা request নিজে ছাড়া
 - কোনো request "running" অবস্থায় ১০ মিনিটের বেশি থাকলে সার্ভার সেটা আবার pending করে দেবে, যাতে helper আবার ধরতে পারে।
 
-### ৪. Limit নিজে থেকে "Completed" হওয়া
+### ৪. Limit নিজে থেকে "Completed" হওয়া (ভুল error আর manual কাজ বন্ধ)
 - CRM-এ top-up সফল হলেই সার্ভার Meta থেকে নতুন limit পড়বে (কয়েক বার, ৩০ সেকেন্ড পরপর, সর্বোচ্চ ৫ মিনিট)। বাড়লে সাথে সাথে "✓ Completed"।
+- helper "error" দিলেও সাথে সাথে ব্যর্থ ধরা হবে না — আগে Meta থেকে limit দেখা হবে। limit বেড়ে থাকলে request নিজে থেকেই "✓ Completed" হবে, আপনাকে manual করতে হবে না।
+- পরে যে কোনো সময় কেউ "Update from Meta" চাপলে বা account sync হলে, ওই account-এর error/Updating অবস্থার request-গুলো limit বাড়া দেখা গেলে নিজে থেকে Completed হয়ে যাবে।
+- শুধু তখনই আসল "Failed" দেখাবে যখন ৫ মিনিট পরেও Meta-তে limit বাড়েনি।
 - এখনকার ১৮টা "Updating…" request-এর limit একবারে Meta থেকে পড়ে ঠিক করে দেওয়া হবে।
 
 ### ৫. অফিস PC-র সেটিং (আপনার দিকে একবার করতে হবে)
