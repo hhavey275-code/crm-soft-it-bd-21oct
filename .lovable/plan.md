@@ -20,11 +20,18 @@
 ### ৩. আটকে থাকা request নিজে ছাড়া
 - কোনো request "running" অবস্থায় ১০ মিনিটের বেশি থাকলে সার্ভার সেটা আবার pending করে দেবে, যাতে helper আবার ধরতে পারে।
 
-### ৪. Limit নিজে থেকে "Completed" হওয়া (ভুল error আর manual কাজ বন্ধ)
-- CRM-এ top-up সফল হলেই সার্ভার Meta থেকে নতুন limit পড়বে (কয়েক বার, ৩০ সেকেন্ড পরপর, সর্বোচ্চ ৫ মিনিট)। বাড়লে সাথে সাথে "✓ Completed"।
-- helper "error" দিলেও সাথে সাথে ব্যর্থ ধরা হবে না — আগে Meta থেকে limit দেখা হবে। limit বেড়ে থাকলে request নিজে থেকেই "✓ Completed" হবে, আপনাকে manual করতে হবে না।
-- পরে যে কোনো সময় কেউ "Update from Meta" চাপলে বা account sync হলে, ওই account-এর error/Updating অবস্থার request-গুলো limit বাড়া দেখা গেলে নিজে থেকে Completed হয়ে যাবে।
-- শুধু তখনই আসল "Failed" দেখাবে যখন ৫ মিনিট পরেও Meta-তে limit বাড়েনি।
+### ৪. ক্লায়েন্ট ৩০ সেকেন্ডের মধ্যে পরিষ্কার ফলাফল দেখবে
+ক্লায়েন্ট কখনো "হয়ে গেছে" দেখে পরে "হয়নি" দেখবে না — এটাই মূল নিয়ম।
+
+- **Submit-এর আগেই যাচাই:** helper offline থাকলে বা SIBD বন্ধ থাকলে ক্লায়েন্ট submit-ই করতে পারবে না, পরিষ্কার লেখা দেখবে "এই মুহূর্তে top-up নেওয়া যাচ্ছে না, একটু পরে চেষ্টা করুন"। টাকা কাটবে না।
+- **Submit-এর পর (০–৩০ সেকেন্ড):** ক্লায়েন্ট একটা progress দেখবে ("Top-up চলছে…", কাউন্টডাউন সহ)।
+- **CRM সফল বললে:** সাথে সাথে "✓ Top-up সম্পন্ন — $X যোগ হয়েছে" দেখাবে। CRM-এর নিজস্ব সফলতার বার্তাই প্রমাণ, কারণ admiki সফল বললে limit সত্যিই বাড়ে (Meta-তে দেখাতে কখনো দেরি হয়, সেটা ক্লায়েন্টের জন্য বাধা হবে না)।
+- **CRM ব্যর্থ বা ৩০ সেকেন্ডে উত্তর না এলে:** "✗ Top-up হয়নি — টাকা wallet-এ ফেরত দেওয়া হয়েছে" দেখাবে, আর কাটা টাকা সাথে সাথে ফেরত যাবে। ক্লায়েন্ট আবার চেষ্টা করতে পারবে।
+- **ভুল error রোধ:** "ব্যর্থ" বলার আগে সার্ভার একবার Meta থেকে limit দেখবে (কয়েক সেকেন্ড)। limit বেড়ে থাকলে সেটা সফল ধরা হবে, টাকা ফেরত যাবে না, আপনাকে manual করতে হবে না।
+- **দুই দিকের নিরাপত্তা (শুধু অ্যাডমিন দেখবে, ক্লায়েন্ট নয়):**
+  - টাকা ফেরত দেওয়ার পরে যদি Meta-তে limit বাড়া দেখা যায় (দেরিতে হয়ে গেছে), অ্যাডমিনকে সতর্কবার্তা যাবে — সিদ্ধান্ত আপনি নেবেন, ক্লায়েন্টের কাছে কিছু উল্টাবে না।
+  - "সম্পন্ন" দেখানোর পর ১০ মিনিটেও Meta-তে limit না বাড়লে অ্যাডমিনকে সতর্কবার্তা (admiki চেক করার জন্য)।
+- History-তে পরে "Update from Meta" বা sync হলে, Updating অবস্থার request-গুলো limit মিললে নিজে থেকে old → new limit সহ Completed হবে।
 - এখনকার ১৮টা "Updating…" request-এর limit একবারে Meta থেকে পড়ে ঠিক করে দেওয়া হবে।
 
 ### ৫. অফিস PC-র সেটিং (আপনার দিকে একবার করতে হবে)
@@ -36,7 +43,10 @@
 ## প্রযুক্তিগত বিবরণ
 - Extension: `offscreen` permission + offscreen document যা WebSocket ও heartbeat ধরে রাখে; background-এ alarm-ভিত্তিক `list_pending` fallback; tab timeout বিদ্যমান।
 - `/api/public/crm-topup`: নতুন actions `heartbeat` (autopilot token দিয়ে যাচাই, `site_settings`/নতুন `autopilot_heartbeats` টেবিলে last_seen, version, crm_logged_in) ও `verify_cap`; `claim`-এর আগে ১০ মিনিটের পুরনো running claim release।
-- `result` success হলে সার্ভারে `get-account-insights` দিয়ে cap পড়ে `spend_cap_after`/`limit_status=updated` সেট (bounded retries, কোনো টাইমার-কাটা নয়)।
+- `result` success → request completed; সার্ভার `get-account-insights` দিয়ে cap পড়ে `spend_cap_after`/`limit_status=updated` সেট, পরে না বাড়লে অ্যাডমিন অ্যালার্ট।
+- `result` failure বা ৩০s deadline পার → একবার Meta cap চেক; বাড়েনি হলে `fail_external_topup` দিয়ে wallet refund ও status `failed`।
+- ক্লায়েন্ট dialog realtime/৩ সেকেন্ড অন্তর request status দেখবে; `request_external_topup` RPC helper heartbeat ৯০s-এর পুরনো হলে reject করবে।
+- Extension-এ প্রতি request-এর timeout ১২০s থেকে ২৫s।
 - Offline/pending সতর্কবার্তা: বিদ্যমান ৫ মিনিটের cron-এর সাথে যুক্ত করা হবে, নতুন আলাদা polling job নয়।
 - UI: `ExternalTopUpPage` এ `HelperStatusBadge`।
 - zip পুনর্নির্মাণ ও download লিংক আপডেট।
