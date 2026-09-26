@@ -34,6 +34,8 @@ interface Req {
   spend_cap_before?: number | null;
   spend_cap_after?: number | null;
   limit_status?: string | null;
+  limit_reason?: string | null;
+  retry_requested_at?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -340,24 +342,14 @@ export function AdminExternalTopUpRequests() {
   const markManual = async (r: Req) => {
     setBusyId(r.id);
     try {
-      // Pull this account fresh from Meta, then verify the limit actually increased.
-      await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: [r.ad_account_id], source: "meta" },
-      }).catch(() => null);
-      const { data: accRow } = await (supabase as any)
-        .from("ad_accounts").select("spend_cap").eq("id", r.ad_account_id).maybeSingle();
-      const cap = Number(accRow?.spend_cap ?? 0);
-      const before = Number(r.spend_cap_before ?? 0);
-      if (!(cap > before + 0.01)) {
-        toast.error(`Meta-তে limit এখনো বাড়েনি (এখন $${cap.toLocaleString()}, আগে $${before.toLocaleString()})। একটু পরে আবার চেষ্টা করুন।`);
-        return;
-      }
-      const { data, error } = await (supabase as any).rpc("admin_mark_external_topup_manual", {
-        p_id: r.id, p_new_cap: cap, p_note: null,
-      });
-      if (error || !data?.ok) { toast.error(error?.message || data?.error || "Failed"); return; }
-      toast.success(`Completed — $${before.toLocaleString()} → $${cap.toLocaleString()}`);
+      // Check Meta live; if the limit still hasn't moved, send it to the helper again.
+      const res = await retryFn({ data: { requestId: r.id } });
+      if (res.status === "updated") toast.success(`Completed — $${res.before.toLocaleString()} → $${res.after.toLocaleString()}`);
+      else if (res.status === "queued") toast.success("Meta-তে limit বাড়েনি — helper-এ আবার top-up পাঠানো হয়েছে");
+      else toast.error(res.reason);
       qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Failed");
     } finally {
       setBusyId(null);
     }
@@ -381,8 +373,12 @@ export function AdminExternalTopUpRequests() {
             )}
           </span>
         )}
+        {r.retry_requested_at && <Badge variant="outline" className="text-[10px] text-amber-600">Retry queued</Badge>}
+        {bad && r.limit_reason && !r.retry_requested_at && (
+          <span className="w-full text-right text-[10px] text-destructive">{r.limit_reason}</span>
+        )}
         {r.limit_status === "manual" && <Badge variant="secondary" className="text-[10px]">Manual</Badge>}
-        {r.spend_cap_after == null && (
+        {r.spend_cap_after == null && r.status === "completed" && !r.retry_requested_at && (
           <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === r.id} onClick={() => markManual(r)}>
             Manually done
           </Button>
