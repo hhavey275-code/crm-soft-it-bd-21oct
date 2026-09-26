@@ -9,6 +9,42 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { RotateCw } from "lucide-react";
+import { retryExternalTopup } from "@/lib/externalTopupRetry.functions";
+
+/** Small Retry button: checks Meta live, completes if risen, else queues one helper retry. */
+function LimitRetryButton({ requestId }: { requestId: string }) {
+  const [busy, setBusy] = useState(false);
+  const retry = useServerFn(retryExternalTopup);
+  const qc = useQueryClient();
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await retry({ data: { requestId } });
+          if (res.status === "updated") toast.success(`Limit updated: ${money(res.before)} → ${money(res.after)}`);
+          else if (res.status === "queued") toast.success("Limit বাড়েনি — আবার top-up পাঠানো হয়েছে, কিছুক্ষণ পরে দেখুন");
+          else toast.error(res.reason);
+          qc.invalidateQueries({ queryKey: ["ext-topup-limits"] });
+        } catch (e: any) {
+          toast.error(e?.message || "Retry failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-muted disabled:opacity-50"
+    >
+      <RotateCw className={cn("h-3 w-3", busy && "animate-spin")} />
+      {busy ? "Checking…" : "Retry"}
+    </button>
+  );
+}
 
 interface TransactionHistoryPanelProps {
   transactions?: any[] | null;
@@ -38,13 +74,16 @@ function ExpandableText({ text, limit = 60 }: { text: string; limit?: number }) 
   );
 }
 
-type Cap = { old: number; next: number | null; status?: string };
+type Cap = { old: number; next: number | null; status?: string; reason?: string | null; requestId?: string; queued?: boolean };
 function capOf(tx: any): Cap | null {
   if (tx.limit_status && tx.old_spend_cap != null) {
     return {
       old: Number(tx.old_spend_cap),
       next: tx.new_spend_cap != null ? Number(tx.new_spend_cap) : null,
       status: tx.limit_status,
+      reason: tx.limit_reason,
+      requestId: tx.ext_request_id,
+      queued: !!tx.retry_queued,
     };
   }
   if (tx.old_spend_cap != null && tx.new_spend_cap != null) {
@@ -147,7 +186,7 @@ export function TransactionHistoryPanel({
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("external_topup_requests")
-        .select("id, ad_account_id, spend_cap_before, spend_cap_after, limit_status")
+        .select("id, ad_account_id, spend_cap_before, spend_cap_after, limit_status, limit_reason, retry_requested_at")
         .in("id", extIds);
       return (data ?? []) as any[];
     },
@@ -167,6 +206,9 @@ export function TransactionHistoryPanel({
         old_spend_cap: r.spend_cap_before,
         new_spend_cap: r.spend_cap_after,
         ext_ad_account_id: r.ad_account_id,
+        ext_request_id: r.id,
+        limit_reason: r.limit_reason,
+        retry_queued: !!r.retry_requested_at,
       };
     });
   }, [rawTransactions, extReqs]);
@@ -519,8 +561,16 @@ export function TransactionHistoryPanel({
         <ArrowRight className="h-4 w-4 text-primary" />
         {cap.next != null ? (
           <span className="text-foreground">{money(cap.next)}</span>
+        ) : cap.queued ? (
+          <span className="text-xs text-amber-600 animate-pulse">Retrying…</span>
         ) : cap.status === "not_updated" ? (
-          <span className="text-xs text-destructive">Limit বাড়েনি</span>
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <span className="text-xs text-destructive">Limit বাড়েনি</span>
+            {cap.requestId && <LimitRetryButton requestId={cap.requestId} />}
+            {cap.reason && (
+              <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">{cap.reason}</span>
+            )}
+          </span>
         ) : (
           <span className="text-xs text-amber-600 animate-pulse">Updating…</span>
         )}

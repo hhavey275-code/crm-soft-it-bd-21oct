@@ -14,6 +14,8 @@ import { format } from "date-fns";
 import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check, Bot } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
+import { useServerFn } from "@tanstack/react-start";
+import { retryExternalTopup } from "@/lib/externalTopupRetry.functions";
 
 
 interface Req {
@@ -41,6 +43,7 @@ interface Req {
 export function AdminExternalTopUpRequests() {
   const { user, session } = useAuth();
   const qc = useQueryClient();
+  const retryFn = useServerFn(retryExternalTopup);
   const isMobile = useIsMobile();
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
