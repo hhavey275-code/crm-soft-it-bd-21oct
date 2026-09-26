@@ -186,7 +186,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             .select(
               "id, amount, wallet_kind, external_topup_url, created_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line)"
             )
-            .eq("status", "pending")
+            .or("status.eq.pending,and(status.eq.completed,retry_requested_at.not.is.null)")
             .order("created_at", { ascending: true })
             .limit(20);
           if (error) return json({ ok: false, error: error.message }, 400);
@@ -222,7 +222,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           const { data: inFlight } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select("id")
-            .eq("status", "pending")
+            .or("status.eq.pending,and(status.eq.completed,retry_requested_at.not.is.null)")
             .not("automation_started_at", "is", null)
             .gt("automation_started_at", staleBefore)
             .neq("id", requestId)
@@ -236,7 +236,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             .from("external_topup_requests" as any)
             .update({ automation_started_at: now, last_error: null, updated_at: now })
             .eq("id", requestId)
-            .eq("status", "pending")
+            .or("status.eq.pending,and(status.eq.completed,retry_requested_at.not.is.null)")
             .or(`automation_started_at.is.null,automation_started_at.lt.${staleBefore}`)
             .select("id, amount, wallet_kind, ad_account_id, external_topup_url")
             .maybeSingle();
@@ -316,11 +316,45 @@ export const Route = createFileRoute("/api/public/crm-topup")({
              }
             // Pull the new spend cap from Meta right away so history shows
             // old → new limit without anyone pressing "manual update".
+            // A finished retry leaves the queue either way.
+            await supabaseAdmin
+              .from("external_topup_requests" as any)
+              .update({ retry_requested_at: null, automation_started_at: null })
+              .eq("id", payload.requestId);
             const capUpdated = await refreshCapFromMeta(supabaseAdmin, payload.requestId);
+            if (!capUpdated) {
+              await supabaseAdmin
+                .from("external_topup_requests" as any)
+                .update({
+                  limit_status: "not_updated",
+                  limit_reason: "CRM সফল দেখিয়েছে, কিন্তু Meta-তে limit বাড়েনি (CRM balance/দেরি হতে পারে)",
+                })
+                .eq("id", payload.requestId)
+                .is("spend_cap_after", null);
+            }
             return json({ ok: true, capUpdated });
           }
           // Auto-pilot failure: release the claim so the request stays visible
           // as pending with the reason, and can be retried or done by hand.
+          const errText = String(body?.error ?? "Automation failed").slice(0, 500);
+          // Failed retry of an already-completed request: stop, show reason, no loop.
+          {
+            const { data: retryRow } = await supabaseAdmin
+              .from("external_topup_requests" as any)
+              .update({
+                retry_requested_at: null,
+                automation_started_at: null,
+                limit_status: "not_updated",
+                limit_reason: "Retry ব্যর্থ: " + errText,
+                last_error: errText,
+              })
+              .eq("id", payload.requestId)
+              .eq("status", "completed")
+              .not("retry_requested_at", "is", null)
+              .select("id")
+              .maybeSingle();
+            if (retryRow) return json({ ok: true, recorded: "retry_failed" });
+          }
           if (payload.autopilot) {
             const failedAt = new Date().toISOString();
             const { error: relErr } = await supabaseAdmin
