@@ -1,0 +1,2 @@
+UPDATE public.external_topup_requests SET spend_cap_after = 500.01, limit_status = 'manual', limit_reason = NULL, retry_requested_at = NULL WHERE id = 'd714859d-5f66-4a54-aaad-3b249204fef3';
+UPDATE public.external_topup_requests SET retry_requested_at = NULL WHERE retry_requested_at IS NOT NULL;
