@@ -18,7 +18,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 import { TelegramPollStatus } from "@/components/TelegramPollStatus";
-import { createProofUrl } from "@/lib/proofUrl";
+import { createProofUrl, openProof } from "@/lib/proofUrl";
 
 type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
