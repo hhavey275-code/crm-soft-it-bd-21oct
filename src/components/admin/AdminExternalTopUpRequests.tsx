@@ -215,7 +215,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   const downloadHelper = () => {
-    fetch("/crm-topup-extension.zip?v=1.5.0", { cache: "no-store" })
+    fetch("/crm-topup-extension.zip?v=1.7.0", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
