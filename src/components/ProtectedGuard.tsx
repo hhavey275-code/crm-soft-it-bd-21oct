@@ -48,7 +48,7 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
 
   return (
     <CompleteProfileGate>
-      {profile.status === "pending" ? (
+      {profile?.status === "pending" ? (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
           <Card className="max-w-md w-full text-center">
             <CardContent className="p-8 space-y-4">
