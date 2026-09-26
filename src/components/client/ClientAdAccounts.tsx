@@ -113,19 +113,19 @@ export function ClientAdAccounts() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawMax, setWithdrawMax] = useState<number | null>(null);
   const [withdrawMaxLoading, setWithdrawMaxLoading] = useState(false);
-  const [isTenantMode, setIsTenantMode] = useState(false);
+  const [withdrawLive, setWithdrawLive] = useState<{ cap: number; spent: number; remaining: number } | null>(null);
 
-  /** Admin-granted permission to pull unused ad account balance back to wallet. */
+  // Whether admin has enabled self-service Spend Cap Withdraw for this client
   const { data: canWithdraw } = useQuery({
     queryKey: ["client-can-withdraw", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from("profiles")
         .select("spend_cap_withdraw_enabled")
         .eq("user_id", user!.id)
         .maybeSingle();
-      return !!data?.spend_cap_withdraw_enabled;
+      return !!(data as any)?.spend_cap_withdraw_enabled;
     },
   });
 
@@ -134,7 +134,7 @@ export function ClientAdAccounts() {
     setWithdrawAmount("");
     setWithdrawNote("");
     setWithdrawMax(null);
-    if (!canWithdraw) return;
+    setWithdrawLive(null);
     setWithdrawMaxLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
@@ -142,7 +142,11 @@ export function ClientAdAccounts() {
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      setWithdrawMax(Number((data as any)?.max_withdrawable ?? 0));
+      const d = data as any;
+      const cap = Number(d?.current_spend_cap ?? 0);
+      const spent = Number(d?.real_amount_spent ?? 0);
+      setWithdrawLive({ cap, spent, remaining: Number(d?.remaining ?? Math.max(0, cap - spent)) });
+      setWithdrawMax(Number(d?.max_withdrawable ?? 0));
     } catch (err: any) {
       toast.error(friendlyEdgeError(err) || "Could not read live limit from Meta");
     } finally {
@@ -205,6 +209,10 @@ export function ClientAdAccounts() {
     const amount = parseFloat(withdrawAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Enter a valid amount");
+      return;
+    }
+    if (withdrawMax == null || amount - withdrawMax > 0.001) {
+      toast.error(`Max withdrawable is $${(withdrawMax ?? 0).toFixed(2)}`);
       return;
     }
     setWithdrawLoading(true);
@@ -1648,32 +1656,38 @@ export function ClientAdAccounts() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {canWithdraw && (
-              <div className="flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
-                <span className="text-muted-foreground">Max withdrawable (live from Meta)</span>
-                <span className="font-semibold">
-                  {withdrawMaxLoading
-                    ? "Checking…"
-                    : withdrawMax != null
-                      ? `$${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                      : "—"}
-                </span>
-              </div>
-            )}
+            <div className="space-y-1.5 rounded-lg bg-muted p-3 text-sm">
+              {withdrawMaxLoading ? (
+                <p className="text-muted-foreground">Checking live limit from Meta…</p>
+              ) : withdrawLive ? (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Live Spend Cap</span><span>${withdrawLive.cap.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Live Spent</span><span>${withdrawLive.spent.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Remaining</span><span>${withdrawLive.remaining.toFixed(2)}</span></div>
+                  <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+                    <span>Max you can withdraw (Remaining − $10)</span>
+                    <span className="text-primary">${(withdrawMax ?? 0).toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-destructive">Couldn't read the live limit, try again.</p>
+              )}
+            </div>
             <div>
               <Label>Amount (USD) *</Label>
               <Input
                 type="number"
                 min="1"
+                max={withdrawMax ?? undefined}
                 step="0.01"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="e.g. 100"
+                placeholder={withdrawMax != null ? `Max $${withdrawMax.toFixed(2)}` : "e.g. 100"}
                 className="mt-1.5"
               />
-              {canWithdraw && withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax && (
+              {withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax && (
                 <p className="mt-1.5 text-sm text-destructive">
-                  Max withdrawable is ${withdrawMax.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  Max withdrawable is ${withdrawMax.toFixed(2)}
                 </p>
               )}
             </div>
@@ -1696,7 +1710,9 @@ export function ClientAdAccounts() {
               disabled={
                 withdrawLoading ||
                 !withdrawAmount ||
-                (canWithdraw && (withdrawMaxLoading || (withdrawMax != null && parseFloat(withdrawAmount || "0") > withdrawMax)))
+                withdrawMaxLoading ||
+                withdrawMax == null ||
+                parseFloat(withdrawAmount || "0") > withdrawMax
               }
             >
               {withdrawLoading ? "Processing..." : canWithdraw ? "Withdraw Now" : "Submit Request"}
