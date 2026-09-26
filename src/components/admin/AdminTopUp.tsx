@@ -670,25 +670,66 @@ export function AdminTopUp() {
       {/* Date Picker & Summary Metrics */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant={datePreset === "today" ? "default" : "outline"} onClick={() => handlePreset("today")}>Today</Button>
-          <Button size="sm" variant={datePreset === "yesterday" ? "default" : "outline"} onClick={() => handlePreset("yesterday")}>Yesterday</Button>
-          <Popover>
+          <Popover open={pickerOpen} onOpenChange={(o) => { setPickerOpen(o); if (o) { setDraftRange(dateRange); setDraftPreset(presetLabel); } }}>
             <PopoverTrigger asChild>
-              <Button size="sm" variant={datePreset === "custom" ? "default" : "outline"} className="gap-1.5">
-                <CalendarIcon className="h-3.5 w-3.5" />
-                {datePreset === "custom" && dateRange?.from
-                  ? `${format(dateRange.from, "MMM d")}${dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? ` – ${format(dateRange.to, "MMM d")}` : ""}`
-                  : "Date Range"}
+              <Button variant="outline" size="sm" className="justify-start text-left font-normal gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                {dateRange?.from
+                  ? `${format(dateRange.from, "MMM d, yyyy")} – ${format(dateRange.to ?? dateRange.from, "MMM d, yyyy")}`
+                  : "Select date range"}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={(range) => { setDateRange(range); setDatePreset("custom"); }}
-                numberOfMonths={isMobile ? 1 : 2}
-                className="p-3 pointer-events-auto"
-              />
+            <PopoverContent className="w-auto p-0" align="start" side="bottom">
+              <div className={cn("flex pointer-events-auto", isMobile && "flex-col")}>
+                <div className={cn("p-3", isMobile ? "border-b" : "border-r min-w-[150px]")}>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Presets</p>
+                  <div className={cn(isMobile ? "grid grid-cols-2 gap-x-3 gap-y-1" : "space-y-1.5")}>
+                    {TOPUP_DATE_PRESETS.map((p) => (
+                      <label key={p.label} className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          name="topup-preset"
+                          checked={draftPreset === p.label}
+                          onChange={() => { setDraftPreset(p.label); setDraftRange(p.getValue()); }}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        {p.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-3">
+                  <Calendar
+                    mode="range"
+                    selected={draftRange}
+                    onSelect={(range) => { setDraftRange(range); setDraftPreset(""); }}
+                    numberOfMonths={isMobile ? 1 : 2}
+                    disabled={(d) => d > new Date()}
+                    className="pointer-events-auto"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t px-4 py-3">
+                <div className="text-sm text-muted-foreground">
+                  {draftRange?.from
+                    ? `${format(draftRange.from, "MMM d, yyyy")} — ${format(draftRange.to ?? draftRange.from, "MMM d, yyyy")}`
+                    : "Select a range"}
+                </div>
+                <Button
+                  size="sm"
+                  disabled={!draftRange?.from}
+                  onClick={() => {
+                    if (!draftRange?.from) return;
+                    setDateRange({ from: startOfDay(draftRange.from), to: endOfDay(draftRange.to ?? draftRange.from) });
+                    setPresetLabel(draftPreset);
+                    setDatePreset(draftPreset === "Today" ? "today" : draftPreset === "Yesterday" ? "yesterday" : "custom");
+                    setPickerOpen(false);
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  Update
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
           {missingForwards.length > 0 && (
