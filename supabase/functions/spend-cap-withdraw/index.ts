@@ -94,13 +94,16 @@ Deno.serve(async (req) => {
         return json({ error: "Forbidden" }, 403);
       }
       // Client-side withdraw must be explicitly enabled by an admin.
-      const { data: permProfile } = await supabase
-        .from("profiles")
-        .select("spend_cap_withdraw_enabled")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (!permProfile?.spend_cap_withdraw_enabled) {
-        return json({ error: "Spend cap withdraw is not enabled for your account. Please contact support." }, 403);
+      // Dry runs (live preview) are allowed so request-mode clients see the max.
+      if (!dry_run) {
+        const { data: permProfile } = await supabase
+          .from("profiles")
+          .select("spend_cap_withdraw_enabled")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!permProfile?.spend_cap_withdraw_enabled) {
+          return json({ error: "Spend cap withdraw is not enabled for your account. Please contact support." }, 403);
+        }
       }
     }
 
@@ -155,12 +158,17 @@ Deno.serve(async (req) => {
     }
     const currentSpendCap = liveSpendCap;
 
-    const maxWithdrawable = Math.max(0, currentSpendCap - realAmountSpent);
+    const remaining = Math.max(0, currentSpendCap - realAmountSpent);
+    // Clients must leave a $10 buffer on the account.
+    const CLIENT_BUFFER = 10;
+    const maxWithdrawable = isAdmin ? remaining : Math.max(0, remaining - CLIENT_BUFFER);
     if (dry_run) {
       return json({
         success: true,
         current_spend_cap: currentSpendCap,
         real_amount_spent: realAmountSpent,
+        remaining: Number(remaining.toFixed(2)),
+        buffer: isAdmin ? 0 : CLIENT_BUFFER,
         max_withdrawable: Number(maxWithdrawable.toFixed(2)),
         via: getLastMetaVia(),
         source_ip: getLastMetaIp(),
