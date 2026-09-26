@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         // Mint and verify on this same deployment. This avoids invalid
         // signatures when the dashboard is served from a custom domain whose
         // runtime has a different secret binding.
-        if (action === "create_job" || action === "create_learn" || action === "create_autopilot") {
+        if (action === "create_job" || action === "create_learn" || action === "create_autopilot" || action === "retry") {
           const auth = request.headers.get("authorization") ?? "";
           const accessToken = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
           if (!accessToken) return json({ ok: false, error: "Admin login required" }, 401);
@@ -51,6 +51,14 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "superadmin" }),
           ]);
           if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
+
+          if (action === "retry") {
+            const requestId = String(body?.requestId ?? "");
+            if (!requestId) return json({ ok: false, error: "Request is required" }, 400);
+            const { retryExternalTopupServer } = await import("@/lib/externalTopupRetry.server");
+            const result = await retryExternalTopupServer(supabaseAdmin, requestId, userId, true);
+            return json({ ok: true, ...result });
+          }
 
           // Long-lived Auto-pilot token (30 days). The extension stores it and
           // uses it to list/claim pending requests — no CRM URL needed.
@@ -184,7 +192,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           const { data, error } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select(
-              "id, amount, wallet_kind, external_topup_url, created_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line)"
+              "id, amount, wallet_kind, external_topup_url, created_at, retry_requested_at, ad_accounts(account_id, external_topup_url, external_topup_url_secondary, external_topup_url_credit_line)"
             )
             .or("status.eq.pending,and(status.eq.completed,retry_requested_at.not.is.null)")
             .order("created_at", { ascending: true })
@@ -204,6 +212,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
               walletKind: r.wallet_kind ?? "primary",
               accountId: String(a.account_id ?? "").replace(/^act_/, ""),
               url,
+              retry: !!r.retry_requested_at,
             };
           });
           return json({ ok: true, items });
@@ -238,7 +247,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             .eq("id", requestId)
             .or("status.eq.pending,and(status.eq.completed,retry_requested_at.not.is.null)")
             .or(`automation_started_at.is.null,automation_started_at.lt.${staleBefore}`)
-            .select("id, amount, wallet_kind, ad_account_id, external_topup_url")
+              .select("id, amount, wallet_kind, ad_account_id, external_topup_url, retry_requested_at")
             .maybeSingle();
           if (claimErr) return json({ ok: false, error: claimErr.message }, 400);
           if (!claimed) return json({ ok: false, error: "Already claimed or no longer pending" }, 409);
