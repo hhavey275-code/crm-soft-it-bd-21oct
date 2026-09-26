@@ -14,8 +14,6 @@ import { format } from "date-fns";
 import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check, Bot } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
-import { useServerFn } from "@tanstack/react-start";
-import { retryExternalTopup } from "@/lib/externalTopupRetry.functions";
 
 
 interface Req {
@@ -127,7 +125,7 @@ export function AdminExternalTopUpRequests() {
   // Keep token signing and callback verification on this project's deployment.
   const apiBase = () => "https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app/api/public/crm-topup";
 
-  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot", data: Record<string, string>) => {
+  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot" | "retry", data: Record<string, string>) => {
     const accessToken = session?.access_token;
     if (!accessToken) throw new Error("Please sign in again");
     const response = await fetch(apiBase(), {
