@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runOcrWithFallback } from '../_shared/ocr-fallback.ts';
+import { resolveProofUrlForTelegram } from '../_shared/proof-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -276,10 +277,11 @@ Deno.serve(async (req) => {
     let ocrAccountMatch = false;
     let ocrAtmCredit = false;
     let ocrAccountNumber = '';
-    if (proof_url) {
+    const proofForOcr = proof_url ? await resolveProofUrlForTelegram(supabase, proof_url, 600) : null;
+    if (proofForOcr) {
       try {
         if (method === 'bank_transfer' || method === 'mfs_to_bank' || method === 'npsb') {
-          const { result } = await runOcrWithFallback(proof_url);
+          const { result } = await runOcrWithFallback(proofForOcr);
           ocrRef = String(result.reference || '').trim();
           ocrAmount = Number(result.bdt_amount || 0);
           ocrAccountNumber = String(result.account_number || '').trim();
@@ -295,7 +297,7 @@ Deno.serve(async (req) => {
           ocrPrompt =
             'Extract the transaction reference number, the BASE payment amount (in BDT), and the receiver/destination account number from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
           }
-          const content = await callOcrWithFallback(ocrPrompt, proof_url);
+          const content = await callOcrWithFallback(ocrPrompt, proofForOcr);
           if (content) {
             const jsonMatch = content.match(/\{[^}]+\}/);
             if (jsonMatch) {
