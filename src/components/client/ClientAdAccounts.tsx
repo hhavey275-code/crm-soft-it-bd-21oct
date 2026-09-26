@@ -114,6 +114,7 @@ export function ClientAdAccounts() {
   const [withdrawMax, setWithdrawMax] = useState<number | null>(null);
   const [withdrawMaxLoading, setWithdrawMaxLoading] = useState(false);
   const [withdrawLive, setWithdrawLive] = useState<{ cap: number; spent: number; remaining: number } | null>(null);
+  const [isTenantMode, setIsTenantMode] = useState(false);
 
   // Whether admin has enabled self-service Spend Cap Withdraw for this client
   const { data: canWithdraw } = useQuery({
