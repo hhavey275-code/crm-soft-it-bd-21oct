@@ -342,11 +342,11 @@ export function AdminExternalTopUpRequests() {
   const markManual = async (r: Req) => {
     setBusyId(r.id);
     try {
-      // Check Meta live; if the limit still hasn't moved, send it to the helper again.
-      const res = await createRemoteJob("retry", { requestId: r.id });
-      if (res.status === "updated") toast.success(`Completed — $${res.before.toLocaleString()} → $${res.after.toLocaleString()}`);
-      else if (res.status === "queued") toast.success("Meta-তে limit বাড়েনি — helper-এ আবার top-up পাঠানো হয়েছে");
-      else toast.error(res.reason);
+      const newCap = Number(r.spend_cap_before ?? 0) + Number(r.amount ?? 0);
+      const { data, error } = await supabase.rpc("admin_mark_external_topup_manual" as any, { p_id: r.id, p_new_cap: newCap, p_note: "Manually done by admin" });
+      if (error) throw error;
+      if ((data as any)?.ok === false) throw new Error((data as any)?.error || "Failed");
+      toast.success("Completed manually");
       qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
     } catch (e: any) {
       toast.error(e?.message || "Failed");
@@ -373,17 +373,16 @@ export function AdminExternalTopUpRequests() {
             )}
           </span>
         )}
-        {r.retry_requested_at && <Badge variant="outline" className="text-[10px] text-amber-600">Retry queued</Badge>}
-        {bad && r.limit_reason && !r.retry_requested_at && (
+        {bad && r.limit_reason && (
           <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive" title={r.limit_reason}>{r.limit_reason}</span>
         )}
-        {bad && !r.limit_reason && !r.retry_requested_at && (
+        {bad && !r.limit_reason && (
           <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive">
-            Meta-তে নতুন limit পাওয়া যায়নি—Manually done চাপলে আবার check করে Helper-এ পাঠাবে।
+            Meta-তে নতুন limit পাওয়া যায়নি।
           </span>
         )}
         {r.limit_status === "manual" && <Badge variant="secondary" className="text-[10px]">Manual</Badge>}
-        {r.spend_cap_after == null && r.status === "completed" && !r.retry_requested_at && (
+        {r.spend_cap_after == null && r.status === "completed" && (
           <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === r.id} onClick={() => markManual(r)}>
             Manually done
           </Button>
