@@ -3296,11 +3296,28 @@ export default function ClientDetailPage() {
                               <p>Method: {r.payment_method.replace(/_/g, " ")}</p>
                             )}
                             {r.usd_rate && <p>Rate: ৳{r.usd_rate}</p>}
-                            {r.invoices && r.invoices.length > 0 && (
-                              <p className="text-primary font-medium">
-                                Invoice: {r.invoices[0].invoice_number}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3 pt-1">
+                              {r.status === "approved" && (
+                                <a
+                                  href={`/invoice/${r.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary font-medium hover:underline inline-flex items-center gap-1"
+                                >
+                                  <FileText className="h-3 w-3" />
+                                  {r.invoices?.[0]?.invoice_number || "Invoice"}
+                                </a>
+                              )}
+                              {r.proof_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => openProof(r.proof_url)}
+                                  className="text-primary hover:underline inline-flex items-center gap-1"
+                                >
+                                  <Eye className="h-3 w-3" /> Proof
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -3358,10 +3375,17 @@ export default function ClientDetailPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs">
-                              {r.invoices && r.invoices.length > 0 ? (
-                                <span className="text-primary font-medium">
-                                  {r.invoices[0].invoice_number}
-                                </span>
+                              {r.status === "approved" ? (
+                                <a
+                                  href={`/invoice/${r.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary font-medium hover:underline inline-flex items-center gap-1"
+                                  title="Invoice দেখুন ও Download করুন"
+                                >
+                                  <FileText className="h-3 w-3" />
+                                  {r.invoices?.[0]?.invoice_number || "Invoice"}
+                                </a>
                               ) : (
                                 "—"
                               )}

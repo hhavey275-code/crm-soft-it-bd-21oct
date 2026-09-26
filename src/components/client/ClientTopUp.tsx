@@ -18,7 +18,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { logSystemAction } from "@/lib/systemLog";
 import { cn } from "@/lib/utils";
 import { TelegramPollStatus } from "@/components/TelegramPollStatus";
-import { createProofUrl } from "@/lib/proofUrl";
+import { createProofUrl, openProof } from "@/lib/proofUrl";
 
 type PaymentMethod = "online_transfer" | "mfs_to_bank" | "npsb" | "atm_deposit" | "cash_deposit";
 type PaymentCategory = "bank" | "mfs";
@@ -1398,11 +1398,18 @@ export function ClientTopUp() {
                     <span className="text-[11px] text-muted-foreground">{format(new Date(r.created_at), "MMM d, hh:mm a")}</span>
                     {r.payment_reference && <span className="text-[11px] text-muted-foreground">Ref: {r.payment_reference}</span>}
                   </div>
-                  {r.status === "approved" && (
-                    <div className="flex justify-end mt-2">
-                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
-                        <Link to={`/invoice/${r.id}`} target="_blank"><FileText className="h-3 w-3" />Invoice</Link>
-                      </Button>
+                  {(r.status === "approved" || r.proof_url) && (
+                    <div className="flex justify-end gap-1 mt-2">
+                      {r.proof_url && (
+                        <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" onClick={() => openProof(r.proof_url)}>
+                          <ImageIcon className="h-3 w-3" />Proof
+                        </Button>
+                      )}
+                      {r.status === "approved" && (
+                        <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
+                          <Link to={`/invoice/${r.id}`} target="_blank"><FileText className="h-3 w-3" />Invoice</Link>
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1418,6 +1425,7 @@ export function ClientTopUp() {
                   <TableHead>USD</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Proof</TableHead>
                   <TableHead>Invoice</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1429,6 +1437,13 @@ export function ClientTopUp() {
                     <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
                     <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
                     <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell>
+                      {r.proof_url ? (
+                        <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" onClick={() => openProof(r.proof_url)}>
+                          <ImageIcon className="h-3.5 w-3.5" />View
+                        </Button>
+                      ) : "—"}
+                    </TableCell>
                     <TableCell>
                       {r.status === "approved" ? (
                         <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
