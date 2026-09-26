@@ -227,7 +227,12 @@ async function ensureOffscreen() {
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.type !== "crm-keepalive") return;
   getState().then(({ autopilot }) => {
-    if (autopilot && autopilot.token) connectSocket();
+    if (autopilot && autopilot.token) {
+      connectSocket();
+      // Realtime can be interrupted by a locked screen or a network switch.
+      // Check the queue on every keep-alive as a deterministic fallback.
+      processQueue();
+    }
   });
 });
 ensureOffscreen();

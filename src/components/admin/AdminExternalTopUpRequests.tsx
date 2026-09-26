@@ -377,6 +377,11 @@ export function AdminExternalTopUpRequests() {
         {bad && r.limit_reason && !r.retry_requested_at && (
           <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive" title={r.limit_reason}>{r.limit_reason}</span>
         )}
+        {bad && !r.limit_reason && !r.retry_requested_at && (
+          <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive">
+            Meta-তে নতুন limit পাওয়া যায়নি—Manually done চাপলে আবার check করে Helper-এ পাঠাবে।
+          </span>
+        )}
         {r.limit_status === "manual" && <Badge variant="secondary" className="text-[10px]">Manual</Badge>}
         {r.spend_cap_after == null && r.status === "completed" && !r.retry_requested_at && (
           <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === r.id} onClick={() => markManual(r)}>

@@ -576,6 +576,11 @@ export function TransactionHistoryPanel({
             {cap.reason && (
               <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">{cap.reason}</span>
             )}
+            {!cap.reason && (
+              <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">
+                Meta-তে নতুন limit পাওয়া যায়নি—Retry চাপলে আবার check করে Helper-এ পাঠাবে।
+              </span>
+            )}
           </span>
         ) : (
           <span className="text-xs text-amber-600 animate-pulse">Updating…</span>
