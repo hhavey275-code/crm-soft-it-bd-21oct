@@ -33,7 +33,7 @@ function LimitRetryButton({ requestId }: { requestId: string }) {
           else toast.error(res.reason);
           qc.invalidateQueries({ queryKey: ["ext-topup-limits"] });
         } catch (e: any) {
-          toast.error(e?.message || "Retry failed");
+          toast.error(typeof e?.message === "string" && e.message ? e.message : "Retry করা যায়নি — আবার login করে চেষ্টা করুন");
         } finally {
           setBusy(false);
         }
