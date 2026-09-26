@@ -314,7 +314,10 @@ export const Route = createFileRoute("/api/public/crm-topup")({
                  return json({ ok: false, error: "Request is no longer pending" }, 409);
                }
              }
-            return json({ ok: true });
+            // Pull the new spend cap from Meta right away so history shows
+            // old → new limit without anyone pressing "manual update".
+            const capUpdated = await refreshCapFromMeta(supabaseAdmin, payload.requestId);
+            return json({ ok: true, capUpdated });
           }
           // Auto-pilot failure: release the claim so the request stays visible
           // as pending with the reason, and can be retried or done by hand.

@@ -482,14 +482,14 @@
           form.requestSubmit();
         } catch {}
       }
-      await sleep(1500);
+      await sleep(500);
     }
 
     // 2) find the row that shows this account id, then its top-up button
     const row = await waitFor(() => {
       const cells = Array.from(document.querySelectorAll("tr,li,[class*='row'],[class*='card']"));
       return cells.find((c) => visible(c) && (c.innerText || "").includes(job.accountId));
-    }, 12000);
+    }, 12000, 200);
     if (!row) {
       await reportFailure("অ্যাকাউন্ট " + job.accountId + " CRM-এর লিস্টে খুঁজে পাইনি।");
       return;
@@ -502,7 +502,7 @@
     btn.click();
 
     // 3) amount field
-    const amountEl = await waitFor(() => find(sel.amountInput) || fallbackAmountInput(document), 12000);
+    const amountEl = await waitFor(() => find(sel.amountInput) || fallbackAmountInput(document), 12000, 150);
     if (!amountEl) {
       await reportFailure("টপ-আপ ফর্মের অ্যামাউন্টের ঘর খুঁজে পাইনি।");
       return;
@@ -518,9 +518,9 @@
       await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
       return;
     }
-    await sleep(900);
+    await sleep(250);
     setValue(amountEl, job.amount);
-    await sleep(700);
+    await sleep(200);
 
 
     // 4) verify before submitting
@@ -578,11 +578,11 @@
         return (
           btns.find((b) => /(yes[, ]|yes$|increase it|confirm|নিশ্চিত|হ্যাঁ)/i.test((b.innerText || "").trim())) || null
         );
-      }, 6000, 300);
+      }, 6000, 150);
       if (confirmEl) {
         say("কনফার্ম করছি…");
         confirmEl.click();
-        await sleep(600);
+        await sleep(200);
       }
 
       const ERROR_RE =
@@ -600,7 +600,7 @@
         }
         if (sel.successIndicator && sel.successIndicator.text && fresh.includes(sel.successIndicator.text)) return true;
         return SUCCESS_RE.test(fresh) ? true : null;
-      }, 25000, 400);
+      }, 25000, 200);
 
       if (ok === "error") {
         await reportFailure("CRM বলছে: " + (crmError || "টপ-আপ ব্যর্থ হয়েছে।"));
