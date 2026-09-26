@@ -567,18 +567,15 @@ export function TransactionHistoryPanel({
         <ArrowRight className="h-4 w-4 text-primary" />
         {cap.next != null ? (
           <span className="text-foreground">{money(cap.next)}</span>
-        ) : cap.queued ? (
-          <span className="text-xs text-amber-600 animate-pulse">Retrying…</span>
         ) : cap.status === "not_updated" ? (
           <span className="inline-flex flex-wrap items-center gap-1">
             <span className="text-xs text-destructive">Limit বাড়েনি</span>
-            {cap.requestId && <LimitRetryButton requestId={cap.requestId} />}
             {cap.reason && (
               <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">{cap.reason}</span>
             )}
             {!cap.reason && (
               <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">
-                Meta-তে নতুন limit পাওয়া যায়নি—Retry চাপলে আবার check করে Helper-এ পাঠাবে।
+                Meta-তে নতুন limit পাওয়া যায়নি—admin দেখে নেবেন।
               </span>
             )}
           </span>
