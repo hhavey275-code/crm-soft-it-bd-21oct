@@ -123,15 +123,22 @@ export function AuthForm() {
         navigate({ to: "/dashboard", replace: true });
         return;
       } else {
+        if (fullName.trim().length < 2) throw new Error("Full name দিন");
+        if (businessName.trim().length < 2) throw new Error("Business name দিন");
+        if (phone.replace(/\D/g, "").length < 10) {
+          throw new Error("সঠিক phone number দিন (কমপক্ষে ১০ ডিজিট)");
+        }
+        if (businessAddress.trim().length < 5) throw new Error("সম্পূর্ণ business address দিন");
+        if (!monthlySpend) throw new Error("Monthly spend select করুন");
         const signUpPayload = {
-          email, password,
+          email: email.trim(), password,
           options: {
             data: {
-              full_name: fullName,
-              company: businessName || undefined,
-              phone: phone || undefined,
-              business_address: businessAddress || undefined,
-              monthly_spend: monthlySpend || undefined,
+              full_name: fullName.trim(),
+              company: businessName.trim(),
+              phone: phone.trim(),
+              business_address: businessAddress.trim(),
+              monthly_spend: monthlySpend,
               ...(agencyBranding.slug ? { agency_slug: agencyBranding.slug } : {}),
             },
             emailRedirectTo: window.location.origin,

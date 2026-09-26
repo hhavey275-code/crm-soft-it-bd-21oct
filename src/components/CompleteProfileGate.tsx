@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -33,29 +33,54 @@ function isBlank(value: string | null | undefined) {
  */
 export function CompleteProfileGate({ children }: { children: React.ReactNode }) {
   const { user, profile, role } = useAuth();
+  const [fullName, setFullName] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
   const [monthlySpend, setMonthlySpend] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    setFullName(profile.full_name?.trim() ?? user?.user_metadata?.full_name?.trim() ?? "");
+    setCompany(profile.company?.trim() ?? "");
+    setPhone(profile.phone?.trim() ?? "");
+    setBusinessAddress(profile.business_address?.trim() ?? "");
+    setMonthlySpend(profile.monthly_spend?.trim() ?? "");
+  }, [profile, user]);
 
   const needsInfo =
     !!user &&
     !!profile &&
     role === "client" &&
-    (isBlank(profile.company) || isBlank(profile.phone) || isBlank(profile.monthly_spend));
+    (isBlank(profile.full_name) ||
+      isBlank(profile.company) ||
+      isBlank(profile.phone) ||
+      isBlank(profile.business_address) ||
+      isBlank(profile.monthly_spend));
 
   if (!needsInfo) return <>{children}</>;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanedFullName = fullName.trim();
     const cleanedCompany = company.trim();
     const cleanedPhone = phone.trim();
+    const cleanedAddress = businessAddress.trim();
+    if (cleanedFullName.length < 2) {
+      toast.error("Full name দিন");
+      return;
+    }
     if (cleanedCompany.length < 2) {
       toast.error("Business name দিন");
       return;
     }
     if (cleanedPhone.replace(/\D/g, "").length < 10) {
       toast.error("সঠিক phone number দিন (কমপক্ষে ১০ ডিজিট)");
+      return;
+    }
+    if (cleanedAddress.length < 5) {
+      toast.error("সম্পূর্ণ business address দিন");
       return;
     }
     if (!monthlySpend) {
@@ -66,8 +91,14 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ company: cleanedCompany, phone: cleanedPhone, monthly_spend: monthlySpend })
-        .eq("user_id", user!.id);
+        .update({
+          full_name: cleanedFullName,
+          company: cleanedCompany,
+          phone: cleanedPhone,
+          business_address: cleanedAddress,
+          monthly_spend: monthlySpend,
+        })
+        .eq("user_id", user.id);
       if (error) throw error;
       toast.success("ধন্যবাদ! তথ্য সংরক্ষণ হয়েছে।");
       window.location.reload();
@@ -87,11 +118,23 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
           <div className="space-y-1 text-center">
             <h2 className="text-xl font-bold">Complete your profile</h2>
             <p className="text-sm text-muted-foreground">
-              আপনার business name, phone number এবং monthly spend দিলেই dashboard ব্যবহার করতে পারবেন।
+              সব তথ্য পূরণ না করা পর্যন্ত dashboard ব্যবহার করা যাবে না।
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-name">Full Name</Label>
+              <Input
+                id="cp-name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Your full name"
+                required
+                className="h-11"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="cp-company">Business Name</Label>
               <Input
@@ -99,6 +142,18 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Your business / company name"
+                required
+                className="h-11"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-address">Business Address</Label>
+              <Input
+                id="cp-address"
+                value={businessAddress}
+                onChange={(e) => setBusinessAddress(e.target.value)}
+                placeholder="Your complete business address"
                 required
                 className="h-11"
               />
