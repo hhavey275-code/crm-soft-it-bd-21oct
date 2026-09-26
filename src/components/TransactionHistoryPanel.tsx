@@ -27,7 +27,7 @@ function LimitRetryButton({ requestId }: { requestId: string }) {
           const { data: sessionData } = await supabase.auth.getSession();
           const accessToken = sessionData.session?.access_token;
           if (!accessToken) throw new Error("Session expired — আবার login করুন");
-          const response = await fetch("/api/public/crm-topup", {
+          const response = await fetch("https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app/api/public/crm-topup", {
             method: "POST",
             headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
             body: JSON.stringify({ action: "retry", requestId }),

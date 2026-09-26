@@ -123,7 +123,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   // Keep token signing and callback verification on this project's deployment.
-  const apiBase = () => `${window.location.origin}/api/public/crm-topup`;
+  const apiBase = () => "https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app/api/public/crm-topup";
 
   const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot" | "retry", data: Record<string, string>) => {
     const accessToken = session?.access_token;
@@ -136,8 +136,8 @@ export function AdminExternalTopUpRequests() {
       },
       body: JSON.stringify({ action, ...data }),
     });
-    const result = await response.json();
-    if (!response.ok || !result?.ok) throw new Error(result?.error || "Failed to create helper link");
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.ok) throw new Error(result?.error || result?.message || `Helper server error (${response.status})`);
     return result;
   };
 
