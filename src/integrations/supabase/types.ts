@@ -1977,6 +1977,7 @@ export type Database = {
           initiated_at: string
           initiated_by: string
           last_error: string | null
+          limit_reason: string | null
           limit_status: string
           manual_note: string | null
           notes: string | null
@@ -1986,6 +1987,8 @@ export type Database = {
           rejected_at: string | null
           rejected_by: string | null
           requested_by_client: boolean
+          retry_count: number
+          retry_requested_at: string | null
           spend_cap_after: number | null
           spend_cap_before: number | null
           status: string
@@ -2010,6 +2013,7 @@ export type Database = {
           initiated_at?: string
           initiated_by: string
           last_error?: string | null
+          limit_reason?: string | null
           limit_status?: string
           manual_note?: string | null
           notes?: string | null
@@ -2019,6 +2023,8 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           requested_by_client?: boolean
+          retry_count?: number
+          retry_requested_at?: string | null
           spend_cap_after?: number | null
           spend_cap_before?: number | null
           status?: string
@@ -2043,6 +2049,7 @@ export type Database = {
           initiated_at?: string
           initiated_by?: string
           last_error?: string | null
+          limit_reason?: string | null
           limit_status?: string
           manual_note?: string | null
           notes?: string | null
@@ -2052,6 +2059,8 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           requested_by_client?: boolean
+          retry_count?: number
+          retry_requested_at?: string | null
           spend_cap_after?: number | null
           spend_cap_before?: number | null
           status?: string
