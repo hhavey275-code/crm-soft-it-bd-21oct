@@ -13,11 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MissingCreditsCard } from "@/components/admin/MissingCreditsCard";
-import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, isWithinInterval, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
 
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send, Search } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon, Send, Search, RefreshCw } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { DateRange } from "react-day-picker";
 import { logSystemAction } from "@/lib/systemLog";
 import { ProofImage } from "@/components/ProofImage";
+
+const TOPUP_DATE_PRESETS = [
+  { label: "Today", getValue: () => ({ from: new Date(), to: new Date() }) },
+  { label: "Yesterday", getValue: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
+  { label: "Last 7 days", getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
+  { label: "Last 14 days", getValue: () => ({ from: subDays(new Date(), 13), to: new Date() }) },
+  { label: "Last 28 days", getValue: () => ({ from: subDays(new Date(), 27), to: new Date() }) },
+  { label: "Last 30 days", getValue: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
+  { label: "This week", getValue: () => ({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: new Date() }) },
+  { label: "Last week", getValue: () => ({ from: startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }), to: endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }) }) },
+  { label: "This month", getValue: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+  { label: "Last month", getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+];
+
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -168,6 +182,11 @@ export function AdminTopUp() {
       setDateRange({ from: yesterday, to: endOfDay(yesterday) });
     }
   };
+  void handlePreset;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [presetLabel, setPresetLabel] = useState("Today");
+  const [draftPreset, setDraftPreset] = useState("Today");
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>(dateRange);
 
 
 
