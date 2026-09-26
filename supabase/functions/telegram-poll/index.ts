@@ -189,11 +189,11 @@ Deno.serve(async (req) => {
     }
 
     // Self-loop: if pending still exists after this pass, schedule another run
-    // (without blocking the response). Bank SMS often arrives 2–10 min after the
-    // client submits, so keep checking for ~20 min: every 10s for the first
+    // (without blocking the response). Bank SMS often arrives a few minutes after
+    // the client submits, so keep checking for ~10 min: every 10s for the first
     // 2 min, then every 20s. New pending rows fire fresh chains via DB trigger.
     const hop = Number(body?.hop || 0);
-    const MAX_HOPS = 66;
+    const MAX_HOPS = 36;
     const HOP_DELAY_MS = hop < 12 ? 10_000 : 20_000;
     let scheduledNext = false;
     try {
