@@ -10,15 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { RotateCw } from "lucide-react";
-import { retryExternalTopup } from "@/lib/externalTopupRetry.functions";
 
 /** Small Retry button: checks Meta live, completes if risen, else queues one helper retry. */
 function LimitRetryButton({ requestId }: { requestId: string }) {
   const [busy, setBusy] = useState(false);
-  const retry = useServerFn(retryExternalTopup);
   const qc = useQueryClient();
   return (
     <button
@@ -27,11 +24,20 @@ function LimitRetryButton({ requestId }: { requestId: string }) {
       onClick={async () => {
         setBusy(true);
         try {
-          const res = await retry({ data: { requestId } });
+          const { data: sessionData } = await supabase.auth.getSession();
+          const accessToken = sessionData.session?.access_token;
+          if (!accessToken) throw new Error("Session expired — আবার login করুন");
+          const response = await fetch("/api/public/crm-topup", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({ action: "retry", requestId }),
+          });
+          const res = await response.json();
+          if (!response.ok || !res?.ok) throw new Error(res?.error || "Retry করা যায়নি");
           if (res.status === "updated") toast.success(`Limit updated: ${money(res.before)} → ${money(res.after)}`);
           else if (res.status === "queued") toast.success("Limit বাড়েনি — আবার top-up পাঠানো হয়েছে, কিছুক্ষণ পরে দেখুন");
           else toast.error(res.reason);
-          qc.invalidateQueries({ queryKey: ["ext-topup-limits"] });
+          await qc.invalidateQueries({ queryKey: ["ext-topup-limits"] });
         } catch (e: any) {
           toast.error(typeof e?.message === "string" && e.message ? e.message : "Retry করা যায়নি — আবার login করে চেষ্টা করুন");
         } finally {
@@ -569,6 +575,11 @@ export function TransactionHistoryPanel({
             {cap.requestId && <LimitRetryButton requestId={cap.requestId} />}
             {cap.reason && (
               <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">{cap.reason}</span>
+            )}
+            {!cap.reason && (
+              <span className="w-full whitespace-normal text-[10px] font-normal text-destructive/80">
+                Meta-তে নতুন limit পাওয়া যায়নি—Retry চাপলে আবার check করে Helper-এ পাঠাবে।
+              </span>
             )}
           </span>
         ) : (

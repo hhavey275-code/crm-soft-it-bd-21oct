@@ -1,4 +1,4 @@
-const API = "https://crm-korbo-plan.lovable.app/api/public/crm-topup";
+const API = "https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app/api/public/crm-topup";
 
 const statusEl = document.getElementById("autopilotStatus");
 const lastEl = document.getElementById("autopilotLast");

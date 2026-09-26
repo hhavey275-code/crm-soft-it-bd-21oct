@@ -14,8 +14,6 @@ import { format } from "date-fns";
 import { ExternalLink, Copy, X, Zap, GraduationCap, Download, Check, Bot } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logSystemAction } from "@/lib/systemLog";
-import { useServerFn } from "@tanstack/react-start";
-import { retryExternalTopup } from "@/lib/externalTopupRetry.functions";
 
 
 interface Req {
@@ -43,7 +41,6 @@ interface Req {
 export function AdminExternalTopUpRequests() {
   const { user, session } = useAuth();
   const qc = useQueryClient();
-  const retryFn = useServerFn(retryExternalTopup);
   const isMobile = useIsMobile();
   const [rejectReq, setRejectReq] = useState<Req | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -126,9 +123,9 @@ export function AdminExternalTopUpRequests() {
   };
 
   // Keep token signing and callback verification on this project's deployment.
-  const apiBase = () => "https://crm-korbo-plan.lovable.app/api/public/crm-topup";
+  const apiBase = () => `${window.location.origin}/api/public/crm-topup`;
 
-  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot", data: Record<string, string>) => {
+  const createRemoteJob = async (action: "create_job" | "create_learn" | "create_autopilot" | "retry", data: Record<string, string>) => {
     const accessToken = session?.access_token;
     if (!accessToken) throw new Error("Please sign in again");
     const response = await fetch(apiBase(), {
@@ -220,7 +217,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   const downloadHelper = () => {
-    fetch("/crm-topup-extension.zip?v=1.7.0", { cache: "no-store" })
+    fetch("/crm-topup-extension.zip?v=1.8.0", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
@@ -228,7 +225,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.7.0.zip";
+        a.download = "crm-topup-helper-v1.8.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -346,7 +343,7 @@ export function AdminExternalTopUpRequests() {
     setBusyId(r.id);
     try {
       // Check Meta live; if the limit still hasn't moved, send it to the helper again.
-      const res = await retryFn({ data: { requestId: r.id } });
+      const res = await createRemoteJob("retry", { requestId: r.id });
       if (res.status === "updated") toast.success(`Completed — $${res.before.toLocaleString()} → $${res.after.toLocaleString()}`);
       else if (res.status === "queued") toast.success("Meta-তে limit বাড়েনি — helper-এ আবার top-up পাঠানো হয়েছে");
       else toast.error(res.reason);
@@ -378,7 +375,12 @@ export function AdminExternalTopUpRequests() {
         )}
         {r.retry_requested_at && <Badge variant="outline" className="text-[10px] text-amber-600">Retry queued</Badge>}
         {bad && r.limit_reason && !r.retry_requested_at && (
-          <span className="w-full text-right text-[10px] text-destructive">{r.limit_reason}</span>
+          <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive" title={r.limit_reason}>{r.limit_reason}</span>
+        )}
+        {bad && !r.limit_reason && !r.retry_requested_at && (
+          <span className="w-full max-w-[280px] whitespace-normal text-right text-[11px] leading-snug text-destructive">
+            Meta-তে নতুন limit পাওয়া যায়নি—Manually done চাপলে আবার check করে Helper-এ পাঠাবে।
+          </span>
         )}
         {r.limit_status === "manual" && <Badge variant="secondary" className="text-[10px]">Manual</Badge>}
         {r.spend_cap_after == null && r.status === "completed" && !r.retry_requested_at && (
@@ -601,7 +603,7 @@ export function AdminExternalTopUpRequests() {
             </Button>
             <Button size="sm" variant="outline" onClick={downloadHelper}>
               <Download className="h-3.5 w-3.5 mr-1" />
-                Download helper (v1.7.0)
+                Download helper (v1.8.0)
             </Button>
           </div>
         </CardContent>

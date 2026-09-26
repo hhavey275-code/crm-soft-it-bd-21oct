@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.3.7)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.8.0)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -13,7 +13,7 @@ const SUPABASE_WS =
   "&vsn=1.0.0";
 const SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s";
-const BASE = "https://crm-korbo-plan.lovable.app";
+const BASE = "https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app";
 const API = BASE + "/api/public/crm-topup";
 
 let ws = null;
@@ -126,6 +126,10 @@ async function runOne(item) {
     throw new Error((claim && claim.error) || "claim failed");
   }
 
+  // A retry may be claimed from an old completed row. Mark the browser
+  // session explicitly so the result endpoint clears that retry queue.
+  claim.retry = !!item.retry;
+
   const url = `${claim.url}${claim.url.includes("#") ? "" : "#"}crmtopup=${encodeURIComponent(claim.token)}&api=${encodeURIComponent(API)}`;
   const tab = await chrome.tabs.create({ url, active: false });
 
@@ -223,7 +227,12 @@ async function ensureOffscreen() {
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.type !== "crm-keepalive") return;
   getState().then(({ autopilot }) => {
-    if (autopilot && autopilot.token) connectSocket();
+    if (autopilot && autopilot.token) {
+      connectSocket();
+      // Realtime can be interrupted by a locked screen or a network switch.
+      // Check the queue on every keep-alive as a deterministic fallback.
+      processQueue();
+    }
   });
 });
 ensureOffscreen();
@@ -259,7 +268,10 @@ chrome.runtime.onStartup.addListener(async () => {
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.storage.local.set({ installedAt: Date.now() });
   const { autopilot } = await getState();
-  if (autopilot && autopilot.token) connectSocket();
+  if (autopilot && autopilot.token) {
+    connectSocket();
+    processQueue();
+  }
 });
 
 // Popup can ask us to (re)start or stop.

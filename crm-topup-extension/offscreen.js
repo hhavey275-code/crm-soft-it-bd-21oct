@@ -2,4 +2,4 @@
 // workers, which made the helper miss new requests until the next alarm.
 setInterval(() => {
   try { chrome.runtime.sendMessage({ type: "crm-keepalive" }); } catch {}
-}, 20000);
+}, 10000);
