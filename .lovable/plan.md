@@ -1,52 +1,37 @@
-# External CRM Auto-pilot — 24/7 নির্ভরযোগ্য করা
+# মোবাইল (Kiwi browser) থেকে এক চাপে External Top-Up
 
-## এখন যা দেখা গেছে (গত ২–৩ দিনের ডেটা)
-- ১১৯টা request-এর সবগুলো শেষে completed হয়েছে, কিন্তু কিছু request সম্পন্ন হতে **৮০–৮৫ মিনিট** লেগেছে — মানে PC-র helper মাঝে মাঝে "ঘুমিয়ে" যায়, পরে জেগে কাজ করে।
-- ১৮টা request CRM-এ হয়ে গেছে কিন্তু history-তে এখনো "Updating…" — Meta থেকে নতুন limit কেউ আবার পড়ে আনেনি।
+## লক্ষ্য
+PC না চললেও অ্যাডমিন ফোনে pending request দেখে "Approve & Top-Up" চাপবেন। তখন Kiwi-তে helper নিজে admiki খুলে top-up করবে, limit মিলিয়ে Completed করবে।
 
-## কাজের পরিকল্পনা
+## যা হবে
 
-### ১. Helper ঘুমিয়ে না পড়া (extension v1.6.0)
-- Chrome-এর ভেতরে একটা লুকানো "keep-alive" পেজ রাখা হবে, যাতে helper কখনো বন্ধ না হয় ও live connection না কাটে।
-- প্রতি ৩০ সেকেন্ডে pending কিছু আছে কিনা নিজে থেকে দেখে নেবে (live সিগন্যাল মিস হলেও)।
-- কাজ আটকে গেলে (tab ঝুলে থাকা) ২ মিনিট পর নিজে বাতিল করে পরের request ধরবে।
+### ১. Pending এলেই ফোনে জানানো
+- নতুন external top-up request এলে অ্যাডমিনের ফোনে push notification যাবে: "AU958 — $50 pending"। ট্যাপ করলে সরাসরি External Top-Up পেজ খুলবে।
+- ৩ মিনিটেও কেউ না ধরলে আরেকবার মনে করিয়ে দেবে।
 
-### ২. Helper online কিনা ড্যাশবোর্ডে দেখা
-- helper প্রতি মিনিটে সার্ভারে "আমি চালু আছি" জানাবে।
-- External Top-Up পেজে সবুজ/লাল বাতি: **Helper Online / Offline (শেষ দেখা: x মিনিট আগে)**।
-- helper ৫ মিনিট offline থাকলে বা কোনো request ৫ মিনিটের বেশি pending থাকলে অ্যাডমিনকে Telegram-এ সতর্কবার্তা।
-- admiki-তে login চলে গেলে (session শেষ) helper সেটা ধরবে ও "CRM-এ আবার login করুন" সতর্কবার্তা পাঠাবে।
+### ২. মোবাইলে সহজ External Top-Up পেজ
+- প্রতিটা pending request বড় কার্ডে দেখাবে: অ্যাকাউন্টের নাম, টাকা, কোন wallet, কত মিনিট ধরে pending।
+- প্রতিটা কার্ডে বড় একটা **"Approve & Top-Up"** বাটন থাকবে। চাপলে নতুন tab-এ admiki খুলবে, helper নিজে amount বসিয়ে submit করবে।
+- শেষ হলে পেজে ফিরে সবুজ "✓ Completed (old → new limit)" দেখাবে। ব্যর্থ হলে লাল লেখায় কারণ আর "আবার চেষ্টা" বাটন থাকবে।
+- PC-র Auto-pilot আগে ধরে ফেললে মোবাইলের বাটন নিজে থেকে বন্ধ হয়ে যাবে, তাই একই top-up দুইবার হবে না।
 
-### ৩. আটকে থাকা request নিজে ছাড়া
-- কোনো request "running" অবস্থায় ১০ মিনিটের বেশি থাকলে সার্ভার সেটা আবার pending করে দেবে, যাতে helper আবার ধরতে পারে।
+### ৩. Helper Kiwi-তে চলার উপযোগী করা (v1.6.0)
+- ফোনে admiki-র পেজ ছোট দেখায়, তাই helper মোবাইল layout-এও বাটন ও ঘর খুঁজে নেবে।
+- মোবাইলে যা নেই (desktop notification, background) সেগুলোর জন্য আর আটকাবে না। ফলাফল পেজেই দেখাবে।
+- ফোন থেকে সহজে ডাউনলোড করে Kiwi-তে বসানোর নির্দেশনা পেজেই দেওয়া থাকবে।
 
-### ৪. ক্লায়েন্ট ৩০ সেকেন্ডের মধ্যে পরিষ্কার ফলাফল দেখবে
-ক্লায়েন্ট কখনো "হয়ে গেছে" দেখে পরে "হয়নি" দেখবে না — এটাই মূল নিয়ম।
+### ৪. Limit নিজে মিলিয়ে দেওয়া (ভুল error বন্ধ)
+- helper সফল বললে বা error দিলেও সার্ভার একবার Meta থেকে limit দেখবে। বেড়ে থাকলে নিজে থেকে "✓ Completed" হবে, আপনাকে আর manual করতে হবে না।
+- এখন history-তে যেসব request "Updating…" হয়ে আছে, সেগুলো একবারে Meta থেকে মিলিয়ে ঠিক করা হবে।
 
-- **Submit-এর আগেই যাচাই:** helper offline থাকলে বা SIBD বন্ধ থাকলে ক্লায়েন্ট submit-ই করতে পারবে না, পরিষ্কার লেখা দেখবে "এই মুহূর্তে top-up নেওয়া যাচ্ছে না, একটু পরে চেষ্টা করুন"। টাকা কাটবে না।
-- **Submit-এর পর (০–৩০ সেকেন্ড):** ক্লায়েন্ট একটা progress দেখবে ("Top-up চলছে…", কাউন্টডাউন সহ)।
-- **CRM সফল বললে:** সাথে সাথে "✓ Top-up সম্পন্ন — $X যোগ হয়েছে" দেখাবে। CRM-এর নিজস্ব সফলতার বার্তাই প্রমাণ, কারণ admiki সফল বললে limit সত্যিই বাড়ে (Meta-তে দেখাতে কখনো দেরি হয়, সেটা ক্লায়েন্টের জন্য বাধা হবে না)।
-- **CRM ব্যর্থ বা ৩০ সেকেন্ডে উত্তর না এলে:** "✗ Top-up হয়নি — টাকা wallet-এ ফেরত দেওয়া হয়েছে" দেখাবে, আর কাটা টাকা সাথে সাথে ফেরত যাবে। ক্লায়েন্ট আবার চেষ্টা করতে পারবে।
-- **ভুল error রোধ:** "ব্যর্থ" বলার আগে সার্ভার একবার Meta থেকে limit দেখবে (কয়েক সেকেন্ড)। limit বেড়ে থাকলে সেটা সফল ধরা হবে, টাকা ফেরত যাবে না, আপনাকে manual করতে হবে না।
-- **দুই দিকের নিরাপত্তা (শুধু অ্যাডমিন দেখবে, ক্লায়েন্ট নয়):**
-  - টাকা ফেরত দেওয়ার পরে যদি Meta-তে limit বাড়া দেখা যায় (দেরিতে হয়ে গেছে), অ্যাডমিনকে সতর্কবার্তা যাবে — সিদ্ধান্ত আপনি নেবেন, ক্লায়েন্টের কাছে কিছু উল্টাবে না।
-  - "সম্পন্ন" দেখানোর পর ১০ মিনিটেও Meta-তে limit না বাড়লে অ্যাডমিনকে সতর্কবার্তা (admiki চেক করার জন্য)।
-- History-তে পরে "Update from Meta" বা sync হলে, Updating অবস্থার request-গুলো limit মিললে নিজে থেকে old → new limit সহ Completed হবে।
-- এখনকার ১৮টা "Updating…" request-এর limit একবারে Meta থেকে পড়ে ঠিক করে দেওয়া হবে।
-
-### ৫. অফিস PC-র সেটিং (আপনার দিকে একবার করতে হবে)
-- Windows: Sleep = **Never**, Screen off হলেও চলবে।
-- Chrome Settings → System → "Continue running background apps when Chrome is closed" **On**।
-- Chrome-কে Windows startup-এ রাখা, এবং admiki-তে "Remember me" দিয়ে login রাখা।
-- (পরে চাইলে) দ্বিতীয় একটা PC-তেও helper চালু রাখা যায় — দুইটা একসাথে চললেও একটা request দুইবার হবে না।
+## আপনার দিকে একবার যা করতে হবে
+- ফোনে Kiwi (বা Lemur) browser ইনস্টল করা।
+- সেখানে helper-এর zip ফাইল বসানো, আর admiki-তে "Remember me" দিয়ে login রাখা।
+- অ্যাপে অ্যাডমিন হিসেবে notification চালু করা।
 
 ## প্রযুক্তিগত বিবরণ
-- Extension: `offscreen` permission + offscreen document যা WebSocket ও heartbeat ধরে রাখে; background-এ alarm-ভিত্তিক `list_pending` fallback; tab timeout বিদ্যমান।
-- `/api/public/crm-topup`: নতুন actions `heartbeat` (autopilot token দিয়ে যাচাই, `site_settings`/নতুন `autopilot_heartbeats` টেবিলে last_seen, version, crm_logged_in) ও `verify_cap`; `claim`-এর আগে ১০ মিনিটের পুরনো running claim release।
-- `result` success → request completed; সার্ভার `get-account-insights` দিয়ে cap পড়ে `spend_cap_after`/`limit_status=updated` সেট, পরে না বাড়লে অ্যাডমিন অ্যালার্ট।
-- `result` failure বা ৩০s deadline পার → একবার Meta cap চেক; বাড়েনি হলে `fail_external_topup` দিয়ে wallet refund ও status `failed`।
-- ক্লায়েন্ট dialog realtime/৩ সেকেন্ড অন্তর request status দেখবে; `request_external_topup` RPC helper heartbeat ৯০s-এর পুরনো হলে reject করবে।
-- Extension-এ প্রতি request-এর timeout ১২০s থেকে ২৫s।
-- Offline/pending সতর্কবার্তা: বিদ্যমান ৫ মিনিটের cron-এর সাথে যুক্ত করা হবে, নতুন আলাদা polling job নয়।
-- UI: `ExternalTopUpPage` এ `HelperStatusBadge`।
-- zip পুনর্নির্মাণ ও download লিংক আপডেট।
+- Push: `notify_admins_on_external_topup_request` ট্রিগারে বিদ্যমান `send-push-notification`, URL `/external-top-up`। Reminder বিদ্যমান ৫-মিনিটের cron-এ যোগ হবে, নতুন polling job নয়।
+- `AdminExternalTopUpRequests.tsx`: মোবাইল কার্ড layout। "Approve & Top-Up" বিদ্যমান `createCrmTopUpJob` ব্যবহার করে `#crmtopup=` লিংক খুলবে। realtime দিয়ে status দেখাবে। `automation_started_at` < ৩ মিনিট হলে বাটন বন্ধ থাকবে।
+- `crm-topup-extension/content.js`: selector fallback (মোবাইলে viewport, hidden menu)। `chrome.notifications`, `alarms` try/catch-এ মোড়ানো। ফলাফল `result` API-তে যাবে।
+- `/api/public/crm-topup` `result`: success বা failure দুই ক্ষেত্রেই `get-account-insights` দিয়ে cap চেক, বাড়লে `spend_cap_after` + `limit_status=updated` + completed। একবারের backfill চলবে পুরনো pending-limit request-গুলোর জন্য।
+- zip rebuild, version 1.6.0।
