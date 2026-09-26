@@ -208,12 +208,39 @@ function connectSocket() {
   };
 }
 
+// ---------- 24/7 keep-alive ----------
+async function ensureOffscreen() {
+  try {
+    if (!chrome.offscreen) return;
+    if (chrome.offscreen.hasDocument && (await chrome.offscreen.hasDocument())) return;
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: ["WORKERS"],
+      justification: "Keep Auto-pilot connected so new top-up requests run instantly",
+    });
+  } catch {}
+}
+chrome.runtime.onMessage.addListener((msg) => {
+  if (!msg || msg.type !== "crm-keepalive") return;
+  getState().then(({ autopilot }) => {
+    if (autopilot && autopilot.token) connectSocket();
+  });
+});
+ensureOffscreen();
+getState().then(({ autopilot }) => {
+  if (autopilot && autopilot.token) {
+    connectSocket();
+    processQueue();
+  }
+});
+
 // MV3 workers are suspended when idle; this alarm only wakes the worker so
 // the socket can reconnect — it does not hit any server by itself.
 chrome.alarms.create("crm-autopilot-keepalive", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name !== "crm-autopilot-keepalive") return;
   const { autopilot } = await getState();
+  ensureOffscreen();
   if (!autopilot || !autopilot.token) return;
   connectSocket();
   // Safety net: if the worker was asleep when a ping fired, catch up here.
@@ -221,6 +248,7 @@ chrome.alarms.onAlarm.addListener(async (a) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  ensureOffscreen();
   const { autopilot } = await getState();
   if (autopilot && autopilot.token) {
     connectSocket();
@@ -239,6 +267,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.type !== "crm-autopilot-control") return;
   (async () => {
     if (msg.command === "start") {
+      ensureOffscreen();
       connectSocket();
       processQueue();
       sendResponse({ ok: true });

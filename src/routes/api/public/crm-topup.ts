@@ -314,7 +314,10 @@ export const Route = createFileRoute("/api/public/crm-topup")({
                  return json({ ok: false, error: "Request is no longer pending" }, 409);
                }
              }
-            return json({ ok: true });
+            // Pull the new spend cap from Meta right away so history shows
+            // old → new limit without anyone pressing "manual update".
+            const capUpdated = await refreshCapFromMeta(supabaseAdmin, payload.requestId);
+            return json({ ok: true, capUpdated });
           }
           // Auto-pilot failure: release the claim so the request stays visible
           // as pending with the reason, and can be retried or done by hand.
@@ -347,3 +350,36 @@ export const Route = createFileRoute("/api/public/crm-topup")({
     },
   },
 });
+
+// Meta sometimes needs a few seconds to reflect the new spend cap. Try a few
+// times (~20s total); the ad_accounts trigger fills spend_cap_after as soon
+// as the cap is higher than before.
+async function refreshCapFromMeta(admin: any, requestId: string): Promise<boolean> {
+  try {
+    const { data: req } = await admin
+      .from("external_topup_requests")
+      .select("ad_account_id, spend_cap_after")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (!req?.ad_account_id) return false;
+    if (req.spend_cap_after != null) return true;
+    const url = process.env["SUPABASE_URL"];
+    const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!url || !key) return false;
+    for (const wait of [1500, 3000, 5000, 8000]) {
+      await new Promise((r) => setTimeout(r, wait));
+      await fetch(`${url}/functions/v1/get-account-insights`, {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+        body: JSON.stringify({ ad_account_ids: [req.ad_account_id], source: "meta" }),
+      }).catch(() => null);
+      const { data: now } = await admin
+        .from("external_topup_requests")
+        .select("spend_cap_after")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (now?.spend_cap_after != null) return true;
+    }
+  } catch {}
+  return false;
+}
