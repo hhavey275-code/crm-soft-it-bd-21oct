@@ -50,15 +50,16 @@ export const Route = createFileRoute("/api/public/crm-topup")({
             supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
             supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "superadmin" }),
           ]);
-          if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
 
           if (action === "retry") {
             const requestId = String(body?.requestId ?? "");
             if (!requestId) return json({ ok: false, error: "Request is required" }, 400);
             const { retryExternalTopupServer } = await import("@/lib/externalTopupRetry.server");
-            const result = await retryExternalTopupServer(supabaseAdmin, requestId, userId, true);
+            const result = await retryExternalTopupServer(supabaseAdmin, requestId, userId, !!isAdmin || !!isSuper);
             return json({ ok: true, ...result });
           }
+
+          if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
 
           // Long-lived Auto-pilot token (30 days). The extension stores it and
           // uses it to list/claim pending requests — no CRM URL needed.
