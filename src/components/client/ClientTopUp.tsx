@@ -425,7 +425,7 @@ export function ClientTopUp() {
   const { data: myRequests } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(20);
+      const { data } = await supabase.from("top_up_requests").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(1000);
       return data ?? [];
     },
     enabled: !!user,
