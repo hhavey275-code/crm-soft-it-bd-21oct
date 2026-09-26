@@ -9,7 +9,7 @@ import { Clock } from "lucide-react";
 import { attachPendingReferral } from "@/lib/referral";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, profile } = useAuth();
+  const { user, loading, profile, role } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,10 +33,10 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
     if (user) void attachPendingReferral();
   }, [user]);
 
-  // Profile/role hydration may be slow even after the auth session is known.
-  // Only block the route while we still do not know whether a user exists;
-  // authenticated children can render their own data-loading/error state.
-  if (loading && !user) {
+  // Fail closed: no protected screen may render before both role and profile
+  // are known. This also prevents a newly-created OAuth user from slipping
+  // past the mandatory profile form while its profile row is still loading.
+  if (loading || (user && (!role || !profile))) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -46,27 +46,25 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  if (profile?.status === "pending") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8 space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-              <Clock className="h-8 w-8 text-amber-600" />
-            </div>
-            <h2 className="text-xl font-bold">Account Pending Approval</h2>
-            <p className="text-muted-foreground">
-              Your account has been created. Please wait for an admin to approve before you can access the platform.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <MaintenanceGate>
-      <CompleteProfileGate>{children}</CompleteProfileGate>
-    </MaintenanceGate>
+    <CompleteProfileGate>
+      {profile?.status === "pending" ? (
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <Card className="max-w-md w-full text-center">
+            <CardContent className="p-8 space-y-4">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <Clock className="h-8 w-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold">Account Pending Approval</h2>
+              <p className="text-muted-foreground">
+                Your details are complete. Please wait for an admin to approve your account.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <MaintenanceGate>{children}</MaintenanceGate>
+      )}
+    </CompleteProfileGate>
   );
 }
