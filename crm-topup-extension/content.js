@@ -505,6 +505,8 @@
       return;
     }
     btn.click();
+    // Give the CRM ~3s to fetch live data from Meta before we touch the form.
+    await sleep(3000);
 
     // 3) amount field
     const amountEl = await waitFor(() => find(sel.amountInput) || fallbackAmountInput(document), 12000, 150);
