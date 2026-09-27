@@ -262,7 +262,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   const downloadHelper = () => {
-    fetch("/crm-topup-extension.zip?v=2.00", { cache: "no-store" })
+    fetch("/crm-topup-extension.zip?v=2.10", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
@@ -270,7 +270,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v2.00.zip";
+        a.download = "crm-topup-helper-v2.10.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -653,7 +653,7 @@ export function AdminExternalTopUpRequests() {
             </Button>
             <Button size="sm" variant="outline" onClick={downloadHelper}>
               <Download className="h-3.5 w-3.5 mr-1" />
-                Download helper (v2.00)
+                Download helper (v2.10)
             </Button>
           </div>
         </CardContent>
