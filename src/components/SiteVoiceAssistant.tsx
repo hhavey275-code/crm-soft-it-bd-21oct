@@ -35,7 +35,7 @@ function speak(text: string, onDone: () => void) {
 function stopSpeaking() {
   currentAbort?.abort();
   currentAbort = null;
-  stopSpeaking();
+  window.speechSynthesis?.cancel();
 }
 
 export function SiteVoiceAssistant() {
