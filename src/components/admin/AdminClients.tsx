@@ -299,13 +299,17 @@ export function AdminClients() {
     return !term || c.full_name?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term) || c.company?.toLowerCase().includes(term);
   });
 
-  const pendingClients = filtered?.filter((c: any) => c.status === "pending") ?? [];
+  // Google sign-ups get a profile row instantly; hide them until the mandatory
+  // details form is completed so admins only see real signup requests.
+  const isIncomplete = (c: any) =>
+    c.status === "pending" && (!String(c.phone ?? "").trim() || !String(c.company ?? "").trim());
+  const pendingClients = filtered?.filter((c: any) => c.status === "pending" && !isIncomplete(c)) ?? [];
   const activeClients = filtered?.filter((c: any) => c.status !== "pending") ?? [];
 
   // Counts for metrics
-  const totalClients = clients?.length ?? 0;
+  const totalClients = clients?.filter((c: any) => !isIncomplete(c)).length ?? 0;
   const activeCount = clients?.filter((c: any) => c.status === "active").length ?? 0;
-  const pendingCount = clients?.filter((c: any) => c.status === "pending").length ?? 0;
+  const pendingCount = pendingClients.length;
   const inactiveCount = clients?.filter((c: any) => c.status === "inactive").length ?? 0;
 
   const renderMobileCards = (items: any[]) => (

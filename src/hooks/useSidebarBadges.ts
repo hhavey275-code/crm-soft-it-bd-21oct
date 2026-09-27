@@ -26,7 +26,9 @@ export function useSidebarBadges(): Record<string, number> {
         supabase
           .from("profiles")
           .select("*", { count: "exact", head: true })
-          .eq("status", "pending"),
+          .eq("status", "pending")
+          .not("phone", "is", null)
+          .not("company", "is", null),
         (supabase as any)
           .from("failed_topups")
           .select("*", { count: "exact", head: true })
