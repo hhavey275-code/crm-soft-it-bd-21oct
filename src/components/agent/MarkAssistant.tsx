@@ -34,10 +34,7 @@ export function MarkAssistant() {
   const [mode, setMode] = useState<Mode>("off");
   const [alwaysOn, setAlwaysOn] = useState(false);
   const [lastAnswer, setLastAnswer] = useState("");
-  const [supported] = useState(() => {
-    const w = window as any;
-    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
-  });
+  const [supported, setSupported] = useState(false);
   const recRef = useRef<any>(null);
   const modeRef = useRef<Mode>("off");
   const alwaysOnRef = useRef(false);
