@@ -92,6 +92,7 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
       startIndex?: number;
       currency?: string;
       timezoneId?: number;
+      forceNumbered?: boolean;
     }) => {
       if (!data?.bmId) throw new Error("bmId is required");
       if (!data?.namePrefix?.trim()) throw new Error("namePrefix is required");
@@ -102,7 +103,8 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const { bm, token, supabaseAdmin } = await loadBm(data.bmId);
 
-    const count = Math.min(Math.max(Number(data.count ?? 1), 1), 20);
+    // Per-call batch (client loops for bigger totals to stay within server time limits).
+    const count = Math.min(Math.max(Number(data.count ?? 1), 1), 10);
     const prefix = data.namePrefix.trim().slice(0, 60);
     const startIndex = Math.max(Number(data.startIndex ?? 1), 1);
     const currency = (data.currency ?? "USD").toUpperCase();
@@ -113,7 +115,7 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
     let stoppedByLimit = false;
 
     for (let i = 0; i < count; i++) {
-      const name = count === 1 ? prefix : `${prefix} ${startIndex + i}`;
+      const name = count === 1 && !data.forceNumbered ? prefix : `${prefix} ${startIndex + i}`;
       const form = new URLSearchParams({
         name,
         currency,
