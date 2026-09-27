@@ -82,18 +82,15 @@
   // confirmed, so always report the outcome back.
   async function reportServer(success, error) {
     if (!session || !session.job) return;
-    // A successful CRM response can reach us before Meta exposes the new cap.
-    // Repeat the result check for a short bounded window; each call refreshes
-    // the account from Meta. Keep the CRM tab open until that finishes.
-    const attempts = success ? 5 : 3;
-    const waits = [0, 2000, 3000, 5000, 7000];
+    // Report once (retry only on network failure) so the CRM tab closes right
+    // away. The server/dashboard keep checking Meta every 10s for the new cap.
     let lastResult = null;
-    for (let i = 0; i < attempts; i++) {
-      if (waits[i]) await sleep(waits[i]);
+    for (let i = 0; i < 3; i++) {
+      if (i) await sleep(1500);
       try {
         const r = await api("result", { success: !!success, error: error || null });
         lastResult = r;
-        if (r && r.ok && (!success || r.capUpdated)) return r;
+        if (r && r.ok) return r;
       } catch {}
     }
     return lastResult;
@@ -622,7 +619,7 @@
       notifyBackground(true);
 
        say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId +
-         (serverResult && serverResult.capUpdated ? "<br>Spend cap update হয়েছে।" : "<br>Meta update যাচাই শেষ হয়েছে।"), [
+         (serverResult && serverResult.capUpdated ? "<br>Spend cap update হয়েছে।" : "<br>Limit Meta থেকে নিজে update হবে।"), [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
 
