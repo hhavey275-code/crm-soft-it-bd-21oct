@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         // Mint and verify on this same deployment. This avoids invalid
         // signatures when the dashboard is served from a custom domain whose
         // runtime has a different secret binding.
-        if (action === "create_job" || action === "create_learn" || action === "create_autopilot" || action === "retry") {
+        if (action === "create_job" || action === "create_learn" || action === "create_autopilot" || action === "helper_status" || action === "retry") {
           const auth = request.headers.get("authorization") ?? "";
           const accessToken = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
           if (!accessToken) return json({ ok: false, error: "Admin login required" }, 401);
@@ -60,6 +60,16 @@ export const Route = createFileRoute("/api/public/crm-topup")({
           }
 
           if (!isAdmin && !isSuper) return json({ ok: false, error: "Admin access required" }, 403);
+
+          if (action === "helper_status") {
+            const { data: heartbeat } = await supabaseAdmin
+              .from("site_settings")
+              .select("value")
+              .eq("key", "crm_helper_last_seen")
+              .maybeSingle();
+            const lastSeen = typeof heartbeat?.value === "string" ? heartbeat.value : null;
+            return json({ ok: true, lastSeen });
+          }
 
           // Long-lived Auto-pilot token (30 days). The extension stores it and
           // uses it to list/claim pending requests — no CRM URL needed.
@@ -416,9 +426,9 @@ export const Route = createFileRoute("/api/public/crm-topup")({
   },
 });
 
-// Meta sometimes needs a few seconds to reflect the new spend cap. Try a few
-// times (~20s total); the ad_accounts trigger fills spend_cap_after as soon
-// as the cap is higher than before.
+// Refresh once per result call. The helper repeats successful result calls for
+// a bounded window, avoiding one long server request that can time out while
+// Meta is still propagating the new cap.
 async function refreshCapFromMeta(admin: any, requestId: string): Promise<boolean> {
   try {
     const { data: req } = await admin
@@ -431,20 +441,17 @@ async function refreshCapFromMeta(admin: any, requestId: string): Promise<boolea
     const url = process.env["SUPABASE_URL"];
     const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
     if (!url || !key) return false;
-    for (const wait of [1500, 3000, 5000, 8000, 10000, 12000]) {
-      await new Promise((r) => setTimeout(r, wait));
-      await fetch(`${url}/functions/v1/get-account-insights`, {
-        method: "POST",
-        headers: { "content-type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-        body: JSON.stringify({ ad_account_ids: [req.ad_account_id], source: "meta" }),
-      }).catch(() => null);
-      const { data: now } = await admin
-        .from("external_topup_requests")
-        .select("spend_cap_after")
-        .eq("id", requestId)
-        .maybeSingle();
-      if (now?.spend_cap_after != null) return true;
-    }
+    await fetch(`${url}/functions/v1/get-account-insights`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ ad_account_ids: [req.ad_account_id], source: "meta" }),
+    }).catch(() => null);
+    const { data: now } = await admin
+      .from("external_topup_requests")
+      .select("spend_cap_after")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (now?.spend_cap_after != null) return true;
   } catch {}
   return false;
 }

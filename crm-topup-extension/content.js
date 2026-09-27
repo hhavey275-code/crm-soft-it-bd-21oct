@@ -81,14 +81,22 @@
   // Auto-pilot jobs stay "pending" on the server until the CRM top-up is
   // confirmed, so always report the outcome back.
   async function reportServer(success, error) {
-    if (!session || !session.autopilot) return;
-    for (let i = 0; i < 3; i++) {
+    if (!session || !session.job) return;
+    // A successful CRM response can reach us before Meta exposes the new cap.
+    // Repeat the result check for a short bounded window; each call refreshes
+    // the account from Meta. Keep the CRM tab open until that finishes.
+    const attempts = success ? 5 : 3;
+    const waits = [0, 2000, 3000, 5000, 7000];
+    let lastResult = null;
+    for (let i = 0; i < attempts; i++) {
+      if (waits[i]) await sleep(waits[i]);
       try {
         const r = await api("result", { success: !!success, error: error || null });
-        if (r && r.ok) return;
+        lastResult = r;
+        if (r && r.ok && (!success || r.capUpdated)) return r;
       } catch {}
-      await sleep(1500 * (i + 1));
     }
+    return lastResult;
   }
 
 
@@ -101,8 +109,8 @@
     return res.json();
   }
 
-  // The dashboard approves the request the moment Approve & Top-Up is clicked,
-  // so the helper never reports back to the server — it only shows the outcome.
+  // Both Auto-pilot and dashboard-started jobs report the CRM outcome. The
+  // request remains Processing until this confirmation reaches the server.
 
   // ---------- local fallback store (works even if the link expired) ----------
   const LOCAL_KEY = "crmLayout:" + location.host;
@@ -610,10 +618,11 @@
         await reportFailure("সফল হয়েছে কিনা নিশ্চিত হতে পারিনি — CRM কোনো success মেসেজ দেয়নি। লিমিট বাড়েনি ধরে নিন, CRM-এ চেক করুন।");
         return;
       }
-      await reportServer(true);
+       const serverResult = await reportServer(true);
       notifyBackground(true);
 
-      say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId, [
+       say("<b style='color:#86efac'>টপ-আপ সম্পন্ন</b><br>$" + job.amount + " — " + job.accountId +
+         (serverResult && serverResult.capUpdated ? "<br>Spend cap update হয়েছে।" : "<br>Meta update যাচাই শেষ হয়েছে।"), [
         { label: "বন্ধ করুন", onClick: () => (clearSession(), panel.remove()) },
       ]);
 
