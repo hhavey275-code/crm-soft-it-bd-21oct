@@ -110,10 +110,17 @@ export function AdminExternalTopUpRequests() {
 
   const { data: helperLastSeen = null } = useQuery({
     queryKey: ["crm-helper-last-seen"],
+    enabled: !!session?.access_token,
     refetchInterval: 20000,
     queryFn: async () => {
-      const { data } = await supabase.from("site_settings").select("value").eq("key", "crm_helper_last_seen").maybeSingle();
-      return (data?.value as string | null) ?? null;
+      const response = await fetch("https://project--d985f3fc-b84f-4152-b2b7-4cffe71556ee.lovable.app/api/public/crm-topup", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ action: "helper_status" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) return null;
+      return (result.lastSeen as string | null) ?? null;
     },
   });
   const helperOnline = !!helperLastSeen && Date.now() - new Date(helperLastSeen).getTime() < 2 * 60 * 1000;
@@ -232,7 +239,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   const downloadHelper = () => {
-    fetch("/crm-topup-extension.zip?v=1.8.1", { cache: "no-store" })
+    fetch("/crm-topup-extension.zip?v=2.00", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
@@ -240,7 +247,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.8.1.zip";
+        a.download = "crm-topup-helper-v2.00.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -623,7 +630,7 @@ export function AdminExternalTopUpRequests() {
             </Button>
             <Button size="sm" variant="outline" onClick={downloadHelper}>
               <Download className="h-3.5 w-3.5 mr-1" />
-                Download helper (v1.8.1)
+                Download helper (v2.00)
             </Button>
           </div>
         </CardContent>
