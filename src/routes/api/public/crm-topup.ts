@@ -125,10 +125,19 @@ export const Route = createFileRoute("/api/public/crm-topup")({
              actorId: userId,
             exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
           });
-          await supabaseAdmin
+          // Atomic claim so an admin click and the helper can never run the same request twice.
+          const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+          const { data: claimedRow } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .update({ crm_provider: host, automation_started_at: new Date().toISOString() })
-            .eq("id", requestId);
+            .eq("id", requestId)
+            .eq("status", "pending")
+            .or(`automation_started_at.is.null,automation_started_at.lt.${staleBefore}`)
+            .select("id")
+            .maybeSingle();
+          if (!claimedRow) {
+            return json({ ok: false, error: "Helper এই request-টা এখন process করছে — আবার top-up দেবেন না" }, 409);
+          }
           return json({ ok: true, token, host, accountId, amount: Number((topup as any).amount) });
         }
 
