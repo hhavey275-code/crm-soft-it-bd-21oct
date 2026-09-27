@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [x] Release CRM Helper v2.00 with verified package, reliable active status, and automatic post-top-up Meta cap refresh (2026-09-27).
 - [x] Diagnose and fix Meta BM ad-account creation responses; make Helper show verified server connectivity instead of only saved-token status (2026-09-27).
 - [x] External CRM "Limit বাড়েনি": show reason; client Retry (Meta check → else queue helper, once); admin Manually done → Meta check → else auto helper retry. No 2-min auto retry (2026-09-27).
 - [x] Block Google/direct sign-ups from every protected page until full name, business name, phone, address, and monthly spend are complete (2026-09-26).
