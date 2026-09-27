@@ -221,6 +221,18 @@ export const Route = createFileRoute("/api/public/crm-topup")({
               await supabaseAdmin.from("site_settings").insert({ key: "crm_helper_last_seen", value: nowIso });
             }
           }
+          // Completed top-ups still waiting for Meta's new cap: re-check them.
+          {
+            const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const { data: waiting } = await supabaseAdmin
+              .from("external_topup_requests" as any)
+              .select("id")
+              .eq("status", "completed")
+              .is("spend_cap_after", null)
+              .gte("completed_at", since)
+              .limit(5);
+            await Promise.all(((waiting as any[]) ?? []).map((w) => refreshCapFromMeta(supabaseAdmin, w.id)));
+          }
           const { data, error } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select(
@@ -362,17 +374,9 @@ export const Route = createFileRoute("/api/public/crm-topup")({
               .from("external_topup_requests" as any)
               .update({ retry_requested_at: null, automation_started_at: null })
               .eq("id", payload.requestId);
+            // Leave limit_status pending ("Updating…"); the helper heartbeat and
+            // the admin page re-check Meta every ~10s until the cap moves.
             const capUpdated = await refreshCapFromMeta(supabaseAdmin, payload.requestId);
-            if (!capUpdated) {
-              await supabaseAdmin
-                .from("external_topup_requests" as any)
-                .update({
-                  limit_status: "not_updated",
-                  limit_reason: "CRM সফল দেখিয়েছে, কিন্তু Meta-তে limit বাড়েনি (CRM balance/দেরি হতে পারে)",
-                })
-                .eq("id", payload.requestId)
-                .is("spend_cap_after", null);
-            }
             return json({ ok: true, capUpdated });
           }
           // Auto-pilot failure: release the claim so the request stays visible
