@@ -190,6 +190,18 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         // ---- Auto-pilot: list & claim pending requests ------------------
         if (action === "list_pending") {
           if (payload.scope !== "autopilot") return json({ ok: false, error: "Auto-pilot token required" }, 403);
+          // Heartbeat: the helper polls every ~30s, so admins can see if it is alive.
+          {
+            const nowIso = new Date().toISOString();
+            const { data: hb } = await supabaseAdmin
+              .from("site_settings")
+              .update({ value: nowIso, updated_at: nowIso })
+              .eq("key", "crm_helper_last_seen")
+              .select("id");
+            if (!hb || hb.length === 0) {
+              await supabaseAdmin.from("site_settings").insert({ key: "crm_helper_last_seen", value: nowIso });
+            }
+          }
           const { data, error } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select(
@@ -410,7 +422,7 @@ async function refreshCapFromMeta(admin: any, requestId: string): Promise<boolea
     const url = process.env["SUPABASE_URL"];
     const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
     if (!url || !key) return false;
-    for (const wait of [1500, 3000, 5000, 8000]) {
+    for (const wait of [1500, 3000, 5000, 8000, 10000, 12000]) {
       await new Promise((r) => setTimeout(r, wait));
       await fetch(`${url}/functions/v1/get-account-insights`, {
         method: "POST",
