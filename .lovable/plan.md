@@ -1,30 +1,23 @@
-# External CRM limit recovery সহজ করা
+# CRM Helper v2.00 ও automatic limit update
 
-## কী হবে
-- CRM helper সফল বলার পর Meta limit না বাড়লে **২ মিনিট অপেক্ষা করে** আবার Meta থেকে live limit check হবে।
-- তখনও limit না বাড়লে request-টি **শুধু একবার** office helper-এর retry queue-তে যাবে; wallet থেকে আর টাকা কাটা হবে না।
-- Retry-এর আগে এবং retry চালুর ঠিক আগেও Meta check হবে। Limit ইতিমধ্যে বাড়লে retry বাতিল করে history-তে old → new limitসহ Completed দেখাবে।
+## কী বদলাবে
+- Helper-এর manifest, popup, download button, filename ও package—সব জায়গায় version `2.00` দেখাবে (Chrome manifest-এ বৈধ version `2.0.0`)।
+- নতুন ZIP cleanভাবে rebuild ও verify করা হবে; ZIP-এর ভেতরে extension files সরাসরি থাকবে।
+- Chrome/Mac-এর সীমাবদ্ধতা পরিষ্কার রাখা হবে: Chrome Web Store ছাড়া ZIP সরাসরি install সমর্থন করে না; ZIP extract করে folder দিয়ে Load unpacked করতে হবে।
 
-## Admin flow
-- `Manually done` চাপলে প্রথমে Meta থেকে live limit check হবে।
-- Limit বাড়লে সঙ্গে সঙ্গে Completed (Admin) হবে।
-- Limit না বাড়লে একই click-এ CRM helper খুলে একবার retry করবে; আলাদা করে manual top-up দিতে হবে না।
-- Busy/retrying state দেখাবে এবং একই request দ্বিতীয়বার চালু করা যাবে না।
+## Helper active status
+- Queue খালি থাকলেও Helper নিয়মিত server heartbeat পাঠাবে, তাই request না থাকাকে আর inactive বলা হবে না।
+- Popup-এ saved token নয়, server connection যাচাই করে Active/Disconnected দেখাবে।
+- token expired বা server error হলে readable কারণ দেখাবে।
 
-## Client flow
-- Transaction History-তে `Limit বাড়েনি`-র পাশে ছোট **Update** button থাকবে।
-- Update চাপলে প্রথমে Meta live check হবে।
-- Limit বাড়লে সঙ্গে সঙ্গে history ঠিক হবে; না বাড়লে office helper-এ একবার retry queue হবে এবং client `Retry queued` দেখবে।
-- Client CRM link/token পাবে না এবং wallet আবার charge হবে না।
+## Automatic processing ও spend-cap update
+- Helper claim করলেই request Pending থেকে Processing-এ যাবে, যাতে অন্য admin দ্বিতীয়বার approve না করেন।
+- CRM success-এর পর Helper result server-এ নিশ্চিতভাবে পাঠাবে; server request Completed করবে এবং Meta থেকে live spend cap refresh করবে।
+- Meta update একটু দেরি করলে সীমিত সময়ের মধ্যে কয়েকবার check হবে; নতুন cap পাওয়া মাত্র history auto-update হবে এবং Helper tab বন্ধ হবে।
+- refresh call-এর payload/account identifier বর্তমান Meta function-এর expected format অনুযায়ী ঠিক করা হবে। Manual Done কেবল সত্যিকারের failure fallback হিসেবে থাকবে।
 
-## নিরাপত্তা ও ভুল top-up প্রতিরোধ
-- নতুন retry count/status/time database-এ রাখা হবে; একই request সর্বোচ্চ একবার retry করা যাবে।
-- Client শুধু নিজের request retry করতে পারবে; admin সব request করতে পারবে।
-- Claim atomic থাকবে, তাই office PC ও admin একই সময় click করলেও একবারই চলবে।
-- Retry ব্যর্থ হলে আর automatic loop হবে না; admin-কে error দেখাবে।
-
-## Technical details
-- `external_topup_requests`-এ retry tracking columns এবং authenticated retry RPC/server function যোগ হবে।
-- `/api/public/crm-topup`-এর list/claim/result flow completed-but-unupdated retry jobs support করবে এবং claim-এর আগে Meta refresh করবে।
-- Existing `autopilot_pings` wake-up ব্যবহার করে client/admin queued retry দ্রুত helper-এ পাঠানো হবে; স্থায়ী database polling job যোগ হবে না।
-- `AdminExternalTopUpRequests` এবং `TransactionHistoryPanel`-এ retry controls/status যোগ হবে; extension package version bump করে ZIP rebuild হবে।
+## যাচাই
+- Helper ZIP integrity, manifest version ও filename যাচাই।
+- empty queue-তেও heartbeat/Active status যাচাই।
+- claim → Processing → CRM result → Completed → spend cap updated flow পরীক্ষা।
+- Type check ও preview build status যাচাই।
