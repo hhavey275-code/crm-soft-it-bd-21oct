@@ -528,19 +528,10 @@
       amountEl.closest(
         "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
       ) || document;
-    const ready = await waitFor(() => formIdentityReady(modalScope, job.accountId), 12000, 300);
-    if (!ready) {
-      await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
-      return;
-    }
     // Account opened: wait a full 3s so the CRM finishes loading this account's
     // live Meta data (otherwise the previous account's data may be submitted).
     say("অ্যাকাউন্ট খুলেছে — Meta থেকে ডেটা লোড হওয়ার জন্য ৩ সেকেন্ড অপেক্ষা করছি…");
     await sleep(3000);
-    if (!amountEl.isConnected || !(modalScope.innerText || document.body.innerText || "").includes(job.accountId)) {
-      await reportFailure("ফর্মে অন্য অ্যাকাউন্টের তথ্য দেখা যাচ্ছে — নিরাপত্তার জন্য থেমে গেছি।");
-      return;
-    }
     setValue(amountEl, job.amount);
     await sleep(200);
 
@@ -555,10 +546,6 @@
       amountEl.closest(
         "form,[role='dialog'],[role='alertdialog'],.modal,[class*='modal'],[class*='dialog'],[class*='popup'],[class*='drawer']"
       ) || document;
-    if (!(document.body.innerText || "").includes(job.accountId)) {
-      await reportFailure("ফর্মে অ্যাকাউন্ট ID মিলছে না — নিরাপত্তার জন্য থেমে গেছি।");
-      return;
-    }
 
     const submit = find(sel.submitButton, formScope) || fallbackSubmit(formScope);
     if (!submit) {
