@@ -92,6 +92,7 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
       startIndex?: number;
       currency?: string;
       timezoneId?: number;
+      forceNumbered?: boolean;
     }) => {
       if (!data?.bmId) throw new Error("bmId is required");
       if (!data?.namePrefix?.trim()) throw new Error("namePrefix is required");
@@ -114,7 +115,7 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
     let stoppedByLimit = false;
 
     for (let i = 0; i < count; i++) {
-      const name = count === 1 ? prefix : `${prefix} ${startIndex + i}`;
+      const name = count === 1 && !data.forceNumbered ? prefix : `${prefix} ${startIndex + i}`;
       const form = new URLSearchParams({
         name,
         currency,
