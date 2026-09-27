@@ -217,7 +217,7 @@ export function AdminExternalTopUpRequests() {
   };
 
   const downloadHelper = () => {
-    fetch("/crm-topup-extension.zip?v=1.8.0", { cache: "no-store" })
+    fetch("/crm-topup-extension.zip?v=1.8.1", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
@@ -225,7 +225,7 @@ export function AdminExternalTopUpRequests() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "crm-topup-helper-v1.8.0.zip";
+        a.download = "crm-topup-helper-v1.8.1.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })

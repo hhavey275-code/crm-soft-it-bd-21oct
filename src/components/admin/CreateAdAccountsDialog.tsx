@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, PlusCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { checkBmAdAccountCapacity, createBmAdAccounts } from "@/lib/bmAdAccounts.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   open: boolean;
@@ -51,6 +51,26 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
   const [checking, setChecking] = useState(false);
   const [info, setInfo] = useState<{ ownedCount: number | null; verificationStatus: string | null } | null>(null);
 
+  const callAccountApi = async (payload: Record<string, unknown>) => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new Error("Login session শেষ—আবার login করুন");
+    const response = await fetch("/api/public/bm-ad-accounts", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(payload),
+    });
+    const text = await response.text();
+    let result: any;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      throw new Error(`Server API-এর বদলে webpage দিয়েছে (HTTP ${response.status})`);
+    }
+    if (!response.ok || !result?.ok) throw new Error(result?.error || `Server error (HTTP ${response.status})`);
+    return result;
+  };
+
   useEffect(() => {
     if (open && bm) {
       setPrefix(bm.name);
@@ -64,7 +84,7 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
     if (!bm) return;
     setChecking(true);
     try {
-      const res = await checkBmAdAccountCapacity({ data: { bmId: bm.id } });
+      const res = await callAccountApi({ action: "check", bmId: bm.id });
       setInfo({ ownedCount: res.ownedCount, verificationStatus: res.verificationStatus });
     } catch (e: any) {
       toast.error(e?.message ?? "Check failed");
@@ -88,16 +108,15 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
       while (done < total) {
         const batch = Math.min(10, total - done);
         setProgress(`${done}/${total}`);
-        const res: any = await createBmAdAccounts({
-          data: {
-            bmId: bm.id,
-            count: batch,
-            namePrefix: total === 1 ? prefix : `${prefix}`,
-            startIndex: start + done,
-            currency,
-            timezoneId: Number(timezoneId),
-            ...(total > 1 ? { forceNumbered: true } : {}),
-          } as any,
+        const res: any = await callAccountApi({
+          action: "create",
+          bmId: bm.id,
+          count: batch,
+          namePrefix: total === 1 ? prefix : `${prefix}`,
+          startIndex: start + done,
+          currency,
+          timezoneId: Number(timezoneId),
+          ...(total > 1 ? { forceNumbered: true } : {}),
         });
         if (!res || !Array.isArray(res.failed)) {
           throw new Error(

@@ -67,6 +67,7 @@ import { Route as AdminPerformanceRouteImport } from './routes/admin.performance
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
 import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
+import { Route as ApiPublicBmAdAccountsRouteImport } from './routes/api/public/bm-ad-accounts'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 
 const WalletBalancesRoute = WalletBalancesRouteImport.update({
@@ -359,6 +360,11 @@ const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
   path: '/api/public/crm-topup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBmAdAccountsRoute = ApiPublicBmAdAccountsRouteImport.update({
+  id: '/api/public/bm-ad-accounts',
+  path: '/api/public/bm-ad-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdsManagerCampaignsRoute = ApiAdsManagerCampaignsRouteImport.update({
   id: '/api/ads-manager/campaigns',
   path: '/api/ads-manager/campaigns',
@@ -423,6 +429,7 @@ export interface FileRoutesByFullPath {
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
@@ -483,6 +490,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsIndexRoute
   '/tenants': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
@@ -545,6 +553,7 @@ export interface FileRoutesById {
   '/clients/': typeof ClientsIndexRoute
   '/tenants/': typeof TenantsIndexRoute
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
+  '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
 }
@@ -608,6 +617,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/tenants/'
     | '/api/ads-manager/campaigns'
+    | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
   fileRoutesByTo: FileRoutesByTo
@@ -668,6 +678,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/tenants'
     | '/api/ads-manager/campaigns'
+    | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
   id:
@@ -729,6 +740,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/tenants/'
     | '/api/ads-manager/campaigns'
+    | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
   fileRoutesById: FileRoutesById
@@ -787,6 +799,7 @@ export interface RootRouteChildren {
   InvoiceRequestIdRoute: typeof InvoiceRequestIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
+  ApiPublicBmAdAccountsRoute: typeof ApiPublicBmAdAccountsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
   ApiPublicReferralCronRoute: typeof ApiPublicReferralCronRoute
 }
@@ -1199,6 +1212,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCrmTopupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bm-ad-accounts': {
+      id: '/api/public/bm-ad-accounts'
+      path: '/api/public/bm-ad-accounts'
+      fullPath: '/api/public/bm-ad-accounts'
+      preLoaderRoute: typeof ApiPublicBmAdAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ads-manager/campaigns': {
       id: '/api/ads-manager/campaigns'
       path: '/api/ads-manager/campaigns'
@@ -1300,6 +1320,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoiceRequestIdRoute: InvoiceRequestIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
+  ApiPublicBmAdAccountsRoute: ApiPublicBmAdAccountsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
   ApiPublicReferralCronRoute: ApiPublicReferralCronRoute,
 }
