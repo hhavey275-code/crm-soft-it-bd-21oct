@@ -39,7 +39,27 @@ function render(state) {
 }
 
 function load() {
-  chrome.storage.local.get(["autopilot", "autopilotLast"], render);
+  chrome.storage.local.get(["autopilot", "autopilotLast"], async (state) => {
+    render(state);
+    if (!state.autopilot?.token) return;
+    statusEl.textContent = "server check হচ্ছে…";
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ action: "list_pending", token: state.autopilot.token }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      statusEl.textContent = `চালু আছে · queue ${Array.isArray(data.items) ? data.items.length : 0}`;
+      statusEl.className = "on";
+      lastEl.textContent = `${lastEl.textContent ? `${lastEl.textContent} · ` : ""}Server connected`;
+    } catch (error) {
+      statusEl.textContent = "সংযোগ নেই";
+      statusEl.className = "off";
+      msgEl.textContent = `Auto-pilot চলছে না: ${error && error.message ? error.message : error}`;
+    }
+  });
 }
 
 document.getElementById("enableBtn").addEventListener("click", async () => {

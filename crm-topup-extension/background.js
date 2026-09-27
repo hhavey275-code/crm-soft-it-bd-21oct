@@ -1,5 +1,5 @@
 // ============================================================
-//  CRM Top-Up Helper — Auto-pilot service worker (v1.8.0)
+//  CRM Top-Up Helper — Auto-pilot service worker (v1.8.1)
 //  Event-driven: listens to Supabase Realtime for a ping that a
 //  new pending external top-up request arrived, then claims and
 //  runs it through the existing content-script automation.
@@ -111,8 +111,10 @@ async function processQueue() {
         setLast({ at: Date.now(), ok: false, accountId: item.accountId, amount: item.amount, error: String(e && e.message ? e.message : e) });
       }
     }
-  } catch {
-    // network hiccup — next ping/alarm retries
+  } catch (error) {
+    const message = String(error && error.message ? error.message : error);
+    setLast({ at: Date.now(), ok: false, error: message });
+    notify("Auto-pilot সংযোগ নেই", message);
   } finally {
     running = false;
   }
