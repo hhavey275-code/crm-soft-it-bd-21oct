@@ -52,22 +52,11 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
   const [info, setInfo] = useState<{ ownedCount: number | null; verificationStatus: string | null } | null>(null);
 
   const callAccountApi = async (payload: Record<string, unknown>) => {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
-    if (!accessToken) throw new Error("Login session শেষ—আবার login করুন");
-    const response = await fetch("/api/public/bm-ad-accounts", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify(payload),
-    });
-    const text = await response.text();
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      throw new Error(`Server API-এর বদলে webpage দিয়েছে (HTTP ${response.status})`);
-    }
-    if (!response.ok || !result?.ok) throw new Error(result?.error || `Server error (HTTP ${response.status})`);
+    const body = { ...payload, action: payload.action === "check" ? "check_bm" : "create_ad_accounts" };
+    const { data, error } = await supabase.functions.invoke("sync-bm-accounts", { body });
+    if (error) throw new Error(error.message || "Server error");
+    const result: any = data;
+    if (!result?.ok) throw new Error(result?.error || "Server error");
     return result;
   };
 
