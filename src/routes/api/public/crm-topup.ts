@@ -125,10 +125,19 @@ export const Route = createFileRoute("/api/public/crm-topup")({
              actorId: userId,
             exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
           });
-          await supabaseAdmin
+          // Atomic claim so an admin click and the helper can never run the same request twice.
+          const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+          const { data: claimedRow } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .update({ crm_provider: host, automation_started_at: new Date().toISOString() })
-            .eq("id", requestId);
+            .eq("id", requestId)
+            .eq("status", "pending")
+            .or(`automation_started_at.is.null,automation_started_at.lt.${staleBefore}`)
+            .select("id")
+            .maybeSingle();
+          if (!claimedRow) {
+            return json({ ok: false, error: "Helper এই request-টা এখন process করছে — আবার top-up দেবেন না" }, 409);
+          }
           return json({ ok: true, token, host, accountId, amount: Number((topup as any).amount) });
         }
 
@@ -190,6 +199,18 @@ export const Route = createFileRoute("/api/public/crm-topup")({
         // ---- Auto-pilot: list & claim pending requests ------------------
         if (action === "list_pending") {
           if (payload.scope !== "autopilot") return json({ ok: false, error: "Auto-pilot token required" }, 403);
+          // Heartbeat: the helper polls every ~30s, so admins can see if it is alive.
+          {
+            const nowIso = new Date().toISOString();
+            const { data: hb } = await supabaseAdmin
+              .from("site_settings")
+              .update({ value: nowIso, updated_at: nowIso })
+              .eq("key", "crm_helper_last_seen")
+              .select("id");
+            if (!hb || hb.length === 0) {
+              await supabaseAdmin.from("site_settings").insert({ key: "crm_helper_last_seen", value: nowIso });
+            }
+          }
           const { data, error } = await supabaseAdmin
             .from("external_topup_requests" as any)
             .select(
@@ -410,7 +431,7 @@ async function refreshCapFromMeta(admin: any, requestId: string): Promise<boolea
     const url = process.env["SUPABASE_URL"];
     const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
     if (!url || !key) return false;
-    for (const wait of [1500, 3000, 5000, 8000]) {
+    for (const wait of [1500, 3000, 5000, 8000, 10000, 12000]) {
       await new Promise((r) => setTimeout(r, wait));
       await fetch(`${url}/functions/v1/get-account-insights`, {
         method: "POST",

@@ -36,6 +36,7 @@ interface Req {
   limit_status?: string | null;
   limit_reason?: string | null;
   retry_requested_at?: string | null;
+  automation_started_at?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -107,8 +108,22 @@ export function AdminExternalTopUpRequests() {
   const acc = (id: string) => (accounts as any[]).find((a) => a.id === id);
   const prof = (id: string) => (profiles as any[]).find((p) => p.user_id === id);
 
-  const pending = requests.filter((r) => r.status === "pending");
+  const { data: helperLastSeen = null } = useQuery({
+    queryKey: ["crm-helper-last-seen"],
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "crm_helper_last_seen").maybeSingle();
+      return (data?.value as string | null) ?? null;
+    },
+  });
+  const helperOnline = !!helperLastSeen && Date.now() - new Date(helperLastSeen).getTime() < 2 * 60 * 1000;
+
+  const isProcessing = (r: Req) =>
+    r.status === "pending" && !!r.automation_started_at && Date.now() - new Date(r.automation_started_at).getTime() < 5 * 60 * 1000;
+  const processing = requests.filter(isProcessing);
+  const pending = requests.filter((r) => r.status === "pending" && !isProcessing(r));
   const history = requests.filter((r) => r.status !== "pending");
+  const waitingTooLong = pending.some((r) => Date.now() - new Date(r.created_at).getTime() > 60 * 1000);
 
   const walletName = (k?: string | null) =>
     k === "credit_line" ? "Credit Line" : k === "secondary" ? "Secondary" : "Main";
@@ -426,7 +441,10 @@ export function AdminExternalTopUpRequests() {
           {format(new Date(r.created_at), "dd MMM yyyy HH:mm")}
         </TableCell>
         <TableCell>
-          {statusBadge(r.status)}
+          {isProcessing(r) ? <Badge className="bg-violet-600 text-white">Helper processing…</Badge> : statusBadge(r.status)}
+          {r.status === "pending" && !isProcessing(r) && !helperOnline && (
+            <div className="text-[10px] text-destructive max-w-[180px]">Helper active নেই — তাই process হয়নি</div>
+          )}
           {r.last_error && (
             <div className="text-[10px] text-destructive max-w-[180px] truncate" title={r.last_error}>
               {r.last_error}
@@ -507,7 +525,10 @@ export function AdminExternalTopUpRequests() {
                 {cleanId(r) || "—"} <Copy className="inline h-3 w-3" />
               </button>
             </div>
-            {statusBadge(r.status)}
+            {isProcessing(r) ? <Badge className="bg-violet-600 text-white">Helper processing…</Badge> : statusBadge(r.status)}
+          {r.status === "pending" && !isProcessing(r) && !helperOnline && (
+            <div className="text-[10px] text-destructive max-w-[180px]">Helper active নেই — তাই process হয়নি</div>
+          )}
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="font-semibold">${Number(r.amount).toLocaleString()}</span>
@@ -602,12 +623,17 @@ export function AdminExternalTopUpRequests() {
             </Button>
             <Button size="sm" variant="outline" onClick={downloadHelper}>
               <Download className="h-3.5 w-3.5 mr-1" />
-                Download helper (v1.8.0)
+                Download helper (v1.8.1)
             </Button>
           </div>
         </CardContent>
       </Card>
 
+      <div className={`rounded-md border p-2 text-xs ${helperOnline ? "border-emerald-500/40 text-emerald-600" : "border-destructive/50 bg-destructive/10 text-destructive"}`}>
+        {helperOnline
+          ? `Helper চালু আছে · শেষ সাড়া ${helperLastSeen ? format(new Date(helperLastSeen), "HH:mm:ss") : ""}`
+          : `Helper active নেই${helperLastSeen ? ` (শেষ সাড়া ${format(new Date(helperLastSeen), "dd MMM HH:mm")})` : ""} — office PC/Chrome চালু করুন।${waitingTooLong ? " Pending request process হচ্ছে না।" : ""}`}
+      </div>
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending" className="gap-1.5">
@@ -618,9 +644,11 @@ export function AdminExternalTopUpRequests() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="processing">Processing{processing.length > 0 ? ` (${processing.length})` : ""}</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="pending" className="mt-3">{list(pending, true)}</TabsContent>
+        <TabsContent value="processing" className="mt-3">{list(processing, false)}</TabsContent>
         <TabsContent value="history" className="mt-3">{list(history, false)}</TabsContent>
       </Tabs>
 
