@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChatWidget } from "@/components/ChatWidget";
 import { ColorThemePicker } from "@/components/ColorThemePicker";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
 
 const TechBackground = lazy(() => import("@/components/TechBackground"));
@@ -29,6 +30,7 @@ function useShouldRenderTechBg() {
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
+  const { isAdmin } = useAuth();
   const showTechBg = useShouldRenderTechBg();
 
   return (
@@ -78,7 +80,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
-      <ChatWidget />
+      {!isAdmin && <ChatWidget />}
       <WhatsNewDialog />
     </SidebarProvider>
   );
