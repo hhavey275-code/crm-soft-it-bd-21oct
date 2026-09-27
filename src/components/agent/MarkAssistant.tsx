@@ -137,6 +137,8 @@ export function MarkAssistant() {
   }, [alwaysOn, startRecognition, stopRecognition]);
 
   useEffect(() => {
+    const w = window as any;
+    setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
     // Preload voices
     window.speechSynthesis?.getVoices();
     return () => {
