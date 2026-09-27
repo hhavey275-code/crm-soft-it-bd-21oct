@@ -371,6 +371,7 @@
   const LEARN_STEPS = [
     { key: "search", label: "অ্যাকাউন্ট সার্চ করার ঘরে ক্লিক করুন", block: true },
     { key: "topupButton", label: "একটা অ্যাকাউন্টের Top-Up বাটনে ক্লিক করুন (ফর্মটা খুলতে দিন)", block: false },
+    { key: "waitNote", info: true, label: "Top-Up পেজ খুললে Helper ৩ সেকেন্ড অপেক্ষা করবে, যেন Meta থেকে অ্যাকাউন্টের ডেটা এসে পড়ে। এরপর অ্যামাউন্ট বসানো হবে।" },
     { key: "amountInput", label: "অ্যামাউন্ট লেখার ঘরে ক্লিক করুন", block: true },
     { key: "submitButton", label: "Increase Spend Cap বাটনে ক্লিক করুন—confirmation box খুলবে, এখনো টাকা যাবে না", block: false },
     { key: "confirmButton", label: "কনফার্ম বক্সের 'Yes, increase it!' বাটনে একবার ক্লিক করুন—Helper final submit আটকাবে", block: true, optional: true },
@@ -403,6 +404,12 @@
       );
       return;
     }
+    if (step.info) {
+      say("<b>Setup " + (session.step + 1) + "/" + LEARN_STEPS.length + "</b><br>" + step.label, [
+        { label: "বুঝেছি, পরের ধাপ", onClick: () => (session.step++, saveSession(session), renderLearn()) },
+      ]);
+      return;
+    }
     say(
       "<b>Setup " + (session.step + 1) + "/" + LEARN_STEPS.length + "</b><br>" + step.label,
       step.optional
@@ -413,7 +420,7 @@
 
   function learnClickHandler(e) {
     const step = LEARN_STEPS[session.step];
-    if (!step) return;
+    if (!step || step.info) return;
     const raw = e.target.closest("input,textarea,select,button,a,[role='button'],span,div");
     const el = raw && (raw.closest("button,a,[role='button']") || raw);
     if (!el || panel.contains(el)) return;
