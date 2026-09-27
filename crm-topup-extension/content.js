@@ -487,7 +487,8 @@
           form.requestSubmit();
         } catch {}
       }
-      await sleep(500);
+      // Let the CRM finish filtering the list so we don't click a stale row.
+      await sleep(1500);
     }
 
     // 2) find the row that shows this account id, then its top-up button
@@ -525,7 +526,14 @@
       await reportFailure("টপ-আপ ফর্মে অ্যাকাউন্টের তথ্য বসেনি — আবার চেষ্টা করুন।");
       return;
     }
-    await sleep(250);
+    // Account opened: wait a full 3s so the CRM finishes loading this account's
+    // live Meta data (otherwise the previous account's data may be submitted).
+    say("অ্যাকাউন্ট খুলেছে — Meta থেকে ডেটা লোড হওয়ার জন্য ৩ সেকেন্ড অপেক্ষা করছি…");
+    await sleep(3000);
+    if (!amountEl.isConnected || !(modalScope.innerText || document.body.innerText || "").includes(job.accountId)) {
+      await reportFailure("ফর্মে অন্য অ্যাকাউন্টের তথ্য দেখা যাচ্ছে — নিরাপত্তার জন্য থেমে গেছি।");
+      return;
+    }
     setValue(amountEl, job.amount);
     await sleep(200);
 
