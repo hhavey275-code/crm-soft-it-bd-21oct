@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, HeadContent, Scripts, Link } from "@tanstack/react-router";
+import { Outlet, createRootRoute, HeadContent, Scripts, Link, useLocation } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
@@ -153,6 +153,7 @@ function RootComponent() {
 
 function PublicVoiceAssistant() {
   const { isAdmin } = useAuth();
+  const location = useLocation();
   if (isAdmin) return null;
-  return <SiteVoiceAssistant />;
+  return <SiteVoiceAssistant showInvitation={location.pathname === "/signup" || location.pathname === "/auth"} />;
 }
