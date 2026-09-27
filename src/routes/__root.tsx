@@ -139,6 +139,7 @@ function RootComponent() {
                 <TutorialProvider>
                   <Toaster />
                   <Outlet />
+                  <PublicVoiceAssistant />
                 </TutorialProvider>
               </TooltipProvider>
             </AuthProvider>
@@ -147,4 +148,10 @@ function RootComponent() {
       </ThemeProvider>
     </QueryClientProvider>
   );
+}
+
+function PublicVoiceAssistant() {
+  const { isAdmin } = useAuth();
+  if (isAdmin) return null;
+  return <SiteVoiceAssistant />;
 }
