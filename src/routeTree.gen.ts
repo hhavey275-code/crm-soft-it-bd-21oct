@@ -65,6 +65,7 @@ import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-link
 import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
+import { Route as ApiPublicSiteTtsRouteImport } from './routes/api/public/site-tts'
 import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
 import { Route as ApiPublicBmAdAccountsRouteImport } from './routes/api/public/bm-ad-accounts'
@@ -350,6 +351,11 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
+const ApiPublicSiteTtsRoute = ApiPublicSiteTtsRouteImport.update({
+  id: '/api/public/site-tts',
+  path: '/api/public/site-tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicReferralCronRoute = ApiPublicReferralCronRouteImport.update({
   id: '/api/public/referral-cron',
   path: '/api/public/referral-cron',
@@ -432,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
+  '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -493,6 +500,7 @@ export interface FileRoutesByTo {
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
+  '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -556,6 +564,7 @@ export interface FileRoutesById {
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
+  '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -620,6 +629,7 @@ export interface FileRouteTypes {
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
+    | '/api/public/site-tts'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -681,6 +691,7 @@ export interface FileRouteTypes {
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
+    | '/api/public/site-tts'
   id:
     | '__root__'
     | '/'
@@ -743,6 +754,7 @@ export interface FileRouteTypes {
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
     | '/api/public/referral-cron'
+    | '/api/public/site-tts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -802,6 +814,7 @@ export interface RootRouteChildren {
   ApiPublicBmAdAccountsRoute: typeof ApiPublicBmAdAccountsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
   ApiPublicReferralCronRoute: typeof ApiPublicReferralCronRoute
+  ApiPublicSiteTtsRoute: typeof ApiPublicSiteTtsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1198,6 +1211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
+    '/api/public/site-tts': {
+      id: '/api/public/site-tts'
+      path: '/api/public/site-tts'
+      fullPath: '/api/public/site-tts'
+      preLoaderRoute: typeof ApiPublicSiteTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/referral-cron': {
       id: '/api/public/referral-cron'
       path: '/api/public/referral-cron'
@@ -1323,6 +1343,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBmAdAccountsRoute: ApiPublicBmAdAccountsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
   ApiPublicReferralCronRoute: ApiPublicReferralCronRoute,
+  ApiPublicSiteTtsRoute: ApiPublicSiteTtsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
