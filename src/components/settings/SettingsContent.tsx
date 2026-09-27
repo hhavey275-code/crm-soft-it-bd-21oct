@@ -24,6 +24,7 @@ import { useColorTheme, type ColorTheme } from "@/contexts/ColorThemeContext";
 import { OcrFallbackSection } from "@/components/settings/OcrFallbackSection";
 import { GlobalRateControl } from "@/components/admin/GlobalRateControl";
 import { createProofUrl } from "@/lib/proofUrl";
+import { SiteAssistantSettingsCard } from "@/components/settings/SiteAssistantSettingsCard";
 
 const COLOR_THEMES: { id: ColorTheme; name: string; swatch: string; ring: string }[] = [
   { id: "blue",   name: "Ocean Blue",   swatch: "bg-[hsl(214,100%,44%)]", ring: "ring-[hsl(214,100%,44%)]" },
@@ -649,6 +650,8 @@ export default function SettingsPage() {
 
         {/* ─── ADMIN: OCR Fallback Providers ─── */}
         {isAdmin && <OcrFallbackSection />}
+
+        {isAdmin && <SiteAssistantSettingsCard />}
 
         {/* ─── ADMIN: Global USD Rate Adjustment ─── */}
         {isAdmin && (

@@ -3127,6 +3127,30 @@ export type Database = {
           },
         ]
       }
+      site_assistant_settings: {
+        Row: {
+          assistant_name: string
+          enabled: boolean
+          id: number
+          knowledge: string
+          updated_at: string
+        }
+        Insert: {
+          assistant_name?: string
+          enabled?: boolean
+          id?: number
+          knowledge?: string
+          updated_at?: string
+        }
+        Update: {
+          assistant_name?: string
+          enabled?: boolean
+          id?: number
+          knowledge?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           id: string

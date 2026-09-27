@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SiteVoiceAssistant } from "@/components/SiteVoiceAssistant";
 import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
 import { AgencyBrandingProvider } from "@/contexts/AgencyBrandingContext";
 import { TutorialProvider } from "@/components/TutorialProvider";
@@ -139,6 +140,7 @@ function RootComponent() {
                 <TutorialProvider>
                   <Toaster />
                   <Outlet />
+                  <PublicVoiceAssistant />
                 </TutorialProvider>
               </TooltipProvider>
             </AuthProvider>
@@ -147,4 +149,10 @@ function RootComponent() {
       </ThemeProvider>
     </QueryClientProvider>
   );
+}
+
+function PublicVoiceAssistant() {
+  const { isAdmin } = useAuth();
+  if (isAdmin) return null;
+  return <SiteVoiceAssistant />;
 }
