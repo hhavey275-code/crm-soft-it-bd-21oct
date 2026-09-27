@@ -73,35 +73,58 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
     }
   };
 
+  const [progress, setProgress] = useState<string | null>(null);
+
   const create = async () => {
     if (!bm) return;
     setCreating(true);
+    const total = Math.min(Math.max(Number(count) || 1, 1), 2500);
+    const start = Number(startIndex) || 1;
+    let done = 0;
+    let createdCount = 0;
+    let lastError: string | null = null;
+    let stoppedByLimit = false;
     try {
-      const res = await createBmAdAccounts({
-        data: {
-          bmId: bm.id,
-          count: Number(count) || 1,
-          namePrefix: prefix,
-          startIndex: Number(startIndex) || 1,
-          currency,
-          timezoneId: Number(timezoneId),
-        },
-      });
-
-      if (res.createdCount > 0) toast.success(`${res.createdCount} ad account তৈরি হয়েছে`);
-      if (res.failed.length) {
-        const last = res.failed[res.failed.length - 1];
-        toast.error(res.stoppedByLimit ? `BM-এর creation limit শেষ: ${last.error}` : last.error, {
-          duration: 9000,
+      while (done < total) {
+        const batch = Math.min(10, total - done);
+        setProgress(`${done}/${total}`);
+        const res: any = await createBmAdAccounts({
+          data: {
+            bmId: bm.id,
+            count: batch,
+            namePrefix: total === 1 ? prefix : `${prefix}`,
+            startIndex: start + done,
+            currency,
+            timezoneId: Number(timezoneId),
+            ...(total > 1 ? { forceNumbered: true } : {}),
+          } as any,
         });
+        if (!res || !Array.isArray(res.failed)) {
+          throw new Error(
+            "Server থেকে সঠিক উত্তর আসেনি। লগইন আবার করে preview/published link থেকে চেষ্টা করুন।",
+          );
+        }
+        createdCount += res.createdCount ?? 0;
+        if (res.failed.length) lastError = res.failed[res.failed.length - 1].error;
+        done += batch;
+        if (res.stoppedByLimit) {
+          stoppedByLimit = true;
+          break;
+        }
+        if ((res.createdCount ?? 0) === 0) break; // every one failed — stop
+      }
+      if (createdCount > 0) toast.success(`${createdCount} ad account তৈরি হয়েছে`);
+      if (lastError) {
+        toast.error(stoppedByLimit ? `BM-এর creation limit শেষ: ${lastError}` : lastError, { duration: 9000 });
       }
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
-      if (res.createdCount > 0 && !res.failed.length) onOpenChange(false);
+      if (createdCount > 0 && !lastError) onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message ?? "Create failed");
     } finally {
       setCreating(false);
+      setProgress(null);
     }
   };
 
@@ -143,8 +166,8 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">কতগুলো (max 20)</Label>
-              <Input type="number" min={1} max={20} value={count} onChange={(e) => setCount(e.target.value)} />
+              <Label className="text-xs">কতগুলো (limit পর্যন্ত)</Label>
+              <Input type="number" min={1} max={2500} value={count} onChange={(e) => setCount(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs">Start number</Label>
@@ -191,7 +214,7 @@ export function CreateAdAccountsDialog({ open, onOpenChange, bm }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={create} disabled={creating || !prefix.trim()}>
             {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-            Create
+            {progress ? `Creating ${progress}` : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

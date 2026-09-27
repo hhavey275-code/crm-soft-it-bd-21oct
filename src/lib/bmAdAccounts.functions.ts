@@ -102,7 +102,8 @@ export const createBmAdAccounts = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const { bm, token, supabaseAdmin } = await loadBm(data.bmId);
 
-    const count = Math.min(Math.max(Number(data.count ?? 1), 1), 20);
+    // Per-call batch (client loops for bigger totals to stay within server time limits).
+    const count = Math.min(Math.max(Number(data.count ?? 1), 1), 10);
     const prefix = data.namePrefix.trim().slice(0, 60);
     const startIndex = Math.max(Number(data.startIndex ?? 1), 1);
     const currency = (data.currency ?? "USD").toUpperCase();
