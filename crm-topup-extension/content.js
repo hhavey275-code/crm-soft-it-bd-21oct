@@ -420,7 +420,7 @@
 
   function learnClickHandler(e) {
     const step = LEARN_STEPS[session.step];
-    if (!step) return;
+    if (!step || step.info) return;
     const raw = e.target.closest("input,textarea,select,button,a,[role='button'],span,div");
     const el = raw && (raw.closest("button,a,[role='button']") || raw);
     if (!el || panel.contains(el)) return;
