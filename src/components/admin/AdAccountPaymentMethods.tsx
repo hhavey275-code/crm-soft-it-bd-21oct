@@ -17,6 +17,17 @@ interface Props {
   isAdmin?: boolean;
 }
 
+function normalizeCardBrand(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const nestedValue = record.brand ?? record.type ?? record.name ?? record.label;
+    return typeof nestedValue === "string" ? nestedValue.trim() : "";
+  }
+  return "";
+}
+
 export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmin = false }: Props) {
   const queryClient = useQueryClient();
   const [showBmCards, setShowBmCards] = useState(false);
@@ -171,11 +182,12 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [], isAdmi
               {displayCards.map((card, idx) => {
                 const meta = cardMeta?.get((card.display_string || "").toLowerCase());
                 const friendly = meta?.admin_label || meta?.holder_name;
-                const brand = meta?.card_type || (card as any).type;
+                const brand = normalizeCardBrand(meta?.card_type || (card as any).type);
+                const lowerBrand = brand.toLowerCase();
                 const brandLabel = brand
-                  ? brand.toLowerCase() === "mastercard" ? "Mastercard"
-                    : brand.toLowerCase() === "visa" ? "Visa"
-                    : brand.toLowerCase() === "amex" ? "Amex"
+                  ? lowerBrand === "mastercard" ? "Mastercard"
+                    : lowerBrand === "visa" ? "Visa"
+                    : lowerBrand === "amex" ? "Amex"
                     : brand.charAt(0).toUpperCase() + brand.slice(1)
                   : null;
                 const bank = meta?.bank_name;
