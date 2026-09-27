@@ -9,6 +9,7 @@ import { ColorThemePicker } from "@/components/ColorThemePicker";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
+import { MarkAssistant } from "@/components/agent/MarkAssistant";
 
 const TechBackground = lazy(() => import("@/components/TechBackground"));
 
@@ -81,6 +82,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       {!isAdmin && <ChatWidget />}
+      {isAdmin && <MarkAssistant floating />}
       <WhatsNewDialog />
     </SidebarProvider>
   );
