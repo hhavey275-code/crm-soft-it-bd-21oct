@@ -83,6 +83,64 @@ async function fetchAllPages(url: string): Promise<any[]> {
   return results;
 }
 
+function jsonRes(body: unknown) {
+  return new Response(JSON.stringify(body), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+function metaErr(o: any, status: number) {
+  const e = o?.error ?? {};
+  const msg = e.error_user_msg || e.message || `Meta error (HTTP ${status})`;
+  return e.code ? `${msg} [code ${e.code}${e.error_subcode ? `/${e.error_subcode}` : ""}]` : msg;
+}
+async function readMetaJson(res: Response) {
+  const t = await res.text();
+  try { return JSON.parse(t); } catch { throw new Error(`Meta সঠিক উত্তর দেয়নি (HTTP ${res.status})`); }
+}
+async function handleCreateAccounts(supabase: any, body: any): Promise<Response> {
+  try {
+    const { data: bm } = await supabase.from("business_managers")
+      .select("id, name, bm_id, access_token").eq("id", String(body.bmId ?? "")).maybeSingle();
+    if (!bm?.access_token) return jsonRes({ ok: false, error: "এই BM-এ access token নেই—Reconnect করুন" });
+    const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const G = "https://graph.facebook.com/v23.0";
+    if (body.action === "check_bm") {
+      const res = await metaFetch(`${G}/${bm.bm_id}?fields=name,verification_status,owned_ad_accounts.limit(1).summary(true)&access_token=${encodeURIComponent(bmToken)}`);
+      const o = await readMetaJson(res);
+      if (!res.ok || o?.error) return jsonRes({ ok: false, error: metaErr(o, res.status) });
+      return jsonRes({ ok: true, ownedCount: o?.owned_ad_accounts?.summary?.total_count ?? null, verificationStatus: o?.verification_status ?? null });
+    }
+    const count = Math.min(Math.max(Number(body.count) || 1, 1), 10);
+    const prefix = String(body.namePrefix ?? "").trim().slice(0, 60);
+    const start = Math.max(Number(body.startIndex) || 1, 1);
+    const currency = /^[A-Z]{3}$/.test(String(body.currency)) ? body.currency : "USD";
+    const tz = Math.max(Number(body.timezoneId) || 1, 1);
+    if (!prefix) return jsonRes({ ok: false, error: "Name prefix দিন" });
+    const created: Array<{ accountId: string; name: string }> = [];
+    const failed: Array<{ name: string; error: string }> = [];
+    let stoppedByLimit = false;
+    for (let i = 0; i < count; i++) {
+      const name = count === 1 && !body.forceNumbered ? prefix : `${prefix} ${start + i}`;
+      const form = new URLSearchParams({ name, currency, timezone_id: String(tz), end_advertiser: bm.bm_id, media_agency: "NONE", partner: "NONE", access_token: bmToken });
+      const res = await metaFetch(`${G}/${bm.bm_id}/adaccount`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      const o = await readMetaJson(res);
+      if (!res.ok || o?.error) {
+        const error = metaErr(o, res.status);
+        failed.push({ name, error });
+        stoppedByLimit = /limit|maximum number|1487742/i.test(error);
+        if (stoppedByLimit) break;
+        continue;
+      }
+      const rawId = String(o?.id ?? o?.account_id ?? "").replace(/^act_/, "");
+      if (!rawId) { failed.push({ name, error: "Meta account ID ফেরত দেয়নি" }); continue; }
+      const { error: se } = await supabase.from("ad_accounts").upsert({ account_id: `act_${rawId}`, account_name: name, business_manager_id: bm.id, business_name: bm.name, status: "active", spend_cap: 0, amount_spent: 0 }, { onConflict: "account_id" });
+      if (se) failed.push({ name, error: `Meta-তে হয়েছে, app-এ save হয়নি: ${se.message}` });
+      created.push({ accountId: `act_${rawId}`, name });
+    }
+    return jsonRes({ ok: true, created, failed, stoppedByLimit, createdCount: created.length });
+  } catch (e) {
+    return jsonRes({ ok: false, error: e instanceof Error ? e.message : "Ad account তৈরি করা যায়নি" });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -114,7 +172,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
-    const { business_manager_id, include_unassigned, preview_only } = await req.json();
+    const reqBody = await req.json();
+    if (reqBody?.action === "check_bm" || reqBody?.action === "create_ad_accounts") {
+      return await handleCreateAccounts(supabase, reqBody);
+    }
+    const { business_manager_id, include_unassigned, preview_only } = reqBody;
     if (!business_manager_id) {
       return new Response(JSON.stringify({ error: "business_manager_id required" }), { status: 400, headers: corsHeaders });
     }
