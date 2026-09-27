@@ -123,7 +123,35 @@ export function AdminExternalTopUpRequests() {
       return (result.lastSeen as string | null) ?? null;
     },
   });
-  const helperOnline = !!helperLastSeen && Date.now() - new Date(helperLastSeen).getTime() < 2 * 60 * 1000;
+  // Chrome can delay the helper's 30s alarm; also count recent helper work as "alive".
+  const recentHelperWork = requests.some((r: any) => {
+    const t = r.automation_started_at || (r.status === "completed" && r.completed_at);
+    return !!t && Date.now() - new Date(t).getTime() < 5 * 60 * 1000;
+  });
+  const helperOnline =
+    recentHelperWork || (!!helperLastSeen && Date.now() - new Date(helperLastSeen).getTime() < 5 * 60 * 1000);
+
+  // Every 10s, pull Meta for completed top-ups still showing "Updating…".
+  const waitingCap = requests.filter(
+    (r: any) =>
+      r.status === "completed" &&
+      r.spend_cap_after == null &&
+      r.completed_at &&
+      Date.now() - new Date(r.completed_at).getTime() < 60 * 60 * 1000,
+  );
+  const waitingKey = waitingCap.map((r) => r.ad_account_id).join(",");
+  useEffect(() => {
+    if (!waitingKey) return;
+    const ids = Array.from(new Set(waitingKey.split(",")));
+    const tick = async () => {
+      try {
+        await supabase.functions.invoke("get-account-insights", { body: { ad_account_ids: ids, source: "meta" } });
+      } catch {}
+      qc.invalidateQueries({ queryKey: ["admin-external-topup-requests"] });
+    };
+    const h = window.setInterval(tick, 10000);
+    return () => window.clearInterval(h);
+  }, [waitingKey]);
 
   const isProcessing = (r: Req) =>
     r.status === "pending" && !!r.automation_started_at && Date.now() - new Date(r.automation_started_at).getTime() < 5 * 60 * 1000;
