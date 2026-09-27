@@ -4,32 +4,38 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mic, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSiteAssistantInfo, askSiteAssistant } from "@/lib/siteAssistant.functions";
+import { streamSpeech } from "@/lib/streamSpeech";
 
 type Turn = { role: "user" | "assistant"; text: string };
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 type Lang = "bn-BD" | "en-US";
 
-function speak(text: string, onDone: () => void) {
+let currentAbort: AbortController | null = null;
+
+function browserSpeak(text: string, onDone: () => void) {
   const synth = window.speechSynthesis;
   if (!synth) { onDone(); return; }
   synth.cancel();
-  const isBn = /[\u0980-\u09FF]/.test(text);
-  const voices = synth.getVoices();
-  const voice = isBn
-    ? voices.find((v) => v.lang.toLowerCase().startsWith("bn"))
-    : voices.find((v) => v.lang.startsWith("en"));
-  const parts = text.split(/(?<=[।.!?])\s+/).filter(Boolean);
-  let i = 0;
-  const next = () => {
-    if (i >= parts.length) { onDone(); return; }
-    const u = new SpeechSynthesisUtterance(parts[i++]);
-    if (voice) u.voice = voice;
-    u.lang = voice?.lang ?? (isBn ? "bn-BD" : "en-US");
-    u.onend = next;
-    u.onerror = next;
-    synth.speak(u);
-  };
-  next();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = /[\u0980-\u09FF]/.test(text) ? "bn-BD" : "en-US";
+  u.onend = onDone; u.onerror = onDone;
+  synth.speak(u);
+}
+
+/** Natural AI voice (good Bangla accent); falls back to the browser voice if it fails. */
+function speak(text: string, onDone: () => void) {
+  currentAbort?.abort();
+  const ctrl = new AbortController();
+  currentAbort = ctrl;
+  streamSpeech("/api/public/site-tts", text, ctrl.signal)
+    .then(() => { if (!ctrl.signal.aborted) onDone(); })
+    .catch(() => { if (!ctrl.signal.aborted) browserSpeak(text, onDone); });
+}
+
+function stopSpeaking() {
+  currentAbort?.abort();
+  currentAbort = null;
+  stopSpeaking();
 }
 
 export function SiteVoiceAssistant() {
@@ -50,7 +56,7 @@ export function SiteVoiceAssistant() {
     const w = window as any;
     setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition) && !!window.speechSynthesis);
     window.speechSynthesis?.getVoices();
-    return () => { recRef.current?.abort?.(); window.speechSynthesis?.cancel(); };
+    return () => { recRef.current?.abort?.(); stopSpeaking(); };
   }, []);
 
   const listen = useCallback(() => {
@@ -101,7 +107,7 @@ export function SiteVoiceAssistant() {
     setOpen(false);
     setPhase("idle");
     const r = recRef.current; recRef.current = null; r?.abort?.();
-    window.speechSynthesis?.cancel();
+    stopSpeaking();
   }, []);
 
   const start = useCallback(() => {
