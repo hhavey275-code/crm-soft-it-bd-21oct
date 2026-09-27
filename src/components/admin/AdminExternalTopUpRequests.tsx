@@ -36,6 +36,7 @@ interface Req {
   limit_status?: string | null;
   limit_reason?: string | null;
   retry_requested_at?: string | null;
+  automation_started_at?: string | null;
 }
 
 export function AdminExternalTopUpRequests() {
@@ -107,8 +108,22 @@ export function AdminExternalTopUpRequests() {
   const acc = (id: string) => (accounts as any[]).find((a) => a.id === id);
   const prof = (id: string) => (profiles as any[]).find((p) => p.user_id === id);
 
-  const pending = requests.filter((r) => r.status === "pending");
+  const { data: helperLastSeen = null } = useQuery({
+    queryKey: ["crm-helper-last-seen"],
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "crm_helper_last_seen").maybeSingle();
+      return (data?.value as string | null) ?? null;
+    },
+  });
+  const helperOnline = !!helperLastSeen && Date.now() - new Date(helperLastSeen).getTime() < 2 * 60 * 1000;
+
+  const isProcessing = (r: Req) =>
+    r.status === "pending" && !!r.automation_started_at && Date.now() - new Date(r.automation_started_at).getTime() < 5 * 60 * 1000;
+  const processing = requests.filter(isProcessing);
+  const pending = requests.filter((r) => r.status === "pending" && !isProcessing(r));
   const history = requests.filter((r) => r.status !== "pending");
+  const waitingTooLong = pending.some((r) => Date.now() - new Date(r.created_at).getTime() > 60 * 1000);
 
   const walletName = (k?: string | null) =>
     k === "credit_line" ? "Credit Line" : k === "secondary" ? "Secondary" : "Main";
