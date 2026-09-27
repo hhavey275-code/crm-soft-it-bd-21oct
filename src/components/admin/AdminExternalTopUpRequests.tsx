@@ -184,13 +184,8 @@ export function AdminExternalTopUpRequests() {
     setBusyId(r.id);
     try {
       const res = await createRemoteJob("create_job", { requestId: r.id, url });
-      // Approve the request right away — the helper does the CRM top-up, and if
-      // it ever fails the admin handles that request manually.
-      const { data: done, error: doneErr } = await (supabase as any).rpc("complete_external_topup", { p_id: r.id });
-      if (doneErr) throw new Error(doneErr.message);
-      if (!done?.ok) throw new Error(done?.error || "Failed to approve request");
       openWithHash(url, `crmtopup=${encodeURIComponent(res.token)}&api=${encodeURIComponent(apiBase())}`);
-      toast.success("Request approved — CRM opened, helper is filling the top-up form");
+      toast.success("Helper processing শুরু হয়েছে — CRM success হলে request নিজে completed হবে");
       await logSystemAction(
         "External Top-up Automation Started",
         `Account ${cleanId(r)} — $${Number(r.amount)} (${walletName(r.wallet_kind).toLowerCase()} wallet)`,

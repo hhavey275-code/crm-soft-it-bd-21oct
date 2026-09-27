@@ -81,7 +81,7 @@
   // Auto-pilot jobs stay "pending" on the server until the CRM top-up is
   // confirmed, so always report the outcome back.
   async function reportServer(success, error) {
-    if (!session || !session.autopilot) return;
+    if (!session || !session.job) return;
     // A successful CRM response can reach us before Meta exposes the new cap.
     // Repeat the result check for a short bounded window; each call refreshes
     // the account from Meta. Keep the CRM tab open until that finishes.
@@ -109,8 +109,8 @@
     return res.json();
   }
 
-  // The dashboard approves the request the moment Approve & Top-Up is clicked,
-  // so the helper never reports back to the server — it only shows the outcome.
+  // Both Auto-pilot and dashboard-started jobs report the CRM outcome. The
+  // request remains Processing until this confirmation reaches the server.
 
   // ---------- local fallback store (works even if the link expired) ----------
   const LOCAL_KEY = "crmLayout:" + location.host;
