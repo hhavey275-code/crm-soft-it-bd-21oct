@@ -41,8 +41,9 @@ const money = (n: number) =>
 
 function defaultRange(months: number) {
   const now = new Date();
-  const end = monthKey(now);
-  const start = monthKey(new Date(now.getFullYear(), now.getMonth() - (months - 1), 1));
+  // Anchor to the last completed month so "1M" = previous month only (e.g. September in October).
+  const end = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const start = monthKey(new Date(now.getFullYear(), now.getMonth() - months, 1));
   return { start, end };
 }
 
