@@ -60,9 +60,17 @@ export function MonthlyUsageExport({
   secondaryEnabled?: boolean;
   clientName?: string;
 }) {
-  const [range, setRange] = useState(() => defaultRange(1));
+  const [fromDate, setFromDate] = useState<Date>(() => presetDates(1).from);
+  const [toDate, setToDate] = useState<Date>(() => presetDates(1).to);
   const [view, setView] = useState<"detail" | "summary">("detail");
   const [expanded, setExpanded] = useState(false);
+
+  const range = useMemo(() => {
+    let start = monthKey(fromDate);
+    let end = monthKey(toDate);
+    if (start > end) [start, end] = [end, start];
+    return { start, end };
+  }, [fromDate, toDate]);
 
   const accountNameOf = (tx: Tx) => {
     const linked = tx.reference_id ? adAccounts?.find((a: any) => a.id === tx.reference_id) : null;
