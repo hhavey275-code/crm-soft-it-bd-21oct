@@ -1,11 +1,11 @@
 import { Fragment, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ChevronDown, ChevronUp, Download } from "lucide-react";
+import { CalendarIcon, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -39,12 +39,13 @@ const monthLabel = (key: string) => {
 const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function defaultRange(months: number) {
+function presetDates(months: number) {
   const now = new Date();
   // Anchor to the last completed month so "1M" = previous month only (e.g. September in October).
-  const end = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const start = monthKey(new Date(now.getFullYear(), now.getMonth() - months, 1));
-  return { start, end };
+  return {
+    from: new Date(now.getFullYear(), now.getMonth() - months, 1),
+    to: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+  };
 }
 
 const zero = (): Sums => ({ topup: 0, withdraw: 0, net: 0 });
