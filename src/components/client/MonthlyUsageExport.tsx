@@ -219,49 +219,58 @@ export function MonthlyUsageExport({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
         <CardTitle className="text-base md:text-lg">Monthly Top Up & Withdraw Report</CardTitle>
-        <div className="flex flex-wrap items-center gap-2">
-          {expanded &&
-            [1, 2, 3, 6, 12].map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant="outline"
-                onClick={() => setRange(defaultRange(m))}
-              >
-                {m}M
-              </Button>
-            ))}
-          <Button size="sm" variant="secondary" onClick={() => setExpanded((v) => !v)} className="gap-1">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Hide report" : "Show report"}
-          </Button>
-        </div>
+        <Button size="sm" variant="secondary" onClick={() => setExpanded((v) => !v)} className="gap-1">
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expanded ? "Hide report" : "Show report"}
+        </Button>
       </CardHeader>
       {expanded && (
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="from-month" className="text-xs">From</Label>
-            <Input
-              id="from-month"
-              type="month"
-              value={range.start}
-              max={range.end}
-              onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
-              className="w-40"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="to-month" className="text-xs">To</Label>
-            <Input
-              id="to-month"
-              type="month"
-              value={range.end}
-              min={range.start}
-              onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
-              className="w-40"
-            />
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 font-normal">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">
+                  {monthLabel(range.start)} – {monthLabel(range.end)}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" align="start">
+              <div className="flex flex-wrap gap-1 mb-2">
+                {[1, 2, 3, 6, 12].map((m) => {
+                  const p = presetDates(m);
+                  const active = range.start === monthKey(p.from) && range.end === monthKey(p.to);
+                  return (
+                    <Button
+                      key={m}
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => {
+                        setFromDate(p.from);
+                        setToDate(p.to);
+                      }}
+                    >
+                      {m}M
+                    </Button>
+                  );
+                })}
+              </div>
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(sel: any) => {
+                  if (sel?.from) {
+                    setFromDate(sel.from);
+                    setToDate(sel.to ?? sel.from);
+                  }
+                }}
+                numberOfMonths={1}
+                className="p-2 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           <Button onClick={downloadDetail} className="gap-2">
             <Download className="h-4 w-4" />
             Ad Account wise CSV
