@@ -159,8 +159,8 @@ Deno.serve(async (req) => {
     const currentSpendCap = liveSpendCap;
 
     const remaining = Math.max(0, currentSpendCap - realAmountSpent);
-    // Clients must leave a $10 buffer on the account.
-    const CLIENT_BUFFER = 10;
+    // Clients must leave a $1.01 buffer on the account.
+    const CLIENT_BUFFER = 1.01;
     const maxWithdrawable = isAdmin ? remaining : Math.max(0, remaining - CLIENT_BUFFER);
     if (dry_run) {
       return json({

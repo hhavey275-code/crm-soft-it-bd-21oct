@@ -1666,7 +1666,7 @@ export function ClientAdAccounts() {
                   <div className="flex justify-between"><span className="text-muted-foreground">Live Spent</span><span>${withdrawLive.spent.toFixed(2)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Remaining</span><span>${withdrawLive.remaining.toFixed(2)}</span></div>
                   <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
-                    <span>Max you can withdraw (Remaining − $10)</span>
+                    <span>Max you can withdraw (Remaining − $1.01)</span>
                     <span className="text-primary">${(withdrawMax ?? 0).toFixed(2)}</span>
                   </div>
                 </>
