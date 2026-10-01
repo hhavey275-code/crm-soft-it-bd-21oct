@@ -35,7 +35,8 @@ function NotFoundComponent() {
   );
 }
 
-function RootErrorComponent({ error }: { error: Error }) {
+function RootErrorComponent({ error: rawError }: import("@tanstack/react-router").ErrorComponentProps) {
+  const error = rawError as Error;
   console.error(error);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
