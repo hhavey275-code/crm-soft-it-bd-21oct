@@ -24,44 +24,20 @@ type Tx = {
   description?: string | null;
 };
 
-type MonthRow = {
-  key: string;
-  label: string;
-  main: number;
-  secondary: number;
-  total: number;
-};
-
-type DetailRow = {
-  monthKey: string;
-  monthLabel: string;
-  date: string;
-  account: string;
-  main: number;
-  secondary: number;
-  total: number;
-};
+type Sums = { topup: number; withdraw: number; net: number };
+type MonthRow = Sums & { key: string; label: string };
+type AccountRow = Sums & { monthKey: string; monthLabel: string; account: string; count: number };
 
 const monthKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 const monthLabel = (key: string) => {
   const [y, m] = key.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString("en-US", {
-    month: "short",
-    year: "numeric",
-  });
+  return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 };
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const dateLabel = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
 function defaultRange(months: number) {
   const now = new Date();
@@ -70,10 +46,11 @@ function defaultRange(months: number) {
   return { start, end };
 }
 
+const zero = (): Sums => ({ topup: 0, withdraw: 0, net: 0 });
+
 export function MonthlyUsageExport({
   transactions,
   adAccounts,
-  secondaryEnabled,
   clientName,
 }: {
   transactions?: Tx[] | null;
@@ -81,45 +58,38 @@ export function MonthlyUsageExport({
   secondaryEnabled?: boolean;
   clientName?: string;
 }) {
-  const [range, setRange] = useState(() => defaultRange(6));
+  const [range, setRange] = useState(() => defaultRange(1));
   const [view, setView] = useState<"detail" | "summary">("detail");
   const [expanded, setExpanded] = useState(false);
 
   const accountNameOf = (tx: Tx) => {
-    const linked = tx.reference_id
-      ? adAccounts?.find((a: any) => a.id === tx.reference_id)
-      : null;
-    return (
-      linked?.account_name ||
-      String(tx.description || "").split("\n")[0] ||
-      "—"
+    const linked = tx.reference_id ? adAccounts?.find((a: any) => a.id === tx.reference_id) : null;
+    if (linked) {
+      const id = String(linked.account_id || "").replace(/^act_/, "");
+      return id ? `${linked.account_name} (${id})` : linked.account_name;
+    }
+    return String(tx.description || "").split("\n")[0] || "—";
+  };
+
+  const accountRows = useMemo<AccountRow[]>(() => {
+    const map = new Map<string, AccountRow>();
+    for (const tx of transactions ?? []) {
+      if (tx.type !== "ad_topup" && tx.type !== "refund") continue;
+      const k = monthKey(new Date(tx.created_at));
+      if (k < range.start || k > range.end) continue;
+      const account = accountNameOf(tx);
+      const id = `${k}|${account}`;
+      const row = map.get(id) ?? { monthKey: k, monthLabel: monthLabel(k), account, count: 0, ...zero() };
+      const amt = Math.abs(Number(tx.amount || 0));
+      if (tx.type === "ad_topup") row.topup += amt;
+      else row.withdraw += amt;
+      row.net = row.topup - row.withdraw;
+      row.count++;
+      map.set(id, row);
+    }
+    return [...map.values()].sort((a, b) =>
+      a.monthKey === b.monthKey ? b.topup - a.topup : a.monthKey.localeCompare(b.monthKey),
     );
-  };
-
-  const inRange = (tx: Tx) => {
-    if (tx.type !== "ad_topup" && tx.type !== "refund") return false;
-    const k = monthKey(new Date(tx.created_at));
-    return k >= range.start && k <= range.end;
-  };
-
-  const detailRows = useMemo<DetailRow[]>(() => {
-    return (transactions ?? [])
-      .filter(inRange)
-      .map((tx) => {
-        const k = monthKey(new Date(tx.created_at));
-        const used = -Number(tx.amount || 0); // ad_topup negative, refund positive
-        const isSecondary = (tx.wallet_kind ?? "primary") === "secondary";
-        return {
-          monthKey: k,
-          monthLabel: monthLabel(k),
-          date: dateLabel(tx.created_at),
-          account: accountNameOf(tx),
-          main: isSecondary ? 0 : used,
-          secondary: isSecondary ? used : 0,
-          total: used,
-        };
-      })
-      .sort((a, b) => (a.monthKey + a.date).localeCompare(b.monthKey + b.date));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, adAccounts, range]);
 
@@ -130,32 +100,25 @@ export function MonthlyUsageExport({
     if (sy && sm && ey && em) {
       const cursor = new Date(sy, sm - 1, 1);
       const last = new Date(ey, em - 1, 1);
-      while (cursor <= last) {
+      while (cursor <= last && map.size <= 240) {
         const k = monthKey(cursor);
-        map.set(k, { key: k, label: monthLabel(k), main: 0, secondary: 0, total: 0 });
+        map.set(k, { key: k, label: monthLabel(k), ...zero() });
         cursor.setMonth(cursor.getMonth() + 1);
-        if (map.size > 240) break;
       }
     }
-    for (const d of detailRows) {
-      const row =
-        map.get(d.monthKey) ??
-        { key: d.monthKey, label: d.monthLabel, main: 0, secondary: 0, total: 0 };
-      row.main += d.main;
-      row.secondary += d.secondary;
-      row.total = row.main + row.secondary;
+    for (const d of accountRows) {
+      const row = map.get(d.monthKey) ?? { key: d.monthKey, label: d.monthLabel, ...zero() };
+      row.topup += d.topup;
+      row.withdraw += d.withdraw;
+      row.net = row.topup - row.withdraw;
       map.set(d.monthKey, row);
     }
     return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
-  }, [detailRows, range]);
+  }, [accountRows, range]);
 
   const totals = rows.reduce(
-    (acc, r) => ({
-      main: acc.main + r.main,
-      secondary: acc.secondary + r.secondary,
-      total: acc.total + r.total,
-    }),
-    { main: 0, secondary: 0, total: 0 },
+    (acc, r) => ({ topup: acc.topup + r.topup, withdraw: acc.withdraw + r.withdraw, net: acc.net + r.net }),
+    zero(),
   );
 
   const toCsv = (lines: (string | number)[][]) =>
@@ -187,44 +150,36 @@ export function MonthlyUsageExport({
     ["Generated", new Date().toLocaleString()],
     [],
   ];
-
-  const header = secondaryEnabled
-    ? ["Main Wallet (USD)", "Secondary Wallet (USD)", "Total (USD)"]
-    : ["Main Wallet (USD)", "Total (USD)"];
-
-  const amounts = (r: { main: number; secondary: number; total: number }) =>
-    secondaryEnabled
-      ? [r.main.toFixed(2), r.secondary.toFixed(2), r.total.toFixed(2)]
-      : [r.main.toFixed(2), r.total.toFixed(2)];
+  const header = ["Total Top Up (USD)", "Total Withdraw (USD)", "Net Used (USD)"];
+  const amounts = (r: Sums) => [r.topup.toFixed(2), r.withdraw.toFixed(2), r.net.toFixed(2)];
 
   const downloadDetail = () => {
-    if (detailRows.length === 0) {
-      toast.error("No transactions in the selected range");
+    if (accountRows.length === 0) {
+      toast.error("No top up or withdraw in the selected range");
       return;
     }
-    const lines: (string | number)[][] = [...meta, ["Date", "Ad Account", ...header]];
+    const lines: (string | number)[][] = [...meta, ["Month", "Ad Account", "Transactions", ...header]];
     let current = "";
-    let sub = { main: 0, secondary: 0, total: 0 };
+    let sub = zero();
     const flush = () => {
       if (!current) return;
-      lines.push([`${current} TOTAL`, "", ...amounts(sub)]);
+      lines.push([`${current} TOTAL`, "", "", ...amounts(sub)]);
       lines.push([]);
     };
-    for (const d of detailRows) {
+    for (const d of accountRows) {
       if (d.monthLabel !== current) {
         flush();
         current = d.monthLabel;
-        sub = { main: 0, secondary: 0, total: 0 };
-        lines.push([current, "", ...header.map(() => "")]);
+        sub = zero();
       }
-      lines.push([d.date, d.account, ...amounts(d)]);
-      sub.main += d.main;
-      sub.secondary += d.secondary;
-      sub.total += d.total;
+      lines.push([d.monthLabel, d.account, d.count, ...amounts(d)]);
+      sub.topup += d.topup;
+      sub.withdraw += d.withdraw;
+      sub.net += d.net;
     }
     flush();
-    lines.push(["GRAND TOTAL", "", ...amounts(totals)]);
-    save(toCsv(lines), `spend-report-detail_${range.start}_to_${range.end}.csv`);
+    lines.push(["GRAND TOTAL", "", "", ...amounts(totals)]);
+    save(toCsv(lines), `topup-withdraw-by-account_${range.start}_to_${range.end}.csv`);
   };
 
   const downloadSummary = () => {
@@ -239,15 +194,21 @@ export function MonthlyUsageExport({
       [],
       ["TOTAL", ...amounts(totals)],
     ];
-    save(toCsv(lines), `spend-report-monthly_${range.start}_to_${range.end}.csv`);
+    save(toCsv(lines), `topup-withdraw-monthly_${range.start}_to_${range.end}.csv`);
   };
 
-  const colCount = secondaryEnabled ? 5 : 4;
+  const cells = (r: Sums, bold = false) => (
+    <>
+      <TableCell className={`text-right ${bold ? "font-bold" : ""}`}>${money(r.topup)}</TableCell>
+      <TableCell className={`text-right ${bold ? "font-bold" : ""}`}>${money(r.withdraw)}</TableCell>
+      <TableCell className="text-right font-semibold">${money(r.net)}</TableCell>
+    </>
+  );
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
-        <CardTitle className="text-base md:text-lg">Spend Report</CardTitle>
+        <CardTitle className="text-base md:text-lg">Monthly Top Up & Withdraw Report</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           {expanded &&
             [1, 2, 3, 6, 12].map((m) => (
@@ -293,7 +254,7 @@ export function MonthlyUsageExport({
           </div>
           <Button onClick={downloadDetail} className="gap-2">
             <Download className="h-4 w-4" />
-            Detailed CSV
+            Ad Account wise CSV
           </Button>
           <Button onClick={downloadSummary} variant="outline" className="gap-2">
             <Download className="h-4 w-4" />
@@ -312,56 +273,36 @@ export function MonthlyUsageExport({
           <Table>
             <TableHeader>
               <TableRow>
-                {view === "detail" ? (
-                  <>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Ad Account</TableHead>
-                  </>
-                ) : (
-                  <TableHead>Month</TableHead>
-                )}
-                <TableHead className="text-right">Main Wallet</TableHead>
-                {secondaryEnabled && (
-                  <TableHead className="text-right">Secondary Wallet</TableHead>
-                )}
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead>{view === "detail" ? "Ad Account" : "Month"}</TableHead>
+                <TableHead className="text-right">Top Up</TableHead>
+                <TableHead className="text-right">Withdraw</TableHead>
+                <TableHead className="text-right">Net Used</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {view === "detail" ? (
                 <>
-                  {detailRows.length === 0 && (
+                  {accountRows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={colCount} className="text-center text-muted-foreground">
-                        No transactions in this period
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No top up or withdraw in this period
                       </TableCell>
                     </TableRow>
                   )}
-                  {detailRows.map((d, i) => {
-                    const newMonth = i === 0 || detailRows[i - 1].monthKey !== d.monthKey;
+                  {accountRows.map((d, i) => {
+                    const newMonth = i === 0 || accountRows[i - 1].monthKey !== d.monthKey;
+                    const month = rows.find((r) => r.key === d.monthKey);
                     return (
-                      <Fragment key={`${d.monthKey}-${i}`}>
-                        {newMonth && (
+                      <Fragment key={`${d.monthKey}-${d.account}`}>
+                        {newMonth && month && (
                           <TableRow className="bg-muted/50">
-                            <TableCell colSpan={colCount} className="font-semibold">
-                              {d.monthLabel}
-                            </TableCell>
+                            <TableCell className="font-semibold">{d.monthLabel}</TableCell>
+                            {cells(month, true)}
                           </TableRow>
                         )}
                         <TableRow>
-                          <TableCell className="whitespace-nowrap">{d.date}</TableCell>
                           <TableCell className="font-medium">{d.account}</TableCell>
-                          <TableCell className="text-right">
-                            {d.main ? `$${money(d.main)}` : "—"}
-                          </TableCell>
-                          {secondaryEnabled && (
-                            <TableCell className="text-right">
-                              {d.secondary ? `$${money(d.secondary)}` : "—"}
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right font-semibold">
-                            ${money(d.total)}
-                          </TableCell>
+                          {cells(d)}
                         </TableRow>
                       </Fragment>
                     );
@@ -371,23 +312,13 @@ export function MonthlyUsageExport({
                 rows.map((r) => (
                   <TableRow key={r.key}>
                     <TableCell className="font-medium">{r.label}</TableCell>
-                    <TableCell className="text-right">${money(r.main)}</TableCell>
-                    {secondaryEnabled && (
-                      <TableCell className="text-right">${money(r.secondary)}</TableCell>
-                    )}
-                    <TableCell className="text-right font-semibold">${money(r.total)}</TableCell>
+                    {cells(r)}
                   </TableRow>
                 ))
               )}
               <TableRow>
-                <TableCell className="font-bold" colSpan={view === "detail" ? 2 : 1}>
-                  GRAND TOTAL
-                </TableCell>
-                <TableCell className="text-right font-bold">${money(totals.main)}</TableCell>
-                {secondaryEnabled && (
-                  <TableCell className="text-right font-bold">${money(totals.secondary)}</TableCell>
-                )}
-                <TableCell className="text-right font-bold">${money(totals.total)}</TableCell>
+                <TableCell className="font-bold">GRAND TOTAL</TableCell>
+                {cells(totals, true)}
               </TableRow>
             </TableBody>
           </Table>
