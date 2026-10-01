@@ -1,11 +1,11 @@
 import { Fragment, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ChevronDown, ChevronUp, Download } from "lucide-react";
+import { CalendarIcon, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -39,12 +39,13 @@ const monthLabel = (key: string) => {
 const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function defaultRange(months: number) {
+function presetDates(months: number) {
   const now = new Date();
   // Anchor to the last completed month so "1M" = previous month only (e.g. September in October).
-  const end = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const start = monthKey(new Date(now.getFullYear(), now.getMonth() - months, 1));
-  return { start, end };
+  return {
+    from: new Date(now.getFullYear(), now.getMonth() - months, 1),
+    to: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+  };
 }
 
 const zero = (): Sums => ({ topup: 0, withdraw: 0, net: 0 });
@@ -59,9 +60,17 @@ export function MonthlyUsageExport({
   secondaryEnabled?: boolean;
   clientName?: string;
 }) {
-  const [range, setRange] = useState(() => defaultRange(1));
+  const [fromDate, setFromDate] = useState<Date>(() => presetDates(1).from);
+  const [toDate, setToDate] = useState<Date>(() => presetDates(1).to);
   const [view, setView] = useState<"detail" | "summary">("detail");
   const [expanded, setExpanded] = useState(false);
+
+  const range = useMemo(() => {
+    let start = monthKey(fromDate);
+    let end = monthKey(toDate);
+    if (start > end) [start, end] = [end, start];
+    return { start, end };
+  }, [fromDate, toDate]);
 
   const accountNameOf = (tx: Tx) => {
     const linked = tx.reference_id ? adAccounts?.find((a: any) => a.id === tx.reference_id) : null;
@@ -210,49 +219,58 @@ export function MonthlyUsageExport({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
         <CardTitle className="text-base md:text-lg">Monthly Top Up & Withdraw Report</CardTitle>
-        <div className="flex flex-wrap items-center gap-2">
-          {expanded &&
-            [1, 2, 3, 6, 12].map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant="outline"
-                onClick={() => setRange(defaultRange(m))}
-              >
-                {m}M
-              </Button>
-            ))}
-          <Button size="sm" variant="secondary" onClick={() => setExpanded((v) => !v)} className="gap-1">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Hide report" : "Show report"}
-          </Button>
-        </div>
+        <Button size="sm" variant="secondary" onClick={() => setExpanded((v) => !v)} className="gap-1">
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expanded ? "Hide report" : "Show report"}
+        </Button>
       </CardHeader>
       {expanded && (
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="from-month" className="text-xs">From</Label>
-            <Input
-              id="from-month"
-              type="month"
-              value={range.start}
-              max={range.end}
-              onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
-              className="w-40"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="to-month" className="text-xs">To</Label>
-            <Input
-              id="to-month"
-              type="month"
-              value={range.end}
-              min={range.start}
-              onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
-              className="w-40"
-            />
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 font-normal">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">
+                  {monthLabel(range.start)} – {monthLabel(range.end)}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" align="start">
+              <div className="flex flex-wrap gap-1 mb-2">
+                {[1, 2, 3, 6, 12].map((m) => {
+                  const p = presetDates(m);
+                  const active = range.start === monthKey(p.from) && range.end === monthKey(p.to);
+                  return (
+                    <Button
+                      key={m}
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => {
+                        setFromDate(p.from);
+                        setToDate(p.to);
+                      }}
+                    >
+                      {m}M
+                    </Button>
+                  );
+                })}
+              </div>
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(sel: any) => {
+                  if (sel?.from) {
+                    setFromDate(sel.from);
+                    setToDate(sel.to ?? sel.from);
+                  }
+                }}
+                numberOfMonths={1}
+                className="p-2 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           <Button onClick={downloadDetail} className="gap-2">
             <Download className="h-4 w-4" />
             Ad Account wise CSV
