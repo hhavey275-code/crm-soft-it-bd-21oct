@@ -55,6 +55,7 @@ import { toast } from "sonner";
 import {
   User,
   Building2,
+  Briefcase,
   Phone,
   CalendarDays,
   Wallet,
