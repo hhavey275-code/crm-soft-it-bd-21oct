@@ -9,271 +9,71 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
-import { Route as WalletRouteImport } from './routes/wallet'
-import { Route as TransactionsRouteImport } from './routes/transactions'
-import { Route as TopUpRouteImport } from './routes/top-up'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as TenantsRouteImport } from './routes/tenants'
-import { Route as SystemTopupRouteImport } from './routes/system-topup'
-import { Route as SystemLogsRouteImport } from './routes/system-logs'
-import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
-import { Route as SignupSuccessRouteImport } from './routes/signup-success'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SellersRouteImport } from './routes/sellers'
-import { Route as SellerTopupsRouteImport } from './routes/seller-topups'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RequestsRouteImport } from './routes/requests'
-import { Route as ReferralRouteImport } from './routes/referral'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as OldSellerRouteImport } from './routes/old-seller'
-import { Route as MyUnusedRouteImport } from './routes/my-unused'
-import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
-import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
-import { Route as FeedbackRouteImport } from './routes/feedback'
-import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
-import { Route as ExternalTopUpRouteImport } from './routes/external-top-up'
-import { Route as DocumentsRouteImport } from './routes/documents'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
-import { Route as ChatRouteImport } from './routes/chat'
-import { Route as CardVaultRouteImport } from './routes/card-vault'
-import { Route as BusinessManagersRouteImport } from './routes/business-managers'
-import { Route as BillingsRouteImport } from './routes/billings'
-import { Route as BanksRouteImport } from './routes/banks'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuditRouteImport } from './routes/audit'
-import { Route as AnnouncementsRouteImport } from './routes/announcements'
-import { Route as AgentRouteImport } from './routes/agent'
-import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
-import { Route as AgencyTopupRouteImport } from './routes/agency-topup'
-import { Route as AgencyPaymentsRouteImport } from './routes/agency-payments'
-import { Route as AgenciesRouteImport } from './routes/agencies'
-import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TenantsIndexRouteImport } from './routes/tenants.index'
-import { Route as ClientsIndexRouteImport } from './routes/clients.index'
-import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
-import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
-import { Route as ClientsIdRouteImport } from './routes/clients.$id'
-import { Route as ApiReferralRefreshRouteImport } from './routes/api.referral-refresh'
-import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
-import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
-import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
-import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
-import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
-import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
+import { Route as AdAccountsRouteImport } from './routes/ad-accounts'
+import { Route as AgenciesRouteImport } from './routes/agencies'
+import { Route as AgencyPaymentsRouteImport } from './routes/agency-payments'
+import { Route as AgencyTopupRouteImport } from './routes/agency-topup'
+import { Route as AgencyWalletRouteImport } from './routes/agency-wallet'
+import { Route as AgentRouteImport } from './routes/agent'
+import { Route as AnnouncementsRouteImport } from './routes/announcements'
+import { Route as AuditRouteImport } from './routes/audit'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BanksRouteImport } from './routes/banks'
+import { Route as BillingsRouteImport } from './routes/billings'
+import { Route as BusinessManagersRouteImport } from './routes/business-managers'
+import { Route as CardVaultRouteImport } from './routes/card-vault'
+import { Route as ChatRouteImport } from './routes/chat'
+import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as ExternalTopUpRouteImport } from './routes/external-top-up'
+import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
+import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
+import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
+import { Route as MyUnusedRouteImport } from './routes/my-unused'
+import { Route as OldSellerRouteImport } from './routes/old-seller'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ReferralRouteImport } from './routes/referral'
+import { Route as RequestsRouteImport } from './routes/requests'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SellerTopupsRouteImport } from './routes/seller-topups'
+import { Route as SellersRouteImport } from './routes/sellers'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SignupSuccessRouteImport } from './routes/signup-success'
+import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
+import { Route as SystemLogsRouteImport } from './routes/system-logs'
+import { Route as SystemTopupRouteImport } from './routes/system-topup'
+import { Route as TenantsRouteImport } from './routes/tenants'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TopUpRouteImport } from './routes/top-up'
+import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as WalletRouteImport } from './routes/wallet'
+import { Route as WalletBalancesRouteImport } from './routes/wallet-balances'
 import { Route as AdAccountsIdRouteImport } from './routes/ad-accounts.$id'
-import { Route as ApiPublicSiteTtsRouteImport } from './routes/api/public/site-tts'
-import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
-import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
-import { Route as ApiPublicBmAdAccountsRouteImport } from './routes/api/public/bm-ad-accounts'
+import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
+import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem-accounts'
+import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
+import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
+import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
+import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
+import { Route as ApiReferralRefreshRouteImport } from './routes/api.referral-refresh'
+import { Route as ClientsIndexRouteImport } from './routes/clients.index'
+import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as InvoiceRequestIdRouteImport } from './routes/invoice.$requestId'
+import { Route as TenantsIndexRouteImport } from './routes/tenants.index'
+import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
+import { Route as ApiPublicBmAdAccountsRouteImport } from './routes/api/public/bm-ad-accounts'
+import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
+import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
+import { Route as ApiPublicSiteTtsRouteImport } from './routes/api/public/site-tts'
 
-const WalletBalancesRoute = WalletBalancesRouteImport.update({
-  id: '/wallet-balances',
-  path: '/wallet-balances',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WalletRoute = WalletRouteImport.update({
-  id: '/wallet',
-  path: '/wallet',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TransactionsRoute = TransactionsRouteImport.update({
-  id: '/transactions',
-  path: '/transactions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TopUpRoute = TopUpRouteImport.update({
-  id: '/top-up',
-  path: '/top-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TenantsRoute = TenantsRouteImport.update({
-  id: '/tenants',
-  path: '/tenants',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SystemTopupRoute = SystemTopupRouteImport.update({
-  id: '/system-topup',
-  path: '/system-topup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SystemLogsRoute = SystemLogsRouteImport.update({
-  id: '/system-logs',
-  path: '/system-logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SubscriptionsRoute = SubscriptionsRouteImport.update({
-  id: '/subscriptions',
-  path: '/subscriptions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupSuccessRoute = SignupSuccessRouteImport.update({
-  id: '/signup-success',
-  path: '/signup-success',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SellersRoute = SellersRouteImport.update({
-  id: '/sellers',
-  path: '/sellers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SellerTopupsRoute = SellerTopupsRouteImport.update({
-  id: '/seller-topups',
-  path: '/seller-topups',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RequestsRoute = RequestsRouteImport.update({
-  id: '/requests',
-  path: '/requests',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferralRoute = ReferralRouteImport.update({
-  id: '/referral',
-  path: '/referral',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OldSellerRoute = OldSellerRouteImport.update({
-  id: '/old-seller',
-  path: '/old-seller',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyUnusedRoute = MyUnusedRouteImport.update({
-  id: '/my-unused',
-  path: '/my-unused',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
-  id: '/meta-oauth-callback',
-  path: '/meta-oauth-callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InvoiceMakerRoute = InvoiceMakerRouteImport.update({
-  id: '/invoice-maker',
-  path: '/invoice-maker',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FeedbackRoute = FeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FailedTopupsRoute = FailedTopupsRouteImport.update({
-  id: '/failed-topups',
-  path: '/failed-topups',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExternalTopUpRoute = ExternalTopUpRouteImport.update({
-  id: '/external-top-up',
-  path: '/external-top-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClientSpendReportRoute = ClientSpendReportRouteImport.update({
-  id: '/client-spend-report',
-  path: '/client-spend-report',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChatRoute = ChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CardVaultRoute = CardVaultRouteImport.update({
-  id: '/card-vault',
-  path: '/card-vault',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BusinessManagersRoute = BusinessManagersRouteImport.update({
-  id: '/business-managers',
-  path: '/business-managers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BillingsRoute = BillingsRouteImport.update({
-  id: '/billings',
-  path: '/billings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BanksRoute = BanksRouteImport.update({
-  id: '/banks',
-  path: '/banks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuditRoute = AuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnnouncementsRoute = AnnouncementsRouteImport.update({
-  id: '/announcements',
-  path: '/announcements',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentRoute = AgentRouteImport.update({
-  id: '/agent',
-  path: '/agent',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgencyWalletRoute = AgencyWalletRouteImport.update({
-  id: '/agency-wallet',
-  path: '/agency-wallet',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgencyTopupRoute = AgencyTopupRouteImport.update({
-  id: '/agency-topup',
-  path: '/agency-topup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgencyPaymentsRoute = AgencyPaymentsRouteImport.update({
-  id: '/agency-payments',
-  path: '/agency-payments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgenciesRoute = AgenciesRouteImport.update({
-  id: '/agencies',
-  path: '/agencies',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdAccountsRoute = AdAccountsRouteImport.update({
@@ -281,69 +81,209 @@ const AdAccountsRoute = AdAccountsRouteImport.update({
   path: '/ad-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AgenciesRoute = AgenciesRouteImport.update({
+  id: '/agencies',
+  path: '/agencies',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TenantsIndexRoute = TenantsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => TenantsRoute,
-} as any)
-const ClientsIndexRoute = ClientsIndexRouteImport.update({
-  id: '/clients/',
-  path: '/clients/',
+const AgencyPaymentsRoute = AgencyPaymentsRouteImport.update({
+  id: '/agency-payments',
+  path: '/agency-payments',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TenantsIdRoute = TenantsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => TenantsRoute,
-} as any)
-const InvoiceRequestIdRoute = InvoiceRequestIdRouteImport.update({
-  id: '/invoice/$requestId',
-  path: '/invoice/$requestId',
+const AgencyTopupRoute = AgencyTopupRouteImport.update({
+  id: '/agency-topup',
+  path: '/agency-topup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsIdRoute = ClientsIdRouteImport.update({
-  id: '/clients/$id',
-  path: '/clients/$id',
+const AgencyWalletRoute = AgencyWalletRouteImport.update({
+  id: '/agency-wallet',
+  path: '/agency-wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiReferralRefreshRoute = ApiReferralRefreshRouteImport.update({
-  id: '/api/referral-refresh',
-  path: '/api/referral-refresh',
+const AgentRoute = AgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMetaProxyRoute = ApiMetaProxyRouteImport.update({
-  id: '/api/meta-proxy',
-  path: '/api/meta-proxy',
+const AnnouncementsRoute = AnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgenciesIdRoute = AgenciesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AgenciesRoute,
-} as any)
-const AdsManagerAccountIdRoute = AdsManagerAccountIdRouteImport.update({
-  id: '/ads-manager/$accountId',
-  path: '/ads-manager/$accountId',
+const AuditRoute = AuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminStripeLinksRoute = AdminStripeLinksRouteImport.update({
-  id: '/admin/stripe-links',
-  path: '/admin/stripe-links',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminProblemAccountsRoute = AdminProblemAccountsRouteImport.update({
-  id: '/admin/problem-accounts',
-  path: '/admin/problem-accounts',
+const BanksRoute = BanksRouteImport.update({
+  id: '/banks',
+  path: '/banks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminPerformanceRoute = AdminPerformanceRouteImport.update({
-  id: '/admin/performance',
-  path: '/admin/performance',
+const BillingsRoute = BillingsRouteImport.update({
+  id: '/billings',
+  path: '/billings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessManagersRoute = BusinessManagersRouteImport.update({
+  id: '/business-managers',
+  path: '/business-managers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CardVaultRoute = CardVaultRouteImport.update({
+  id: '/card-vault',
+  path: '/card-vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientSpendReportRoute = ClientSpendReportRouteImport.update({
+  id: '/client-spend-report',
+  path: '/client-spend-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExternalTopUpRoute = ExternalTopUpRouteImport.update({
+  id: '/external-top-up',
+  path: '/external-top-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FailedTopupsRoute = FailedTopupsRouteImport.update({
+  id: '/failed-topups',
+  path: '/failed-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceMakerRoute = InvoiceMakerRouteImport.update({
+  id: '/invoice-maker',
+  path: '/invoice-maker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
+  id: '/meta-oauth-callback',
+  path: '/meta-oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyUnusedRoute = MyUnusedRouteImport.update({
+  id: '/my-unused',
+  path: '/my-unused',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OldSellerRoute = OldSellerRouteImport.update({
+  id: '/old-seller',
+  path: '/old-seller',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferralRoute = ReferralRouteImport.update({
+  id: '/referral',
+  path: '/referral',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestsRoute = RequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellerTopupsRoute = SellerTopupsRouteImport.update({
+  id: '/seller-topups',
+  path: '/seller-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellersRoute = SellersRouteImport.update({
+  id: '/sellers',
+  path: '/sellers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupSuccessRoute = SignupSuccessRouteImport.update({
+  id: '/signup-success',
+  path: '/signup-success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionsRoute = SubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemLogsRoute = SystemLogsRouteImport.update({
+  id: '/system-logs',
+  path: '/system-logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemTopupRoute = SystemTopupRouteImport.update({
+  id: '/system-topup',
+  path: '/system-topup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TenantsRoute = TenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TopUpRoute = TopUpRouteImport.update({
+  id: '/top-up',
+  path: '/top-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WalletBalancesRoute = WalletBalancesRouteImport.update({
+  id: '/wallet-balances',
+  path: '/wallet-balances',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
@@ -351,19 +291,69 @@ const AdAccountsIdRoute = AdAccountsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdAccountsRoute,
 } as any)
-const ApiPublicSiteTtsRoute = ApiPublicSiteTtsRouteImport.update({
-  id: '/api/public/site-tts',
-  path: '/api/public/site-tts',
+const AdminPerformanceRoute = AdminPerformanceRouteImport.update({
+  id: '/admin/performance',
+  path: '/admin/performance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicReferralCronRoute = ApiPublicReferralCronRouteImport.update({
-  id: '/api/public/referral-cron',
-  path: '/api/public/referral-cron',
+const AdminProblemAccountsRoute = AdminProblemAccountsRouteImport.update({
+  id: '/admin/problem-accounts',
+  path: '/admin/problem-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
-  id: '/api/public/crm-topup',
-  path: '/api/public/crm-topup',
+const AdminStripeLinksRoute = AdminStripeLinksRouteImport.update({
+  id: '/admin/stripe-links',
+  path: '/admin/stripe-links',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsManagerAccountIdRoute = AdsManagerAccountIdRouteImport.update({
+  id: '/ads-manager/$accountId',
+  path: '/ads-manager/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgenciesIdRoute = AgenciesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AgenciesRoute,
+} as any)
+const ApiMetaProxyRoute = ApiMetaProxyRouteImport.update({
+  id: '/api/meta-proxy',
+  path: '/api/meta-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReferralRefreshRoute = ApiReferralRefreshRouteImport.update({
+  id: '/api/referral-refresh',
+  path: '/api/referral-refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsIndexRoute = ClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsIdRoute = ClientsIdRouteImport.update({
+  id: '/clients/$id',
+  path: '/clients/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceRequestIdRoute = InvoiceRequestIdRouteImport.update({
+  id: '/invoice/$requestId',
+  path: '/invoice/$requestId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TenantsIndexRoute = TenantsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TenantsRoute,
+} as any)
+const TenantsIdRoute = TenantsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => TenantsRoute,
+} as any)
+const ApiAdsManagerCampaignsRoute = ApiAdsManagerCampaignsRouteImport.update({
+  id: '/api/ads-manager/campaigns',
+  path: '/api/ads-manager/campaigns',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicBmAdAccountsRoute = ApiPublicBmAdAccountsRouteImport.update({
@@ -371,9 +361,19 @@ const ApiPublicBmAdAccountsRoute = ApiPublicBmAdAccountsRouteImport.update({
   path: '/api/public/bm-ad-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdsManagerCampaignsRoute = ApiAdsManagerCampaignsRouteImport.update({
-  id: '/api/ads-manager/campaigns',
-  path: '/api/ads-manager/campaigns',
+const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
+  id: '/api/public/crm-topup',
+  path: '/api/public/crm-topup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicReferralCronRoute = ApiPublicReferralCronRouteImport.update({
+  id: '/api/public/referral-cron',
+  path: '/api/public/referral-cron',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSiteTtsRoute = ApiPublicSiteTtsRouteImport.update({
+  id: '/api/public/site-tts',
+  path: '/api/public/site-tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -819,291 +819,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/wallet-balances': {
-      id: '/wallet-balances'
-      path: '/wallet-balances'
-      fullPath: '/wallet-balances'
-      preLoaderRoute: typeof WalletBalancesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/wallet': {
-      id: '/wallet'
-      path: '/wallet'
-      fullPath: '/wallet'
-      preLoaderRoute: typeof WalletRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/transactions': {
-      id: '/transactions'
-      path: '/transactions'
-      fullPath: '/transactions'
-      preLoaderRoute: typeof TransactionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/top-up': {
-      id: '/top-up'
-      path: '/top-up'
-      fullPath: '/top-up'
-      preLoaderRoute: typeof TopUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tenants': {
-      id: '/tenants'
-      path: '/tenants'
-      fullPath: '/tenants'
-      preLoaderRoute: typeof TenantsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/system-topup': {
-      id: '/system-topup'
-      path: '/system-topup'
-      fullPath: '/system-topup'
-      preLoaderRoute: typeof SystemTopupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/system-logs': {
-      id: '/system-logs'
-      path: '/system-logs'
-      fullPath: '/system-logs'
-      preLoaderRoute: typeof SystemLogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/subscriptions': {
-      id: '/subscriptions'
-      path: '/subscriptions'
-      fullPath: '/subscriptions'
-      preLoaderRoute: typeof SubscriptionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup-success': {
-      id: '/signup-success'
-      path: '/signup-success'
-      fullPath: '/signup-success'
-      preLoaderRoute: typeof SignupSuccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sellers': {
-      id: '/sellers'
-      path: '/sellers'
-      fullPath: '/sellers'
-      preLoaderRoute: typeof SellersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/seller-topups': {
-      id: '/seller-topups'
-      path: '/seller-topups'
-      fullPath: '/seller-topups'
-      preLoaderRoute: typeof SellerTopupsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/requests': {
-      id: '/requests'
-      path: '/requests'
-      fullPath: '/requests'
-      preLoaderRoute: typeof RequestsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/referral': {
-      id: '/referral'
-      path: '/referral'
-      fullPath: '/referral'
-      preLoaderRoute: typeof ReferralRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/old-seller': {
-      id: '/old-seller'
-      path: '/old-seller'
-      fullPath: '/old-seller'
-      preLoaderRoute: typeof OldSellerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-unused': {
-      id: '/my-unused'
-      path: '/my-unused'
-      fullPath: '/my-unused'
-      preLoaderRoute: typeof MyUnusedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/meta-oauth-callback': {
-      id: '/meta-oauth-callback'
-      path: '/meta-oauth-callback'
-      fullPath: '/meta-oauth-callback'
-      preLoaderRoute: typeof MetaOauthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/invoice-maker': {
-      id: '/invoice-maker'
-      path: '/invoice-maker'
-      fullPath: '/invoice-maker'
-      preLoaderRoute: typeof InvoiceMakerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/feedback': {
-      id: '/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof FeedbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/failed-topups': {
-      id: '/failed-topups'
-      path: '/failed-topups'
-      fullPath: '/failed-topups'
-      preLoaderRoute: typeof FailedTopupsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/external-top-up': {
-      id: '/external-top-up'
-      path: '/external-top-up'
-      fullPath: '/external-top-up'
-      preLoaderRoute: typeof ExternalTopUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/client-spend-report': {
-      id: '/client-spend-report'
-      path: '/client-spend-report'
-      fullPath: '/client-spend-report'
-      preLoaderRoute: typeof ClientSpendReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/chat': {
-      id: '/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof ChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/card-vault': {
-      id: '/card-vault'
-      path: '/card-vault'
-      fullPath: '/card-vault'
-      preLoaderRoute: typeof CardVaultRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/business-managers': {
-      id: '/business-managers'
-      path: '/business-managers'
-      fullPath: '/business-managers'
-      preLoaderRoute: typeof BusinessManagersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/billings': {
-      id: '/billings'
-      path: '/billings'
-      fullPath: '/billings'
-      preLoaderRoute: typeof BillingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/banks': {
-      id: '/banks'
-      path: '/banks'
-      fullPath: '/banks'
-      preLoaderRoute: typeof BanksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/audit': {
-      id: '/audit'
-      path: '/audit'
-      fullPath: '/audit'
-      preLoaderRoute: typeof AuditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/announcements': {
-      id: '/announcements'
-      path: '/announcements'
-      fullPath: '/announcements'
-      preLoaderRoute: typeof AnnouncementsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agent': {
-      id: '/agent'
-      path: '/agent'
-      fullPath: '/agent'
-      preLoaderRoute: typeof AgentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agency-wallet': {
-      id: '/agency-wallet'
-      path: '/agency-wallet'
-      fullPath: '/agency-wallet'
-      preLoaderRoute: typeof AgencyWalletRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agency-topup': {
-      id: '/agency-topup'
-      path: '/agency-topup'
-      fullPath: '/agency-topup'
-      preLoaderRoute: typeof AgencyTopupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agency-payments': {
-      id: '/agency-payments'
-      path: '/agency-payments'
-      fullPath: '/agency-payments'
-      preLoaderRoute: typeof AgencyPaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agencies': {
-      id: '/agencies'
-      path: '/agencies'
-      fullPath: '/agencies'
-      preLoaderRoute: typeof AgenciesRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ad-accounts': {
@@ -1113,95 +833,291 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/agencies': {
+      id: '/agencies'
+      path: '/agencies'
+      fullPath: '/agencies'
+      preLoaderRoute: typeof AgenciesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tenants/': {
-      id: '/tenants/'
-      path: '/'
-      fullPath: '/tenants/'
-      preLoaderRoute: typeof TenantsIndexRouteImport
-      parentRoute: typeof TenantsRoute
-    }
-    '/clients/': {
-      id: '/clients/'
-      path: '/clients'
-      fullPath: '/clients/'
-      preLoaderRoute: typeof ClientsIndexRouteImport
+    '/agency-payments': {
+      id: '/agency-payments'
+      path: '/agency-payments'
+      fullPath: '/agency-payments'
+      preLoaderRoute: typeof AgencyPaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tenants/$id': {
-      id: '/tenants/$id'
-      path: '/$id'
-      fullPath: '/tenants/$id'
-      preLoaderRoute: typeof TenantsIdRouteImport
-      parentRoute: typeof TenantsRoute
-    }
-    '/invoice/$requestId': {
-      id: '/invoice/$requestId'
-      path: '/invoice/$requestId'
-      fullPath: '/invoice/$requestId'
-      preLoaderRoute: typeof InvoiceRequestIdRouteImport
+    '/agency-topup': {
+      id: '/agency-topup'
+      path: '/agency-topup'
+      fullPath: '/agency-topup'
+      preLoaderRoute: typeof AgencyTopupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients/$id': {
-      id: '/clients/$id'
-      path: '/clients/$id'
-      fullPath: '/clients/$id'
-      preLoaderRoute: typeof ClientsIdRouteImport
+    '/agency-wallet': {
+      id: '/agency-wallet'
+      path: '/agency-wallet'
+      fullPath: '/agency-wallet'
+      preLoaderRoute: typeof AgencyWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/referral-refresh': {
-      id: '/api/referral-refresh'
-      path: '/api/referral-refresh'
-      fullPath: '/api/referral-refresh'
-      preLoaderRoute: typeof ApiReferralRefreshRouteImport
+    '/agent': {
+      id: '/agent'
+      path: '/agent'
+      fullPath: '/agent'
+      preLoaderRoute: typeof AgentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/meta-proxy': {
-      id: '/api/meta-proxy'
-      path: '/api/meta-proxy'
-      fullPath: '/api/meta-proxy'
-      preLoaderRoute: typeof ApiMetaProxyRouteImport
+    '/announcements': {
+      id: '/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AnnouncementsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agencies/$id': {
-      id: '/agencies/$id'
-      path: '/$id'
-      fullPath: '/agencies/$id'
-      preLoaderRoute: typeof AgenciesIdRouteImport
-      parentRoute: typeof AgenciesRoute
-    }
-    '/ads-manager/$accountId': {
-      id: '/ads-manager/$accountId'
-      path: '/ads-manager/$accountId'
-      fullPath: '/ads-manager/$accountId'
-      preLoaderRoute: typeof AdsManagerAccountIdRouteImport
+    '/audit': {
+      id: '/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/stripe-links': {
-      id: '/admin/stripe-links'
-      path: '/admin/stripe-links'
-      fullPath: '/admin/stripe-links'
-      preLoaderRoute: typeof AdminStripeLinksRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/problem-accounts': {
-      id: '/admin/problem-accounts'
-      path: '/admin/problem-accounts'
-      fullPath: '/admin/problem-accounts'
-      preLoaderRoute: typeof AdminProblemAccountsRouteImport
+    '/banks': {
+      id: '/banks'
+      path: '/banks'
+      fullPath: '/banks'
+      preLoaderRoute: typeof BanksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/performance': {
-      id: '/admin/performance'
-      path: '/admin/performance'
-      fullPath: '/admin/performance'
-      preLoaderRoute: typeof AdminPerformanceRouteImport
+    '/billings': {
+      id: '/billings'
+      path: '/billings'
+      fullPath: '/billings'
+      preLoaderRoute: typeof BillingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business-managers': {
+      id: '/business-managers'
+      path: '/business-managers'
+      fullPath: '/business-managers'
+      preLoaderRoute: typeof BusinessManagersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/card-vault': {
+      id: '/card-vault'
+      path: '/card-vault'
+      fullPath: '/card-vault'
+      preLoaderRoute: typeof CardVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/client-spend-report': {
+      id: '/client-spend-report'
+      path: '/client-spend-report'
+      fullPath: '/client-spend-report'
+      preLoaderRoute: typeof ClientSpendReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/external-top-up': {
+      id: '/external-top-up'
+      path: '/external-top-up'
+      fullPath: '/external-top-up'
+      preLoaderRoute: typeof ExternalTopUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/failed-topups': {
+      id: '/failed-topups'
+      path: '/failed-topups'
+      fullPath: '/failed-topups'
+      preLoaderRoute: typeof FailedTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoice-maker': {
+      id: '/invoice-maker'
+      path: '/invoice-maker'
+      fullPath: '/invoice-maker'
+      preLoaderRoute: typeof InvoiceMakerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meta-oauth-callback': {
+      id: '/meta-oauth-callback'
+      path: '/meta-oauth-callback'
+      fullPath: '/meta-oauth-callback'
+      preLoaderRoute: typeof MetaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-unused': {
+      id: '/my-unused'
+      path: '/my-unused'
+      fullPath: '/my-unused'
+      preLoaderRoute: typeof MyUnusedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/old-seller': {
+      id: '/old-seller'
+      path: '/old-seller'
+      fullPath: '/old-seller'
+      preLoaderRoute: typeof OldSellerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referral': {
+      id: '/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof ReferralRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/requests': {
+      id: '/requests'
+      path: '/requests'
+      fullPath: '/requests'
+      preLoaderRoute: typeof RequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seller-topups': {
+      id: '/seller-topups'
+      path: '/seller-topups'
+      fullPath: '/seller-topups'
+      preLoaderRoute: typeof SellerTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sellers': {
+      id: '/sellers'
+      path: '/sellers'
+      fullPath: '/sellers'
+      preLoaderRoute: typeof SellersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup-success': {
+      id: '/signup-success'
+      path: '/signup-success'
+      fullPath: '/signup-success'
+      preLoaderRoute: typeof SignupSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriptions': {
+      id: '/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/subscriptions'
+      preLoaderRoute: typeof SubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system-logs': {
+      id: '/system-logs'
+      path: '/system-logs'
+      fullPath: '/system-logs'
+      preLoaderRoute: typeof SystemLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system-topup': {
+      id: '/system-topup'
+      path: '/system-topup'
+      fullPath: '/system-topup'
+      preLoaderRoute: typeof SystemTopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenants': {
+      id: '/tenants'
+      path: '/tenants'
+      fullPath: '/tenants'
+      preLoaderRoute: typeof TenantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/top-up': {
+      id: '/top-up'
+      path: '/top-up'
+      fullPath: '/top-up'
+      preLoaderRoute: typeof TopUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wallet-balances': {
+      id: '/wallet-balances'
+      path: '/wallet-balances'
+      fullPath: '/wallet-balances'
+      preLoaderRoute: typeof WalletBalancesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ad-accounts/$id': {
@@ -1211,25 +1127,95 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdAccountsIdRouteImport
       parentRoute: typeof AdAccountsRoute
     }
-    '/api/public/site-tts': {
-      id: '/api/public/site-tts'
-      path: '/api/public/site-tts'
-      fullPath: '/api/public/site-tts'
-      preLoaderRoute: typeof ApiPublicSiteTtsRouteImport
+    '/admin/performance': {
+      id: '/admin/performance'
+      path: '/admin/performance'
+      fullPath: '/admin/performance'
+      preLoaderRoute: typeof AdminPerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/referral-cron': {
-      id: '/api/public/referral-cron'
-      path: '/api/public/referral-cron'
-      fullPath: '/api/public/referral-cron'
-      preLoaderRoute: typeof ApiPublicReferralCronRouteImport
+    '/admin/problem-accounts': {
+      id: '/admin/problem-accounts'
+      path: '/admin/problem-accounts'
+      fullPath: '/admin/problem-accounts'
+      preLoaderRoute: typeof AdminProblemAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/crm-topup': {
-      id: '/api/public/crm-topup'
-      path: '/api/public/crm-topup'
-      fullPath: '/api/public/crm-topup'
-      preLoaderRoute: typeof ApiPublicCrmTopupRouteImport
+    '/admin/stripe-links': {
+      id: '/admin/stripe-links'
+      path: '/admin/stripe-links'
+      fullPath: '/admin/stripe-links'
+      preLoaderRoute: typeof AdminStripeLinksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads-manager/$accountId': {
+      id: '/ads-manager/$accountId'
+      path: '/ads-manager/$accountId'
+      fullPath: '/ads-manager/$accountId'
+      preLoaderRoute: typeof AdsManagerAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agencies/$id': {
+      id: '/agencies/$id'
+      path: '/$id'
+      fullPath: '/agencies/$id'
+      preLoaderRoute: typeof AgenciesIdRouteImport
+      parentRoute: typeof AgenciesRoute
+    }
+    '/api/meta-proxy': {
+      id: '/api/meta-proxy'
+      path: '/api/meta-proxy'
+      fullPath: '/api/meta-proxy'
+      preLoaderRoute: typeof ApiMetaProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/referral-refresh': {
+      id: '/api/referral-refresh'
+      path: '/api/referral-refresh'
+      fullPath: '/api/referral-refresh'
+      preLoaderRoute: typeof ApiReferralRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients/': {
+      id: '/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof ClientsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients/$id': {
+      id: '/clients/$id'
+      path: '/clients/$id'
+      fullPath: '/clients/$id'
+      preLoaderRoute: typeof ClientsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoice/$requestId': {
+      id: '/invoice/$requestId'
+      path: '/invoice/$requestId'
+      fullPath: '/invoice/$requestId'
+      preLoaderRoute: typeof InvoiceRequestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenants/': {
+      id: '/tenants/'
+      path: '/'
+      fullPath: '/tenants/'
+      preLoaderRoute: typeof TenantsIndexRouteImport
+      parentRoute: typeof TenantsRoute
+    }
+    '/tenants/$id': {
+      id: '/tenants/$id'
+      path: '/$id'
+      fullPath: '/tenants/$id'
+      preLoaderRoute: typeof TenantsIdRouteImport
+      parentRoute: typeof TenantsRoute
+    }
+    '/api/ads-manager/campaigns': {
+      id: '/api/ads-manager/campaigns'
+      path: '/api/ads-manager/campaigns'
+      fullPath: '/api/ads-manager/campaigns'
+      preLoaderRoute: typeof ApiAdsManagerCampaignsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/bm-ad-accounts': {
@@ -1239,11 +1225,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBmAdAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/ads-manager/campaigns': {
-      id: '/api/ads-manager/campaigns'
-      path: '/api/ads-manager/campaigns'
-      fullPath: '/api/ads-manager/campaigns'
-      preLoaderRoute: typeof ApiAdsManagerCampaignsRouteImport
+    '/api/public/crm-topup': {
+      id: '/api/public/crm-topup'
+      path: '/api/public/crm-topup'
+      fullPath: '/api/public/crm-topup'
+      preLoaderRoute: typeof ApiPublicCrmTopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/referral-cron': {
+      id: '/api/public/referral-cron'
+      path: '/api/public/referral-cron'
+      fullPath: '/api/public/referral-cron'
+      preLoaderRoute: typeof ApiPublicReferralCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/site-tts': {
+      id: '/api/public/site-tts'
+      path: '/api/public/site-tts'
+      fullPath: '/api/public/site-tts'
+      preLoaderRoute: typeof ApiPublicSiteTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
