@@ -55,6 +55,7 @@ import { toast } from "sonner";
 import {
   User,
   Building2,
+  Briefcase,
   Phone,
   CalendarDays,
   Wallet,
@@ -133,6 +134,8 @@ export default function ClientDetailPage() {
   const [spendInput, setSpendInput] = useState("");
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressInput, setAddressInput] = useState("");
+  const [editingBmId, setEditingBmId] = useState(false);
+  const [bmIdInput, setBmIdInput] = useState("");
   const [editingDueLimit, setEditingDueLimit] = useState(false);
   const [dueLimitInput, setDueLimitInput] = useState("");
   const [dueLimitExpiry, setDueLimitExpiry] = useState<string>("never");
@@ -1582,6 +1585,51 @@ export default function ClientDetailPage() {
                           }}
                         >
                           {(profile as any)?.business_address || "—"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Business Manager ID */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Briefcase className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Business Manager ID
+                      </p>
+                      {editingBmId ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            className="h-7 text-sm"
+                            placeholder="e.g. 123456789012345"
+                            value={bmIdInput}
+                            onChange={(e) => setBmIdInput(e.target.value)}
+                          />
+                          <Button
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => {
+                              saveProfileMutation.mutate({ bm_id: bmIdInput.trim() || null } as any);
+                              setEditingBmId(false);
+                            }}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingBmId(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p
+                          className="font-semibold text-sm break-words cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setBmIdInput((profile as any)?.bm_id ?? "");
+                            setEditingBmId(true);
+                          }}
+                        >
+                          {(profile as any)?.bm_id || "—"}
                         </p>
                       )}
                     </div>

@@ -2336,6 +2336,7 @@ export type Database = {
         Row: {
           account_rename_enabled: boolean
           agency_id: string | null
+          bm_id: string | null
           business_address: string | null
           campaign_management_enabled: boolean
           can_approve_topups: boolean
@@ -2383,6 +2384,7 @@ export type Database = {
         Insert: {
           account_rename_enabled?: boolean
           agency_id?: string | null
+          bm_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
           can_approve_topups?: boolean
@@ -2430,6 +2432,7 @@ export type Database = {
         Update: {
           account_rename_enabled?: boolean
           agency_id?: string | null
+          bm_id?: string | null
           business_address?: string | null
           campaign_management_enabled?: boolean
           can_approve_topups?: boolean
