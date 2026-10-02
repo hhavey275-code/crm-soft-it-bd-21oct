@@ -44,7 +44,7 @@ export function useSidebarBadges(): Record<string, number> {
         (supabase as any)
           .from("seller_transactions")
           .select("*", { count: "exact", head: true })
-          .eq("type", "usdt_received")
+          .in("type", ["usdt_received", "withdraw"])
           .eq("status", "pending"),
         (supabase as any)
           .from("spend_cap_withdraw_requests")

@@ -426,7 +426,7 @@ export function AdminSellers() {
       const { data } = await (supabase as any)
         .from("seller_transactions")
         .select("seller_id")
-        .eq("type", "usdt_received")
+        .in("type", ["usdt_received", "withdraw"])
         .eq("status", "pending");
       const map: Record<string, number> = {};
       for (const r of (data as any[]) ?? []) {
@@ -1197,7 +1197,7 @@ export function AdminSellers() {
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {pendingCount > 0
-                      ? `🔔 ${pendingCount} pending USDT submission${pendingCount > 1 ? "s" : ""}`
+                      ? `🔔 ${pendingCount} pending request${pendingCount > 1 ? "s" : ""} (USDT / Withdraw)`
                       : s.email}
                   </p>
                 </div>
