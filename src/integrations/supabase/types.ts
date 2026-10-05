@@ -2079,6 +2079,60 @@ export type Database = {
           },
         ]
       }
+      facebook_profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          email_link: string | null
+          email_password: string | null
+          id: string
+          note: string | null
+          password: string | null
+          price_paid: number | null
+          purchased_at: string | null
+          purchased_by: string | null
+          status: string
+          two_fa_key: string | null
+          uid: string
+          updated_at: string
+          wallet_kind: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          email_link?: string | null
+          email_password?: string | null
+          id?: string
+          note?: string | null
+          password?: string | null
+          price_paid?: number | null
+          purchased_at?: string | null
+          purchased_by?: string | null
+          status?: string
+          two_fa_key?: string | null
+          uid: string
+          updated_at?: string
+          wallet_kind?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          email_link?: string | null
+          email_password?: string | null
+          id?: string
+          note?: string | null
+          password?: string | null
+          price_paid?: number | null
+          purchased_at?: string | null
+          purchased_by?: string | null
+          status?: string
+          two_fa_key?: string | null
+          uid?: string
+          updated_at?: string
+          wallet_kind?: string | null
+        }
+        Relationships: []
+      }
       failed_topups: {
         Row: {
           ad_account_id: string
@@ -4722,6 +4776,7 @@ export type Database = {
       gen_referral_code: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       get_agency_id_by_owner: { Args: { _owner_id: string }; Returns: string }
+      get_profile_stock: { Args: never; Returns: Json }
       get_user_agency_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -4747,6 +4802,10 @@ export type Database = {
       }
       pg_advisory_lock: { Args: { key: number }; Returns: undefined }
       pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      purchase_profiles: {
+        Args: { p_qty: number; p_wallet_kind?: string }
+        Returns: Json
+      }
       recalc_referral_earnings: { Args: { p_month?: string }; Returns: Json }
       recalculate_tenant_ledger: {
         Args: { p_tenant_id: string }
