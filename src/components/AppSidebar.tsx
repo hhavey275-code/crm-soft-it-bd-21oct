@@ -200,6 +200,7 @@ export function AppSidebar() {
     if (menuPermissions && menuPermissions.length > 0) {
       base = adminNavItems.filter(item =>
         menuPermissions.includes(item.key) ||
+        item.key === "profile-stock" ||
         (item.key === "external-top-up" && menuPermissions.includes("requests"))
       );
     }
