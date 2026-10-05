@@ -26,6 +26,7 @@ import {
   Archive,
   FolderLock,
   Gift,
+  UserCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -77,6 +78,7 @@ const adminNavItems = [
   { title: "Announcements", url: "/announcements", icon: Megaphone, key: "announcements" },
   { title: "Admin Performance", url: "/admin/performance", icon: Trophy, key: "admin-performance" },
   { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
+  { title: "Profile Stock", url: "/profile-stock", icon: UserCircle, key: "profile-stock" },
   { title: "Documents Vault", url: "/documents", icon: FolderLock, key: "documents-vault" },
   { title: "Invoice Maker", url: "/invoice-maker", icon: FileText, key: "invoice-maker" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
@@ -90,6 +92,7 @@ const clientNavItems = [
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Buy Profile", url: "/buy-profile", icon: UserCircle, key: "buy-profile" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
   { title: "Referral", url: "/referral", icon: Gift, key: "referral" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
