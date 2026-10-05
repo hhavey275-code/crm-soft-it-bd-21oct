@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -118,7 +119,9 @@ export function AdminTransactions() {
                           {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
                         </span>
                         {canRemove && (
-                          <button onClick={() => removeTx(tx)} className="text-destructive" aria-label="Remove transaction"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <Button type="button" variant="destructive" size="sm" className="h-7 px-2 text-xs" onClick={() => removeTx(tx)}>
+                            <Trash2 /> Delete
+                          </Button>
                         )}
                         <span className="text-[11px] text-muted-foreground">
                           Bal: <span className="font-medium text-foreground">${Number(tx.balance_after ?? 0).toLocaleString()}</span>
@@ -167,7 +170,7 @@ export function AdminTransactions() {
                     <TableCell className="text-sm text-muted-foreground">{getProcessedBy(tx)}</TableCell>
                     {canRemove && (
                       <TableCell>
-                        <button onClick={() => removeTx(tx)} className="text-destructive" aria-label="Remove transaction"><Trash2 className="h-4 w-4" /></button>
+                        <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => removeTx(tx)} aria-label="Delete transaction" title="Delete transaction"><Trash2 /></Button>
                       </TableCell>
                     )}
                   </TableRow>
