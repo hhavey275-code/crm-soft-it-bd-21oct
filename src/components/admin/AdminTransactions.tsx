@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { MoreVertical, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -119,9 +120,18 @@ export function AdminTransactions() {
                           {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
                         </span>
                         {canRemove && (
-                          <Button type="button" variant="destructive" size="sm" className="h-7 px-2 text-xs" onClick={() => removeTx(tx)}>
-                            <Trash2 /> Delete
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Transaction actions">
+                                <MoreVertical />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => removeTx(tx)}>
+                                <Trash2 /> Delete transaction
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         <span className="text-[11px] text-muted-foreground">
                           Bal: <span className="font-medium text-foreground">${Number(tx.balance_after ?? 0).toLocaleString()}</span>
@@ -170,7 +180,16 @@ export function AdminTransactions() {
                     <TableCell className="text-sm text-muted-foreground">{getProcessedBy(tx)}</TableCell>
                     {canRemove && (
                       <TableCell>
-                        <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => removeTx(tx)} aria-label="Delete transaction" title="Delete transaction"><Trash2 /></Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" aria-label="Transaction actions"><MoreVertical /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => removeTx(tx)}>
+                              <Trash2 /> Delete transaction
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     )}
                   </TableRow>

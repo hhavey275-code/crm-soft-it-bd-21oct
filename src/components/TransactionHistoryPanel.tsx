@@ -2,13 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChevronDown, ChevronUp, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -686,21 +687,27 @@ export function TransactionHistoryPanel({
                       </span>
                     </div>
                     {canRemoveTransaction && onRemoveTransaction && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="mt-2 h-7 w-full text-xs"
-                        disabled={removingTransactionId === tx.id}
-                        onClick={() => onRemoveTransaction(tx)}
-                      >
-                        {removingTransactionId === tx.id ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <Trash2 />
-                        )}
-                        Delete transaction
-                      </Button>
+                      <div className="mt-1 flex justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={removingTransactionId === tx.id}
+                              aria-label="Transaction actions"
+                            >
+                              {removingTransactionId === tx.id ? <Loader2 className="animate-spin" /> : <MoreVertical />}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onRemoveTransaction(tx)}>
+                              <Trash2 /> Delete transaction
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -730,7 +737,7 @@ export function TransactionHistoryPanel({
                 <TableHead className="w-[9%] text-right">Amount</TableHead>
                 <TableHead className="w-[10%] text-right">Balance</TableHead>
                 <TableHead className="w-[12%]">Processed By</TableHead>
-                {canRemoveTransaction && <TableHead className="w-[7%] text-right">Delete</TableHead>}
+                {canRemoveTransaction && <TableHead className="w-[7%] text-right">Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -802,18 +809,24 @@ export function TransactionHistoryPanel({
                     </TableCell>
                     {canRemoveTransaction && onRemoveTransaction && (
                       <TableCell className="py-2.5 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          disabled={removingTransactionId === tx.id}
-                          onClick={() => onRemoveTransaction(tx)}
-                          aria-label="Delete transaction"
-                          title="Delete transaction"
-                        >
-                          {removingTransactionId === tx.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={removingTransactionId === tx.id}
+                              aria-label="Transaction actions"
+                            >
+                              {removingTransactionId === tx.id ? <Loader2 className="animate-spin" /> : <MoreVertical />}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onRemoveTransaction(tx)}>
+                              <Trash2 /> Delete transaction
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     )}
                   </TableRow>
