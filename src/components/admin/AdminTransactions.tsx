@@ -1,4 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,6 +12,21 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 export function AdminTransactions() {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const canRemove = user?.email?.toLowerCase() === "maksudurrahaman64@gmail.com";
+
+  const removeTx = async (tx: any) => {
+    if (!confirm(`এই transaction remove করবেন? ($${Number(tx.amount)})\nClient-এর wallet balance থেকেও এই amount উল্টে যাবে।`)) return;
+    const { data, error } = await supabase.rpc("superadmin_remove_transaction" as any, { p_id: tx.id });
+    const res = data as any;
+    if (error || res?.success === false) {
+      toast.error(error?.message || res?.error || "Remove হয়নি");
+      return;
+    }
+    toast.success("Transaction remove হয়েছে");
+    qc.invalidateQueries({ queryKey: ["admin-transactions"] });
+  };
 
   const { data: transactions } = useQuery({
     queryKey: ["admin-transactions"],
@@ -99,6 +117,9 @@ export function AdminTransactions() {
                         <span className="text-[11px] text-muted-foreground">
                           {format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}
                         </span>
+                        {canRemove && (
+                          <button onClick={() => removeTx(tx)} className="text-destructive" aria-label="Remove transaction"><Trash2 className="h-3.5 w-3.5" /></button>
+                        )}
                         <span className="text-[11px] text-muted-foreground">
                           Bal: <span className="font-medium text-foreground">${Number(tx.balance_after ?? 0).toLocaleString()}</span>
                         </span>
@@ -129,6 +150,7 @@ export function AdminTransactions() {
                   <TableHead>Amount</TableHead>
                   <TableHead>Balance After</TableHead>
                   <TableHead>Processed By</TableHead>
+                  {canRemove && <TableHead />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,10 +165,15 @@ export function AdminTransactions() {
                     </TableCell>
                     <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{getProcessedBy(tx)}</TableCell>
+                    {canRemove && (
+                      <TableCell>
+                        <button onClick={() => removeTx(tx)} className="text-destructive" aria-label="Remove transaction"><Trash2 className="h-4 w-4" /></button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {(!transactions || transactions.length === 0) && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={canRemove ? 8 : 7} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
