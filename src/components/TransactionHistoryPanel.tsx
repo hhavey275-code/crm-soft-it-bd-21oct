@@ -2,11 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -59,6 +60,9 @@ interface TransactionHistoryPanelProps {
   resolveProcessedBy?: (tx: any) => string;
   secondaryEnabled?: boolean;
   isMobile?: boolean;
+  canRemoveTransaction?: boolean;
+  removingTransactionId?: string | null;
+  onRemoveTransaction?: (tx: any) => void;
 }
 
 /** Collapses long text to one line with a clickable "…" that expands it. */
@@ -177,6 +181,9 @@ export function TransactionHistoryPanel({
   resolveProcessedBy,
   secondaryEnabled = false,
   isMobile = false,
+  canRemoveTransaction = false,
+  removingTransactionId,
+  onRemoveTransaction,
 }: TransactionHistoryPanelProps) {
   const extIds = useMemo(
     () =>
@@ -678,6 +685,23 @@ export function TransactionHistoryPanel({
                         </span>
                       </span>
                     </div>
+                    {canRemoveTransaction && onRemoveTransaction && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="mt-2 h-7 w-full text-xs"
+                        disabled={removingTransactionId === tx.id}
+                        onClick={() => onRemoveTransaction(tx)}
+                      >
+                        {removingTransactionId === tx.id ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Trash2 />
+                        )}
+                        Delete transaction
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -706,6 +730,7 @@ export function TransactionHistoryPanel({
                 <TableHead className="w-[9%] text-right">Amount</TableHead>
                 <TableHead className="w-[10%] text-right">Balance</TableHead>
                 <TableHead className="w-[12%]">Processed By</TableHead>
+                {canRemoveTransaction && <TableHead className="w-[7%] text-right">Delete</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -775,12 +800,28 @@ export function TransactionHistoryPanel({
                     <TableCell className="py-2.5 text-[12px] text-muted-foreground break-words">
                       <ExpandableText text={resolveProcessedBy?.(tx) || "—"} limit={28} />
                     </TableCell>
+                    {canRemoveTransaction && onRemoveTransaction && (
+                      <TableCell className="py-2.5 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          disabled={removingTransactionId === tx.id}
+                          onClick={() => onRemoveTransaction(tx)}
+                          aria-label="Delete transaction"
+                          title="Delete transaction"
+                        >
+                          {removingTransactionId === tx.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={canRemoveTransaction ? 8 : 7} className="py-8 text-center text-muted-foreground">
                     No transactions
                   </TableCell>
                 </TableRow>

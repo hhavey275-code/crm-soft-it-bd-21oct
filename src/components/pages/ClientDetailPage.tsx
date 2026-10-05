@@ -145,6 +145,7 @@ export default function ClientDetailPage() {
   const [editingClDueLimit, setEditingClDueLimit] = useState(false);
   const [clDueLimitInput, setClDueLimitInput] = useState("");
   const [clDueLimitExpiry, setClDueLimitExpiry] = useState<string>("never");
+  const [removingTransactionId, setRemovingTransactionId] = useState<string | null>(null);
 
   // Wallet adjust dialog
   const [walletDialogType, setWalletDialogType] = useState<"credit" | "debit" | null>(null);
@@ -506,6 +507,31 @@ export default function ClientDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["client-detail-wallet", userId] });
     queryClient.invalidateQueries({ queryKey: ["client-detail-transactions", userId] });
     queryClient.invalidateQueries({ queryKey: ["client-detail-ad-accounts", userId] });
+  };
+
+  const canRemoveTransactions =
+    isSuperAdmin && currentUser?.email?.toLowerCase() === "maksudurrahaman64@gmail.com";
+
+  const removeTransaction = async (tx: any) => {
+    const confirmed = window.confirm(
+      `এই transaction delete করবেন? ($${Math.abs(Number(tx.amount)).toLocaleString()})\n\nClient-এর wallet balance-ও এই transaction অনুযায়ী ঠিক হবে। এটি ফেরত আনা যাবে না।`,
+    );
+    if (!confirmed) return;
+
+    setRemovingTransactionId(tx.id);
+    try {
+      const { data, error } = await supabase.rpc("superadmin_remove_transaction", { p_id: tx.id });
+      const result = data as { success?: boolean; error?: string } | null;
+      if (error || result?.success === false) {
+        throw new Error(error?.message || result?.error || "Transaction delete হয়নি");
+      }
+      toast.success("Transaction delete হয়েছে এবং wallet balance ঠিক করা হয়েছে");
+      invalidateAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Transaction delete হয়নি");
+    } finally {
+      setRemovingTransactionId(null);
+    }
   };
 
   const saveProfileMutation = useMutation({
@@ -3210,6 +3236,9 @@ export default function ClientDetailPage() {
               adAccounts={adAccounts}
               secondaryEnabled={wallets.secondaryEnabled}
               isMobile={isMobile}
+              canRemoveTransaction={canRemoveTransactions}
+              removingTransactionId={removingTransactionId}
+              onRemoveTransaction={removeTransaction}
               resolveProcessedBy={(tx: any) => {
                 const pb = tx.processed_by || "";
                 if (pb === "system") return "Auto Approved by System";
