@@ -4872,6 +4872,7 @@ export type Database = {
         Returns: Json
       }
       settle_secondary_from_main: { Args: { p_user_id: string }; Returns: Json }
+      superadmin_remove_transaction: { Args: { p_id: string }; Returns: Json }
       topup_requests_mirrored: {
         Args: { p_ids: string[] }
         Returns: {
