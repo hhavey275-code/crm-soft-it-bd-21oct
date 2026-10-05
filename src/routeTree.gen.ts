@@ -26,6 +26,7 @@ import { Route as SellerTopupsRouteImport } from './routes/seller-topups'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RequestsRouteImport } from './routes/requests'
 import { Route as ReferralRouteImport } from './routes/referral'
+import { Route as ProfileStockRouteImport } from './routes/profile-stock'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OldSellerRouteImport } from './routes/old-seller'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
@@ -39,6 +40,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClientSpendReportRouteImport } from './routes/client-spend-report'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CardVaultRouteImport } from './routes/card-vault'
+import { Route as BuyProfileRouteImport } from './routes/buy-profile'
 import { Route as BusinessManagersRouteImport } from './routes/business-managers'
 import { Route as BillingsRouteImport } from './routes/billings'
 import { Route as BanksRouteImport } from './routes/banks'
@@ -156,6 +158,11 @@ const ReferralRoute = ReferralRouteImport.update({
   path: '/referral',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileStockRoute = ProfileStockRouteImport.update({
+  id: '/profile-stock',
+  path: '/profile-stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
@@ -219,6 +226,11 @@ const ChatRoute = ChatRouteImport.update({
 const CardVaultRoute = CardVaultRouteImport.update({
   id: '/card-vault',
   path: '/card-vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuyProfileRoute = BuyProfileRouteImport.update({
+  id: '/buy-profile',
+  path: '/buy-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BusinessManagersRoute = BusinessManagersRouteImport.update({
@@ -391,6 +403,7 @@ export interface FileRoutesByFullPath {
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/buy-profile': typeof BuyProfileRoute
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
@@ -404,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/profile-stock': typeof ProfileStockRoute
   '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -454,6 +468,7 @@ export interface FileRoutesByTo {
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/buy-profile': typeof BuyProfileRoute
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
@@ -467,6 +482,7 @@ export interface FileRoutesByTo {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/profile-stock': typeof ProfileStockRoute
   '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -517,6 +533,7 @@ export interface FileRoutesById {
   '/banks': typeof BanksRoute
   '/billings': typeof BillingsRoute
   '/business-managers': typeof BusinessManagersRoute
+  '/buy-profile': typeof BuyProfileRoute
   '/card-vault': typeof CardVaultRoute
   '/chat': typeof ChatRoute
   '/client-spend-report': typeof ClientSpendReportRoute
@@ -530,6 +547,7 @@ export interface FileRoutesById {
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
+  '/profile-stock': typeof ProfileStockRoute
   '/referral': typeof ReferralRoute
   '/requests': typeof RequestsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -582,6 +600,7 @@ export interface FileRouteTypes {
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/buy-profile'
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
@@ -595,6 +614,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/profile-stock'
     | '/referral'
     | '/requests'
     | '/reset-password'
@@ -645,6 +665,7 @@ export interface FileRouteTypes {
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/buy-profile'
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
@@ -658,6 +679,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/profile-stock'
     | '/referral'
     | '/requests'
     | '/reset-password'
@@ -707,6 +729,7 @@ export interface FileRouteTypes {
     | '/banks'
     | '/billings'
     | '/business-managers'
+    | '/buy-profile'
     | '/card-vault'
     | '/chat'
     | '/client-spend-report'
@@ -720,6 +743,7 @@ export interface FileRouteTypes {
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
+    | '/profile-stock'
     | '/referral'
     | '/requests'
     | '/reset-password'
@@ -771,6 +795,7 @@ export interface RootRouteChildren {
   BanksRoute: typeof BanksRoute
   BillingsRoute: typeof BillingsRoute
   BusinessManagersRoute: typeof BusinessManagersRoute
+  BuyProfileRoute: typeof BuyProfileRoute
   CardVaultRoute: typeof CardVaultRoute
   ChatRoute: typeof ChatRoute
   ClientSpendReportRoute: typeof ClientSpendReportRoute
@@ -784,6 +809,7 @@ export interface RootRouteChildren {
   MyUnusedRoute: typeof MyUnusedRoute
   OldSellerRoute: typeof OldSellerRoute
   PrivacyRoute: typeof PrivacyRoute
+  ProfileStockRoute: typeof ProfileStockRoute
   ReferralRoute: typeof ReferralRoute
   RequestsRoute: typeof RequestsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -938,6 +964,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReferralRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile-stock': {
+      id: '/profile-stock'
+      path: '/profile-stock'
+      fullPath: '/profile-stock'
+      preLoaderRoute: typeof ProfileStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
@@ -1027,6 +1060,13 @@ declare module '@tanstack/react-router' {
       path: '/card-vault'
       fullPath: '/card-vault'
       preLoaderRoute: typeof CardVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/buy-profile': {
+      id: '/buy-profile'
+      path: '/buy-profile'
+      fullPath: '/buy-profile'
+      preLoaderRoute: typeof BuyProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/business-managers': {
@@ -1300,6 +1340,7 @@ const rootRouteChildren: RootRouteChildren = {
   BanksRoute: BanksRoute,
   BillingsRoute: BillingsRoute,
   BusinessManagersRoute: BusinessManagersRoute,
+  BuyProfileRoute: BuyProfileRoute,
   CardVaultRoute: CardVaultRoute,
   ChatRoute: ChatRoute,
   ClientSpendReportRoute: ClientSpendReportRoute,
@@ -1313,6 +1354,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyUnusedRoute: MyUnusedRoute,
   OldSellerRoute: OldSellerRoute,
   PrivacyRoute: PrivacyRoute,
+  ProfileStockRoute: ProfileStockRoute,
   ReferralRoute: ReferralRoute,
   RequestsRoute: RequestsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
