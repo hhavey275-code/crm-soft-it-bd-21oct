@@ -146,6 +146,17 @@ export default function MyAdsPage() {
             আপনার কোনো অনুমোদিত page নেই। আগে "My Pages" থেকে page যুক্ত করুন।
           </CardContent></Card>
         )}
+        {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && (
+          <Card className="border-destructive"><CardContent className="p-4 text-sm text-destructive">
+            Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।
+          </CardContent></Card>
+        )}
+        {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && (
+          <Card className="border-primary"><CardContent className="p-4 text-sm">
+            আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে। এখনই top-up করুন।
+          </CardContent></Card>
+        )}
+        <p className="text-xs text-muted-foreground">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend" নামে দেখবেন)।</p>
         {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
         {(data?.errors ?? []).map((e: string, i: number) => <p key={i} className="text-sm text-destructive">{e}</p>)}
 
