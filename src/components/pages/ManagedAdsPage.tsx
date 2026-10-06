@@ -72,10 +72,12 @@ export default function ManagedAdsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Managed Ads Control</h1>
-          <p className="text-sm text-muted-foreground">Client-দের Facebook page shared ad account-এ assign ও অনুমোদন করুন।</p>
+          <p className="text-sm text-muted-foreground">Client-কে একটি shared ad account দিন — তারপর client নিজের যেকোনো page বেছে ad চালাতে পারবে। নিচের page তালিকা শুধু দেখার ও দরকারে বাতিল করার জন্য।</p>
         </div>
 
         <ThresholdCard />
+
+        <SharedAccountAssign accounts={data?.accounts ?? []} />
 
         <div className="flex flex-wrap items-center gap-2">
           {(["pending", "approved", "rejected"] as const).map((t) => (
@@ -163,6 +165,78 @@ function ThresholdCard() {
           <Input className="w-32" type="number" value={alert ?? data?.low_balance_alert ?? ""} onChange={(e) => setAlert(e.target.value)} /></div>
         <Button size="sm" onClick={save}>সেভ</Button>
         <p className="w-full text-xs text-muted-foreground">প্রতি ১৫ মিনিটে Meta-র খরচ client wallet থেকে কাটা হয়; ব্যালেন্স এই সীমায় নামলে সেই client-এর সব campaign বন্ধ হয়।</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+function SharedAccountAssign({ accounts }: { accounts: any[] }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [client, setClient] = useState("");
+  const [acc, setAcc] = useState("");
+  const [q, setQ] = useState("");
+  const { data } = useQuery({
+    queryKey: ["managed-assignments"],
+    queryFn: async () => {
+      const [{ data: rows }, { data: clients }] = await Promise.all([
+        db.from("managed_account_assignments").select("*").order("assigned_at", { ascending: false }),
+        db.from("profiles").select("user_id, full_name, email").order("full_name").limit(2000),
+      ]);
+      return { rows: rows ?? [], clients: clients ?? [] };
+    },
+  });
+  const cMap = new Map((data?.clients ?? []).map((c: any) => [c.user_id, c]));
+  const aMap = new Map(accounts.map((a: any) => [a.id, a]));
+  const filtered = (data?.clients ?? []).filter((c: any) => !q.trim() || [c.full_name, c.email].some((v: string) => v?.toLowerCase().includes(q.trim().toLowerCase()))).slice(0, 50);
+
+  const assign = async () => {
+    if (!client || !acc) return toast.error("Client ও ad account দুটোই বাছুন");
+    const { error } = await db.from("managed_account_assignments").insert({ user_id: client, ad_account_id: acc, assigned_by: user?.id });
+    if (error) return toast.error(error.code === "23505" ? "এই account আগেই এই client-কে দেওয়া আছে" : error.message);
+    await db.from("profiles").update({ managed_ads_enabled: true }).eq("user_id", client);
+    toast.success("Shared ad account দেওয়া হয়েছে — client এখন My Ads থেকে চালাতে পারবে");
+    setAcc("");
+    qc.invalidateQueries({ queryKey: ["managed-assignments"] });
+  };
+  const remove = async (id: string) => {
+    if (!window.confirm("এই client-এর কাছ থেকে account সরিয়ে নেবেন?")) return;
+    const { error } = await db.from("managed_account_assignments").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["managed-assignments"] });
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Client-কে shared ad account দিন</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <div className="space-y-1">
+            <Input placeholder="Client খুঁজুন (নাম/ইমেইল)" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Select value={client} onValueChange={setClient}>
+              <SelectTrigger><SelectValue placeholder="Client বাছুন" /></SelectTrigger>
+              <SelectContent>{filtered.map((c: any) => <SelectItem key={c.user_id} value={c.user_id}>{c.full_name || c.email} — {c.email}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <Select value={acc} onValueChange={setAcc}>
+            <SelectTrigger className="md:mt-[42px]"><SelectValue placeholder="Shared ad account বাছুন" /></SelectTrigger>
+            <SelectContent>{accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.account_name} ({a.account_id})</SelectItem>)}</SelectContent>
+          </Select>
+          <Button className="md:mt-[42px]" onClick={assign}>দিন</Button>
+        </div>
+        <div className="space-y-2">
+          {(data?.rows ?? []).length === 0 && <p className="text-sm text-muted-foreground">এখনো কাউকে shared account দেওয়া হয়নি।</p>}
+          {(data?.rows ?? []).map((r: any) => {
+            const c: any = cMap.get(r.user_id); const a: any = aMap.get(r.ad_account_id);
+            return (
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
+                <div className="min-w-0"><p className="font-medium truncate">{c?.full_name || c?.email || r.user_id}</p><p className="text-xs text-muted-foreground truncate">{a ? `${a.account_name} (${a.account_id})` : r.ad_account_id}</p></div>
+                <Button size="sm" variant="outline" onClick={() => remove(r.id)}>সরিয়ে নিন</Button>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
