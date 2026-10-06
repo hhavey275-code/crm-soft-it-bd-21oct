@@ -71,7 +71,4 @@ async function handle(request: Request): Promise<Response> {
             link: p.link ?? `https://facebook.com/${p.id}`, picture: p.picture?.data?.url ?? null,
           })),
         });
-      },
-    },
-  },
-});
+}
