@@ -31,11 +31,13 @@ export const Route = createFileRoute("/api/fb-pages")({
 
 async function verifyUser(token: string): Promise<boolean> {
   if (!token) return false;
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://dhswrfzdqcavgmymllat.supabase.co";
+  // Same project the browser signs in to (public URL + public anon key).
+  const url = "https://dhswrfzdqcavgmymllat.supabase.co";
+  const PUBLIC_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s";
   const keys = [
+    PUBLIC_ANON,
     process.env.SUPABASE_PUBLISHABLE_KEY,
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    process.env.SUPABASE_ANON_KEY,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   ].filter(Boolean) as string[];
   for (const key of keys) {
