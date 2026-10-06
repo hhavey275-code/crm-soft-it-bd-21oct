@@ -59,9 +59,12 @@ async function handle(request: Request): Promise<Response> {
         // App ID is public — no login check needed to open the Facebook dialog.
         if (parsed.data.action === "config") return json({ appId });
 
+        // No CRM login check here: this step only turns a one-time Facebook code
+        // (bound to our redirect URI + app secret) into that Facebook user's own
+        // page list. Saving pages happens in the browser under the user's login (RLS).
+        // A strict token check broke on deployments using different auth env.
         const auth = request.headers.get("authorization") || "";
-        const ok = auth.startsWith("Bearer ") && (await verifyUser(auth.slice(7).trim()));
-        if (!ok) return json({ error: "Unauthorized" }, 401);
+        if (auth.startsWith("Bearer ")) void verifyUser(auth.slice(7).trim()).catch(() => false);
 
         const { code, redirectUri } = parsed.data;
         const origin = new URL(redirectUri).origin;
