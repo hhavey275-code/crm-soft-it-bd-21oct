@@ -2280,6 +2280,24 @@ export default function ClientDetailPage() {
                       disabled={saveProfileMutation.isPending}
                     />
                   </div>
+                  {/* Managed Ads (shared account) Permission */}
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Managed Ads (My Pages & My Ads)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        On করলে client-এর dashboard-এ My Pages ও My Ads দেখাবে
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!(profile as any)?.managed_ads_enabled}
+                      onCheckedChange={(checked) =>
+                        saveProfileMutation.mutate({ managed_ads_enabled: checked } as any)
+                      }
+                      disabled={saveProfileMutation.isPending}
+                    />
+                  </div>
                   {/* Ad Account Rename Permission */}
                   <div className="flex items-center justify-between pt-3 border-t">
                     <div>
