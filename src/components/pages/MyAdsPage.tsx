@@ -111,147 +111,192 @@ export default function MyAdsPage() {
     );
   }
 
-  const selectCount = tab === "campaign" ? selCampaigns.length : tab === "adset" ? selAdsets.length : 0;
+  const sel = tab === "campaign" ? selCampaigns : selAdsets;
+  const setSel = tab === "campaign" ? setSelCampaigns : setSelAdsets;
+  const rowTotals = rows.reduce((t, r) => {
+    t.spend += Number(r.insights?.spend || 0); t.impr += Number(r.insights?.impressions || 0);
+    t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
+  }, { spend: 0, impr: 0, reach: 0, results: 0 });
+  const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
+  const rangeLabel = range === "today" ? "Today" : range === "7d" ? "Last 7 days" : "Last 30 days";
+  const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
+  const th = "px-3 py-2 text-left text-[13px] font-semibold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
+  const td = "px-3 py-2 border-r border-fb-border align-top whitespace-nowrap";
+  const sub = "block text-[11px] text-fb-muted";
+  const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2"><Megaphone className="h-5 w-5 text-primary" />Ads Manager</h1>
-            <p className="text-sm text-muted-foreground">
-              Wallet: <span className="font-semibold text-foreground">{money(data?.walletBalance ?? 0)}</span>
-              {pages.length > 0 && <> · Page: {pages.map((p) => p.page_name).join(", ")}</>}
-            </p>
+      <div className="-m-4 md:-m-6 min-h-full bg-fb-bg p-3 text-fb-text font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif]">
+        {/* Top bar */}
+        <div className="flex flex-wrap items-center gap-3 rounded-t-lg bg-background px-4 py-3 border border-fb-border">
+          <h1 className="text-lg font-bold">Campaigns</h1>
+          <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-fb-border text-[13px] max-w-[260px]">
+            <Megaphone className="h-4 w-4 text-fb-muted shrink-0" />
+            <span className="truncate">{pages.length ? pages.map((p) => p.page_name).join(", ") : "No page"}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[13px] text-fb-muted">
+              {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
+            </span>
+            <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+              {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
+            </button>
+          </div>
+        </div>
+
+        {/* Filter chips + search */}
+        <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-3">
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border-2 border-fb-blue bg-fb-blue-soft text-[13px] font-semibold text-fb-blue">All ads</span>
+            <span className={tbBtn}>Active ads</span>
+            <span className={tbBtn}>Had delivery</span>
+          </div>
+          <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+
+        {(error || (data?.errors ?? []).length > 0 || (data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && pages.length === 0)) && (
+          <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-2 text-[13px]">
+            {!isFetching && pages.length === 0 && <div className="rounded-md bg-fb-bg p-3">আপনার কোনো অনুমোদিত page নেই। আগে "My Pages" থেকে page যুক্ত করুন।</div>}
+            {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
+            {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
+            {error && <p className="text-destructive">{(error as Error).message}</p>}
+            {(data?.errors ?? []).map((e: string, i: number) => <p key={i} className="text-destructive">{e}</p>)}
+          </div>
+        )}
+
+        {/* Level tabs */}
+        <div className="flex items-end gap-1 bg-background border-x border-fb-border px-4 pt-2">
+          {([["campaign", "Campaigns"], ["adset", "Ad sets"], ["ad", "Ads"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className={cn("flex-1 max-w-[300px] h-11 px-4 text-left text-[15px] font-semibold rounded-t-lg border border-b-0 border-fb-border",
+                tab === k ? "bg-background text-fb-blue border-t-2 border-t-fb-blue" : "bg-fb-bg text-fb-text")}>
+              {l}
+              {k === "adset" && selCampaigns.length > 0 && <span className="ml-2 text-xs font-normal text-fb-blue">for {selCampaigns.length} campaign</span>}
+              {k === "ad" && (selCampaigns.length + selAdsets.length) > 0 && <span className="ml-2 text-xs font-normal text-fb-blue">filtered</span>}
+            </button>
+          ))}
+          <div className="ml-auto pb-1">
             <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-auto gap-2 border-fb-border text-[13px]"><SelectValue>{rangeLabel}: {dates.dateFrom} – {dates.dateTo}</SelectValue></SelectTrigger>
               <SelectContent>
-                <SelectItem value="today">আজ</SelectItem>
-                <SelectItem value="7d">শেষ ৭ দিন</SelectItem>
-                <SelectItem value="30d">শেষ ৩০ দিন</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh}>
-              <RefreshCw className={cn("h-4 w-4 mr-1", isFetching && "animate-spin")} />
-              {cooldownLeft > 0 ? `${Math.ceil(cooldownLeft / 1000)}s` : "Refresh"}
-            </Button>
-            <Button size="sm" disabled={!pages.length} onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" />Create</Button>
           </div>
         </div>
 
-        {!isFetching && pages.length === 0 && (
-          <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-            আপনার কোনো অনুমোদিত page নেই। আগে "My Pages" থেকে page যুক্ত করুন।
-          </CardContent></Card>
-        )}
-        {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && (
-          <Card className="border-destructive"><CardContent className="p-4 text-sm text-destructive">
-            Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।
-          </CardContent></Card>
-        )}
-        {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && (
-          <Card className="border-primary"><CardContent className="p-4 text-sm">
-            আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে। এখনই top-up করুন।
-          </CardContent></Card>
-        )}
-        <p className="text-xs text-muted-foreground">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend" নামে দেখবেন)।</p>
-        {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
-        {(data?.errors ?? []).map((e: string, i: number) => <p key={i} className="text-sm text-destructive">{e}</p>)}
-
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[["খরচ", money(totals.spend)], ["Results", num(totals.results)], ["Impressions", num(totals.impr)], ["Clicks", num(totals.clicks)]].map(([l, v]) => (
-            <Card key={l}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{l}</p><p className="text-lg font-semibold">{v}</p></CardContent></Card>
-          ))}
+        {/* Action toolbar */}
+        <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
+          <button disabled={!pages.length} onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
+            <Plus className="h-4 w-4" />Create
+          </button>
+          <button className={tbBtn} disabled={!(tab === "adset" && sel.length === 1)}
+            onClick={() => { const r = adsets.find((x) => String(x.id) === sel[0]); if (r) editBudget(r); }}>
+            <Pencil className="h-4 w-4" />Edit
+          </button>
+          {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length} selected</button>}
+          <div className="ml-auto flex gap-2">
+            <span className={tbBtn}>Columns: Performance</span>
+            <span className={tbBtn}>Breakdown</span>
+          </div>
         </div>
 
-        <Card>
-          <div className="flex flex-wrap items-center gap-1 border-b p-2">
-            {([["campaign", "Campaigns"], ["adset", "Ad Sets"], ["ad", "Ads"]] as const).map(([k, l]) => (
-              <Button key={k} size="sm" variant={tab === k ? "secondary" : "ghost"} onClick={() => setTab(k)}>
-                {l}
-                {k === "adset" && selCampaigns.length > 0 && <Badge className="ml-1" variant="outline">{selCampaigns.length} বাছাই</Badge>}
-                {k === "ad" && (selCampaigns.length + selAdsets.length) > 0 && <Badge className="ml-1" variant="outline">filter</Badge>}
-              </Button>
-            ))}
-            {selectCount > 0 && (
-              <Button size="sm" variant="link" onClick={() => tab === "campaign" ? setSelCampaigns([]) : setSelAdsets([])}>বাছাই মুছুন</Button>
+        {/* Table */}
+        <div className="bg-background border-x border-b border-fb-border rounded-b-lg overflow-x-auto">
+          <table className="w-full border-collapse text-[13px]">
+            <thead className="border-b border-fb-border">
+              <tr>
+                {tab !== "ad" && <th className={cn(th, "w-10")} />}
+                <th className={cn(th, "w-16")}>Off / On</th>
+                <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
+                <th className={cn(th, "text-fb-blue")}>Delivery</th>
+                <th className={th}>Attribution setting</th>
+                <th className={cn(th, "text-right")}>Results</th>
+                <th className={cn(th, "text-right")}>Cost per result</th>
+                {tab !== "ad" && <th className={cn(th, "text-right")}>Budget</th>}
+                <th className={cn(th, "text-right")}>Amount spent</th>
+                <th className={cn(th, "text-right")}>Impressions</th>
+                <th className={cn(th, "text-right")}>Reach</th>
+                <th className={cn(th, "text-right")}>CTR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isFetching && !data && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">Loading…</td></tr>}
+              {data && rows.length === 0 && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
+              {rows.map((r, i) => {
+                const res = resultOf(r.insights);
+                const on = r.status === "ACTIVE";
+                const eff = String(r.effective_status || r.status || "").toUpperCase();
+                const deliv = eff === "ACTIVE" ? "Active" : eff.includes("PAUSED") ? "Off" : eff.includes("REVIEW") || eff === "PENDING_REVIEW" ? "In review" : eff.includes("DISAPPROVED") ? "Rejected" : eff.toLowerCase().replace(/_/g, " ") || "—";
+                const dot = eff === "ACTIVE" ? "bg-fb-green" : eff.includes("DISAPPROVED") ? "bg-destructive" : "bg-fb-muted";
+                const canBudget = tab === "adset" && (r.daily_budget || r.lifetime_budget);
+                return (
+                  <tr key={r.id} className={cn("border-b border-fb-border hover:bg-fb-blue-soft/50", i % 2 && "bg-fb-bg/50")}>
+                    {tab !== "ad" && (
+                      <td className={td}>
+                        <input type="checkbox" className="h-4 w-4 accent-fb-blue" checked={sel.includes(String(r.id))}
+                          onChange={(e) => setSel((s) => e.target.checked ? [...s, String(r.id)] : s.filter((x) => x !== String(r.id)))} />
+                      </td>
+                    )}
+                    <td className={td}><Switch checked={on} disabled={busy === r.id} onCheckedChange={(v) => toggle(tab, r, v)} className="data-[state=checked]:bg-fb-blue" /></td>
+                    <td className={cn(td, "whitespace-normal")}>
+                      <div className="flex items-center gap-2">
+                        {tab === "ad" && r.thumbnail_url && <img src={r.thumbnail_url} alt="" className="h-9 w-9 rounded object-cover" />}
+                        <button className="text-left text-fb-blue hover:underline"
+                          onClick={() => {
+                            if (tab === "campaign") { setSelCampaigns([String(r.id)]); setSelAdsets([]); setTab("adset"); }
+                            else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
+                          }}>{r.name}</button>
+                      </div>
+                    </td>
+                    <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full", dot)} />{deliv}</span></td>
+                    <td className={td}>7-day click or 1-day view<span className={sub}>All conversions</span></td>
+                    <td className={cn(td, "text-right")}>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></td>
+                    <td className={cn(td, "text-right")}>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></td>
+                    {tab !== "ad" && (
+                      <td className={cn(td, "text-right")}>
+                        <span className="inline-flex items-center gap-1">
+                          {r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}
+                          {canBudget && <button onClick={() => editBudget(r)} className="text-fb-muted hover:text-fb-blue"><Pencil className="h-3 w-3" /></button>}
+                        </span>
+                        {(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}
+                      </td>
+                    )}
+                    <td className={cn(td, "text-right")}>{money(r.insights?.spend)}</td>
+                    <td className={cn(td, "text-right")}>{num(r.insights?.impressions)}</td>
+                    <td className={cn(td, "text-right")}>{num(r.insights?.reach)}</td>
+                    <td className={cn(td, "text-right")}>{r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {rows.length > 0 && (
+              <tfoot>
+                <tr className="font-semibold">
+                  {tab !== "ad" && <td className={td} />}
+                  <td className={td} />
+                  <td className={td}>Results from {rows.length} {levelName}</td>
+                  <td className={td} />
+                  <td className={td}>Multiple attribution settings</td>
+                  <td className={cn(td, "text-right")}>{num(rowTotals.results)}<span className={sub}>Results</span></td>
+                  <td className={cn(td, "text-right")}>{rowTotals.results ? money(rowTotals.spend / rowTotals.results) : "—"}<span className={sub}>Per result</span></td>
+                  {tab !== "ad" && <td className={td} />}
+                  <td className={cn(td, "text-right")}>{money(rowTotals.spend)}<span className={sub}>Total spent</span></td>
+                  <td className={cn(td, "text-right")}>{num(rowTotals.impr)}<span className={sub}>Total</span></td>
+                  <td className={cn(td, "text-right")}>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></td>
+                  <td className={td} />
+                </tr>
+              </tfoot>
             )}
-            <Input className="ml-auto h-8 w-48" placeholder="নাম খুঁজুন" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {tab !== "ad" && <TableHead className="w-8" />}
-                  <TableHead className="w-14">On/Off</TableHead>
-                  <TableHead className="min-w-[200px]">নাম</TableHead>
-                  <TableHead>Delivery</TableHead>
-                  {tab !== "ad" && <TableHead>Budget</TableHead>}
-                  <TableHead className="text-right">Results</TableHead>
-                  <TableHead className="text-right">Cost/result</TableHead>
-                  <TableHead className="text-right">খরচ</TableHead>
-                  <TableHead className="text-right">Impr.</TableHead>
-                  <TableHead className="text-right">Clicks</TableHead>
-                  <TableHead className="text-right">CTR</TableHead>
-                  <TableHead className="text-right">CPM</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isFetching && !data && <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">লোড হচ্ছে...</TableCell></TableRow>}
-                {data && rows.length === 0 && <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">কিছু নেই</TableCell></TableRow>}
-                {rows.map((r) => {
-                  const st = getCampaignStatusConfig(r.effective_status);
-                  const res = resultOf(r.insights);
-                  const sel = tab === "campaign" ? selCampaigns : selAdsets;
-                  const setSel = tab === "campaign" ? setSelCampaigns : setSelAdsets;
-                  const canBudget = tab === "adset" && (r.daily_budget || r.lifetime_budget);
-                  return (
-                    <TableRow key={r.id}>
-                      {tab !== "ad" && (
-                        <TableCell>
-                          <input type="checkbox" className="h-4 w-4 accent-primary" checked={sel.includes(String(r.id))}
-                            onChange={(e) => setSel((s) => e.target.checked ? [...s, String(r.id)] : s.filter((x) => x !== String(r.id)))} />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <Switch checked={r.status === "ACTIVE"} disabled={busy === r.id} onCheckedChange={(v) => toggle(tab, r, v)} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {tab === "ad" && r.thumbnail_url && <img src={r.thumbnail_url} alt="" className="h-9 w-9 rounded object-cover" />}
-                          <button
-                            className="text-left font-medium text-primary hover:underline"
-                            onClick={() => {
-                              if (tab === "campaign") { setSelCampaigns([String(r.id)]); setSelAdsets([]); setTab("adset"); }
-                              else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
-                            }}
-                          >{r.name}</button>
-                        </div>
-                      </TableCell>
-                      <TableCell><Badge variant="outline" className={cn("font-medium", st.className)}>{st.label}</Badge></TableCell>
-                      {tab !== "ad" && (
-                        <TableCell className="whitespace-nowrap">
-                          {budget(r)}
-                          {canBudget && <Button size="icon" variant="ghost" className="h-6 w-6 ml-1" onClick={() => editBudget(r)}><Pencil className="h-3 w-3" /></Button>}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right">{res.count ? num(res.count) : "—"}</TableCell>
-                      <TableCell className="text-right">{res.cost != null ? money(res.cost) : "—"}</TableCell>
-                      <TableCell className="text-right">{money(r.insights?.spend)}</TableCell>
-                      <TableCell className="text-right">{num(r.insights?.impressions)}</TableCell>
-                      <TableCell className="text-right">{num(r.insights?.clicks)}</TableCell>
-                      <TableCell className="text-right">{r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—"}</TableCell>
-                      <TableCell className="text-right">{money(r.insights?.cpm)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        {data?.fetchedAt && <p className="text-xs text-muted-foreground">শেষ আপডেট: {format(new Date(data.fetchedAt), "p")}</p>}
+          </table>
+        </div>
+        <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>
       </div>
     </DashboardLayout>
   );
