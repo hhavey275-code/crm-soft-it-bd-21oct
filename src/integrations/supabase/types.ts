@@ -1672,6 +1672,65 @@ export type Database = {
         }
         Relationships: []
       }
+      client_facebook_pages: {
+        Row: {
+          ad_account_id: string | null
+          admin_note: string | null
+          approved_at: string | null
+          approved_by: string | null
+          connect_method: string
+          created_at: string
+          id: string
+          page_avatar_url: string | null
+          page_id: string
+          page_name: string
+          page_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id?: string | null
+          admin_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          connect_method?: string
+          created_at?: string
+          id?: string
+          page_avatar_url?: string | null
+          page_id: string
+          page_name?: string
+          page_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string | null
+          admin_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          connect_method?: string
+          created_at?: string
+          id?: string
+          page_avatar_url?: string | null
+          page_id?: string
+          page_name?: string
+          page_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_facebook_pages_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_feedback: {
         Row: {
           admin_note: string | null
@@ -2411,6 +2470,7 @@ export type Database = {
           full_name: string | null
           id: string
           main_wallet_enabled: boolean
+          managed_ads_enabled: boolean
           meta_user_token: string | null
           meta_user_token_expires_at: string | null
           monthly_spend: string | null
@@ -2459,6 +2519,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           main_wallet_enabled?: boolean
+          managed_ads_enabled?: boolean
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null
@@ -2507,6 +2568,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           main_wallet_enabled?: boolean
+          managed_ads_enabled?: boolean
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null

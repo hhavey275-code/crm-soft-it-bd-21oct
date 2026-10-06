@@ -32,7 +32,9 @@ import { Route as ExternalTopUpRouteImport } from './routes/external-top-up'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
+import { Route as ManagedAdsRouteImport } from './routes/managed-ads'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
+import { Route as MyPagesRouteImport } from './routes/my-pages'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
 import { Route as OldSellerRouteImport } from './routes/old-seller'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -188,9 +190,19 @@ const InvoiceMakerRoute = InvoiceMakerRouteImport.update({
   path: '/invoice-maker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ManagedAdsRoute = ManagedAdsRouteImport.update({
+  id: '/managed-ads',
+  path: '/managed-ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
   id: '/meta-oauth-callback',
   path: '/meta-oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyPagesRoute = MyPagesRouteImport.update({
+  id: '/my-pages',
+  path: '/my-pages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyUnusedRoute = MyUnusedRouteImport.update({
@@ -413,7 +425,9 @@ export interface FileRoutesByFullPath {
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
@@ -478,7 +492,9 @@ export interface FileRoutesByTo {
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
@@ -543,7 +559,9 @@ export interface FileRoutesById {
   '/failed-topups': typeof FailedTopupsRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
   '/privacy': typeof PrivacyRoute
@@ -610,7 +628,9 @@ export interface FileRouteTypes {
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
+    | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-pages'
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
@@ -675,7 +695,9 @@ export interface FileRouteTypes {
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
+    | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-pages'
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
@@ -739,7 +761,9 @@ export interface FileRouteTypes {
     | '/failed-topups'
     | '/feedback'
     | '/invoice-maker'
+    | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-pages'
     | '/my-unused'
     | '/old-seller'
     | '/privacy'
@@ -805,7 +829,9 @@ export interface RootRouteChildren {
   FailedTopupsRoute: typeof FailedTopupsRoute
   FeedbackRoute: typeof FeedbackRoute
   InvoiceMakerRoute: typeof InvoiceMakerRoute
+  ManagedAdsRoute: typeof ManagedAdsRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
+  MyPagesRoute: typeof MyPagesRoute
   MyUnusedRoute: typeof MyUnusedRoute
   OldSellerRoute: typeof OldSellerRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -1006,11 +1032,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoiceMakerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/managed-ads': {
+      id: '/managed-ads'
+      path: '/managed-ads'
+      fullPath: '/managed-ads'
+      preLoaderRoute: typeof ManagedAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/meta-oauth-callback': {
       id: '/meta-oauth-callback'
       path: '/meta-oauth-callback'
       fullPath: '/meta-oauth-callback'
       preLoaderRoute: typeof MetaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-pages': {
+      id: '/my-pages'
+      path: '/my-pages'
+      fullPath: '/my-pages'
+      preLoaderRoute: typeof MyPagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-unused': {
@@ -1350,7 +1390,9 @@ const rootRouteChildren: RootRouteChildren = {
   FailedTopupsRoute: FailedTopupsRoute,
   FeedbackRoute: FeedbackRoute,
   InvoiceMakerRoute: InvoiceMakerRoute,
+  ManagedAdsRoute: ManagedAdsRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,
+  MyPagesRoute: MyPagesRoute,
   MyUnusedRoute: MyUnusedRoute,
   OldSellerRoute: OldSellerRoute,
   PrivacyRoute: PrivacyRoute,

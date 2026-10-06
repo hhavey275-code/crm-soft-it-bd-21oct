@@ -79,6 +79,7 @@ const adminNavItems = [
   { title: "Admin Performance", url: "/admin/performance", icon: Trophy, key: "admin-performance" },
   { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
   { title: "Profile Stock", url: "/profile-stock", icon: UserCircle, key: "profile-stock" },
+  { title: "Managed Ads", url: "/managed-ads", icon: Megaphone, key: "managed-ads" },
   { title: "Documents Vault", url: "/documents", icon: FolderLock, key: "documents-vault" },
   { title: "Invoice Maker", url: "/invoice-maker", icon: FileText, key: "invoice-maker" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
@@ -93,6 +94,7 @@ const clientNavItems = [
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Buy Profile", url: "/buy-profile", icon: UserCircle, key: "buy-profile" },
+  { title: "My Pages", url: "/my-pages", icon: Megaphone, key: "my-pages" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
   { title: "Referral", url: "/referral", icon: Gift, key: "referral" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
@@ -201,6 +203,7 @@ export function AppSidebar() {
       base = adminNavItems.filter(item =>
         menuPermissions.includes(item.key) ||
         item.key === "profile-stock" ||
+        item.key === "managed-ads" ||
         (item.key === "external-top-up" && menuPermissions.includes("requests"))
       );
     }

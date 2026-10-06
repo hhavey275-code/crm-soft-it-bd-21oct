@@ -12,3 +12,8 @@
 - [x] Credit Line wallet: due limit (admin control + client view), payment order Main → Credit Line → Secondary, invoice split row, client Main→Credit Line/Secondary transfer (2026-09-20).
 - [x] Group Main, Secondary, Credit Line and Combined wallet summaries into one responsive row across client dashboard, Ad Accounts and admin client overview (2026-09-20).
 - [x] Referral: per-client enable + taka (BDT) commission rate, hidden menu when off, ad-account wise $3000 monthly qualification with Meta "Update" fetch (2026-09-20).
+- [x] Shared ad account step 1: client "My Pages" page request + admin "Managed Ads" assign/approve (2026-10-06).
+- [ ] Shared ad account step 1b: automatic "Connect with Facebook" page login. Blocker: Meta App ID/secret with pages permissions.
+- [ ] Shared ad account step 2: page-filtered Facebook-style Ads Manager for managed clients.
+- [ ] Shared ad account step 3: cached batch insights sync + refresh cooldown.
+- [ ] Shared ad account step 4: wallet budget guard, spend deduction, zero-balance auto-pause.
