@@ -23,6 +23,12 @@ export function pageOfAd(ad: any): string | null {
   return null;
 }
 
+/** Shared (wallet-charged) ad accounts assigned to a client by admin. */
+export async function sharedAccountIds(supabaseAdmin: any, userId: string): Promise<string[]> {
+  const { data } = await supabaseAdmin.from("managed_account_assignments").select("ad_account_id").eq("user_id", userId);
+  return (data ?? []).map((r: any) => String(r.ad_account_id));
+}
+
 /** Client's own (dedicated) Meta ad accounts — only when Campaign Management is on. */
 export async function ownAccounts(supabaseAdmin: any, userId: string) {
   const { data: prof } = await supabaseAdmin.from("profiles").select("campaign_management_enabled").eq("user_id", userId).maybeSingle();
@@ -41,21 +47,21 @@ export async function ownAccounts(supabaseAdmin: any, userId: string) {
  */
 export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean }) {
   const { graphClient } = await import("@/lib/metaGraph.server");
+  // All of the client's own pages (any not rejected). Page IDs are globally unique, so one owner per page.
   const { data: allPages } = await supabaseAdmin
     .from("client_facebook_pages")
     .select("id, page_id, page_name, ad_account_id, status")
     .eq("user_id", userId)
     .neq("status", "rejected");
-  const pages = (allPages ?? []).filter((p: any) => p.status === "approved");
+  const pages = allPages ?? [];
   const { data: registry } = await supabaseAdmin.from("managed_campaigns").select("campaign_id").eq("user_id", userId);
   const registered = new Set<string>((registry ?? []).map((r: any) => String(r.campaign_id)));
 
+  // Shared accounts the admin assigned to this client; client may run ANY of their pages on them.
+  const pageIdSet = new Set<string>(pages.map((p: any) => String(p.page_id)));
+  const sharedList = await sharedAccountIds(supabaseAdmin, userId);
   const byAccount = new Map<string, Set<string> | null>();
-  for (const p of pages) {
-    if (!p.ad_account_id) continue;
-    if (!byAccount.has(p.ad_account_id)) byAccount.set(p.ad_account_id, new Set());
-    byAccount.get(p.ad_account_id)!.add(String(p.page_id));
-  }
+  for (const id of sharedList) byAccount.set(id, pageIdSet);
   const own = opts?.includeOwn ? await ownAccounts(supabaseAdmin, userId) : [];
   for (const a of own) if (!byAccount.has(a.id)) byAccount.set(a.id, null);
 
@@ -68,7 +74,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
     ...own.filter((a: any) => !sharedIds.includes(a.id)).map((a: any) => ({ id: a.id, account_id: a.account_id, name: a.account_name || a.account_id, kind: "own" as const })),
   ];
 
-  const result = { campaigns: [] as any[], adsets: [] as any[], ads: [] as any[], pages, allPages: allPages ?? [], accounts, errors: [] as string[] };
+  const result = { campaigns: [] as any[], adsets: [] as any[], ads: [] as any[], pages, allPages: pages, accounts, errors: [] as string[] };
 
   for (const [accId, pageIds] of byAccount) {
     try {

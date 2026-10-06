@@ -12,9 +12,9 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
 /** Charge new spend for one client, then pause everything if wallet is at/below threshold. */
 export async function syncClientSpend(supabaseAdmin: any, userId: string, pauseThreshold: number) {
   const owned = await loadOwned(supabaseAdmin, userId);
-  const { data: pages } = await supabaseAdmin
-    .from("client_facebook_pages").select("approved_at").eq("user_id", userId).eq("status", "approved");
-  const firstApproved = (pages ?? []).map((p: any) => p.approved_at).filter(Boolean).sort()[0];
+  const { data: assigns } = await supabaseAdmin
+    .from("managed_account_assignments").select("assigned_at").eq("user_id", userId);
+  const firstApproved = (assigns ?? []).map((p: any) => p.assigned_at).filter(Boolean).sort()[0];
 
   const yesterday = new Date(Date.now() - 86400000);
   const sinceDate = firstApproved && new Date(firstApproved) > yesterday ? new Date(firstApproved) : yesterday;

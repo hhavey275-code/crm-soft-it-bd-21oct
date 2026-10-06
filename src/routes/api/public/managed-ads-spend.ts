@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/managed-ads-spend")({
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
         const { pauseThreshold } = await getManagedSettings(supabaseAdmin);
-        const { data: pages } = await (supabaseAdmin as any).from("client_facebook_pages").select("user_id").eq("status", "approved");
+        const { data: pages } = await (supabaseAdmin as any).from("managed_account_assignments").select("user_id");
         const users: string[] = Array.from(new Set<string>((pages ?? []).map((p: any) => String(p.user_id))));
         const results: any[] = [];
         for (const userId of users) {
