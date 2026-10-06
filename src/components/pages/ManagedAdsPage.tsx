@@ -29,7 +29,7 @@ export default function ManagedAdsPage() {
       if (error) throw error;
       const userIds = [...new Set((pages ?? []).map((p: any) => p.user_id))];
       const { data: profiles } = userIds.length
-        ? await db.from("profiles").select("user_id, full_name, email, business_name").in("user_id", userIds)
+        ? await db.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
         : { data: [] };
       return { pages: pages ?? [], accounts: accounts ?? [], profiles: profiles ?? [] };
     },
@@ -43,7 +43,7 @@ export default function ManagedAdsPage() {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const pr: any = profileMap.get(p.user_id);
-    return [p.page_name, p.page_id, pr?.full_name, pr?.email, pr?.business_name].some((v) => v?.toLowerCase?.().includes(q));
+    return [p.page_name, p.page_id, pr?.full_name, pr?.email].some((v) => v?.toLowerCase?.().includes(q));
   });
 
   const counts = (data?.pages ?? []).reduce((acc: Record<string, number>, p: any) => ({ ...acc, [p.status]: (acc[p.status] ?? 0) + 1 }), {});
@@ -95,7 +95,7 @@ export default function ManagedAdsPage() {
                 <div key={p.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{pr?.full_name || pr?.email || "Client"}</p>
-                    <p className="text-xs text-muted-foreground truncate">{pr?.business_name} {pr?.email ? `· ${pr.email}` : ""}</p>
+                    <p className="text-xs text-muted-foreground truncate">{pr?.email}</p>
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium truncate">
