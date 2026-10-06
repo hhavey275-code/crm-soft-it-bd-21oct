@@ -8,7 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 type FbPage = { id: string; name: string; link: string; picture: string | null };
 
 async function call(body: Record<string, unknown>) {
-  const { data: { session } } = await supabase.auth.getSession();
+  let { data: { session } } = await supabase.auth.getSession();
+  if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
+    const r = await supabase.auth.refreshSession();
+    if (r.data.session) session = r.data.session;
+  }
   const res = await fetch("/api/fb-pages", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
