@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Facebook, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 type FbPage = { id: string; name: string; link: string; picture: string | null };
 
-async function call(body: Record<string, unknown>) {
+export async function call(body: Record<string, unknown>) {
   let { data: { session } } = await supabase.auth.getSession();
   if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
     const r = await supabase.auth.refreshSession();
@@ -27,59 +27,39 @@ async function call(body: Record<string, unknown>) {
   return j;
 }
 
-// Facebook's login page cuts the link between popup and this tab, so
-// window.opener/popup.closed are unreliable. Use same-site channels instead.
-function waitForCode(_popup: Window) {
-  return new Promise<string>((resolve, reject) => {
-    const done = (d: any) => {
-      if (d?.type !== "fbPagesOAuth") return;
-      cleanup();
-      d.code ? resolve(d.code) : reject(new Error(d.error || "বাতিল হয়েছে"));
-    };
-    const onMsg = (e: MessageEvent) => { if (e.origin === window.location.origin) done(e.data); };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "fbPagesOAuth" && e.newValue) { try { done(JSON.parse(e.newValue)); } catch { /* ignore */ } }
-    };
-    const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("fbPagesOAuth") : null;
-    if (bc) bc.onmessage = (e) => done(e.data);
-    const timer = window.setTimeout(() => { cleanup(); reject(new Error("সময় শেষ — আবার চেষ্টা করুন")); }, 5 * 60_000);
-    const cleanup = () => {
-      window.removeEventListener("message", onMsg);
-      window.removeEventListener("storage", onStorage);
-      bc?.close();
-      window.clearTimeout(timer);
-    };
-    window.addEventListener("message", onMsg);
-    window.addEventListener("storage", onStorage);
-  });
-}
-
 export function FacebookPagesConnect({ userId, existingIds, onImported }: { userId: string; existingIds: string[]; onImported: () => void }) {
   const [busy, setBusy] = useState(false);
   const [pages, setPages] = useState<FbPage[] | null>(null);
   const [sel, setSel] = useState<string[]>([]);
 
+  // Load the page list the callback page saved after Facebook login (same tab).
+  useEffect(() => {
+    const raw = sessionStorage.getItem("fbPagesResult");
+    if (!raw) return;
+    sessionStorage.removeItem("fbPagesResult");
+    try {
+      const r = JSON.parse(raw);
+      if (r.error) { toast.error(r.error); return; }
+      setPages(r.pages ?? []); setSel([]);
+      if (!r.pages?.length) toast.info("এই profile-এ কোনো page পাওয়া যায়নি");
+      else toast.success("Page-এর তালিকা এসেছে — যেগুলো চান টিক দিয়ে জমা দিন");
+    } catch { /* ignore */ }
+  }, []);
+
   const connect = async () => {
-    const popup = window.open("", "fb-pages", "width=600,height=720");
-    if (!popup) return toast.error("Popup বন্ধ আছে — popup allow করুন");
     setBusy(true);
     try {
       const { appId } = await call({ action: "config" });
       const redirectUri = `${window.location.origin}/fb-pages-callback`;
-      const wait = waitForCode(popup);
-      popup.location.href = `https://www.facebook.com/v25.0/dialog/oauth?${new URLSearchParams({
+      sessionStorage.setItem("fbPagesReturn", window.location.pathname);
+      window.location.href = `https://www.facebook.com/v25.0/dialog/oauth?${new URLSearchParams({
         client_id: appId, redirect_uri: redirectUri, response_type: "code",
         scope: "pages_show_list", state: crypto.randomUUID(),
       })}`;
-      const code = await wait;
-      const { pages } = await call({ action: "pages", code, redirectUri });
-      setPages(pages);
-      setSel([]);
-      if (!pages.length) toast.info("এই profile-এ কোনো page পাওয়া যায়নি");
     } catch (e: any) {
-      popup.close();
       toast.error(e.message);
-    } finally { setBusy(false); }
+      setBusy(false);
+    }
   };
 
   const importSel = async () => {

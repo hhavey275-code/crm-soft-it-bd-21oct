@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { call } from "@/components/client/FacebookPagesConnect";
 
 export const Route = createFileRoute("/fb-pages-callback")({
   ssr: false,
@@ -17,17 +18,20 @@ export const Route = createFileRoute("/fb-pages-callback")({
 });
 
 function Callback() {
-  const [msg, setMsg] = useState("Facebook connect শেষ হচ্ছে…");
+  const [msg, setMsg] = useState("Facebook থেকে page-এর তালিকা আনা হচ্ছে…");
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const code = p.get("code");
     const err = p.get("error_description") || p.get("error");
-    const payload = { type: "fbPagesOAuth", code, error: err, t: Date.now() };
-    try { window.opener?.postMessage(payload, window.location.origin); } catch { /* opener cut */ }
-    try { const bc = new BroadcastChannel("fbPagesOAuth"); bc.postMessage(payload); bc.close(); } catch { /* unsupported */ }
-    try { localStorage.setItem("fbPagesOAuth", JSON.stringify(payload)); localStorage.removeItem("fbPagesOAuth"); } catch { /* blocked */ }
-    setMsg(code ? "সম্পন্ন! এই window বন্ধ হচ্ছে… আগের tab-এ ফিরে যান।" : err || "বাতিল হয়েছে");
-    setTimeout(() => window.close(), 1200);
+    const back = sessionStorage.getItem("fbPagesReturn") || "/my-pages";
+    const finish = (result: unknown) => {
+      sessionStorage.setItem("fbPagesResult", JSON.stringify(result));
+      window.location.replace(back);
+    };
+    if (!code) { finish({ error: err || "Facebook connect বাতিল হয়েছে" }); return; }
+    call({ action: "pages", code, redirectUri: `${window.location.origin}/fb-pages-callback` })
+      .then((r) => finish({ pages: r.pages }))
+      .catch((e) => { setMsg(e.message); finish({ error: e.message }); });
   }, []);
   return <p className="p-6 text-center text-sm">{msg}</p>;
 }
