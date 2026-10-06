@@ -20,6 +20,16 @@ export const Route = createFileRoute("/api/fb-pages")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        try { return await handle(request); } catch (e: any) {
+          console.error("fb-pages error", e);
+          return json({ error: `সার্ভার সমস্যা: ${e?.message || "unknown"}` }, 500);
+        }
+      },
+    },
+  },
+});
+
+async function handle(request: Request): Promise<Response> {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const auth = request.headers.get("authorization") || "";
         if (!auth.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
@@ -61,7 +71,4 @@ export const Route = createFileRoute("/api/fb-pages")({
             link: p.link ?? `https://facebook.com/${p.id}`, picture: p.picture?.data?.url ?? null,
           })),
         });
-      },
-    },
-  },
-});
+}

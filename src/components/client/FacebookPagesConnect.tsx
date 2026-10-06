@@ -14,8 +14,12 @@ async function call(body: Record<string, unknown>) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
     body: JSON.stringify(body),
   });
-  const j = await res.json().catch(() => ({ error: "সার্ভার থেকে উত্তর পাওয়া যায়নি" }));
-  if (!res.ok || j?.error) throw new Error(j?.error || "Request failed");
+  const text = await res.text();
+  let j: any = null;
+  try { j = JSON.parse(text); } catch { /* not json */ }
+  if (res.status === 401) throw new Error("লগইন সেশন শেষ — আবার লগইন করে চেষ্টা করুন");
+  if (res.status === 404) throw new Error("Facebook connect সার্ভিস এই সাইটে পাওয়া যায়নি — সাইট আবার deploy করতে হবে");
+  if (!res.ok || j?.error) throw new Error(j?.error || j?.message || `সার্ভার সমস্যা (${res.status})`);
   return j;
 }
 
