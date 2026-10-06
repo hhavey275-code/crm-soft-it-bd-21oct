@@ -2346,6 +2346,54 @@ export type Database = {
           },
         ]
       }
+      managed_ads_settings: {
+        Row: {
+          id: number
+          low_balance_alert: number
+          pause_threshold: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          low_balance_alert?: number
+          pause_threshold?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          low_balance_alert?: number
+          pause_threshold?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      managed_campaign_spend: {
+        Row: {
+          campaign_id: string
+          id: string
+          spend_charged: number
+          spend_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          id?: string
+          spend_charged?: number
+          spend_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          id?: string
+          spend_charged?: number
+          spend_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       managed_campaigns: {
         Row: {
           ad_account_id: string
@@ -2509,6 +2557,7 @@ export type Database = {
           id: string
           main_wallet_enabled: boolean
           managed_ads_enabled: boolean
+          managed_ads_paused_at: string | null
           meta_user_token: string | null
           meta_user_token_expires_at: string | null
           monthly_spend: string | null
@@ -2558,6 +2607,7 @@ export type Database = {
           id?: string
           main_wallet_enabled?: boolean
           managed_ads_enabled?: boolean
+          managed_ads_paused_at?: string | null
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null
@@ -2607,6 +2657,7 @@ export type Database = {
           id?: string
           main_wallet_enabled?: boolean
           managed_ads_enabled?: boolean
+          managed_ads_paused_at?: string | null
           meta_user_token?: string | null
           meta_user_token_expires_at?: string | null
           monthly_spend?: string | null
@@ -4777,6 +4828,16 @@ export type Database = {
         Returns: Json
       }
       attach_referral: { Args: { p_code: string }; Returns: Json }
+      charge_managed_spend: {
+        Args: {
+          p_campaign_id: string
+          p_date: string
+          p_label: string
+          p_total_spend: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
       claim_forward_slot: {
         Args: { p_group_id: string; p_source_id: string; p_source_type: string }
         Returns: boolean
