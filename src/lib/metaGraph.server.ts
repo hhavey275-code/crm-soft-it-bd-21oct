@@ -61,11 +61,17 @@ function safeJson(text: string): any {
 
 export class MetaError extends Error {}
 
+function metaMsg(json: any) {
+  const e = json?.error ?? {};
+  const parts = [e.error_user_title, e.error_user_msg || e.message].filter(Boolean);
+  return (parts.join(": ") || "Meta error") + (e.code ? ` (#${e.code}${e.error_subcode ? `/${e.error_subcode}` : ""})` : "");
+}
+
 export function graphClient(token: string) {
   const get = async (path: string, params: Record<string, string> = {}) => {
     const qs = new URLSearchParams({ ...params, access_token: token });
     const { status, json } = await metaFetch(`${GRAPH_BASE}/${path}?${qs}`);
-    if (status >= 400 || json?.error) throw new MetaError(json?.error?.error_user_msg || json?.error?.message || "Meta error");
+    if (status >= 400 || json?.error) throw new MetaError(metaMsg(json));
     return json;
   };
   const post = async (path: string, params: Record<string, unknown>) => {
@@ -75,7 +81,7 @@ export function graphClient(token: string) {
       body.set(k, typeof v === "string" ? v : JSON.stringify(v));
     }
     const { status, json } = await metaFetch(`${GRAPH_BASE}/${path}`, { method: "POST", body: body.toString() });
-    if (status >= 400 || json?.error) throw new MetaError(json?.error?.error_user_msg || json?.error?.message || "Meta error");
+    if (status >= 400 || json?.error) throw new MetaError(metaMsg(json));
     return json;
   };
   const del = async (path: string) => {
