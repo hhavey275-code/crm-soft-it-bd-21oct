@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { tokenFor, loadOwned, walletBalance, ownAccounts } from "@/lib/managedAds.server";
+import { tokenFor, loadOwned, walletBalance, ownAccounts, sharedAccountIds } from "@/lib/managedAds.server";
 
 /**
  * Managed (shared ad account) Ads Manager API.
@@ -43,12 +43,30 @@ const schema = z.discriminatedUnion("action", [
 
 type Body = z.infer<typeof schema>;
 
+// Verify the browser's login with the project's public URL + anon key (works on every host,
+// independent of server env names).
+async function verifyUser(token: string): Promise<{ id: string } | null> {
+  if (!token) return null;
+  const url = "https://dhswrfzdqcavgmymllat.supabase.co";
+  const keys = [
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s",
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+  ].filter(Boolean) as string[];
+  for (const key of keys) {
+    try {
+      const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
+      if (r.ok) { const u: any = await r.json().catch(() => null); if (u?.id) return { id: String(u.id) }; }
+    } catch { /* next */ }
+  }
+  return null;
+}
+
 async function ctx(request: Request) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return null;
-  const { data: { user } } = await supabaseAdmin.auth.getUser(auth.slice(7).trim());
+  const user = await verifyUser(auth.slice(7).trim());
   if (!user) return null;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id);
   const isAdmin = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "superadmin");
   return { supabaseAdmin, user, isAdmin };
@@ -92,14 +110,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (!page || page.status === "rejected" || (page.user_id !== user.id && !isAdmin)) {
     throw new Error("এই page আপনার নয় বা বাতিল হয়েছে");
   }
-  // Which ad account? Shared = the account admin assigned to this approved page (wallet-charged).
+  // Which ad account? Shared = an account admin assigned to this client (wallet-charged), any of their pages.
   // Own = one of the client's dedicated accounts (Campaign Management on).
-  const wantAcc = body.adAccountDbId || page.ad_account_id;
+  const wantAcc = body.adAccountDbId;
   if (!wantAcc) throw new Error("Ad account বাছুন");
   let shared: boolean;
-  if (page.status === "approved" && page.ad_account_id && wantAcc === page.ad_account_id) shared = true;
+  if ((await sharedAccountIds(supabaseAdmin, page.user_id)).includes(wantAcc)) shared = true;
   else if ((await ownAccounts(supabaseAdmin, page.user_id)).some((a: any) => a.id === wantAcc)) shared = false;
-  else throw new Error(page.status !== "approved" ? "এই page এখনো admin অনুমোদন পায়নি — shared account-এ চালানো যাবে না" : "এই ad account-এ এই page চালানোর অনুমতি নেই");
+  else throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
   const { token, act } = await tokenFor(supabaseAdmin, wantAcc);
   const g = graphClient(token);
 

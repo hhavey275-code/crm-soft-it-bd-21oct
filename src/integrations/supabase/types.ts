@@ -2346,6 +2346,38 @@ export type Database = {
           },
         ]
       }
+      managed_account_assignments: {
+        Row: {
+          ad_account_id: string
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "managed_account_assignments_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       managed_ads_settings: {
         Row: {
           id: number
