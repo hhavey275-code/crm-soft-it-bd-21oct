@@ -34,6 +34,7 @@ import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
 import { Route as ManagedAdsRouteImport } from './routes/managed-ads'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
+import { Route as MyAdsRouteImport } from './routes/my-ads'
 import { Route as MyPagesRouteImport } from './routes/my-pages'
 import { Route as MyUnusedRouteImport } from './routes/my-unused'
 import { Route as OldSellerRouteImport } from './routes/old-seller'
@@ -199,6 +200,11 @@ const ManagedAdsRoute = ManagedAdsRouteImport.update({
 const MetaOauthCallbackRoute = MetaOauthCallbackRouteImport.update({
   id: '/meta-oauth-callback',
   path: '/meta-oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyAdsRoute = MyAdsRouteImport.update({
+  id: '/my-ads',
+  path: '/my-ads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyPagesRoute = MyPagesRouteImport.update({
@@ -433,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-ads': typeof MyAdsRoute
   '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -501,6 +508,7 @@ export interface FileRoutesByTo {
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-ads': typeof MyAdsRoute
   '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -569,6 +577,7 @@ export interface FileRoutesById {
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
+  '/my-ads': typeof MyAdsRoute
   '/my-pages': typeof MyPagesRoute
   '/my-unused': typeof MyUnusedRoute
   '/old-seller': typeof OldSellerRoute
@@ -639,6 +648,7 @@ export interface FileRouteTypes {
     | '/invoice-maker'
     | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-ads'
     | '/my-pages'
     | '/my-unused'
     | '/old-seller'
@@ -707,6 +717,7 @@ export interface FileRouteTypes {
     | '/invoice-maker'
     | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-ads'
     | '/my-pages'
     | '/my-unused'
     | '/old-seller'
@@ -774,6 +785,7 @@ export interface FileRouteTypes {
     | '/invoice-maker'
     | '/managed-ads'
     | '/meta-oauth-callback'
+    | '/my-ads'
     | '/my-pages'
     | '/my-unused'
     | '/old-seller'
@@ -843,6 +855,7 @@ export interface RootRouteChildren {
   InvoiceMakerRoute: typeof InvoiceMakerRoute
   ManagedAdsRoute: typeof ManagedAdsRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
+  MyAdsRoute: typeof MyAdsRoute
   MyPagesRoute: typeof MyPagesRoute
   MyUnusedRoute: typeof MyUnusedRoute
   OldSellerRoute: typeof OldSellerRoute
@@ -1057,6 +1070,13 @@ declare module '@tanstack/react-router' {
       path: '/meta-oauth-callback'
       fullPath: '/meta-oauth-callback'
       preLoaderRoute: typeof MetaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-ads': {
+      id: '/my-ads'
+      path: '/my-ads'
+      fullPath: '/my-ads'
+      preLoaderRoute: typeof MyAdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-pages': {
@@ -1412,6 +1432,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoiceMakerRoute: InvoiceMakerRoute,
   ManagedAdsRoute: ManagedAdsRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,
+  MyAdsRoute: MyAdsRoute,
   MyPagesRoute: MyPagesRoute,
   MyUnusedRoute: MyUnusedRoute,
   OldSellerRoute: OldSellerRoute,
