@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { FacebookPagesConnect } from "@/components/client/FacebookPagesConnect";
 
 const db = supabase as any;
 
@@ -66,7 +67,20 @@ export default function MyPagesPage() {
         </div>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">নতুন Page যুক্ত করুন</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Facebook profile দিয়ে page আনুন</CardTitle></CardHeader>
+          <CardContent>
+            {user && (
+              <FacebookPagesConnect
+                userId={user.id}
+                existingIds={pages.map((p) => String(p.page_id))}
+                onImported={() => qc.invalidateQueries({ queryKey: ["my-fb-pages"] })}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">অথবা নিজে Page ID দিয়ে যুক্ত করুন</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-md bg-muted p-3 text-sm space-y-1">
               <p className="font-medium">আগে যা করবেন:</p>
