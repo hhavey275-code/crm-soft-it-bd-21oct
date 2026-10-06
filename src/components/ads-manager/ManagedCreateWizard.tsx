@@ -29,14 +29,14 @@ interface Props {
 export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated }: Props) {
   const [accId, setAccId] = useState(accounts[0]?.id ?? "");
   const acc = accounts.find((a) => a.id === accId);
-  const pages = allPages.filter((p) => (acc?.kind === "own" ? p.status !== "rejected" : p.status === "approved" && p.ad_account_id === accId));
+  const pages = allPages.filter((p) => p.status !== "rejected");
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [pageDbId, setPageDbId] = useState(pages[0]?.id ?? "");
   const pickAccount = (id: string) => {
     setAccId(id);
     const a = accounts.find((x) => x.id === id);
-    const first = allPages.find((p) => (a?.kind === "own" ? p.status !== "rejected" : p.status === "approved" && p.ad_account_id === id));
+    const first = allPages.find((p) => p.status !== "rejected");
     setPageDbId(first?.id ?? "");
   };
   const [objective, setObjective] = useState<(typeof OBJECTIVES)[number]["v"]>("MESSAGES");
@@ -163,9 +163,9 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <Label>Page</Label>
                   <Select value={pageDbId} onValueChange={setPageDbId}>
                     <SelectTrigger><SelectValue placeholder="Page বাছুন" /></SelectTrigger>
-                    <SelectContent>{pages.map((p) => <SelectItem key={p.id} value={p.id}>{p.page_name}{p.status !== "approved" ? " (অনুমোদন বাকি)" : ""}</SelectItem>)}</SelectContent>
+                    <SelectContent>{pages.map((p) => <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>)}</SelectContent>
                   </Select>
-                  {!pages.length && <p className="text-xs text-destructive mt-1">এই account-এ চালানোর মতো কোনো page নেই।</p>}
+                  {!pages.length && <p className="text-xs text-destructive mt-1">কোনো page নেই — আগে "My Pages" থেকে Facebook দিয়ে page যুক্ত করুন।</p>}
                 </div>
                 <div>
                   <Label>Campaign objective</Label>

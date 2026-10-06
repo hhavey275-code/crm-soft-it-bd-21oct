@@ -99,7 +99,6 @@ export default function MyAdsPage() {
   const pages: any[] = data?.pages ?? [];
   const allPages: any[] = data?.allPages ?? pages;
   const accounts: any[] = data?.accounts ?? [];
-  const pendingPages = allPages.filter((p) => p.status === "pending");
 
   if (creating) {
     return (
@@ -161,10 +160,9 @@ export default function MyAdsPage() {
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        {(error || (data?.errors ?? []).length > 0 || (data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0) || pendingPages.length > 0) && (
+        {(error || (data?.errors ?? []).length > 0 || (data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
           <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-2 text-[13px]">
-            {pendingPages.length > 0 && <div className="rounded-md bg-fb-bg p-3">{pendingPages.map((p) => p.page_name).join(", ")} — admin অনুমোদন ও ad account দেওয়ার অপেক্ষায় আছে।</div>}
-            {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">{allPages.length === 0 ? "আগে \"My Pages\" থেকে page যুক্ত করুন।" : "এখনো কোনো ad account পাওয়া যায়নি — admin page অনুমোদন দিয়ে ad account দিলে Create চালু হবে।"}</div>}
+                        {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">{allPages.length === 0 ? "আগে \"My Pages\" থেকে page যুক্ত করুন।" : "এখনো কোনো ad account দেওয়া হয়নি — admin আপনাকে একটি shared ad account দিলে Create চালু হবে।"}</div>}
             {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
             {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
             {error && <p className="text-destructive">{(error as Error).message}</p>}
@@ -197,7 +195,7 @@ export default function MyAdsPage() {
 
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
-          <button disabled={!accounts.length} onClick={() => setCreating(true)}
+          <button disabled={!accounts.length || !allPages.length} onClick={() => setCreating(true)}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
           </button>

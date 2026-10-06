@@ -1,13 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export async function managedAds<T = any>(body: Record<string, unknown>): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
+  let { data: { session } } = await supabase.auth.getSession();
+  if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
+    const r = await supabase.auth.refreshSession();
+    if (r.data.session) session = r.data.session;
+  }
   const res = await fetch("/api/managed-ads", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({ error: "সার্ভার থেকে উত্তর পাওয়া যায়নি" }));
+  if (res.status === 401) throw new Error("লগইন যাচাই হয়নি — একবার Sign out করে আবার লগইন করুন");
   if (!res.ok || json?.error) throw new Error(json?.error || "Request failed");
   return json as T;
 }
