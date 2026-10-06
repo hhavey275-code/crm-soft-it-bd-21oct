@@ -4,14 +4,21 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
   const { decryptToken } = await import("@/lib/metaGraph.server");
   const { data: account } = await supabaseAdmin
     .from("ad_accounts")
-    .select("id, account_id, account_name, business_managers(access_token)")
+    .select("id, account_id, account_name, business_managers(access_token, bm_id, name)")
     .eq("id", adAccountDbId)
     .maybeSingle();
   const bm = Array.isArray(account?.business_managers) ? account.business_managers[0] : account?.business_managers;
   if (!account || !bm?.access_token) throw new Error("Ad account বা Business Manager token পাওয়া যায়নি");
-  const token = await decryptToken(bm.access_token, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Tokens are encrypted with the backend's service key; BM_TOKEN_SECRET lets a host whose
+  // SUPABASE_SERVICE_ROLE_KEY string differs still unlock them.
+  const secrets = [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[];
+  let token: string | null = null;
+  for (const sec of secrets) {
+    try { token = await decryptToken(bm.access_token, sec); break; } catch { /* try next */ }
+  }
+  if (!token) throw new Error(`Business Manager "${bm.name ?? ""}"-এর token খোলা যাচ্ছে না — Business Managers পেজে এই BM-এর access token আবার সেভ করুন`);
   const act = String(account.account_id).startsWith("act_") ? account.account_id : `act_${account.account_id}`;
-  return { token, act, account };
+  return { token, act, account, bmId: bm.bm_id ? String(bm.bm_id) : null };
 }
 
 export function pageOfAd(ad: any): string | null {

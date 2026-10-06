@@ -14,11 +14,16 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(100000), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("request_page_access"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({
     action: z.literal("create"),
     pageDbId: z.string().uuid(),
     adAccountDbId: z.string().uuid().optional(),
-    objective: z.enum(["MESSAGES", "TRAFFIC", "ENGAGEMENT", "AWARENESS"]),
+    objective: z.enum(["SALES", "MESSAGES", "TRAFFIC", "ENGAGEMENT", "AWARENESS"]),
+    pixelId: z.string().regex(/^\d+$/).optional(),
+    customEvent: z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT", "VIEW_CONTENT"]).optional(),
     campaignName: z.string().min(1).max(200),
     adsetName: z.string().min(1).max(200),
     adName: z.string().min(1).max(200),
@@ -118,8 +123,30 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if ((await sharedAccountIds(supabaseAdmin, page.user_id)).includes(wantAcc)) shared = true;
   else if ((await ownAccounts(supabaseAdmin, page.user_id)).some((a: any) => a.id === wantAcc)) shared = false;
   else throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
-  const { token, act } = await tokenFor(supabaseAdmin, wantAcc);
+  const { token, act, bmId } = await tokenFor(supabaseAdmin, wantAcc);
   const g = graphClient(token);
+  const pageId = String(page.page_id);
+
+  if (body.action === "pixels") {
+    const r = await g.get(`${act}/adspixels`, { fields: "id,name,last_fired_time", limit: "50" });
+    return { pixels: (r.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null })) };
+  }
+
+  if (body.action === "posts") {
+    // Reading posts needs the page's own token, which our Business Manager gets once the page shares access with it.
+    let pageToken: string | undefined;
+    try { pageToken = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* no access */ }
+    if (!pageToken) return { posts: [], needsAccess: true };
+    const pg = graphClient(pageToken);
+    const r = await pg.get(`${pageId}/published_posts`, { fields: "id,message,full_picture,created_time,permalink_url", limit: "25" });
+    return { posts: (r.data ?? []).map((x: any) => ({ id: String(x.id), message: x.message ?? "", picture: x.full_picture ?? null, created: x.created_time, link: x.permalink_url })) };
+  }
+
+  if (body.action === "request_page_access") {
+    if (!bmId) throw new Error("Business Manager ID পাওয়া যায়নি");
+    await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
+    return { ok: true };
+  }
 
   if (body.action === "interests") {
     const r = await g.get("search", { type: "adinterest", q: body.q, limit: "20" });
@@ -136,19 +163,23 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     throw new Error("Post টি এই page-এর নয়");
   }
 
-  const pageId = String(page.page_id);
   const status = body.publish ? "ACTIVE" : "PAUSED";
   const map = {
+    SALES: { objective: "OUTCOME_SALES", goal: "OFFSITE_CONVERSIONS", destination: "WEBSITE", cta: "SHOP_NOW" },
     MESSAGES: { objective: "OUTCOME_ENGAGEMENT", goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" },
     TRAFFIC: { objective: "OUTCOME_TRAFFIC", goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" },
     ENGAGEMENT: { objective: "OUTCOME_ENGAGEMENT", goal: "POST_ENGAGEMENT", destination: "ON_POST", cta: "" },
     AWARENESS: { objective: "OUTCOME_AWARENESS", goal: "REACH", destination: "", cta: "LEARN_MORE" },
   }[body.objective];
   if (body.objective === "ENGAGEMENT" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
-  if (body.objective === "TRAFFIC" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website link দিন");
+  if (body.objective === "SALES" && (!body.pixelId || !body.customEvent)) throw new Error("Sales-এর জন্য Pixel/Dataset ও conversion event বাছুন");
+  if (body.objective === "SALES" && !/^https?:\/\//.test(body.link || "")) throw new Error("Sales-এর জন্য website link দিন");
+  if ((body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website link দিন");
 
   let campaignId: string | null = null;
+  let step = "Campaign";
   try {
+    step = "Campaign";
     const camp = await g.post(`${act}/campaigns`, {
       name: body.campaignName, objective: map.objective, status, special_ad_categories: [], is_adset_budget_sharing_enabled: false,
     });
@@ -168,6 +199,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (body.interests.length) targeting.flexible_spec = [{ interests: body.interests }];
 
     const cents = String(Math.round(body.amount * 100));
+    step = "Ad set";
     const adset = await g.post(`${act}/adsets`, {
       name: body.adsetName, campaign_id: campaignId, status,
       billing_event: "IMPRESSIONS", optimization_goal: map.goal,
@@ -176,7 +208,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       ...(body.bidAmount ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}),
       [body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"]: cents,
       ...(body.endTime ? { end_time: body.endTime } : {}),
-      promoted_object: { page_id: pageId },
+      promoted_object: body.objective === "SALES" ? { pixel_id: body.pixelId, custom_event_type: body.customEvent } : { page_id: pageId },
       targeting,
     });
 
@@ -200,15 +232,20 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         },
       };
     }
+    step = "Ad creative";
     const cr = await g.post(`${act}/adcreatives`, creative);
+    step = "Ad";
     await g.post(`${act}/ads`, { name: body.adName, adset_id: adset.id, creative: { creative_id: cr.id }, status });
     return { ok: true, campaignId };
-  } catch (e) {
+  } catch (e: any) {
     if (campaignId) {
       await g.del(campaignId);
       await supabaseAdmin.from("managed_campaigns").delete().eq("campaign_id", campaignId);
     }
-    throw e;
+    const msg = String(e?.message || "");
+    const hint = /permission|page|actor|not authorized|\(#200\)|\(#10\)/i.test(msg)
+      ? " — সম্ভবত এই Page আমাদের Business Manager-এ access দেয়নি। Ad ধাপে \"Page access request পাঠান\" চাপুন।" : "";
+    throw new Error(`${step} তৈরি করা যায়নি: ${msg}${hint}`);
   }
 }
 
