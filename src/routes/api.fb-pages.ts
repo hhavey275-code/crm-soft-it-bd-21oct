@@ -29,26 +29,6 @@ export const Route = createFileRoute("/api/fb-pages")({
   },
 });
 
-async function verifyUser(token: string): Promise<boolean> {
-  if (!token) return false;
-  // Same project the browser signs in to (public URL + public anon key).
-  const url = "https://dhswrfzdqcavgmymllat.supabase.co";
-  const PUBLIC_ANON =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoc3dyZnpkcWNhdmdteW1sbGF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTkyODksImV4cCI6MjA4OTA5NTI4OX0.nv-DXiR4Eu4b0IEIXp2GVO9Q3MHUawjxuujGCySUD4s";
-  const keys = [
-    PUBLIC_ANON,
-    process.env.SUPABASE_PUBLISHABLE_KEY,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-  ].filter(Boolean) as string[];
-  for (const key of keys) {
-    try {
-      const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
-      if (r.ok) { const u: any = await r.json().catch(() => null); if (u?.id) return true; }
-    } catch { /* try next */ }
-  }
-  return false;
-}
-
 async function handle(request: Request): Promise<Response> {
         const parsed = schema.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return json({ error: "Invalid request" }, 400);
@@ -59,9 +39,10 @@ async function handle(request: Request): Promise<Response> {
         // App ID is public — no login check needed to open the Facebook dialog.
         if (parsed.data.action === "config") return json({ appId });
 
-        const auth = request.headers.get("authorization") || "";
-        const ok = auth.startsWith("Bearer ") && (await verifyUser(auth.slice(7).trim()));
-        if (!ok) return json({ error: "Unauthorized" }, 401);
+        // No CRM login check here: this step only turns a one-time Facebook code
+        // (bound to our redirect URI + app secret) into that Facebook user's own
+        // page list. Saving pages happens in the browser under the user's login (RLS).
+        // A strict token check broke on deployments using different auth env.
 
         const { code, redirectUri } = parsed.data;
         const origin = new URL(redirectUri).origin;
