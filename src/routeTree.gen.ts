@@ -30,6 +30,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as ExternalTopUpRouteImport } from './routes/external-top-up'
 import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
+import { Route as FbPagesCallbackRouteImport } from './routes/fb-pages-callback'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
 import { Route as ManagedAdsRouteImport } from './routes/managed-ads'
@@ -63,6 +64,7 @@ import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem
 import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
+import { Route as ApiFbPagesRouteImport } from './routes/api.fb-pages'
 import { Route as ApiManagedAdsRouteImport } from './routes/api.managed-ads'
 import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
 import { Route as ApiReferralRefreshRouteImport } from './routes/api.referral-refresh'
@@ -181,6 +183,11 @@ const ExternalTopUpRoute = ExternalTopUpRouteImport.update({
 const FailedTopupsRoute = FailedTopupsRouteImport.update({
   id: '/failed-topups',
   path: '/failed-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FbPagesCallbackRoute = FbPagesCallbackRouteImport.update({
+  id: '/fb-pages-callback',
+  path: '/fb-pages-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeedbackRoute = FeedbackRouteImport.update({
@@ -348,6 +355,11 @@ const AgenciesIdRoute = AgenciesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AgenciesRoute,
 } as any)
+const ApiFbPagesRoute = ApiFbPagesRouteImport.update({
+  id: '/api/fb-pages',
+  path: '/api/fb-pages',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiManagedAdsRoute = ApiManagedAdsRouteImport.update({
   id: '/api/managed-ads',
   path: '/api/managed-ads',
@@ -442,6 +454,7 @@ export interface FileRoutesByFullPath {
   '/documents': typeof DocumentsRoute
   '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
+  '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
@@ -475,6 +488,7 @@ export interface FileRoutesByFullPath {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
@@ -512,6 +526,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsRoute
   '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
+  '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
@@ -544,6 +559,7 @@ export interface FileRoutesByTo {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
@@ -582,6 +598,7 @@ export interface FileRoutesById {
   '/documents': typeof DocumentsRoute
   '/external-top-up': typeof ExternalTopUpRoute
   '/failed-topups': typeof FailedTopupsRoute
+  '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
   '/managed-ads': typeof ManagedAdsRoute
@@ -615,6 +632,7 @@ export interface FileRoutesById {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
@@ -654,6 +672,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/external-top-up'
     | '/failed-topups'
+    | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
     | '/managed-ads'
@@ -687,6 +706,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
@@ -724,6 +744,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/external-top-up'
     | '/failed-topups'
+    | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
     | '/managed-ads'
@@ -756,6 +777,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
@@ -793,6 +815,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/external-top-up'
     | '/failed-topups'
+    | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
     | '/managed-ads'
@@ -826,6 +849,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
@@ -864,6 +888,7 @@ export interface RootRouteChildren {
   DocumentsRoute: typeof DocumentsRoute
   ExternalTopUpRoute: typeof ExternalTopUpRoute
   FailedTopupsRoute: typeof FailedTopupsRoute
+  FbPagesCallbackRoute: typeof FbPagesCallbackRoute
   FeedbackRoute: typeof FeedbackRoute
   InvoiceMakerRoute: typeof InvoiceMakerRoute
   ManagedAdsRoute: typeof ManagedAdsRoute
@@ -895,6 +920,7 @@ export interface RootRouteChildren {
   AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ApiFbPagesRoute: typeof ApiFbPagesRoute
   ApiManagedAdsRoute: typeof ApiManagedAdsRoute
   ApiMetaProxyRoute: typeof ApiMetaProxyRoute
   ApiReferralRefreshRoute: typeof ApiReferralRefreshRoute
@@ -1056,6 +1082,13 @@ declare module '@tanstack/react-router' {
       path: '/failed-topups'
       fullPath: '/failed-topups'
       preLoaderRoute: typeof FailedTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fb-pages-callback': {
+      id: '/fb-pages-callback'
+      path: '/fb-pages-callback'
+      fullPath: '/fb-pages-callback'
+      preLoaderRoute: typeof FbPagesCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/feedback': {
@@ -1289,6 +1322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgenciesIdRouteImport
       parentRoute: typeof AgenciesRoute
     }
+    '/api/fb-pages': {
+      id: '/api/fb-pages'
+      path: '/api/fb-pages'
+      fullPath: '/api/fb-pages'
+      preLoaderRoute: typeof ApiFbPagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/managed-ads': {
       id: '/api/managed-ads'
       path: '/api/managed-ads'
@@ -1449,6 +1489,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocumentsRoute: DocumentsRoute,
   ExternalTopUpRoute: ExternalTopUpRoute,
   FailedTopupsRoute: FailedTopupsRoute,
+  FbPagesCallbackRoute: FbPagesCallbackRoute,
   FeedbackRoute: FeedbackRoute,
   InvoiceMakerRoute: InvoiceMakerRoute,
   ManagedAdsRoute: ManagedAdsRoute,
@@ -1480,6 +1521,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ApiFbPagesRoute: ApiFbPagesRoute,
   ApiManagedAdsRoute: ApiManagedAdsRoute,
   ApiMetaProxyRoute: ApiMetaProxyRoute,
   ApiReferralRefreshRoute: ApiReferralRefreshRoute,
