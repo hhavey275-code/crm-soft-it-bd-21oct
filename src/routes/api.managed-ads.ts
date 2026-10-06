@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { tokenFor, loadOwned, walletBalance } from "@/lib/managedAds.server";
+import { tokenFor, loadOwned, walletBalance, ownAccounts } from "@/lib/managedAds.server";
 
 /**
  * Managed (shared ad account) Ads Manager API.
@@ -13,10 +13,11 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(100000), asUserId: z.string().uuid().optional() }),
-  z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), q: z.string().min(2).max(60) }),
+  z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
   z.object({
     action: z.literal("create"),
     pageDbId: z.string().uuid(),
+    adAccountDbId: z.string().uuid().optional(),
     objective: z.enum(["MESSAGES", "TRAFFIC", "ENGAGEMENT", "AWARENESS"]),
     campaignName: z.string().min(1).max(200),
     adsetName: z.string().min(1).max(200),
@@ -62,21 +63,22 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   if (body.action === "list") {
-    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo });
+    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true });
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
   if (body.action === "set_status" || body.action === "set_budget") {
-    const owned = await loadOwned(supabaseAdmin, targetUser);
+    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true });
     const list = body.action === "set_budget" ? owned.adsets : body.level === "campaign" ? owned.campaigns : body.level === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
     if (!obj) throw new Error("এই campaign/ad আপনার নয়");
+    const shared = obj.account_kind !== "own"; // own accounts spend their own limit, not the wallet
     const bal = await walletBalance(supabaseAdmin, targetUser);
-    if (body.action === "set_status" && body.status === "ACTIVE" && bal <= settings.pauseThreshold) {
+    if (shared && body.action === "set_status" && body.status === "ACTIVE" && bal <= settings.pauseThreshold) {
       throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন, তারপর চালু করুন`);
     }
     if (body.action === "set_budget") {
-      if (!isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
+      if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
     }
     const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
     const g = graphClient(token);
@@ -87,10 +89,18 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
 
   // interests + create need an approved page owned by the caller
   const { data: page } = await supabaseAdmin.from("client_facebook_pages").select("*").eq("id", body.pageDbId).maybeSingle();
-  if (!page || page.status !== "approved" || !page.ad_account_id || (page.user_id !== user.id && !isAdmin)) {
-    throw new Error("এই page অনুমোদিত নয়");
+  if (!page || page.status === "rejected" || (page.user_id !== user.id && !isAdmin)) {
+    throw new Error("এই page আপনার নয় বা বাতিল হয়েছে");
   }
-  const { token, act } = await tokenFor(supabaseAdmin, page.ad_account_id);
+  // Which ad account? Shared = the account admin assigned to this approved page (wallet-charged).
+  // Own = one of the client's dedicated accounts (Campaign Management on).
+  const wantAcc = body.adAccountDbId || page.ad_account_id;
+  if (!wantAcc) throw new Error("Ad account বাছুন");
+  let shared: boolean;
+  if (page.status === "approved" && page.ad_account_id && wantAcc === page.ad_account_id) shared = true;
+  else if ((await ownAccounts(supabaseAdmin, page.user_id)).some((a: any) => a.id === wantAcc)) shared = false;
+  else throw new Error(page.status !== "approved" ? "এই page এখনো admin অনুমোদন পায়নি — shared account-এ চালানো যাবে না" : "এই ad account-এ এই page চালানোর অনুমতি নেই");
+  const { token, act } = await tokenFor(supabaseAdmin, wantAcc);
   const g = graphClient(token);
 
   if (body.action === "interests") {
@@ -100,8 +110,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
 
   // ---- create ----
   const bal = await walletBalance(supabaseAdmin, page.user_id);
-  if (!isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
-  if (body.publish && bal <= settings.pauseThreshold) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন`);
+  if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
+  if (shared && body.publish && bal <= settings.pauseThreshold) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন`);
   if (body.budgetType === "lifetime" && !body.endTime) throw new Error("Lifetime budget-এর জন্য শেষ তারিখ দিন");
   if (body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && !body.bidAmount) throw new Error("Bid amount দিন");
   if (body.existingPostId && !body.existingPostId.startsWith(`${page.page_id}_`) && !/^\d+$/.test(body.existingPostId)) {
@@ -125,9 +135,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       name: body.campaignName, objective: map.objective, status, special_ad_categories: [], is_adset_budget_sharing_enabled: false,
     });
     campaignId = String(camp.id);
-    await supabaseAdmin.from("managed_campaigns").insert({
-      user_id: page.user_id, page_id: pageId, ad_account_id: page.ad_account_id, campaign_id: campaignId, campaign_name: body.campaignName,
-    });
+    if (shared) {
+      await supabaseAdmin.from("managed_campaigns").insert({
+        user_id: page.user_id, page_id: pageId, ad_account_id: wantAcc, campaign_id: campaignId, campaign_name: body.campaignName,
+      });
+    }
 
     const targeting: Record<string, unknown> = {
       geo_locations: { countries: body.countries },

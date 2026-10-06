@@ -19,16 +19,26 @@ const OBJECTIVES = [
 ] as const;
 
 interface Props {
-  pages: any[];
+  accounts: { id: string; account_id: string; name: string; kind: "shared" | "own" }[];
+  allPages: any[];
   walletBalance: number;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export function ManagedCreateWizard({ pages, walletBalance, onClose, onCreated }: Props) {
+export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated }: Props) {
+  const [accId, setAccId] = useState(accounts[0]?.id ?? "");
+  const acc = accounts.find((a) => a.id === accId);
+  const pages = allPages.filter((p) => (acc?.kind === "own" ? p.status !== "rejected" : p.status === "approved" && p.ad_account_id === accId));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [pageDbId, setPageDbId] = useState(pages[0]?.id ?? "");
+  const pickAccount = (id: string) => {
+    setAccId(id);
+    const a = accounts.find((x) => x.id === id);
+    const first = allPages.find((p) => (a?.kind === "own" ? p.status !== "rejected" : p.status === "approved" && p.ad_account_id === id));
+    setPageDbId(first?.id ?? "");
+  };
   const [objective, setObjective] = useState<(typeof OBJECTIVES)[number]["v"]>("MESSAGES");
   const [campaignName, setCampaignName] = useState("New Campaign");
   const [adsetName, setAdsetName] = useState("New Ad Set");
@@ -54,12 +64,12 @@ export function ManagedCreateWizard({ pages, walletBalance, onClose, onCreated }
 
   const page = pages.find((p) => p.id === pageDbId);
   const amt = Number(amount) || 0;
-  const overWallet = amt > walletBalance;
+  const overWallet = acc?.kind !== "own" && amt > walletBalance;
 
   const searchInterests = async () => {
     if (iq.trim().length < 2) return;
     try {
-      const r = await managedAds<{ interests: any[] }>({ action: "interests", pageDbId, q: iq.trim() });
+      const r = await managedAds<{ interests: any[] }>({ action: "interests", pageDbId, adAccountDbId: accId, q: iq.trim() });
       setIResults(r.interests);
     } catch (e: any) { toast.error(e.message); }
   };
@@ -81,11 +91,13 @@ export function ManagedCreateWizard({ pages, walletBalance, onClose, onCreated }
   };
 
   const submit = async (publish: boolean) => {
+    if (!accId) return toast.error("Ad account বাছুন");
+    if (!pageDbId) return toast.error("Page বাছুন");
     if (overWallet) return toast.error("Wallet balance-এর বেশি budget দেওয়া যাবে না");
     setSaving(true);
     try {
       await managedAds({
-        action: "create", pageDbId, objective, campaignName, adsetName, adName,
+        action: "create", pageDbId, adAccountDbId: accId, objective, campaignName, adsetName, adName,
         budgetType, amount: amt,
         endTime: budgetType === "lifetime" && endTime ? new Date(endTime).toISOString() : undefined,
         bidStrategy, bidAmount: bidAmount ? Number(bidAmount) : undefined,
@@ -132,11 +144,28 @@ export function ManagedCreateWizard({ pages, walletBalance, onClose, onCreated }
             {step === 0 && (
               <>
                 <div>
+                  <Label>Ad account</Label>
+                  <Select value={accId} onValueChange={pickAccount}>
+                    <SelectTrigger><SelectValue placeholder="Ad account বাছুন" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} ({a.account_id}) — {a.kind === "shared" ? "Shared, wallet থেকে খরচ" : "আমার নিজের account"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {acc?.kind === "own" ? "খরচ এই ad account-এর নিজের limit থেকে যাবে, wallet থেকে কাটবে না।" : "খরচ প্রতি ১৫ মিনিটে আপনার wallet থেকে কাটা হবে।"}
+                  </p>
+                </div>
+                <div>
                   <Label>Page</Label>
                   <Select value={pageDbId} onValueChange={setPageDbId}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{pages.map((p) => <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>)}</SelectContent>
+                    <SelectTrigger><SelectValue placeholder="Page বাছুন" /></SelectTrigger>
+                    <SelectContent>{pages.map((p) => <SelectItem key={p.id} value={p.id}>{p.page_name}{p.status !== "approved" ? " (অনুমোদন বাকি)" : ""}</SelectItem>)}</SelectContent>
                   </Select>
+                  {!pages.length && <p className="text-xs text-destructive mt-1">এই account-এ চালানোর মতো কোনো page নেই।</p>}
                 </div>
                 <div>
                   <Label>Campaign objective</Label>
@@ -168,7 +197,7 @@ export function ManagedCreateWizard({ pages, walletBalance, onClose, onCreated }
                   <div>
                     <Label>পরিমাণ ($)</Label>
                     <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} />
-                    <p className={cn("text-xs mt-1", overWallet ? "text-destructive" : "text-muted-foreground")}>Wallet: ${walletBalance.toFixed(2)}</p>
+                    {acc?.kind !== "own" && <p className={cn("text-xs mt-1", overWallet ? "text-destructive" : "text-muted-foreground")}>Wallet: ${walletBalance.toFixed(2)}</p>}
                   </div>
                   {budgetType === "lifetime" && (
                     <div><Label>শেষ তারিখ</Label><Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
