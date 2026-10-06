@@ -84,7 +84,7 @@ async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since
     .eq("user_id", userId)
     .eq("status", "approved");
   const { data: registry } = await supabaseAdmin.from("managed_campaigns").select("campaign_id").eq("user_id", userId);
-  const registered = new Set((registry ?? []).map((r: any) => String(r.campaign_id)));
+  const registered = new Set<string>((registry ?? []).map((r: any) => String(r.campaign_id)));
 
   const byAccount = new Map<string, Set<string>>();
   for (const p of pages ?? []) {
@@ -104,7 +104,7 @@ async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since
         g.get(`${act}/adsets`, { fields: "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time", limit: "500" }),
         g.get(`${act}/campaigns`, { fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time", limit: "500" }),
       ]);
-      const owned = new Set<string>(registered);
+      const owned = new Set<string>(registered as Set<string>);
       for (const ad of ads.data ?? []) { const pg = pageOfAd(ad); if (pg && pageIds.has(pg)) owned.add(String(ad.campaign_id)); }
       for (const s of adsets.data ?? []) { const pg = s.promoted_object?.page_id; if (pg && pageIds.has(String(pg))) owned.add(String(s.campaign_id)); }
       // An ad belonging to a foreign page inside an "owned" campaign is never exposed.
