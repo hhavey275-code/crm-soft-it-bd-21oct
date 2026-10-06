@@ -214,14 +214,16 @@ export function AppSidebar() {
   } else if (isSeller) {
     navItems = sellerNavItems;
   } else {
-    // Client: filter out permission-gated items like ads-manager
-    const permGatedKeys = ["ads-manager"];
-    // Referral menu only for clients the admin has enabled it for
+    // Client: permission-gated items
     const referralOn = referralGlobalOn !== false && !!(profile as any)?.referral_enabled;
-    navItems = clientNavItems.filter(item =>
-      (item.key !== "referral" || referralOn) &&
-      (!permGatedKeys.includes(item.key) || (menuPermissions && menuPermissions.includes(item.key)))
-    );
+    const managedOn = !!(profile as any)?.managed_ads_enabled;
+    const campaignOn = !!(profile as any)?.campaign_management_enabled;
+    navItems = clientNavItems.filter(item => {
+      if (item.key === "referral") return referralOn;
+      if (item.key === "my-pages" || item.key === "my-ads") return managedOn;
+      if (item.key === "ads-manager") return campaignOn || !!(menuPermissions && menuPermissions.includes(item.key));
+      return true;
+    });
   }
 
   // Documents Vault: only show for the whitelisted vault-owner email.

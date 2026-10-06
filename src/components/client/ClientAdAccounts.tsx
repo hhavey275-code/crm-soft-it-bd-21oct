@@ -1413,6 +1413,12 @@ export function ClientAdAccounts() {
                                   Rename
                                 </DropdownMenuItem>
                               )}
+                              {(profile as any)?.campaign_management_enabled && (
+                                <DropdownMenuItem onClick={() => navigate(`/ads-manager/${a.id}`)}>
+                                  <Zap className="h-3.5 w-3.5 mr-2" />
+                                  Campaign Management
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
                                 Request BM Access
                               </DropdownMenuItem>
