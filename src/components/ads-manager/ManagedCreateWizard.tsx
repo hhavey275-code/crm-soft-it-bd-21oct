@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, X, MessageCircle, MousePointer, ThumbsUp, Eye } from "lucide-react";
+import { ArrowLeft, Loader2, X, MessageCircle, MousePointer, ThumbsUp, Eye, ShoppingCart, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,16 @@ import { cn } from "@/lib/utils";
 import { managedAds } from "@/lib/managedAdsApi";
 
 const OBJECTIVES = [
+  { v: "SALES", l: "Sales", d: "Website-এ purchase/lead (Pixel দিয়ে)", icon: ShoppingCart },
   { v: "MESSAGES", l: "Messages", d: "Messenger-এ message আনুন", icon: MessageCircle },
   { v: "TRAFFIC", l: "Traffic", d: "Website-এ visitor পাঠান", icon: MousePointer },
   { v: "ENGAGEMENT", l: "Engagement", d: "Post-এ like/comment/share", icon: ThumbsUp },
   { v: "AWARENESS", l: "Awareness", d: "বেশি মানুষের কাছে পৌঁছান", icon: Eye },
+] as const;
+
+const EVENTS = [
+  ["PURCHASE", "Purchase"], ["ADD_TO_CART", "Add to cart"], ["INITIATE_CHECKOUT", "Initiate checkout"],
+  ["LEAD", "Lead"], ["COMPLETE_REGISTRATION", "Complete registration"], ["CONTACT", "Contact"], ["VIEW_CONTENT", "View content"],
 ] as const;
 
 interface Props {
@@ -61,6 +67,39 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [headline, setHeadline] = useState("");
   const [link, setLink] = useState("");
   const [image, setImage] = useState<{ b64: string; url: string } | null>(null);
+  const [pixels, setPixels] = useState<any[] | null>(null);
+  const [pixelId, setPixelId] = useState("");
+  const [customEvent, setCustomEvent] = useState("PURCHASE");
+  const [posts, setPosts] = useState<any[] | null>(null);
+  const [postsNeedAccess, setPostsNeedAccess] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
+  // Pixels of the chosen ad account (for Sales)
+  useEffect(() => {
+    setPixels(null); setPixelId("");
+    if (objective !== "SALES" || !accId || !pageDbId) return;
+    managedAds<{ pixels: any[] }>({ action: "pixels", pageDbId, adAccountDbId: accId })
+      .then((r) => { setPixels(r.pixels); if (r.pixels[0]) setPixelId(r.pixels[0].id); })
+      .catch((e) => { setPixels([]); toast.error(e.message); });
+  }, [objective, accId, pageDbId]);
+
+  const loadPosts = async () => {
+    if (!accId || !pageDbId) return;
+    setLoadingPosts(true);
+    try {
+      const r = await managedAds<{ posts: any[]; needsAccess?: boolean }>({ action: "posts", pageDbId, adAccountDbId: accId });
+      setPosts(r.posts); setPostsNeedAccess(!!r.needsAccess);
+    } catch (e: any) { setPosts([]); toast.error(e.message); } finally { setLoadingPosts(false); }
+  };
+  useEffect(() => { setPosts(null); setPostId(""); }, [accId, pageDbId]);
+  useEffect(() => { if (step === 2 && creativeMode === "post" && posts === null) loadPosts(); }, [step, creativeMode, posts]);
+
+  const requestAccess = async () => {
+    try {
+      await managedAds({ action: "request_page_access", pageDbId, adAccountDbId: accId });
+      toast.success("Request পাঠানো হয়েছে — Page-এর admin Facebook-এ (Settings → Business access / notification) request accept করলে চালু হবে");
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   const page = pages.find((p) => p.id === pageDbId);
   const amt = Number(amount) || 0;
@@ -94,10 +133,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     if (!accId) return toast.error("Ad account বাছুন");
     if (!pageDbId) return toast.error("Page বাছুন");
     if (overWallet) return toast.error("Wallet balance-এর বেশি budget দেওয়া যাবে না");
+    if (objective === "SALES" && !pixelId) return toast.error("Pixel / Dataset বাছুন");
     setSaving(true);
     try {
       await managedAds({
-        action: "create", pageDbId, adAccountDbId: accId, objective, campaignName, adsetName, adName,
+        action: "create", pageDbId, adAccountDbId: accId, objective,
+        pixelId: objective === "SALES" ? pixelId : undefined,
+        customEvent: objective === "SALES" ? customEvent : undefined, campaignName, adsetName, adName,
         budgetType, amount: amt,
         endTime: budgetType === "lifetime" && endTime ? new Date(endTime).toISOString() : undefined,
         bidStrategy, bidAmount: bidAmount ? Number(bidAmount) : undefined,
@@ -108,7 +150,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         existingPostId: creativeMode === "post" && postId ? parsePostId(postId) : undefined,
         message: creativeMode === "new" ? message : undefined,
         headline: creativeMode === "new" ? headline : undefined,
-        link: creativeMode === "new" ? link : undefined,
+        link: creativeMode === "new" || objective === "SALES" ? link : undefined,
         imageBase64: creativeMode === "new" ? image?.b64 : undefined,
         publish,
       });
@@ -179,6 +221,26 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                     ))}
                   </div>
                 </div>
+                {objective === "SALES" && (
+                  <div className="grid gap-3 sm:grid-cols-2 rounded-md border p-3">
+                    <div>
+                      <Label>Pixel / Dataset</Label>
+                      <Select value={pixelId} onValueChange={setPixelId}>
+                        <SelectTrigger><SelectValue placeholder={pixels === null ? "লোড হচ্ছে…" : "Pixel বাছুন"} /></SelectTrigger>
+                        <SelectContent>{(pixels ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.id})</SelectItem>)}</SelectContent>
+                      </Select>
+                      {pixels && pixels.length === 0 && <p className="text-xs text-destructive mt-1">এই ad account-এ কোনো Pixel/Dataset নেই — admin-কে বলুন।</p>}
+                    </div>
+                    <div>
+                      <Label>Conversion event</Label>
+                      <Select value={customEvent} onValueChange={setCustomEvent}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{EVENTS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-2"><Label>Website link (যেখানে কিনবে)</Label><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." /></div>
+                  </div>
+                )}
                 <div><Label>Campaign নাম</Label><Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} /></div>
               </>
             )}
@@ -270,16 +332,38 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <Button size="sm" variant={creativeMode === "new" ? "default" : "outline"} disabled={objective === "ENGAGEMENT"} onClick={() => setCreativeMode("new")}>নতুন ad বানান</Button>
                 </div>
                 {creativeMode === "post" ? (
-                  <div>
-                    <Label>Post link বা Post ID</Label>
-                    <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="https://facebook.com/.../posts/123..." />
-                    <p className="text-xs text-muted-foreground mt-1">শুধু {page?.page_name} page-এর post চলবে।</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>{page?.page_name}-এর post বাছুন</Label>
+                      <Button size="sm" variant="ghost" disabled={loadingPosts} onClick={loadPosts}>{loadingPosts ? "লোড হচ্ছে…" : "আবার আনুন"}</Button>
+                    </div>
+                    {postsNeedAccess && (
+                      <div className="rounded-md border border-destructive/50 p-3 text-sm space-y-2">
+                        <p>এই Page এখনো আমাদের Business Manager-কে access দেয়নি, তাই post দেখা ও ad চালানো যাবে না।</p>
+                        <Button size="sm" onClick={requestAccess}>Page access request পাঠান</Button>
+                        <p className="text-xs text-muted-foreground">Request পাঠানোর পর Page-এর admin Facebook-এ accept করবেন, তারপর "আবার আনুন" চাপুন।</p>
+                      </div>
+                    )}
+                    {posts && posts.length > 0 && (
+                      <div className="grid max-h-80 gap-2 overflow-auto sm:grid-cols-2">
+                        {posts.map((p) => (
+                          <button key={p.id} type="button" onClick={() => setPostId(p.id)}
+                            className={cn("relative flex gap-2 rounded-md border p-2 text-left text-xs", postId === p.id ? "border-primary bg-primary/5" : "hover:border-primary/50")}>
+                            {p.picture ? <img src={p.picture} alt="" className="h-14 w-14 shrink-0 rounded object-cover" /> : <div className="h-14 w-14 shrink-0 rounded bg-muted" />}
+                            <span className="line-clamp-3">{p.message || "(লেখা নেই)"}</span>
+                            {postId === p.id && <Check className="absolute right-1 top-1 h-4 w-4 text-primary" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {posts && posts.length === 0 && !postsNeedAccess && <p className="text-xs text-muted-foreground">কোনো post পাওয়া যায়নি।</p>}
+                    <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="অথবা post link / ID লিখুন" />
                   </div>
                 ) : (
                   <>
                     <div><Label>Primary text</Label><Textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} /></div>
                     <div><Label>Headline</Label><Input value={headline} onChange={(e) => setHeadline(e.target.value)} /></div>
-                    {objective !== "MESSAGES" && <div><Label>Website link</Label><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." /></div>}
+                    {objective !== "MESSAGES" && objective !== "SALES" && <div><Label>Website link</Label><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." /></div>}
                     <div><Label>ছবি</Label><Input type="file" accept="image/*" onChange={(e) => onImage(e.target.files?.[0])} /></div>
                   </>
                 )}
@@ -310,8 +394,15 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 <div className="h-8 w-8 rounded-full bg-muted" />
                 <div><p className="text-sm font-semibold">{page?.page_name ?? "Page"}</p><p className="text-xs text-muted-foreground">Sponsored</p></div>
               </div>
-              {creativeMode === "post" ? (
-                <p className="px-3 pb-6 text-sm text-muted-foreground">{postId ? "আপনার বাছাই করা post-টি এখানে দেখাবে" : "Post link দিন"}</p>
+              {creativeMode === "post" ? (() => {
+                const sp = posts?.find((p) => p.id === postId);
+                return sp ? (
+                  <>
+                    {sp.message && <p className="px-3 pb-2 text-sm whitespace-pre-line line-clamp-6">{sp.message}</p>}
+                    {sp.picture && <img src={sp.picture} alt="" className="w-full object-cover" />}
+                  </>
+                ) : <p className="px-3 pb-6 text-sm text-muted-foreground">{postId ? "আপনার বাছাই করা post-টি এখানে দেখাবে" : "একটি post বাছুন"}</p>;
+              })()
               ) : (
                 <>
                   {message && <p className="px-3 pb-2 text-sm whitespace-pre-line">{message}</p>}
