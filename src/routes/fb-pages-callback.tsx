@@ -22,9 +22,12 @@ function Callback() {
     const p = new URLSearchParams(window.location.search);
     const code = p.get("code");
     const err = p.get("error_description") || p.get("error");
-    window.opener?.postMessage({ type: "fbPagesOAuth", code, error: err }, window.location.origin);
-    setMsg(code ? "সম্পন্ন! এই window বন্ধ হচ্ছে…" : err || "বাতিল হয়েছে");
-    setTimeout(() => window.close(), 800);
+    const payload = { type: "fbPagesOAuth", code, error: err, t: Date.now() };
+    try { window.opener?.postMessage(payload, window.location.origin); } catch { /* opener cut */ }
+    try { const bc = new BroadcastChannel("fbPagesOAuth"); bc.postMessage(payload); bc.close(); } catch { /* unsupported */ }
+    try { localStorage.setItem("fbPagesOAuth", JSON.stringify(payload)); localStorage.removeItem("fbPagesOAuth"); } catch { /* blocked */ }
+    setMsg(code ? "সম্পন্ন! এই window বন্ধ হচ্ছে… আগের tab-এ ফিরে যান।" : err || "বাতিল হয়েছে");
+    setTimeout(() => window.close(), 1200);
   }, []);
   return <p className="p-6 text-center text-sm">{msg}</p>;
 }

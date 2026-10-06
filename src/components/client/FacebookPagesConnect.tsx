@@ -27,16 +27,30 @@ async function call(body: Record<string, unknown>) {
   return j;
 }
 
-function waitForCode(popup: Window) {
+// Facebook's login page cuts the link between popup and this tab, so
+// window.opener/popup.closed are unreliable. Use same-site channels instead.
+function waitForCode(_popup: Window) {
   return new Promise<string>((resolve, reject) => {
-    const onMsg = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin || e.data?.type !== "fbPagesOAuth") return;
+    const done = (d: any) => {
+      if (d?.type !== "fbPagesOAuth") return;
       cleanup();
-      e.data.code ? resolve(e.data.code) : reject(new Error(e.data.error || "বাতিল হয়েছে"));
+      d.code ? resolve(d.code) : reject(new Error(d.error || "বাতিল হয়েছে"));
     };
-    const poll = window.setInterval(() => { if (popup.closed) { cleanup(); reject(new Error("Window বন্ধ হয়ে গেছে")); } }, 700);
-    const cleanup = () => { window.removeEventListener("message", onMsg); window.clearInterval(poll); };
+    const onMsg = (e: MessageEvent) => { if (e.origin === window.location.origin) done(e.data); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "fbPagesOAuth" && e.newValue) { try { done(JSON.parse(e.newValue)); } catch { /* ignore */ } }
+    };
+    const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("fbPagesOAuth") : null;
+    if (bc) bc.onmessage = (e) => done(e.data);
+    const timer = window.setTimeout(() => { cleanup(); reject(new Error("সময় শেষ — আবার চেষ্টা করুন")); }, 5 * 60_000);
+    const cleanup = () => {
+      window.removeEventListener("message", onMsg);
+      window.removeEventListener("storage", onStorage);
+      bc?.close();
+      window.clearTimeout(timer);
+    };
     window.addEventListener("message", onMsg);
+    window.addEventListener("storage", onStorage);
   });
 }
 
