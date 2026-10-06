@@ -75,6 +75,8 @@ export default function ManagedAdsPage() {
           <p className="text-sm text-muted-foreground">Client-দের Facebook page shared ad account-এ assign ও অনুমোদন করুন।</p>
         </div>
 
+        <ThresholdCard />
+
         <div className="flex flex-wrap items-center gap-2">
           {(["pending", "approved", "rejected"] as const).map((t) => (
             <Button key={t} size="sm" variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)}>
@@ -132,5 +134,36 @@ export default function ManagedAdsPage() {
         </Card>
       </div>
     </DashboardLayout>
+  );
+}
+
+function ThresholdCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["managed-ads-settings"],
+    queryFn: async () => (await db.from("managed_ads_settings").select("*").eq("id", 1).maybeSingle()).data,
+  });
+  const [pause, setPause] = useState<string | null>(null);
+  const [alert, setAlert] = useState<string | null>(null);
+  const save = async () => {
+    const p = Number(pause ?? data?.pause_threshold), a = Number(alert ?? data?.low_balance_alert);
+    if (!(p >= 0) || !(a >= p)) return toast.error("সতর্কবার্তার পরিমাণ বন্ধের পরিমাণের সমান বা বেশি হতে হবে");
+    const { error } = await db.from("managed_ads_settings").update({ pause_threshold: p, low_balance_alert: a, updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) return toast.error(error.message);
+    toast.success("সেভ হয়েছে");
+    qc.invalidateQueries({ queryKey: ["managed-ads-settings"] });
+  };
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Wallet সুরক্ষা</CardTitle></CardHeader>
+      <CardContent className="flex flex-wrap items-end gap-3 text-sm">
+        <div><p className="text-xs text-muted-foreground mb-1">এই ব্যালেন্সে ad বন্ধ হবে ($)</p>
+          <Input className="w-32" type="number" value={pause ?? data?.pause_threshold ?? ""} onChange={(e) => setPause(e.target.value)} /></div>
+        <div><p className="text-xs text-muted-foreground mb-1">সতর্কবার্তা দেখাবে ($)</p>
+          <Input className="w-32" type="number" value={alert ?? data?.low_balance_alert ?? ""} onChange={(e) => setAlert(e.target.value)} /></div>
+        <Button size="sm" onClick={save}>সেভ</Button>
+        <p className="w-full text-xs text-muted-foreground">প্রতি ১৫ মিনিটে Meta-র খরচ client wallet থেকে কাটা হয়; ব্যালেন্স এই সীমায় নামলে সেই client-এর সব campaign বন্ধ হয়।</p>
+      </CardContent>
+    </Card>
   );
 }
