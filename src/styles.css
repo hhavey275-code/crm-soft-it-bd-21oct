@@ -385,3 +385,13 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-rise, .auth-rise-bg { animation: none; }
 }
+
+@theme {
+  --color-fb-blue: #0a66d8;
+  --color-fb-blue-soft: #e7f0fd;
+  --color-fb-green: #0b7a3e;
+  --color-fb-bg: #f0f2f5;
+  --color-fb-border: #dadde1;
+  --color-fb-text: #1c2b33;
+  --color-fb-muted: #65676b;
+}
