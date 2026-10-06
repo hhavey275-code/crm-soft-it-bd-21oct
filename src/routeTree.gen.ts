@@ -62,6 +62,7 @@ import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem
 import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
+import { Route as ApiManagedAdsRouteImport } from './routes/api.managed-ads'
 import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
 import { Route as ApiReferralRefreshRouteImport } from './routes/api.referral-refresh'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
@@ -340,6 +341,11 @@ const AgenciesIdRoute = AgenciesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AgenciesRoute,
 } as any)
+const ApiManagedAdsRoute = ApiManagedAdsRouteImport.update({
+  id: '/api/managed-ads',
+  path: '/api/managed-ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaProxyRoute = ApiMetaProxyRouteImport.update({
   id: '/api/meta-proxy',
   path: '/api/meta-proxy',
@@ -455,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
@@ -521,6 +528,7 @@ export interface FileRoutesByTo {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
@@ -589,6 +597,7 @@ export interface FileRoutesById {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
   '/api/referral-refresh': typeof ApiReferralRefreshRoute
   '/clients/$id': typeof ClientsIdRoute
@@ -658,6 +667,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
     | '/clients/$id'
@@ -724,6 +734,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
     | '/clients/$id'
@@ -791,6 +802,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/managed-ads'
     | '/api/meta-proxy'
     | '/api/referral-refresh'
     | '/clients/$id'
@@ -857,6 +869,7 @@ export interface RootRouteChildren {
   AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ApiManagedAdsRoute: typeof ApiManagedAdsRoute
   ApiMetaProxyRoute: typeof ApiMetaProxyRoute
   ApiReferralRefreshRoute: typeof ApiReferralRefreshRoute
   ClientsIdRoute: typeof ClientsIdRoute
@@ -1242,6 +1255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgenciesIdRouteImport
       parentRoute: typeof AgenciesRoute
     }
+    '/api/managed-ads': {
+      id: '/api/managed-ads'
+      path: '/api/managed-ads'
+      fullPath: '/api/managed-ads'
+      preLoaderRoute: typeof ApiManagedAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/meta-proxy': {
       id: '/api/meta-proxy'
       path: '/api/meta-proxy'
@@ -1418,6 +1438,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ApiManagedAdsRoute: ApiManagedAdsRoute,
   ApiMetaProxyRoute: ApiMetaProxyRoute,
   ApiReferralRefreshRoute: ApiReferralRefreshRoute,
   ClientsIdRoute: ClientsIdRoute,
