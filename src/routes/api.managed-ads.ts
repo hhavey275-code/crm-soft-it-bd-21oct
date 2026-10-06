@@ -58,9 +58,12 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const targetUser = "asUserId" in body && body.asUserId && isAdmin ? body.asUserId : user.id;
   const { graphClient } = await import("@/lib/metaGraph.server");
 
+  const { getManagedSettings } = await import("@/lib/managedSpend.server");
+  const settings = await getManagedSettings(supabaseAdmin);
+
   if (body.action === "list") {
     const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo });
-    return { ...data, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
+    return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
   if (body.action === "set_status" || body.action === "set_budget") {
@@ -68,8 +71,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const list = body.action === "set_budget" ? owned.adsets : body.level === "campaign" ? owned.campaigns : body.level === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
     if (!obj) throw new Error("এই campaign/ad আপনার নয়");
+    const bal = await walletBalance(supabaseAdmin, targetUser);
+    if (body.action === "set_status" && body.status === "ACTIVE" && bal <= settings.pauseThreshold) {
+      throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন, তারপর চালু করুন`);
+    }
     if (body.action === "set_budget") {
-      const bal = await walletBalance(supabaseAdmin, targetUser);
       if (!isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
     }
     const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
