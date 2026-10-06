@@ -95,6 +95,7 @@ const clientNavItems = [
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Buy Profile", url: "/buy-profile", icon: UserCircle, key: "buy-profile" },
   { title: "My Pages", url: "/my-pages", icon: Megaphone, key: "my-pages" },
+  { title: "My Ads", url: "/my-ads", icon: Megaphone, key: "my-ads" },
   { title: "Feedback", url: "/feedback", icon: MessageSquareHeart, key: "feedback" },
   { title: "Referral", url: "/referral", icon: Gift, key: "referral" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
