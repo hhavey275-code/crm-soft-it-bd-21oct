@@ -402,8 +402,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                     {sp.picture && <img src={sp.picture} alt="" className="w-full object-cover" />}
                   </>
                 ) : <p className="px-3 pb-6 text-sm text-muted-foreground">{postId ? "আপনার বাছাই করা post-টি এখানে দেখাবে" : "একটি post বাছুন"}</p>;
-              })()
-              ) : (
+              })() : (
                 <>
                   {message && <p className="px-3 pb-2 text-sm whitespace-pre-line">{message}</p>}
                   {image ? <img src={image.url} alt="" className="w-full aspect-square object-cover" /> : <div className="aspect-square bg-muted" />}
