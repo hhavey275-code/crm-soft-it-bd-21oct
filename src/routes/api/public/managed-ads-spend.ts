@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/managed-ads-spend")({
         }
         const { pauseThreshold } = await getManagedSettings(supabaseAdmin);
         const { data: pages } = await (supabaseAdmin as any).from("client_facebook_pages").select("user_id").eq("status", "approved");
-        const users = [...new Set((pages ?? []).map((p: any) => p.user_id as string))];
+        const users: string[] = Array.from(new Set<string>((pages ?? []).map((p: any) => String(p.user_id))));
         const results: any[] = [];
         for (const userId of users) {
           try {
