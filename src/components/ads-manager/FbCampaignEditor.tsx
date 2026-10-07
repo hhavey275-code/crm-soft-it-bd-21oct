@@ -73,7 +73,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
       if (n.level === "adset") {
         if (a.startTime !== b.startTime && a.startTime) body.startTime = new Date(a.startTime).toISOString();
         if (a.endTime !== b.endTime) body.endTime = a.endTime ? new Date(a.endTime).toISOString() : "";
-        if (a.countries !== b.countries) { const cs = a.countries.split(/[,\s]+/).map((c) => c.trim().toUpperCase()).filter((c) => c.length === 2); if (cs.length) body.countries = cs; }
+        if (a.countries !== b.countries) { const cs = a.countries.split(/[,\s]+/).map((c: string) => c.trim().toUpperCase()).filter((c: string) => c.length === 2); if (cs.length) body.countries = cs; }
         if (a.ageMin !== b.ageMin && a.ageMin) body.ageMin = Number(a.ageMin);
         if (a.ageMax !== b.ageMax && a.ageMax) body.ageMax = Number(a.ageMax);
       }
