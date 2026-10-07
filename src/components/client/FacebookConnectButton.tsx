@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Facebook, Loader2 } from "lucide-react";
+import { Facebook, Loader2, CheckCircle2 } from "lucide-react";
+import { managedAds } from "@/lib/managedAdsApi";
 import { call } from "@/components/client/FacebookPagesConnect";
 
 /** One-click Facebook login: pages are added automatically and shared with our Business Managers. */
 export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { onDone?: () => void; label?: string }) {
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ connected: boolean } | null>(null);
+  useEffect(() => { managedAds<{ connected: boolean }>({ action: "fb_status" }).then(setStatus).catch(() => setStatus(null)); }, []);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("fbPagesResult");
@@ -38,10 +41,18 @@ export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { 
     }
   };
 
+  if (status?.connected && !busy) {
+    return (
+      <span className="inline-flex h-9 items-center gap-1.5 rounded-md border border-fb-green/40 bg-fb-green/10 px-3 text-[13px] font-semibold text-fb-green">
+        <CheckCircle2 className="h-4 w-4" />Facebook connected
+        <button onClick={connect} className="ml-1 text-[11px] font-normal text-fb-muted underline">আবার connect</button>
+      </span>
+    );
+  }
   return (
     <button onClick={connect} disabled={busy} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-fb-blue text-primary-foreground text-[13px] font-semibold disabled:opacity-60">
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Facebook className="h-4 w-4" />}
-      {label}
+      {status && !status.connected ? "Facebook আবার connect" : label}
     </button>
   );
 }
