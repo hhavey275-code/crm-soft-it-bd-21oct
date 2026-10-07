@@ -176,7 +176,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
 
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE";
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
-  const wa = pageInfo?.whatsappNumber ?? null;
+  const [waManual, setWaManual] = useState("");
+  const wa = pageInfo?.whatsappNumber ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : null);
   const waConnectUrl = `https://business.facebook.com/latest/settings/whatsapp_account?asset_id=${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}`;
   const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
   const amt = Number(amount) || 0;
@@ -567,9 +568,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   </div>
                 )}
                 {!pageInfo && <p className="mt-2 flex items-center gap-1 text-[12px] text-fb-muted"><Loader2 className="h-3 w-3 animate-spin" />WhatsApp খোঁজা হচ্ছে…</p>}
-                {!wa && pageInfo && (
+                {pageInfo && !pageInfo.whatsappNumber && (
                   <div className="mt-2 rounded-md border border-fb-border bg-background p-2 text-[12px]">
-                    <p>এই Page-এ WhatsApp পাওয়া যায়নি। Connect করতে: <b>Connect WhatsApp</b> চাপুন → Page settings-এ "Linked accounts → WhatsApp" → নম্বর দিন → WhatsApp-এ আসা code দিন। তারপর এখানে <b>আবার চেক করুন</b> চাপুন।</p>
+                    <p>Facebook থেকে WhatsApp নম্বর আসেনি। Page-এ আগেই WhatsApp যুক্ত থাকলে নিচে সেই নম্বরটা লিখে দিন (দেশের কোডসহ, যেমন +8801XXXXXXXXX)।</p>
+                    <input value={waManual} onChange={(e) => setWaManual(e.target.value)} placeholder="+8801XXXXXXXXX" className="mt-1 w-full rounded-md border border-fb-border bg-background px-2 py-1.5 text-[13px]" />
+                    <p className="mt-2">নম্বর যুক্ত না থাকলে: <b>Connect WhatsApp</b> চাপুন → নম্বর দিন → WhatsApp-এ আসা code দিন → এখানে <b>আবার চেক করুন</b>।</p>
                     {pageInfo.pageTokenMissing && <p className="mt-1 font-semibold text-destructive">এই Page-এর Facebook login এখনো CRM-এ save হয়নি। তাই WhatsApp নম্বর পড়া যাচ্ছে না। Campaigns পাতার উপরে "Facebook আবার connect" চেপে login করুন (Page-টা টিক দিয়ে), তারপর "আবার চেক করুন" চাপুন।</p>}
                     <div className="mt-2 flex gap-2">
                       <a href={waConnectUrl} target="_blank" rel="noreferrer" className="rounded-md bg-fb-blue px-3 py-1 font-semibold text-primary-foreground">Connect WhatsApp</a>
@@ -784,12 +787,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         </div>
         {text ? <p className="whitespace-pre-line px-3 pb-2 text-[13px] line-clamp-6">{text}</p> : <p className="px-3 pb-2 text-[13px] text-fb-muted">Primary text</p>}
         {img ? <img src={img} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted"><ImagePlus className="h-8 w-8" /></div>}
-        {setup === "new" && (
+        {(setup === "new" || isMsg || (objective === "ENGAGEMENT" && engLoc !== "ON_AD")) && (
           <div className="flex items-center justify-between gap-2 bg-fb-bg p-3">
-            <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com"}</p><p className="truncate text-[13px] font-semibold">{headline || "Headline"}</p></div>
-            <span className="shrink-0 rounded-md bg-fb-border px-3 py-1.5 text-[12px] font-semibold">{ctaLabel}</span>
+            <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{isMsg ? (finalDests.includes("WHATSAPP") && finalDests.length === 1 ? "WhatsApp" : "Messenger") : link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com"}</p><p className="truncate text-[13px] font-semibold">{setup === "new" ? (headline || "Headline") : (page?.page_name ?? "")}</p></div>
+            <span className="shrink-0 rounded-md bg-fb-border px-3 py-1.5 text-[12px] font-semibold text-foreground">{ctaLabel}</span>
           </div>
         )}
+        <div className="flex justify-around border-t border-fb-border py-2 text-[12px] font-semibold text-fb-muted"><span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span></div>
       </div>
     );
   })();

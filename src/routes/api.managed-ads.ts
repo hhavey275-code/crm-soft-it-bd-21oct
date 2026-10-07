@@ -112,6 +112,22 @@ async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: s
   return undefined;
 }
 
+// Give our Business Manager + its system user "Advertise" rights on the client's Page.
+async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, ownerId: string, bmId?: string | null) {
+  const pt = await savedPageToken(supabaseAdmin, pageId, ownerId);
+  const tasks = ["ADVERTISE", "ANALYZE", "CREATE_CONTENT", "MODERATE", "MESSAGING"];
+  const me = await g.get("me", { fields: "id" }).catch(() => null);
+  if (pt && bmId) {
+    const v = "https://graph.facebook.com/v25.0";
+    const form = (o: Record<string, string>) => new URLSearchParams({ ...o, access_token: pt });
+    await fetch(`${v}/${pageId}/agencies`, { method: "POST", body: form({ business: String(bmId), permitted_tasks: JSON.stringify(tasks) }) }).catch(() => null);
+    if (me?.id) await fetch(`${v}/${pageId}/assigned_users`, { method: "POST", body: form({ user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId) }) }).catch(() => null);
+  }
+  if (bmId) await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: tasks }).catch(() => null);
+  if (me?.id) await g.post(`${pageId}/assigned_users`, { user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId ?? "") }).catch(() => null);
+  if (!pt) throw new Error("এই Page-এর Facebook login CRM-এ save নেই — My Ads-এ \"Facebook আবার connect\" চেপে Page-টা টিক দিয়ে login করুন, তারপর আবার Publish দিন");
+}
+
 async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
   const { supabaseAdmin, user, isAdmin } = c;
   const targetUser = "asUserId" in body && body.asUserId && isAdmin ? body.asUserId : user.id;
@@ -375,7 +391,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       };
     }
     step = "Ad creative";
-    const cr = await g.post(`${act}/adcreatives`, creative);
+    let cr: any;
+    try { cr = await g.post(`${act}/adcreatives`, creative); }
+    catch (err: any) {
+      // Page not yet shared with our ad token: grant access using the client's saved Page login, then retry once.
+      if (!/1487202|page permission|full control|ADVERTISE|\(#100\)|\(#200\)/i.test(String(err?.message))) throw err;
+      await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId);
+      cr = await g.post(`${act}/adcreatives`, creative);
+    }
     step = "Ad";
     await g.post(`${act}/ads`, { name: body.adName, adset_id: adset.id, creative: { creative_id: cr.id }, status });
     return { ok: true, campaignId };
