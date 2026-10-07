@@ -36,6 +36,8 @@ export default function MyAdsPage() {
   const [lastManual, setLastManual] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState<string | null>(null);
+  const [accSel, setAccSel] = useState<string | undefined>(undefined);
+  useEffect(() => { const v = localStorage.getItem("myads-account"); if (v) setAccSel(v); }, []);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
@@ -45,8 +47,8 @@ export default function MyAdsPage() {
   }, [range]);
 
   const { data, isFetching, error, refetch } = useQuery({
-    queryKey: ["managed-ads-list", dates],
-    queryFn: () => managedAds({ action: "list", ...dates }),
+    queryKey: ["managed-ads-list", dates, accSel],
+    queryFn: () => managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) }),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
@@ -73,7 +75,7 @@ export default function MyAdsPage() {
     try {
       await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED" });
       toast.success(on ? "চালু হয়েছে" : "বন্ধ হয়েছে");
-      qc.setQueryData(["managed-ads-list", dates], (old: any) => {
+      qc.setQueryData(["managed-ads-list", dates, accSel], (old: any) => {
         if (!old) return old;
         const key = level === "campaign" ? "campaigns" : level === "adset" ? "adsets" : "ads";
         return { ...old, [key]: old[key].map((x: any) => x.id === o.id ? { ...x, status: on ? "ACTIVE" : "PAUSED", effective_status: on ? "ACTIVE" : "PAUSED" } : x) };
@@ -99,12 +101,16 @@ export default function MyAdsPage() {
   const pages: any[] = data?.pages ?? [];
   const allPages: any[] = data?.allPages ?? pages;
   const accounts: any[] = data?.accounts ?? [];
+  const currentAccId: string | undefined = data?.selectedAccountId ?? accSel;
+  const currentAcc = accounts.find((a) => a.id === currentAccId);
+  const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
+  const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
 
   if (creating) {
     return (
       <DashboardLayout>
         <ManagedCreateWizard
-          accounts={accounts}
+          accounts={orderedAccounts}
           allPages={allPages}
           walletBalance={Number(data?.walletBalance ?? 0)}
           onClose={() => setCreating(false)}
@@ -134,6 +140,24 @@ export default function MyAdsPage() {
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-3 rounded-t-lg bg-background px-4 py-3 border border-fb-border">
           <h1 className="text-lg font-bold">Campaigns</h1>
+          <Select value={currentAccId ?? ""} onValueChange={pickAccount} disabled={!accounts.length}>
+            <SelectTrigger className="h-9 w-auto min-w-[260px] max-w-[360px] gap-2 border-fb-border text-[13px]">
+              <span className="flex items-center gap-2 truncate">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-destructive text-[11px] font-bold text-background">{(currentAcc?.name || "A").charAt(0).toUpperCase()}</span>
+                <span className="truncate">{currentAcc ? `${currentAcc.name} (${String(currentAcc.account_id).replace(/^act_/, "")})` : "Ad account বাছুন"}</span>
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {(["own", "shared"] as const).map((k) => accounts.some((a) => a.kind === k) && (
+                <div key={k}>
+                  <div className="px-2 py-1 text-[11px] font-semibold text-fb-muted">{k === "own" ? "আপনার Ad Accounts" : "Shared Ad Accounts (wallet)"}</div>
+                  {accounts.filter((a) => a.kind === k).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name} ({String(a.account_id).replace(/^act_/, "")})</SelectItem>
+                  ))}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-fb-border text-[13px] max-w-[260px]">
             <Megaphone className="h-4 w-4 text-fb-muted shrink-0" />
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>

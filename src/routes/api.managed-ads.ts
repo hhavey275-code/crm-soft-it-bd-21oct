@@ -10,7 +10,7 @@ import { tokenFor, loadOwned, walletBalance, ownAccounts, sharedAccountIds } fro
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
 const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(100000), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
@@ -91,7 +91,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   if (body.action === "list") {
-    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true });
+    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, onlyAccount: body.adAccountDbId ?? "first" });
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
