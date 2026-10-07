@@ -135,9 +135,6 @@ async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, owne
   const e = r?.error ?? {};
   const bm = await g.get(String(bmId), { fields: "name" }).catch(() => null);
   const bmName = bm?.name ? `"${String(bm.name).trim()}"` : "এই ad account-এর";
-  if (e.error_subcode === 2446325 || /not allowed to advertise/i.test(`${e.error_user_title} ${e.message}`)) {
-    return `${bmName} Business Manager-কে Facebook ad চালানো বন্ধ (restricted) করে রেখেছে, তাই কোনো Page এতে access দেওয়া যাচ্ছে না। Admin-কে বলুন আপনাকে অন্য একটি চালু (active) ad account দিতে`;
-  }
   // Page belongs to another Business: send a request and point the owner to that exact Business's Requests page.
   await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] }).catch(() => null);
   const pb = await fetch(`${v}/${pageId}?fields=business{id,name}&access_token=${encodeURIComponent(pt)}`).then((x) => x.json()).catch(() => null);
@@ -145,7 +142,8 @@ async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, owne
   const where = owner?.id
     ? `Page-টা "${owner.name}" Business-এর মালিকানায়। এই লিংকে গিয়ে ${bmName} এর request-এ Approve চাপুন: https://business.facebook.com/latest/settings/requests?business_id=${owner.id}`
     : `Facebook-এ Page-এর Settings → Page access → Partner requests-এ গিয়ে ${bmName} এর request Approve করুন: https://www.facebook.com/settings/?tab=profile_access`;
-  return `Facebook নিজে থেকে access দিতে দেয়নি (${e.error_user_msg || e.message || "অনুমতি নেই"})। ${where} — তারপর আবার Publish দিন`;
+  const restricted = e.error_subcode === 2446325 ? " (Facebook বলছে Page-এর মালিক Business-এর ad চালানোর অনুমতিতে সমস্যা আছে, তাই নিজে থেকে দেওয়া যায়নি)" : ` (${e.error_user_msg || e.message || "অনুমতি নেই"})`;
+  return `Page-টা এখনো এই ad account-এর Business Manager-এ access পায়নি${restricted}। ${where} — একবার Approve করলেই এই Page দিয়ে বারবার ad চালানো যাবে`;
 }
 
 async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
