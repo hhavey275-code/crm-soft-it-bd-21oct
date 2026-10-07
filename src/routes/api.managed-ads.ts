@@ -26,6 +26,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("fb_status") }),
+  z.object({ action: z.literal("demographics"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().max(60).optional() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("request_page_access"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({
@@ -52,7 +54,7 @@ const schema = z.discriminatedUnion("action", [
     ageMin: z.number().int().min(18).max(65),
     ageMax: z.number().int().min(18).max(65),
     genders: z.array(z.union([z.literal(1), z.literal(2)])).max(2),
-    interests: z.array(z.object({ id: z.string(), name: z.string() })).max(25),
+    interests: z.array(z.object({ id: z.string(), name: z.string(), type: z.string().max(40).optional() })).max(25),
     existingPostId: z.string().max(80).optional(),
     message: z.string().max(5000).optional(),
     headline: z.string().max(255).optional(),
@@ -97,10 +99,32 @@ async function ctx(request: Request) {
   return { supabaseAdmin, user, isAdmin };
 }
 
+// Page key the client saved via Facebook login (any CRM user who connected that page).
+async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabaseAdmin.from("client_page_tokens").select("access_token,user_id").eq("page_id", pageId).limit(10);
+    const rows = (data ?? []).sort((a: any, b: any) => (a.user_id === preferUser ? -1 : 0) - (b.user_id === preferUser ? -1 : 0));
+    const { decryptToken } = await import("@/lib/metaGraph.server");
+    for (const row of rows) for (const sec of [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[]) {
+      try { return await decryptToken(row.access_token, sec); } catch { /* next */ }
+    }
+  } catch { /* none */ }
+  return undefined;
+}
+
 async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
   const { supabaseAdmin, user, isAdmin } = c;
   const targetUser = "asUserId" in body && body.asUserId && isAdmin ? body.asUserId : user.id;
   const { graphClient } = await import("@/lib/metaGraph.server");
+
+  if (body.action === "fb_status") {
+    const { data } = await (supabaseAdmin as any).from("client_page_tokens").select("page_id").eq("user_id", targetUser).limit(1);
+    if (!data?.length) return { connected: false, hasToken: false };
+    const tok = await savedPageToken(supabaseAdmin, String(data[0].page_id), targetUser);
+    if (!tok) return { connected: false, hasToken: true };
+    const r = await fetch(`https://graph.facebook.com/v25.0/me?fields=id,name&access_token=${encodeURIComponent(tok)}`).then((x) => x.json()).catch(() => null);
+    return { connected: !!r?.id, hasToken: true };
+  }
 
   const { getManagedSettings } = await import("@/lib/managedSpend.server");
   const settings = await getManagedSettings(supabaseAdmin);
@@ -181,7 +205,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const pageId = String(page.page_id);
 
   if (body.action === "page_info") {
-    const r = await g.get(pageId, { fields: "name,whatsapp_number,phone,picture{url}" }).catch(() => ({} as any));
+    const fields = "name,whatsapp_number,phone,picture{url}";
+    const pt = await savedPageToken(supabaseAdmin, pageId, page.user_id);
+    let r: any = {};
+    if (pt) r = await graphClient(pt).get(pageId, { fields }).catch(() => ({}));
+    if (!r?.whatsapp_number) { const b = await g.get(pageId, { fields }).catch(() => ({} as any)); r = { ...b, ...r, whatsapp_number: r.whatsapp_number ?? b.whatsapp_number }; }
     return { name: r.name ?? page.page_name, whatsappNumber: r.whatsapp_number ?? null, phone: r.phone ?? null, picture: r.picture?.data?.url ?? null };
   }
 
@@ -193,22 +221,13 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (body.action === "posts") {
     // Reading posts needs the page's own token, which our Business Manager gets once the page shares access with it.
     let pageToken: string | undefined;
-    // 1) Page key the client saved via Facebook login (encrypted, server-only table).
-    try {
-      const { data: saved } = await (supabaseAdmin as any).from("client_page_tokens")
-        .select("access_token").eq("user_id", page.user_id).eq("page_id", pageId).maybeSingle();
-      if (saved?.access_token) {
-        const { decryptToken } = await import("@/lib/metaGraph.server");
-        for (const sec of [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[]) {
-          try { pageToken = await decryptToken(saved.access_token, sec); break; } catch { /* next */ }
-        }
-      }
-    } catch { /* fall back */ }
+    pageToken = await savedPageToken(supabaseAdmin, pageId, page.user_id);
     // 2) Business Manager's shared Page access.
     if (!pageToken) { try { pageToken = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* no access */ } }
     if (!pageToken) return { posts: [], needsAccess: true };
     const pg = graphClient(pageToken);
-    const r = await pg.get(`${pageId}/published_posts`, { fields: "id,message,full_picture,created_time,permalink_url", limit: "25" });
+    const f = { fields: "id,message,full_picture,created_time,permalink_url", limit: "30" };
+    const r = await pg.get(`${pageId}/published_posts`, f).catch(() => pg.get(`${pageId}/posts`, f));
     return { posts: (r.data ?? []).map((x: any) => ({ id: String(x.id), message: x.message ?? "", picture: x.full_picture ?? null, created: x.created_time, link: x.permalink_url })) };
   }
 
@@ -216,6 +235,16 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (!bmId) throw new Error("Business Manager ID পাওয়া যায়নি");
     await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
     return { ok: true };
+  }
+
+  if (body.action === "demographics") {
+    const out: any[] = [];
+    for (const cls of ["demographics", "behaviors", "life_events", "family_statuses", "education_statuses", "income"]) {
+      const r = await g.get("search", { type: "adTargetingCategory", class: cls, limit: "300" }).catch(() => ({ data: [] }));
+      for (const i of r.data ?? []) out.push({ id: String(i.id), name: i.name, type: i.type || cls, path: (i.path ?? []).join(" › "), audience: i.audience_size_upper_bound });
+    }
+    const q = (body.q ?? "").toLowerCase();
+    return { items: (q ? out.filter((i) => `${i.name} ${i.path}`.toLowerCase().includes(q)) : out).slice(0, 200) };
   }
 
   if (body.action === "interests") {
@@ -286,7 +315,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       targeting_automation: { advantage_audience: 0 },
     };
     if (body.genders.length === 1) targeting.genders = body.genders;
-    if (body.interests.length) targeting.flexible_spec = [{ interests: body.interests }];
+    if (body.interests.length) {
+      const grp: Record<string, { id: string; name: string }[]> = {};
+      for (const i of body.interests) { const k = i.type || "interests"; (grp[k] ??= []).push({ id: i.id, name: i.name }); }
+      targeting.flexible_spec = [grp];
+    }
 
     step = "Ad set";
     const adset = await g.post(`${act}/adsets`, {
