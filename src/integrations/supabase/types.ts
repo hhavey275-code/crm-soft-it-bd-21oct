@@ -1767,6 +1767,30 @@ export type Database = {
         }
         Relationships: []
       }
+      client_page_tokens: {
+        Row: {
+          access_token: string
+          id: string
+          page_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          id?: string
+          page_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          id?: string
+          page_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_documents: {
         Row: {
           category: string
