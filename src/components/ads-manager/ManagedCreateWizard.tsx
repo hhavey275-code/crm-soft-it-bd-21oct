@@ -333,8 +333,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <Radio on={budgetLevel === "adset"} onClick={() => setBudgetLevel("adset")} title="Ad set budget" desc="Set different bid strategies or budget schedules for each ad set." />
           </div>
         )}
-        {budgetLevel === "campaign" && {BudgetInputs()}}
-        {budgetLevel === "campaign" && {BidStrategy()}}
+        {budgetLevel === "campaign" && BudgetInputs()}
+        {budgetLevel === "campaign" && BidStrategy()}
         {WalletNote()}
       </Section>
       <Section title="A/B test" right={<span className="flex items-center gap-2 text-fb-muted">Off <Switch disabled /></span>}>
