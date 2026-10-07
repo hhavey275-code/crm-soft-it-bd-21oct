@@ -64,7 +64,7 @@ export async function ownAccounts(supabaseAdmin: any, userId: string) {
  * Shared accounts: only campaigns of the user's approved pages (these are wallet-charged).
  * includeOwn: also the user's own dedicated accounts (not wallet-charged; spend uses the account's own limit).
  */
-export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean }) {
+export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string }) {
   const { graphClient } = await import("@/lib/metaGraph.server");
   // All of the client's own pages (any not rejected). Page IDs are globally unique, so one owner per page.
   const { data: allPages } = await supabaseAdmin
@@ -108,7 +108,10 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
     }
   };
 
+  const onlyAcc = opts?.onlyAccount === "first" ? accounts[0]?.id : opts?.onlyAccount;
+  if (onlyAcc && accounts.some((a) => a.id === onlyAcc)) (result as any).selectedAccountId = onlyAcc;
   for (const [accId, pageIds] of byAccount) {
+    if ((result as any).selectedAccountId && accId !== (result as any).selectedAccountId) continue;
     try {
       const { token, act } = await tokenFor(supabaseAdmin, accId);
       const g = graphClient(token);
