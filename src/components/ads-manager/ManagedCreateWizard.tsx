@@ -696,10 +696,10 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 </div>
               </div>
               {acc?.kind !== "own" && (
-                <div className={cn("rounded-lg border bg-background p-4", walletBalance < 1 || overWallet ? "border-destructive" : "border-fb-border")}>
+                <div className={cn("rounded-lg border bg-background p-4", (acc?.kind !== "own" && walletBalance < 1) || overWallet ? "border-destructive" : "border-fb-border")}>
                   <p className="flex items-center gap-2 text-[14px] font-semibold"><Wallet className="h-4 w-4" />Account balance</p>
                   <p className="mt-1 text-[20px] font-bold">{fmt(walletBalance)}</p>
-                  {(walletBalance < 1 || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
+                  {((acc?.kind !== "own" && walletBalance < 1) || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
                 </div>
               )}
               {level === 1 && tab === "edit" && (
