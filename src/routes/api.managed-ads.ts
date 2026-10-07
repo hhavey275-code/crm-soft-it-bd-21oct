@@ -183,7 +183,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         let list: any[] = camps?.data ?? [];
         if (shared.has(id) && !own.has(id) && !isAdmin) list = list.filter((c) => mine.has(String(c.id)));
         out[id] = { status: Number(info?.account_status), disableReason: Number(info?.disable_reason || 0), active: camps ? list.length : null,
-          balance: Number(info?.balance || 0) / 100, currency: info?.currency || "USD" };
+          balance: Number(info?.balance || 0) / 100, spendCap: Number(info?.spend_cap || 0) / 100, amountSpent: Number(info?.amount_spent || 0) / 100, currency: info?.currency || "USD" };
       } catch (e: any) { out[id] = { error: String(e?.message || "error").slice(0, 120) }; }
     };
     for (let i = 0; i < ids.length; i += 6) await Promise.all(ids.slice(i, i + 6).map(one));
