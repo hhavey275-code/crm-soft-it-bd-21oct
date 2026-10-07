@@ -130,6 +130,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   if (body.action === "list") {
+    const { error: keyErr } = await supabaseAdmin.from("ad_accounts").select("id", { head: true, count: "exact" });
+    if (keyErr) throw new Error("সার্ভারের গোপন key (SUPABASE_SERVICE_ROLE_KEY) ঠিক নেই — Vercel-এ সঠিক service_role key বসিয়ে Redeploy করুন");
     const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first" });
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
@@ -382,9 +384,29 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   }
 }
 
+// Setup check: says only whether the server keys work (never their values).
+async function health() {
+  const url = process.env.SUPABASE_URL ?? "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  let keyRole: string | null = null;
+  try { keyRole = JSON.parse(atob(key.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role ?? null; } catch { keyRole = key.startsWith("sb_secret_") ? "service_role" : key ? "unknown" : null; }
+  let adAccountsVisible = 0; let readError: string | null = null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count, error } = await supabaseAdmin.from("ad_accounts").select("id", { count: "exact", head: true });
+    if (error) readError = error.message; else adAccountsVisible = count ?? 0;
+  } catch (e: any) { readError = e?.message ?? "failed"; }
+  return {
+    urlSet: !!url, urlMatchesProject: url.includes("dhswrfzdqcavgmymllat"),
+    serviceKeySet: !!key, keyRole, adAccountsVisible, readError,
+    metaAppSet: !!process.env.META_APP_ID && !!process.env.META_APP_SECRET,
+  };
+}
+
 export const Route = createFileRoute("/api/managed-ads")({
   server: {
     handlers: {
+      GET: async () => Response.json(await health(), { headers: { "Cache-Control": "no-store" } }),
       POST: async ({ request }) => {
         try {
           const c = await ctx(request);
