@@ -16,6 +16,7 @@ import { managedAds, resultOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
+import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -165,6 +166,7 @@ export default function MyAdsPage() {
             <Megaphone className="h-4 w-4 text-fb-muted shrink-0" />
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>
           </div>
+          <FacebookConnectButton label={allPages.length ? "Facebook আবার connect" : "Connect Facebook"} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
           <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-[13px] text-fb-muted">

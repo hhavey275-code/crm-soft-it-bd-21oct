@@ -92,7 +92,48 @@ async function handle(request: Request): Promise<Response> {
           } catch (e) { console.error("page token save", e); }
         }
 
+        // Auto-add the pages to the client's list (no separate My Pages / approval step),
+        // then share each page with the Business Managers of the client's ad accounts.
+        let added = 0; let bmShared = 0;
+        if (userId && pages.length) {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const db = supabaseAdmin as any;
+            const { data: existing } = await db.from("client_facebook_pages").select("id, page_id, user_id, status").in("page_id", pages.map((p) => String(p.id)));
+            const mine = new Set((existing ?? []).map((e: any) => String(e.page_id)));
+            const rows = pages.filter((p) => !mine.has(String(p.id))).map((p) => ({
+              user_id: userId, page_id: String(p.id), page_name: String(p.name ?? ""), page_url: p.link ?? `https://facebook.com/${p.id}`,
+              page_avatar_url: p.picture?.data?.url ?? null, status: "approved", connect_method: "oauth", approved_at: new Date().toISOString(),
+            }));
+            if (rows.length) { const { error } = await db.from("client_facebook_pages").insert(rows); if (!error) added = rows.length; else console.error("page insert", error); }
+            // Re-activate this user's earlier rejected/pending copies of the same pages.
+            const own = (existing ?? []).filter((e: any) => e.user_id === userId && e.status !== "approved").map((e: any) => e.id);
+            if (own.length) await db.from("client_facebook_pages").update({ status: "approved", approved_at: new Date().toISOString() }).in("id", own);
+
+            // BMs behind the client's shared + own ad accounts.
+            const { sharedAccountIds } = await import("@/lib/managedAds.server");
+            const shared = await sharedAccountIds(db, userId);
+            const { data: links } = await db.from("user_ad_accounts").select("ad_account_id").eq("user_id", userId);
+            const accIds = [...new Set([...shared, ...(links ?? []).map((l: any) => String(l.ad_account_id))])];
+            const { data: accs } = accIds.length ? await db.from("ad_accounts").select("business_managers(bm_id)").in("id", accIds) : { data: [] };
+            const bmIds = [...new Set((accs ?? []).map((a: any) => (Array.isArray(a.business_managers) ? a.business_managers[0] : a.business_managers)?.bm_id).filter(Boolean).map(String))];
+            for (const p of pages) {
+              if (!p.access_token) continue;
+              for (const bm of bmIds) {
+                try {
+                  const r: any = await (await fetch(`${GRAPH}/${p.id}/agencies`, {
+                    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ business: String(bm), permitted_tasks: JSON.stringify(["ADVERTISE", "ANALYZE", "CREATE_CONTENT"]), access_token: p.access_token }),
+                  })).json().catch(() => ({}));
+                  if (r?.success || !r?.error) bmShared++; else console.warn("page share", p.id, bm, r.error?.message);
+                } catch (e) { console.warn("page share", e); }
+              }
+            }
+          } catch (e) { console.error("auto page add", e); }
+        }
+
         return json({
+          added, bmShared, signedIn: !!userId,
           saved,
           pages: pages.map((p) => ({
             id: String(p.id), name: String(p.name ?? ""),
