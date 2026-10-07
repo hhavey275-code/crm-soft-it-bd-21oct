@@ -1,4 +1,5 @@
 // Server-only helpers for managed (shared) ad accounts.
+import { cleanKey } from "@/lib/serverKey";
 
 export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
   const { decryptToken } = await import("@/lib/metaGraph.server");
@@ -11,7 +12,7 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
   if (!account || !bm?.access_token) throw new Error("Ad account বা Business Manager token পাওয়া যায়নি");
   // Tokens are encrypted with the backend's service key; BM_TOKEN_SECRET lets a host whose
   // SUPABASE_SERVICE_ROLE_KEY string differs still unlock them.
-  const secrets = [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[];
+  const secrets = [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY, cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY)].filter(Boolean) as string[];
   let token: string | null = null;
   for (const sec of secrets) {
     try { token = await decryptToken(bm.access_token, sec); break; } catch { /* try next */ }
@@ -21,7 +22,7 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
     try {
       const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/ads-manager-campaigns`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-service-key": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`, apikey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "" },
+        headers: { "Content-Type": "application/json", "x-service-key": cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY), Authorization: `Bearer ${cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY)}`, apikey: cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY) },
         body: JSON.stringify({ mode: "resolve_token", adAccountId: adAccountDbId }),
       });
       const j = await res.json().catch(() => ({}));
