@@ -20,6 +20,7 @@ const schema = z.discriminatedUnion("action", [
     countries: z.array(z.string().length(2)).min(1).max(25).optional(),
     ageMin: z.number().int().min(18).max(65).optional(), ageMax: z.number().int().min(18).max(65).optional(),
     message: z.string().max(5000).optional(), headline: z.string().max(255).optional(), link: z.string().max(1000).optional(),
+    startTime: z.string().max(40).optional(), endTime: z.string().max(40).optional(),
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
@@ -121,6 +122,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       const upd: Record<string, unknown> = {};
       if (body.name) upd.name = body.name;
       if (body.amount && body.budgetType && lvl !== "ad") upd[body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"] = String(Math.round(body.amount * 100));
+      if (lvl === "adset" && body.startTime) upd.start_time = body.startTime;
+      if (lvl === "adset" && body.endTime) upd.end_time = body.endTime;
       if (lvl === "adset" && (body.countries || body.ageMin || body.ageMax)) {
         const t: any = { ...(obj.targeting ?? {}) };
         if (body.countries) t.geo_locations = { countries: body.countries, location_types: ["home", "recent"] };
