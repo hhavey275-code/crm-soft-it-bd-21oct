@@ -333,9 +333,9 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <Radio on={budgetLevel === "adset"} onClick={() => setBudgetLevel("adset")} title="Ad set budget" desc="Set different bid strategies or budget schedules for each ad set." />
           </div>
         )}
-        {budgetLevel === "campaign" && <BudgetInputs />}
-        {budgetLevel === "campaign" && <BidStrategy />}
-        <WalletNote />
+        {budgetLevel === "campaign" && {BudgetInputs()}}
+        {budgetLevel === "campaign" && {BidStrategy()}}
+        {WalletNote()}
       </Section>
       <Section title="A/B test" right={<span className="flex items-center gap-2 text-fb-muted">Off <Switch disabled /></span>}>
         <p className="text-[12px] text-fb-muted">Compare versions of your ad to see what works best.</p>
@@ -451,7 +451,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       <Section title="Budget & schedule" ok={budgetType !== "lifetime" || hasEnd}>
         {budgetLevel === "campaign" ? (
           <div><p className="font-semibold">Budget strategy</p><p className="text-[12px] text-fb-muted">Your campaign budget automatically distributes your {budgetType} budget of {fmt(amt)} across ad sets to get the best performance.</p></div>
-        ) : (<><BudgetInputs /><BidStrategy /><WalletNote /></>)}
+        ) : (<>{BudgetInputs()}{BidStrategy()}{WalletNote()}</>)}
         <p className="pt-2 font-semibold">Schedule</p>
         <Field label="Start date"><input type="datetime-local" className={inp} value={startTime} onChange={(e) => setStartTime(e.target.value)} /></Field>
         <label className="flex items-center gap-2"><input type="checkbox" checked={hasEnd} disabled={budgetType === "lifetime"} onChange={(e) => setHasEnd(e.target.checked)} />Set an end date</label>
