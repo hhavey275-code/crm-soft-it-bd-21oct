@@ -33,6 +33,7 @@ interface Props {
   onClose: () => void;
   onCreated: () => void;
   draft?: CampaignDraft;
+  newDraftId?: string;
 }
 
 // ---------- small Facebook-style building blocks ----------
@@ -71,7 +72,7 @@ function Radio({ on, title, desc, onClick, disabled }: { on: boolean; title: str
 }
 const Adv = () => <span className="inline-flex items-center gap-1 rounded-full bg-fb-green/10 px-2 py-0.5 text-[11px] font-semibold text-fb-green"><Sparkles className="h-3 w-3" />Advantage+ on</span>;
 
-export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft }: Props) {
+export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft, newDraftId }: Props) {
   const pages = allPages.filter((p) => p.status !== "rejected");
   const [phase, setPhase] = useState<"objective" | "edit">("objective");
   const [pick, setPick] = useState<Obj | null>(null);
@@ -138,7 +139,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const restored = useRef(false);
 
   // ---- drafts: every new campaign gets its own draft; Edit on a draft reopens exactly that one ----
-  const draftId = useRef(draft?.id ?? crypto.randomUUID()).current;
+  const draftId = useRef(draft?.id ?? newDraftId ?? crypto.randomUUID()).current;
   const snapshot = { phase, pick, objective, level, pageDbId, accId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
     adsetName, location, customEvent, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender, interests, adName, setup, postId,
     message, headline, link, cta, engLoc, destMode, dests, phone };
