@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Loader2, X, Megaphone, MousePointer2, MessagesSquare, Filter, Users, ShoppingBag, Folder, LayoutGrid, FileText,
@@ -108,7 +108,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [ageMin, setAgeMin] = useState("18");
   const [ageMax, setAgeMax] = useState("65");
   const [gender, setGender] = useState("all");
-  const [interests, setInterests] = useState<{ id: string; name: string }[]>([]);
+  const [interests, setInterests] = useState<{ id: string; name: string; type?: string }[]>([]);
   const [iq, setIq] = useState("");
   const [iResults, setIResults] = useState<any[]>([]);
   const [placements, setPlacements] = useState<"auto" | "manual">("auto");
@@ -129,10 +129,55 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
   const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null } | null>(null);
   const [phone, setPhone] = useState("");
+  const [infoTick, setInfoTick] = useState(0);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoItems, setDemoItems] = useState<any[] | null>(null);
+  const restored = useRef(false);
+
+  // ---- local draft: survives tab switches, reloads and accidental closes ----
+  const DRAFT_KEY = "myads-wizard-draft";
+  const snapshot = { phase, pick, objective, level, pageDbId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
+    adsetName, location, customEvent, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender, interests, adName, setup, postId,
+    message, headline, link, cta, engLoc, destMode, dests, phone };
+  useEffect(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (d && d.phase === "edit") {
+        const S: Record<string, (v: any) => void> = { phase: setPhase, pick: setPick, objective: setObjective, level: setLevel, campaignName: setCampaignName,
+          budgetLevel: setBudgetLevel, budgetType: setBudgetType, amount: setAmount, bidStrategy: setBidStrategy, bidAmount: setBidAmount, special: setSpecial,
+          adsetName: setAdsetName, location: setLocation, customEvent: setCustomEvent, startTime: setStartTime, hasEnd: setHasEnd, endTime: setEndTime,
+          countries: setCountries, ageMin: setAgeMin, ageMax: setAgeMax, gender: setGender, interests: setInterests, adName: setAdName, setup: setSetup,
+          message: setMessage, headline: setHeadline, link: setLink, cta: setCta, engLoc: setEngLoc, destMode: setDestMode, dests: setDests, phone: setPhone };
+        for (const [k, f] of Object.entries(S)) if (d[k] !== undefined) f(d[k]);
+        if (d.pageDbId && pages.some((p) => p.id === d.pageDbId)) setPageDbId(d.pageDbId);
+        setTimeout(() => d.postId && setPostId(d.postId), 50);
+        toast.info("আগের অসম্পূর্ণ campaign ফিরিয়ে আনা হয়েছে");
+      }
+    } catch { /* ignore */ }
+    restored.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { if (restored.current && phase === "edit") localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot)); });
+  const clearDraft = () => localStorage.removeItem(DRAFT_KEY);
+  const askClose = () => (phase === "edit" ? setConfirmClose(true) : onClose());
+  const discard = () => { clearDraft(); setConfirmClose(false); onClose(); };
+
+  // Browser back / reload should not silently lose the campaign.
+  useEffect(() => {
+    if (phase !== "edit") return;
+    history.pushState({ wizard: true }, "");
+    const onPop = () => { history.pushState({ wizard: true }, ""); setConfirmClose(true); };
+    const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("popstate", onPop);
+    window.addEventListener("beforeunload", onUnload);
+    return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("beforeunload", onUnload); };
+  }, [phase]);
 
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE";
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const wa = pageInfo?.whatsappNumber ?? null;
+  const waConnectUrl = `https://business.facebook.com/latest/settings/whatsapp_account?asset_id=${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}`;
   const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
   const amt = Number(amount) || 0;
   const overWallet = acc?.kind === "shared" && amt > walletBalance;
@@ -152,7 +197,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     managedAds<any>({ action: "page_info", pageDbId, adAccountDbId: accId })
       .then((r) => { setPageInfo(r); if (r.phone) setPhone((p) => p || r.phone); })
       .catch(() => setPageInfo({ whatsappNumber: null, phone: null, picture: null }));
-  }, [accId, pageDbId, phase]);
+  }, [accId, pageDbId, phase, infoTick]);
 
   const loadPosts = async () => {
     if (!accId || !pageDbId) return;
@@ -162,7 +207,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       setPosts(r.posts); setPostsNeedAccess(!!r.needsAccess);
     } catch (e: any) { setPosts([]); toast.error(e.message); } finally { setLoadingPosts(false); }
   };
-  useEffect(() => { setPosts(null); setPostId(""); }, [accId, pageDbId]);
+  const firstPage = useRef(true);
+  useEffect(() => { setPosts(null); if (firstPage.current) { firstPage.current = false; return; } setPostId(""); }, [accId, pageDbId]);
   useEffect(() => { if (level === 2 && setup === "post" && posts === null) loadPosts(); }, [level, setup, posts]);
 
   const requestAccess = async () => {
@@ -175,10 +221,21 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const searchInterests = async () => {
     if (iq.trim().length < 2 || !pageDbId || !accId) return;
     try {
-      const r = await managedAds<{ interests: any[] }>({ action: "interests", pageDbId, adAccountDbId: accId, q: iq.trim() });
-      setIResults(r.interests);
+      const [r, d] = await Promise.all([
+        managedAds<{ interests: any[] }>({ action: "interests", pageDbId, adAccountDbId: accId, q: iq.trim() }),
+        managedAds<{ items: any[] }>({ action: "demographics", pageDbId, adAccountDbId: accId, q: iq.trim() }).catch(() => ({ items: [] })),
+      ]);
+      setIResults([...d.items.slice(0, 15), ...r.interests.map((i: any) => ({ ...i, type: "interests" }))]);
     } catch (e: any) { toast.error(e.message); }
   };
+
+  const loadDemo = async () => {
+    setDemoOpen(!demoOpen);
+    if (demoItems || !pageDbId || !accId) return;
+    try { setDemoItems((await managedAds<{ items: any[] }>({ action: "demographics", pageDbId, adAccountDbId: accId })).items); }
+    catch (e: any) { setDemoItems([]); toast.error(e.message); }
+  };
+  const addTarget = (i: any) => { if (!interests.some((x) => x.id === i.id)) setInterests([...interests, { id: i.id, name: i.name, type: i.type } as any]); };
 
   const onImage = (f?: File) => {
     if (!f) return;
@@ -244,7 +301,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         } : {}),
         publish,
       });
-      toast.success(publish ? "Ad publish হয়েছে — Facebook review-এর পর চালু হবে" : "Draft (বন্ধ অবস্থায়) তৈরি হয়েছে");
+      clearDraft();
+      toast.success(publish ? "Ad publish হয়েছে — Facebook review-এর পর চালু হবে" : "Draft হিসেবে Facebook-এ save হয়েছে (বন্ধ অবস্থায়)");
       onCreated();
     } catch (e: any) { toast.error(e.message, { duration: 12000 }); } finally { setSaving(false); }
   };
@@ -479,9 +537,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               <div className="border-t border-fb-border pt-3">
                 <p className="font-semibold">Facebook Page <span className="font-normal text-fb-muted">• This page will represent your business in your ad and conversation.</span></p>
                 <div className="mt-2 flex items-center gap-2">
-                  {pageInfo?.picture ? <img src={pageInfo.picture} alt="" className="h-9 w-9 rounded-full" /> : <div className="h-9 w-9 rounded-full bg-fb-blue-soft" />}
-                  <div><p className="font-semibold">Facebook Page</p><p className="text-[12px] text-fb-muted">{page?.page_name ?? "—"}</p></div>
+                  {pageInfo?.picture ? <img src={pageInfo.picture} alt="" className="h-9 w-9 rounded-full" /> : <div className="h-9 w-9 shrink-0 rounded-full bg-fb-blue-soft" />}
+                  <select className={cn(sel, !pageDbId && "border-destructive")} value={pageDbId} onChange={(e) => setPageDbId(e.target.value)}>
+                    <option value="">Select Page</option>
+                    {pages.map((p) => <option key={p.id} value={p.id}>{p.page_name}</option>)}
+                  </select>
                 </div>
+                {!pages.length && <p className="mt-1 text-[12px] text-destructive">কোনো page নেই — Campaigns পাতার উপরে "Connect Facebook" চাপুন।</p>}
               </div>
               <div className="rounded-md bg-fb-bg p-3">
                 <p className="mb-1 font-semibold">Message destinations</p>
@@ -499,12 +561,22 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                       <span><b>Messenger</b><span className="block text-[12px] text-fb-muted">{page?.page_name}</span></span></label>
                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-fb-blue" disabled={!wa} checked={dests.includes("WHATSAPP")} onChange={(e) => setDests((d) => e.target.checked ? [...d.filter((x) => x !== "WHATSAPP"), "WHATSAPP"] : d.filter((x) => x !== "WHATSAPP"))} />
                       <span className="flex-1"><b>WhatsApp</b><span className="block text-[12px] text-fb-muted">{wa ?? "এই Page-এ WhatsApp connect করা নেই"}</span></span>
-                      {!wa && pageInfo && <a href="https://www.facebook.com/settings/?tab=linked_whatsapp" target="_blank" rel="noreferrer" className="rounded-md border border-fb-border px-3 py-1 text-[12px] font-semibold">Connect WhatsApp</a>}
+                      {!wa && pageInfo && <a href={waConnectUrl} target="_blank" rel="noreferrer" className="rounded-md border border-fb-border px-3 py-1 text-[12px] font-semibold">Connect WhatsApp</a>}
                     </label>
                     {!finalDests.length && <p className="text-[12px] text-destructive">অন্তত একটা বাছুন</p>}
                   </div>
                 )}
-                {!wa && pageInfo && destMode === "auto" && <p className="mt-2 text-[12px] text-fb-muted">WhatsApp যোগ করতে Page-এ WhatsApp connect করুন, তারপর এখানে আবার খুলুন।</p>}
+                {!pageInfo && <p className="mt-2 flex items-center gap-1 text-[12px] text-fb-muted"><Loader2 className="h-3 w-3 animate-spin" />WhatsApp খোঁজা হচ্ছে…</p>}
+                {!wa && pageInfo && (
+                  <div className="mt-2 rounded-md border border-fb-border bg-background p-2 text-[12px]">
+                    <p>এই Page-এ WhatsApp পাওয়া যায়নি। Connect করতে: <b>Connect WhatsApp</b> চাপুন → Page settings-এ "Linked accounts → WhatsApp" → নম্বর দিন → WhatsApp-এ আসা code দিন। তারপর এখানে <b>আবার চেক করুন</b> চাপুন।</p>
+                    <p className="mt-1 text-fb-muted">আগে থেকে connect থাকলে "Facebook আবার connect" দিয়ে একবার login করুন, তাহলে নম্বরটা পড়া যাবে।</p>
+                    <div className="mt-2 flex gap-2">
+                      <a href={waConnectUrl} target="_blank" rel="noreferrer" className="rounded-md bg-fb-blue px-3 py-1 font-semibold text-primary-foreground">Connect WhatsApp</a>
+                      <button type="button" onClick={() => setInfoTick((t) => t + 1)} className="rounded-md border border-fb-border px-3 py-1 font-semibold">আবার চেক করুন</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -546,14 +618,27 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         <Field label="Detailed targeting" hint="Include people who match interests.">
           <div className="flex gap-2">
             <input className={inp} value={iq} onChange={(e) => setIq(e.target.value)} placeholder="Add demographics, interests or behaviors" onKeyDown={(e) => e.key === "Enter" && searchInterests()} />
-            <button onClick={searchInterests} className="h-9 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg">Browse</button>
+            <button onClick={searchInterests} className="h-9 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg">Search</button>
+            <button onClick={loadDemo} className="h-9 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg">Browse</button>
           </div>
+          {demoOpen && (
+            <div className="mt-2 max-h-56 overflow-auto rounded-md border border-fb-border">
+              {demoItems === null && <p className="flex items-center gap-1 p-2 text-fb-muted"><Loader2 className="h-3 w-3 animate-spin" />লোড হচ্ছে…</p>}
+              {demoItems?.length === 0 && <p className="p-2 text-fb-muted">কিছু পাওয়া যায়নি</p>}
+              {(demoItems ?? []).map((i) => (
+                <button key={`${i.type}-${i.id}`} className="flex w-full justify-between gap-2 px-3 py-1.5 text-left hover:bg-fb-bg" onClick={() => addTarget(i)}>
+                  <span><span className="block">{i.name}</span><span className="block text-[11px] text-fb-muted">{i.path || i.type}</span></span>
+                  {i.audience && <span className="shrink-0 text-[12px] text-fb-muted">{Number(i.audience).toLocaleString()}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           {iResults.length > 0 && (
             <div className="mt-2 max-h-44 overflow-auto rounded-md border border-fb-border">
               {iResults.map((i) => (
                 <button key={i.id} className="flex w-full justify-between px-3 py-1.5 hover:bg-fb-bg"
-                  onClick={() => { if (!interests.some((x) => x.id === i.id)) setInterests([...interests, { id: i.id, name: i.name }]); }}>
-                  <span>{i.name}</span>{i.audience && <span className="text-[12px] text-fb-muted">{Number(i.audience).toLocaleString()}</span>}
+                  onClick={() => addTarget(i)}>
+                  <span>{i.name}{i.type && i.type !== "interests" && <span className="ml-1 text-[11px] text-fb-muted">({i.path || i.type})</span>}</span>{i.audience && <span className="text-[12px] text-fb-muted">{Number(i.audience).toLocaleString()}</span>}
                 </button>
               ))}
             </div>
@@ -605,8 +690,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             </div>
             {postsNeedAccess && (
               <div className="space-y-2 rounded-md border border-destructive/50 p-3">
-                <p>এই Page এখনো আমাদের Business Manager-কে access দেয়নি, তাই post দেখা যাচ্ছে না।</p>
-                <button onClick={requestAccess} className="h-8 rounded-md bg-fb-blue px-3 font-semibold text-primary-foreground">Page access request পাঠান</button>
+                <p>এই Page-এর post পড়ার অনুমতি পাওয়া যায়নি। Campaigns পাতার উপরে <b>"Facebook আবার connect"</b> চেপে login করুন এবং এই Page-টা টিক দিয়ে রাখুন — তারপর এখানে Refresh চাপুন।</p>
+                <button onClick={requestAccess} className="h-8 rounded-md border border-fb-border px-3 font-semibold">অথবা Business Manager-কে access request পাঠান</button>
               </div>
             )}
             {posts && posts.length > 0 && (
@@ -626,7 +711,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           </div>
         )}
       </Section>
-      {!isMsg && objective !== "AWARENESS" && objective !== "ENGAGEMENT" && (
+      {!isMsg && objective !== "AWARENESS" && (objective !== "ENGAGEMENT" || engLoc === "WEBSITE") && (
         <Section title="Destination" ok={/^https?:\/\//.test(link) || setup === "post"}>
           <Field label="Main destination"><select className={sel} disabled><option>Website</option></select></Field>
           <Field label="Website URL" req={setup === "new"}>
@@ -635,8 +720,23 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         </Section>
       )}
       {isMsg && (
-        <Section title="Destination">
-          <Field label="Message destination"><select className={sel} disabled><option>Messenger</option></select></Field>
+        <Section title="Destination" ok={finalDests.length > 0}>
+          <p className="text-fb-muted">মানুষ ad-এ চাপলে কোথায় message করবে।</p>
+          {(["MESSENGER", "WHATSAPP"] as const).map((d) => {
+            const on = finalDests.includes(d); const off = d === "WHATSAPP" && !wa;
+            return (
+              <label key={d} className={cn("flex items-center gap-2 rounded-md border p-2", on ? "border-fb-blue bg-fb-blue-soft" : "border-fb-border", off && "opacity-50")}>
+                <input type="checkbox" className="h-4 w-4 accent-fb-blue" disabled={off || objective !== "ENGAGEMENT"} checked={on}
+                  onChange={(e) => { setDestMode("manual"); setDests((x) => e.target.checked ? [...x.filter((y) => y !== d), d] : x.filter((y) => y !== d)); }} />
+                <span><b>{d === "MESSENGER" ? "Messenger" : "WhatsApp"}</b><span className="block text-[12px] text-fb-muted">{d === "MESSENGER" ? page?.page_name : wa ?? "Page-এ WhatsApp connect করা নেই"}</span></span>
+              </label>
+            );
+          })}
+        </Section>
+      )}
+      {objective === "ENGAGEMENT" && engLoc === "CALLS" && (
+        <Section title="Destination" ok={!!phone.trim()}>
+          <Field label="Phone number" req><input className={inp} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+8801XXXXXXXXX" /></Field>
         </Section>
       )}
       {setup === "new" && (
@@ -714,7 +814,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       {/* Left tree */}
       <aside className="hidden w-72 shrink-0 border-r border-fb-border bg-background md:block">
         <div className="flex h-12 items-center border-b border-fb-border px-2">
-          <button onClick={onClose} className="rounded-md p-2 hover:bg-fb-bg"><X className="h-5 w-5" /></button>
+          <button onClick={askClose} className="rounded-md p-2 hover:bg-fb-bg"><X className="h-5 w-5" /></button>
         </div>
         {tree.map((t, i) => (
           <button key={i} onClick={() => { setLevel(i as any); setTab("edit"); }}
@@ -729,7 +829,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="flex h-12 items-center gap-2 border-b border-fb-border bg-background px-3 text-[13px]">
-          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-fb-bg md:hidden"><X className="h-5 w-5" /></button>
+          <button onClick={askClose} className="rounded-md p-1.5 hover:bg-fb-bg md:hidden"><X className="h-5 w-5" /></button>
           {tree.map((t, i) => (
             <span key={i} className="flex min-w-0 items-center gap-1">
               {i > 0 && <span className="text-fb-muted">›</span>}
@@ -778,7 +878,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
 
         {/* Bottom bar */}
         <footer className="flex items-center gap-3 border-t border-fb-border bg-background px-4 py-2.5 text-[13px]">
-          <button onClick={onClose} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Close</button>
+          <button onClick={askClose} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Close</button>
           <span className="hidden items-center gap-1 text-fb-green sm:flex"><Check className="h-4 w-4" />All edits saved</span>
           {level === 2 && <span className="hidden text-[11px] text-fb-muted lg:inline">By clicking Publish, you acknowledge the Terms and Conditions.</span>}
           <div className="ml-auto flex gap-2">
@@ -796,6 +896,22 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           </div>
         </footer>
       </div>
+      {confirmClose && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-4">
+          <div className="w-full max-w-[420px] rounded-lg bg-background p-5 shadow-2xl">
+            <p className="text-[16px] font-semibold">Campaign বন্ধ করবেন?</p>
+            <p className="mt-1 text-[13px] text-fb-muted">
+              {ready ? "Save as draft চাপলে campaign-টা Facebook-এ বন্ধ অবস্থায় save হবে, পরে চালু করতে পারবেন।" : "এখনো সব তথ্য দেওয়া হয়নি। Save as draft চাপলে এখানেই রেখে দেওয়া হবে — পরের বার Create চাপলে আবার ফিরে আসবে।"}
+            </p>
+            <div className="mt-4 flex justify-end gap-2 text-[13px]">
+              <button onClick={() => setConfirmClose(false)} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Cancel</button>
+              <button onClick={discard} className="h-9 rounded-md border border-destructive/50 px-4 font-semibold text-destructive hover:bg-destructive/10">Discard</button>
+              <button disabled={saving} onClick={async () => { if (ready) { setConfirmClose(false); await submit(false); } else { setConfirmClose(false); toast.success("Draft রাখা হয়েছে"); onClose(); } }}
+                className="h-9 rounded-md bg-fb-blue px-4 font-semibold text-primary-foreground disabled:opacity-50">Save as draft</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
