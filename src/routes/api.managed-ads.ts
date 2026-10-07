@@ -25,6 +25,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("request_page_access"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({
@@ -57,6 +58,10 @@ const schema = z.discriminatedUnion("action", [
     headline: z.string().max(255).optional(),
     link: z.string().max(1000).optional(),
     imageBase64: z.string().max(8_000_000).optional(),
+    engagementLocation: z.enum(["ON_AD", "MESSAGING", "WEBSITE", "CALLS"]).optional(),
+    msgDestinations: z.array(z.enum(["MESSENGER", "WHATSAPP"])).max(2).optional(),
+    whatsappNumber: z.string().max(30).optional(),
+    phoneNumber: z.string().max(30).optional(),
     publish: z.boolean(),
   }),
 ]);
@@ -175,6 +180,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const g = graphClient(token);
   const pageId = String(page.page_id);
 
+  if (body.action === "page_info") {
+    const r = await g.get(pageId, { fields: "name,whatsapp_number,phone,picture{url}" }).catch(() => ({} as any));
+    return { name: r.name ?? page.page_name, whatsappNumber: r.whatsapp_number ?? null, phone: r.phone ?? null, picture: r.picture?.data?.url ?? null };
+  }
+
   if (body.action === "pixels") {
     const r = await g.get(`${act}/adspixels`, { fields: "id,name,last_fired_time", limit: "50" });
     return { pixels: (r.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null })) };
@@ -233,10 +243,20 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     ENGAGEMENT: { objective: "OUTCOME_ENGAGEMENT", goal: "POST_ENGAGEMENT", destination: "ON_POST", cta: "" },
     AWARENESS: { objective: "OUTCOME_AWARENESS", goal: "REACH", destination: "", cta: "LEARN_MORE" },
   }[body.objective];
-  const map = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
-  const isMsg = map.destination === "MESSENGER";
+  const eng = body.objective === "ENGAGEMENT" ? (body.engagementLocation ?? "ON_AD") : null;
+  const dests = body.msgDestinations?.length ? body.msgDestinations : ["MESSENGER"];
+  const msgDest = dests.length === 2 ? "MESSAGING_MESSENGER_WHATSAPP" : dests[0];
+  let map: { objective: string; goal: string; destination: string; cta: string } = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
+  if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
+  if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
+  if (eng === "CALLS") map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
+  const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
+  const waOnly = map.destination === "WHATSAPP";
+  if (map.destination.includes("WHATSAPP") && !body.whatsappNumber) throw new Error("এই Page-এ WhatsApp number connect করা নেই — আগে Page-এ WhatsApp connect করুন");
+  if (eng === "CALLS" && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
+  if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
   const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging;
-  if (body.objective === "ENGAGEMENT" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
+  if (eng === "ON_AD" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
   if (pixelNeeded && (!body.pixelId || !body.customEvent)) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
   if ((pixelNeeded || body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
 
@@ -277,7 +297,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       ...(body.bidAmount && body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}),
       ...(body.startTime ? { start_time: body.startTime } : {}),
       ...(body.endTime ? { end_time: body.endTime } : {}),
-      promoted_object: pixelNeeded ? { pixel_id: body.pixelId, custom_event_type: body.customEvent } : { page_id: pageId },
+      promoted_object: pixelNeeded ? { pixel_id: body.pixelId, custom_event_type: body.customEvent }
+        : map.destination.includes("WHATSAPP") ? { page_id: pageId, whatsapp_phone_number: body.whatsappNumber } : { page_id: pageId },
       targeting,
     });
 
@@ -292,8 +313,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
       }
       const link = body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const ctaType = isMsg ? "MESSAGE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
-      const cta: Record<string, unknown> = { type: ctaType, value: isMsg ? { app_destination: "MESSENGER" } : { link } };
+      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : (body.cta || map.cta || "LEARN_MORE");
+      const cta: Record<string, unknown> = {
+        type: ctaType,
+        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : { link },
+      };
       creative = {
         name: `${body.adName} creative`,
         object_story_spec: {
