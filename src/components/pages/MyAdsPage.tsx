@@ -138,6 +138,13 @@ export default function MyAdsPage() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: curSummary } = useQuery({
+    queryKey: ["managed-ads-cur-summary", currentAcc?.id],
+    queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc!.id] })).summary,
+    enabled: !!currentAcc?.id && currentAcc?.kind !== "shared",
+    staleTime: 2 * 60_000,
+    refetchOnWindowFocus: false,
+  });
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
   const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
   const closeWizard = () => { setCreating(false); setOpenDraftObj(undefined); sessionStorage.removeItem("myads-wizard"); };
@@ -255,7 +262,7 @@ export default function MyAdsPage() {
               {isShared ? (
                 <div><p className="text-[13px] text-fb-muted">Wallet balance</p><p className="text-2xl font-bold">{money(data?.walletBalance ?? 0)}</p></div>
               ) : (() => {
-                const sm: any = currentAcc ? accSummary?.[currentAcc.id] : null;
+                const sm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
                 if (!sm) return <div><p className="text-[13px] text-fb-muted">Spend limit</p><p className="text-sm text-fb-muted">Loading…</p></div>;
                 const cap = Number(sm.spendCap || 0);
                 if (!cap) return <div><p className="text-[13px] text-fb-muted">Spend limit</p><p className="text-2xl font-bold">No limit</p></div>;
