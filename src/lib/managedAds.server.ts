@@ -95,14 +95,27 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
 
   const result = { campaigns: [] as any[], adsets: [] as any[], ads: [] as any[], pages, allPages: pages, accounts, errors: [] as string[] };
 
+  const noPerm: string[] = [];
+  const tooBig: string[] = [];
+  const other = new Set<string>();
+  const accName = (id: string) => accounts.find((a) => a.id === id)?.name ?? id;
+  // Meta rejects big nested requests with (#1); retry the same call with a smaller page.
+  const getSmall = async (g: any, path: string, fields: string) => {
+    try { return await g.get(path, { fields, limit: "100" }); }
+    catch (e: any) {
+      if (!/reduce the amount of data|\(#1\)/i.test(String(e?.message))) throw e;
+      return await g.get(path, { fields, limit: "25" });
+    }
+  };
+
   for (const [accId, pageIds] of byAccount) {
     try {
       const { token, act } = await tokenFor(supabaseAdmin, accId);
       const g = graphClient(token);
       const [ads, adsets, camps] = await Promise.all([
-        g.get(`${act}/ads`, { fields: "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,effective_object_story_id,thumbnail_url}", limit: "500" }),
-        g.get(`${act}/adsets`, { fields: "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time", limit: "500" }),
-        g.get(`${act}/campaigns`, { fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time", limit: "500" }),
+        getSmall(g, `${act}/ads`, "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,effective_object_story_id,thumbnail_url}"),
+        getSmall(g, `${act}/adsets`, "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time"),
+        getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time"),
       ]);
       let ownAds: any[], ownSets: any[], ownCamps: any[];
       if (pageIds === null) {
@@ -137,9 +150,15 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       result.adsets.push(...ownSets.map(tag));
       result.ads.push(...ownAds.map(({ creative, ...a }: any) => tag({ ...a, thumbnail_url: creative?.thumbnail_url, page_id: pageOfAd({ creative }) })));
     } catch (e: any) {
-      result.errors.push(e?.message || "Meta data আনা যায়নি");
+      const m = String(e?.message || "");
+      if (/#200|ads_management|ads_read/i.test(m)) noPerm.push(accName(accId));
+      else if (/reduce the amount of data|\(#1\)/i.test(m)) tooBig.push(accName(accId));
+      else other.add(m || "Meta data আনা যায়নি");
     }
   }
+  if (noPerm.length) result.errors.push(`${noPerm.length}টি ad account-এ আমাদের Business Manager-এর campaign দেখার/চালানোর অনুমতি নেই (${noPerm.slice(0, 3).join(", ")}${noPerm.length > 3 ? "…" : ""})। এগুলোতে ad চালাতে Admin-কে জানান।`);
+  if (tooBig.length) result.errors.push(`${tooBig.length}টি account-এর data এখন Meta দিচ্ছে না — একটু পরে Refresh দিন।`);
+  result.errors.push(...other);
   return result;
 }
 
