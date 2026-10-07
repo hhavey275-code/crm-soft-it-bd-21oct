@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { managedAds, resultOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
+import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -31,6 +32,8 @@ export default function MyAdsPage() {
   const [range, setRange] = useState("7d");
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
   const [selAdsets, setSelAdsets] = useState<string[]>([]);
+  const [selAds, setSelAds] = useState<string[]>([]);
+  const [editing, setEditing] = useState<any | null>(null);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [lastManual, setLastManual] = useState(0);
@@ -73,7 +76,7 @@ export default function MyAdsPage() {
   const toggle = async (level: Level, o: any, on: boolean) => {
     setBusy(o.id);
     try {
-      await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED" });
+      await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED", adAccountDbId: o.ad_account_db_id });
       toast.success(on ? "চালু হয়েছে" : "বন্ধ হয়েছে");
       qc.setQueryData(["managed-ads-list", dates, accSel], (old: any) => {
         if (!old) return old;
@@ -92,7 +95,7 @@ export default function MyAdsPage() {
     if (!(amount > 0)) return toast.error("সঠিক পরিমাণ দিন");
     setBusy(o.id);
     try {
-      await managedAds({ action: "set_budget", objectId: String(o.id), budgetType: type, amount });
+      await managedAds({ action: "set_budget", objectId: String(o.id), budgetType: type, amount, adAccountDbId: o.ad_account_db_id });
       toast.success("Budget আপডেট হয়েছে");
       refetch();
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
@@ -120,8 +123,8 @@ export default function MyAdsPage() {
     );
   }
 
-  const sel = tab === "campaign" ? selCampaigns : selAdsets;
-  const setSel = tab === "campaign" ? setSelCampaigns : setSelAdsets;
+  const sel = tab === "campaign" ? selCampaigns : tab === "adset" ? selAdsets : selAds;
+  const setSel = tab === "campaign" ? setSelCampaigns : tab === "adset" ? setSelAdsets : setSelAds;
   const rowTotals = rows.reduce((t, r) => {
     t.spend += Number(r.insights?.spend || 0); t.impr += Number(r.insights?.impressions || 0);
     t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
@@ -217,14 +220,15 @@ export default function MyAdsPage() {
           </div>
         </div>
 
+        <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
           <button onClick={() => setCreating(true)}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
           </button>
-          <button className={tbBtn} disabled={!(tab === "adset" && sel.length === 1)}
-            onClick={() => { const r = adsets.find((x) => String(x.id) === sel[0]); if (r) editBudget(r); }}>
+          <button className={tbBtn} disabled={sel.length !== 1}
+            onClick={() => { const r = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).find((x) => String(x.id) === sel[0]); if (r) setEditing(r); }}>
             <Pencil className="h-4 w-4" />Edit
           </button>
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length} selected</button>}
