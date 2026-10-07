@@ -50,7 +50,9 @@ export default function MyAdsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [accSel, setAccSel] = useState<string | undefined>(undefined);
   const isMobile = useIsMobile();
-  const [mobileStep, setMobileStep] = useState<"accounts" | "campaigns">("accounts");
+  const [mobileStep, setMobileStepRaw] = useState<"accounts" | "campaigns">("accounts");
+  const setMobileStep = (v: "accounts" | "campaigns") => { setMobileStepRaw(v); sessionStorage.setItem("myads-mobile-step", v); };
+  const [newDraftId, setNewDraftId] = useState<string | undefined>(undefined);
   const [accSearch, setAccSearch] = useState("");
   useEffect(() => { const v = localStorage.getItem("myads-account"); if (v) setAccSel(v); }, []);
   const [drafts, setDrafts] = useState<CampaignDraft[]>([]);
@@ -126,16 +128,30 @@ export default function MyAdsPage() {
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
 
-  const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); };
+  const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
+  const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
+  const closeWizard = () => { setCreating(false); setOpenDraftObj(undefined); sessionStorage.removeItem("myads-wizard"); };
+  // Restore view + open wizard if the page was reloaded/remounted (e.g. on mobile)
+  useEffect(() => {
+    const st = sessionStorage.getItem("myads-mobile-step");
+    if (st === "campaigns") setMobileStepRaw("campaigns");
+    const wid = sessionStorage.getItem("myads-wizard");
+    if (wid) {
+      const d = listDrafts().find((x) => x.id === wid);
+      if (d) setOpenDraftObj(d); else setNewDraftId(wid);
+      setCreating(true);
+    }
+  }, []);
   const wizard = creating && (
         <ManagedCreateWizard
-          key={openDraftObj?.id ?? "new"}
+          key={openDraftObj?.id ?? newDraftId ?? "new"}
+          newDraftId={newDraftId}
           accounts={orderedAccounts}
           allPages={allPages}
           walletBalance={Number(data?.walletBalance ?? 0)}
           draft={openDraftObj}
-          onClose={() => { setCreating(false); setOpenDraftObj(undefined); }}
-          onCreated={() => { setCreating(false); setOpenDraftObj(undefined); refetch(); }}
+          onClose={closeWizard}
+          onCreated={() => { closeWizard(); refetch(); }}
         />
   );
 
@@ -153,7 +169,7 @@ export default function MyAdsPage() {
   const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
   if (isMobile) {
-    const startCreate = () => { setOpenDraftObj(undefined); setCreating(true); };
+    const startCreate = startNew;
     if (mobileStep === "accounts") {
       const q = accSearch.trim().toLowerCase();
       const list = accounts.filter((a) => !q || `${a.name} ${a.account_id}`.toLowerCase().includes(q));
@@ -353,7 +369,7 @@ export default function MyAdsPage() {
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
-          <button onClick={() => { setOpenDraftObj(undefined); setCreating(true); }}
+          <button onClick={startNew}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
           </button>
