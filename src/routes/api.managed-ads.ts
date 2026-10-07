@@ -21,7 +21,12 @@ const schema = z.discriminatedUnion("action", [
     action: z.literal("create"),
     pageDbId: z.string().uuid(),
     adAccountDbId: z.string().uuid().optional(),
-    objective: z.enum(["SALES", "MESSAGES", "TRAFFIC", "ENGAGEMENT", "AWARENESS"]),
+    objective: z.enum(["SALES", "LEADS", "MESSAGES", "TRAFFIC", "ENGAGEMENT", "AWARENESS"]),
+    conversionLocation: z.enum(["WEBSITE", "MESSAGING"]).default("WEBSITE"),
+    budgetLevel: z.enum(["campaign", "adset"]).default("adset"),
+    startTime: z.string().optional(),
+    cta: z.enum(["SHOP_NOW", "LEARN_MORE", "SIGN_UP", "ORDER_NOW", "BUY_NOW", "CONTACT_US", "SEND_MESSAGE", "MESSAGE_PAGE", "GET_OFFER", "BOOK_TRAVEL", "SEE_MORE"]).optional(),
+    specialCategories: z.array(z.enum(["CREDIT", "EMPLOYMENT", "HOUSING", "ISSUES_ELECTIONS_POLITICS", "FINANCIAL_PRODUCTS_SERVICES"])).max(5).default([]),
     pixelId: z.string().regex(/^\d+$/).optional(),
     customEvent: z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT", "VIEW_CONTENT"]).optional(),
     campaignName: z.string().min(1).max(200),
@@ -164,24 +169,34 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   }
 
   const status = body.publish ? "ACTIVE" : "PAUSED";
-  const map = {
+  const msging = (body.objective === "SALES" || body.objective === "LEADS") && body.conversionLocation === "MESSAGING";
+  const base = {
     SALES: { objective: "OUTCOME_SALES", goal: "OFFSITE_CONVERSIONS", destination: "WEBSITE", cta: "SHOP_NOW" },
+    LEADS: { objective: "OUTCOME_LEADS", goal: "OFFSITE_CONVERSIONS", destination: "WEBSITE", cta: "SIGN_UP" },
     MESSAGES: { objective: "OUTCOME_ENGAGEMENT", goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" },
     TRAFFIC: { objective: "OUTCOME_TRAFFIC", goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" },
     ENGAGEMENT: { objective: "OUTCOME_ENGAGEMENT", goal: "POST_ENGAGEMENT", destination: "ON_POST", cta: "" },
     AWARENESS: { objective: "OUTCOME_AWARENESS", goal: "REACH", destination: "", cta: "LEARN_MORE" },
   }[body.objective];
+  const map = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
+  const isMsg = map.destination === "MESSENGER";
+  const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging;
   if (body.objective === "ENGAGEMENT" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
-  if (body.objective === "SALES" && (!body.pixelId || !body.customEvent)) throw new Error("Sales-এর জন্য Pixel/Dataset ও conversion event বাছুন");
-  if (body.objective === "SALES" && !/^https?:\/\//.test(body.link || "")) throw new Error("Sales-এর জন্য website link দিন");
-  if ((body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website link দিন");
+  if (pixelNeeded && (!body.pixelId || !body.customEvent)) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
+  if ((pixelNeeded || body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
+
+  const cents = String(Math.round(body.amount * 100));
+  const budgetKey = body.budgetType === "daily" ? "daily_budget" : "lifetime_budget";
+  const cbo = body.budgetLevel === "campaign";
 
   let campaignId: string | null = null;
   let step = "Campaign";
   try {
     step = "Campaign";
     const camp = await g.post(`${act}/campaigns`, {
-      name: body.campaignName, objective: map.objective, status, special_ad_categories: [], is_adset_budget_sharing_enabled: false,
+      name: body.campaignName, objective: map.objective, status, buying_type: "AUCTION",
+      special_ad_categories: body.specialCategories,
+      ...(cbo ? { [budgetKey]: cents, bid_strategy: body.bidStrategy } : { is_adset_budget_sharing_enabled: false }),
     });
     campaignId = String(camp.id);
     if (shared) {
@@ -198,17 +213,16 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (body.genders.length === 1) targeting.genders = body.genders;
     if (body.interests.length) targeting.flexible_spec = [{ interests: body.interests }];
 
-    const cents = String(Math.round(body.amount * 100));
     step = "Ad set";
     const adset = await g.post(`${act}/adsets`, {
       name: body.adsetName, campaign_id: campaignId, status,
       billing_event: "IMPRESSIONS", optimization_goal: map.goal,
       ...(map.destination ? { destination_type: map.destination } : {}),
-      bid_strategy: body.bidStrategy,
-      ...(body.bidAmount ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}),
-      [body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"]: cents,
+      ...(cbo ? {} : { bid_strategy: body.bidStrategy, [budgetKey]: cents }),
+      ...(body.bidAmount && body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}),
+      ...(body.startTime ? { start_time: body.startTime } : {}),
       ...(body.endTime ? { end_time: body.endTime } : {}),
-      promoted_object: body.objective === "SALES" ? { pixel_id: body.pixelId, custom_event_type: body.customEvent } : { page_id: pageId },
+      promoted_object: pixelNeeded ? { pixel_id: body.pixelId, custom_event_type: body.customEvent } : { page_id: pageId },
       targeting,
     });
 
@@ -223,7 +237,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
       }
       const link = body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const cta: Record<string, unknown> = { type: map.cta || "LEARN_MORE", value: body.objective === "MESSAGES" ? { app_destination: "MESSENGER" } : { link } };
+      const ctaType = isMsg ? "MESSAGE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
+      const cta: Record<string, unknown> = { type: ctaType, value: isMsg ? { app_destination: "MESSENGER" } : { link } };
       creative = {
         name: `${body.adName} creative`,
         object_story_spec: {

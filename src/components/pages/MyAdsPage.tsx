@@ -195,7 +195,7 @@ export default function MyAdsPage() {
 
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
-          <button disabled={!accounts.length || !allPages.length} onClick={() => setCreating(true)}
+          <button onClick={() => setCreating(true)}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
           </button>
