@@ -7,6 +7,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { managedAds } from "@/lib/managedAdsApi";
+import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
 const OBJECTIVES: { v: Obj; l: string; icon: any; d: string; good: string[] }[] = [
@@ -31,6 +32,7 @@ interface Props {
   walletBalance: number;
   onClose: () => void;
   onCreated: () => void;
+  draft?: CampaignDraft;
 }
 
 // ---------- small Facebook-style building blocks ----------
@@ -69,7 +71,7 @@ function Radio({ on, title, desc, onClick, disabled }: { on: boolean; title: str
 }
 const Adv = () => <span className="inline-flex items-center gap-1 rounded-full bg-fb-green/10 px-2 py-0.5 text-[11px] font-semibold text-fb-green"><Sparkles className="h-3 w-3" />Advantage+ on</span>;
 
-export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated }: Props) {
+export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft }: Props) {
   const pages = allPages.filter((p) => p.status !== "rejected");
   const [phase, setPhase] = useState<"objective" | "edit">("objective");
   const [pick, setPick] = useState<Obj | null>(null);
@@ -135,15 +137,15 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [demoItems, setDemoItems] = useState<any[] | null>(null);
   const restored = useRef(false);
 
-  // ---- local draft: survives tab switches, reloads and accidental closes ----
-  const DRAFT_KEY = "myads-wizard-draft";
-  const snapshot = { phase, pick, objective, level, pageDbId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
+  // ---- drafts: every new campaign gets its own draft; Edit on a draft reopens exactly that one ----
+  const draftId = useRef(draft?.id ?? crypto.randomUUID()).current;
+  const snapshot = { phase, pick, objective, level, pageDbId, accId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
     adsetName, location, customEvent, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender, interests, adName, setup, postId,
     message, headline, link, cta, engLoc, destMode, dests, phone };
   useEffect(() => {
     try {
-      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-      if (d && d.phase === "edit") {
+      const d = draft?.data;
+      if (d) {
         const S: Record<string, (v: any) => void> = { phase: setPhase, pick: setPick, objective: setObjective, level: setLevel, campaignName: setCampaignName,
           budgetLevel: setBudgetLevel, budgetType: setBudgetType, amount: setAmount, bidStrategy: setBidStrategy, bidAmount: setBidAmount, special: setSpecial,
           adsetName: setAdsetName, location: setLocation, customEvent: setCustomEvent, startTime: setStartTime, hasEnd: setHasEnd, endTime: setEndTime,
@@ -151,17 +153,18 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           message: setMessage, headline: setHeadline, link: setLink, cta: setCta, engLoc: setEngLoc, destMode: setDestMode, dests: setDests, phone: setPhone };
         for (const [k, f] of Object.entries(S)) if (d[k] !== undefined) f(d[k]);
         if (d.pageDbId && pages.some((p) => p.id === d.pageDbId)) setPageDbId(d.pageDbId);
+        if (d.accId && accounts.some((a) => a.id === d.accId)) setAccId(d.accId);
         setTimeout(() => d.postId && setPostId(d.postId), 50);
-        toast.info("আগের অসম্পূর্ণ campaign ফিরিয়ে আনা হয়েছে");
       }
     } catch { /* ignore */ }
     restored.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { if (restored.current && phase === "edit") localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot)); });
-  const clearDraft = () => localStorage.removeItem(DRAFT_KEY);
+  useEffect(() => { if (restored.current && phase === "edit") saveDraft(draftId, snapshot); });
+  const clearDraft = () => deleteDraft(draftId);
   const askClose = () => (phase === "edit" ? setConfirmClose(true) : onClose());
   const discard = () => { clearDraft(); setConfirmClose(false); onClose(); };
+  const keepDraft = () => { saveDraft(draftId, snapshot); setConfirmClose(false); toast.success("Draft হিসেবে রাখা হয়েছে — list-এ দেখা যাবে"); onClose(); };
 
   // Browser back / reload should not silently lose the campaign.
   useEffect(() => {
@@ -303,7 +306,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         publish,
       });
       clearDraft();
-      toast.success(publish ? "Ad publish হয়েছে — Facebook review-এর পর চালু হবে" : "Draft হিসেবে Facebook-এ save হয়েছে (বন্ধ অবস্থায়)");
+      toast.success(publish ? "Ad publish হয়েছে — Facebook review-এর পর চালু হবে" : "Facebook-এ বন্ধ অবস্থায় save হয়েছে");
       onCreated();
     } catch (e: any) { toast.error(e.message, { duration: 12000 }); } finally { setSaving(false); }
   };
@@ -891,7 +894,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               <button onClick={() => { setLevel((level + 1) as any); setTab("edit"); }} className="h-9 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground">Next</button>
             ) : (
               <>
-                <button disabled={saving} onClick={() => submit(false)} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg disabled:opacity-50">Save as draft</button>
+                <button disabled={saving} onClick={keepDraft} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg disabled:opacity-50">Save as draft</button>
                 <button disabled={saving || !ready} onClick={() => submit(true)} className="inline-flex h-9 items-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40">
                   {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Publish
                 </button>
@@ -905,12 +908,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="w-full max-w-[420px] rounded-lg bg-background p-5 shadow-2xl">
             <p className="text-[16px] font-semibold">Campaign বন্ধ করবেন?</p>
             <p className="mt-1 text-[13px] text-fb-muted">
-              {ready ? "Save as draft চাপলে campaign-টা Facebook-এ বন্ধ অবস্থায় save হবে, পরে চালু করতে পারবেন।" : "এখনো সব তথ্য দেওয়া হয়নি। Save as draft চাপলে এখানেই রেখে দেওয়া হবে — পরের বার Create চাপলে আবার ফিরে আসবে।"}
+              Save as draft চাপলে campaign-টা list-এ "In draft" হিসেবে থাকবে। পরে Edit চাপলে এটাই খুলবে, তখন Publish করতে পারবেন।
             </p>
             <div className="mt-4 flex justify-end gap-2 text-[13px]">
               <button onClick={() => setConfirmClose(false)} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Cancel</button>
               <button onClick={discard} className="h-9 rounded-md border border-destructive/50 px-4 font-semibold text-destructive hover:bg-destructive/10">Discard</button>
-              <button disabled={saving} onClick={async () => { if (ready) { setConfirmClose(false); await submit(false); } else { setConfirmClose(false); toast.success("Draft রাখা হয়েছে"); onClose(); } }}
+              <button onClick={keepDraft}
                 className="h-9 rounded-md bg-fb-blue px-4 font-semibold text-primary-foreground disabled:opacity-50">Save as draft</button>
             </div>
           </div>

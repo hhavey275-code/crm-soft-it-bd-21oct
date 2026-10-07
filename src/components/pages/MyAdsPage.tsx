@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2 } from "lucide-react";
+import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
+import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,13 @@ export default function MyAdsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [accSel, setAccSel] = useState<string | undefined>(undefined);
   useEffect(() => { const v = localStorage.getItem("myads-account"); if (v) setAccSel(v); }, []);
+  const [drafts, setDrafts] = useState<CampaignDraft[]>([]);
+  const [openDraftObj, setOpenDraftObj] = useState<CampaignDraft | undefined>(undefined);
+  useEffect(() => {
+    const load = () => setDrafts(listDrafts());
+    load(); window.addEventListener("myads-drafts", load);
+    return () => window.removeEventListener("myads-drafts", load);
+  }, []);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
@@ -113,13 +122,16 @@ export default function MyAdsPage() {
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
 
+  const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); };
   const wizard = creating && (
         <ManagedCreateWizard
+          key={openDraftObj?.id ?? "new"}
           accounts={orderedAccounts}
           allPages={allPages}
           walletBalance={Number(data?.walletBalance ?? 0)}
-          onClose={() => setCreating(false)}
-          onCreated={() => { setCreating(false); refetch(); }}
+          draft={openDraftObj}
+          onClose={() => { setCreating(false); setOpenDraftObj(undefined); }}
+          onCreated={() => { setCreating(false); setOpenDraftObj(undefined); refetch(); }}
         />
   );
 
@@ -218,7 +230,7 @@ export default function MyAdsPage() {
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
-          <button onClick={() => setCreating(true)}
+          <button onClick={() => { setOpenDraftObj(undefined); setCreating(true); }}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
           </button>
@@ -259,13 +271,32 @@ export default function MyAdsPage() {
             </thead>
             <tbody>
               {isFetching && !data && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">Loading…</td></tr>}
-              {data && rows.length === 0 && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
+              {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
+              {tab === "campaign" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
+                <tr key={d.id} className="border-b border-fb-border hover:bg-fb-blue-soft/50">
+                  <td className={td} />
+                  <td className={td}><Switch checked={false} disabled /></td>
+                  <td className={cn(td, "whitespace-normal")}>
+                    <div className="flex items-center gap-2">
+                      <button className="text-left text-fb-blue hover:underline" onClick={() => openDraft(d)}>{d.data.campaignName || "Untitled campaign"}</button>
+                      <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => openDraft(d)}><Pencil className="h-3 w-3" /></button>
+                      <button title="Draft মুছুন" className="text-fb-muted hover:text-destructive" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id); }}><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                    <span className={sub}>Edited {new Date(d.updatedAt).toLocaleString()}</span>
+                  </td>
+                  <td className={td}><span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-fb-muted" />In draft</span></td>
+                  <td className={td}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
+                  <td className={cn(td, "text-right")}>{d.data.amount ? money(Number(d.data.amount)) : "—"}<span className={sub}>{d.data.budgetType === "lifetime" ? "Lifetime" : "Daily"}</span></td>
+                  <td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
+                  {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>—</td>)}
+                </tr>
+              ))}
               {rows.map((r, i) => {
                 const res = resultOf(r.insights);
                 const on = r.status === "ACTIVE";
-                const eff = String(r.effective_status || r.status || "").toUpperCase();
-                const deliv = eff === "ACTIVE" ? "Active" : eff.includes("PAUSED") ? "Off" : eff.includes("REVIEW") || eff === "PENDING_REVIEW" ? "In review" : eff.includes("DISAPPROVED") ? "Rejected" : eff.toLowerCase().replace(/_/g, " ") || "—";
-                const dot = eff === "ACTIVE" ? "bg-fb-green" : eff.includes("DISAPPROVED") ? "bg-destructive" : "bg-fb-muted";
+                const dv = tab === "campaign" ? campaignDelivery(r, data?.adsets ?? [], data?.ads ?? []) : tab === "adset" ? adsetDelivery(r, data?.ads ?? []) : adDelivery(r);
+                const deliv = dv.label;
+                const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "bg-fb-blue", amber: "bg-primary" }[dv.tone];
                 const canBudget = tab === "adset" && (r.daily_budget || r.lifetime_budget);
                 return (
                   <tr key={r.id} className={cn("border-b border-fb-border hover:bg-fb-blue-soft/50", i % 2 && "bg-fb-bg/50")}>
