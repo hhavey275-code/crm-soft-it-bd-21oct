@@ -315,13 +315,14 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   if (phase === "objective") {
     const cur = OBJECTIVES.find((o) => o.v === pick);
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
-        <div className="w-full max-w-[560px] rounded-lg bg-background shadow-2xl">
-          <div className="flex items-center gap-2 px-4 pt-4">
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4 font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
+        <div className="flex max-h-[100dvh] w-full max-w-[560px] flex-col rounded-t-xl bg-background shadow-2xl sm:max-h-[90vh] sm:rounded-lg">
+          <div className="flex shrink-0 items-center gap-2 px-4 pt-4">
             <span className="rounded-md bg-fb-blue-soft px-3 py-2 text-[13px] font-semibold text-fb-blue">Create new campaign</span>
-            <span className="px-3 py-2 text-[13px] text-fb-muted">New ad set or ad</span>
+            <span className="hidden px-3 py-2 text-[13px] text-fb-muted sm:inline">New ad set or ad</span>
             <button onClick={onClose} className="ml-auto rounded-full p-1 hover:bg-fb-bg"><X className="h-5 w-5" /></button>
           </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="px-4 pt-3">
             <p className="text-[13px] font-semibold">Choose a buying type <Info className="inline h-3 w-3" /></p>
             <select className={cn(sel, "mt-1")} defaultValue="AUCTION"><option value="AUCTION">Auction</option></select>
@@ -329,17 +330,17 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="px-4 pt-5">
             <p className="text-[15px] font-semibold">Choose a campaign objective</p>
           </div>
-          <div className="grid min-h-[340px] grid-cols-1 gap-4 px-2 py-3 sm:grid-cols-[1fr_1fr]">
+          <div className="grid grid-cols-1 gap-3 px-2 py-2 sm:min-h-[340px] sm:gap-4 sm:py-3 sm:grid-cols-[1fr_1fr]">
             <div className="space-y-1">
               {OBJECTIVES.map((o) => {
                 const on = pick === o.v;
                 return (
                   <button key={o.v} onClick={() => setPick(o.v)} onMouseEnter={() => !pick && null}
-                    className={cn("flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left", on ? "bg-fb-blue-soft" : "hover:bg-fb-bg")}>
+                    className={cn("flex w-full items-center gap-3 rounded-md px-2 py-1 text-left", on ? "bg-fb-blue-soft" : "hover:bg-fb-bg")}>
                     <span className={cn("flex h-5 w-5 items-center justify-center rounded-full border-2", on ? "border-fb-blue" : "border-fb-muted")}>
                       {on && <span className="h-2.5 w-2.5 rounded-full bg-fb-blue" />}
                     </span>
-                    <span className={cn("flex h-10 w-10 items-center justify-center rounded-md", on ? "bg-fb-blue text-primary-foreground" : "bg-fb-bg")}>
+                    <span className={cn("flex h-8 w-8 items-center justify-center rounded-md sm:h-10 sm:w-10", on ? "bg-fb-blue text-primary-foreground" : "bg-fb-bg")}>
                       <o.icon className="h-5 w-5" />
                     </span>
                     <span className="text-[14px]">{o.l}</span>
@@ -350,7 +351,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <div className="px-2">
               {cur ? (
                 <div className="space-y-2">
-                  <div className="flex h-24 items-center justify-center rounded-lg bg-gradient-to-br from-fb-blue-soft to-fb-green/10"><cur.icon className="h-12 w-12 text-fb-blue" /></div>
+                  <div className="hidden h-24 sm:flex items-center justify-center rounded-lg bg-gradient-to-br from-fb-blue-soft to-fb-green/10"><cur.icon className="h-12 w-12 text-fb-blue" /></div>
                   <p className="text-[15px] font-semibold">{cur.l}</p>
                   <p className="text-[13px] text-fb-muted">{cur.d}</p>
                   <p className="pt-2 text-[13px] font-semibold">Good for:</p>
@@ -358,16 +359,17 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   {cur.v === "APP" && <p className="pt-2 text-[12px] text-destructive">App promotion এখনো চালু নেই।</p>}
                 </div>
               ) : (
-                <div className="space-y-3 pt-6">
+                <div className="hidden space-y-3 pt-6 sm:block">
                   <div className="flex h-24 items-center justify-center rounded-lg bg-fb-blue-soft"><Megaphone className="h-12 w-12 text-fb-blue" /></div>
                   <p className="text-[13px] text-fb-muted">Your campaign objective is the business goal you hope to achieve by running your ads. Hover over each one for more information.</p>
                 </div>
               )}
             </div>
           </div>
-          <div className="flex items-center justify-between border-t border-fb-border px-4 py-3">
-            <span className="text-[13px] text-fb-blue">About campaign objectives</span>
-            <div className="flex gap-2">
+          </div>
+          <div className="flex shrink-0 items-center justify-between border-t border-fb-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <span className="hidden text-[13px] text-fb-blue sm:inline">About campaign objectives</span>
+            <div className="ml-auto flex gap-2">
               <button onClick={onClose} className="h-9 rounded-md border border-fb-border px-4 text-[13px] font-semibold hover:bg-fb-bg">Cancel</button>
               <button disabled={!pick || pick === "APP"} onClick={startEdit} className="h-9 rounded-md bg-fb-blue px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-40">Continue</button>
             </div>
@@ -817,7 +819,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-fb-bg font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
+    <div className="fixed inset-0 z-50 flex h-[100dvh] bg-fb-bg font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
       {/* Left tree */}
       <aside className="hidden w-72 shrink-0 border-r border-fb-border bg-background md:block">
         <div className="flex h-12 items-center border-b border-fb-border px-2">
