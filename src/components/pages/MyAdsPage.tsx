@@ -16,6 +16,7 @@ import { managedAds, resultOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
+import { ColumnsPicker, fmtCol, totalCol, useExtraColumns } from "@/components/ads-manager/fbColumns";
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
 import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-manager/FbDateRangePicker";
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
@@ -33,6 +34,7 @@ export default function MyAdsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Level>("campaign");
   const [range, setRange] = useState<FbRange>(() => makeRange("today"));
+  const extra = useExtraColumns();
   const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
   const [selAdsets, setSelAdsets] = useState<string[]>([]);
@@ -129,8 +131,8 @@ export default function MyAdsPage() {
   }, { spend: 0, impr: 0, reach: 0, results: 0 });
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
-  const th = "px-3 py-2 text-left text-[13px] font-semibold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
-  const td = "px-3 py-2 border-r border-fb-border align-top whitespace-nowrap";
+  const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
+  const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
   const sub = "block text-[11px] text-fb-muted";
   const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
@@ -230,7 +232,7 @@ export default function MyAdsPage() {
           </button>
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length} selected</button>}
           <div className="ml-auto flex gap-2">
-            <span className={tbBtn}>Columns: Performance</span>
+            <ColumnsPicker keys={extra.keys} toggle={extra.toggle} className={tbBtn} />
             <span className={tbBtn}>Breakdown</span>
           </div>
         </div>
@@ -252,6 +254,7 @@ export default function MyAdsPage() {
                 <th className={cn(th, "text-right")}>Impressions</th>
                 <th className={cn(th, "text-right")}>Reach</th>
                 <th className={cn(th, "text-right")}>CTR</th>
+                {extra.cols.map((c) => <th key={c.key} className={cn(th, "text-right max-w-[140px] whitespace-normal")}>{c.label}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -284,7 +287,7 @@ export default function MyAdsPage() {
                         <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => { const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id)); if (c) setEditCampaign(c); }}><Pencil className="h-3 w-3" /></button>
                       </div>
                     </td>
-                    <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full", dot)} />{deliv}</span></td>
+                    <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-3 w-3 rounded-full", dot)} />{deliv}</span></td>
                     <td className={td}>7-day click or 1-day view<span className={sub}>All conversions</span></td>
                     <td className={cn(td, "text-right")}>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></td>
                     <td className={cn(td, "text-right")}>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></td>
@@ -301,6 +304,7 @@ export default function MyAdsPage() {
                     <td className={cn(td, "text-right")}>{num(r.insights?.impressions)}</td>
                     <td className={cn(td, "text-right")}>{num(r.insights?.reach)}</td>
                     <td className={cn(td, "text-right")}>{r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—"}</td>
+                    {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, c.get(r.insights))}</td>)}
                   </tr>
                 );
               })}
@@ -320,6 +324,7 @@ export default function MyAdsPage() {
                   <td className={cn(td, "text-right")}>{num(rowTotals.impr)}<span className={sub}>Total</span></td>
                   <td className={cn(td, "text-right")}>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></td>
                   <td className={td} />
+                  {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, totalCol(c, rows))}<span className={sub}>{c.sub}</span></td>)}
                 </tr>
               </tfoot>
             )}
