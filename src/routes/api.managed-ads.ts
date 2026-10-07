@@ -205,12 +205,18 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const pageId = String(page.page_id);
 
   if (body.action === "page_info") {
-    const fields = "name,whatsapp_number,phone,picture{url}";
+    // Ask each field separately: one unsupported field would make Facebook reject the whole request.
     const pt = await savedPageToken(supabaseAdmin, pageId, page.user_id);
-    let r: any = {};
-    if (pt) r = await graphClient(pt).get(pageId, { fields }).catch(() => ({}));
-    if (!r?.whatsapp_number) { const b = await g.get(pageId, { fields }).catch(() => ({} as any)); r = { ...b, ...r, whatsapp_number: r.whatsapp_number ?? b.whatsapp_number }; }
-    return { name: r.name ?? page.page_name, whatsappNumber: r.whatsapp_number ?? null, phone: r.phone ?? null, picture: r.picture?.data?.url ?? null };
+    const clients = [pt ? graphClient(pt) : null, g].filter(Boolean) as any[];
+    const one = async (field: string) => {
+      for (const c of clients) { const r = await c.get(pageId, { fields: field }).catch(() => null); if (r && r[field.split("{")[0]] != null) return r; }
+      return null;
+    };
+    const [wa1, wa2, ph, pic, nm] = await Promise.all([one("whatsapp_number"), one("whatsapp_display_number"), one("phone"), one("picture{url}"), one("name")]);
+    let picture = pic?.picture?.data?.url ?? null;
+    if (!picture) picture = `https://graph.facebook.com/${pageId}/picture?type=normal`;
+    const wa = wa1?.whatsapp_number || wa2?.whatsapp_display_number || null;
+    return { name: nm?.name ?? page.page_name, whatsappNumber: wa ? String(wa) : null, phone: ph?.phone ?? null, picture, pageTokenMissing: !pt };
   }
 
   if (body.action === "pixels") {
