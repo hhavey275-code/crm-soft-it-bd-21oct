@@ -124,9 +124,16 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [link, setLink] = useState("");
   const [cta, setCta] = useState("SHOP_NOW");
   const [image, setImage] = useState<{ b64: string; url: string } | null>(null);
+  const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS">("MESSAGING");
+  const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
+  const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
+  const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null } | null>(null);
+  const [phone, setPhone] = useState("");
 
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE";
-  const isMsg = objective === "ENGAGEMENT" ? false : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
+  const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
+  const wa = pageInfo?.whatsappNumber ?? null;
+  const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
   const amt = Number(amount) || 0;
   const overWallet = acc?.kind === "shared" && amt > walletBalance;
   const label = OBJECTIVES.find((o) => o.v === objective)?.l ?? "";
@@ -138,6 +145,14 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       .then((r) => { setPixels(r.pixels); if (r.pixels[0]) setPixelId(r.pixels[0].id); })
       .catch((e) => { setPixels([]); toast.error(e.message); });
   }, [needsPixel, accId, pageDbId, phase]);
+
+  useEffect(() => {
+    setPageInfo(null);
+    if (!accId || !pageDbId || phase !== "edit") return;
+    managedAds<any>({ action: "page_info", pageDbId, adAccountDbId: accId })
+      .then((r) => { setPageInfo(r); if (r.phone) setPhone((p) => p || r.phone); })
+      .catch(() => setPageInfo({ whatsappNumber: null, phone: null, picture: null }));
+  }, [accId, pageDbId, phase]);
 
   const loadPosts = async () => {
     if (!accId || !pageDbId) return;
@@ -180,16 +195,18 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     const n = OBJECTIVES.find((o) => o.v === pick)!.l;
     setCampaignName(`New ${n} Campaign`); setAdsetName(`New ${n} Ad Set`); setAdName(`New ${n} Ad`);
     setCta(pick === "SALES" ? "SHOP_NOW" : pick === "LEADS" ? "SIGN_UP" : "LEARN_MORE");
-    if (pick === "ENGAGEMENT") setSetup("post");
+    if (pick === "ENGAGEMENT") setSetup(engLoc === "ON_AD" ? "post" : "new");
     setPhase("edit");
   };
 
   // validation per level (drives red icons like Facebook)
   const errs = {
     campaign: !campaignName.trim() || amt < 1 || overWallet,
-    adset: !adsetName.trim() || !countries.length || (needsPixel && !pixelId) || (budgetType === "lifetime" && !hasEnd),
+    adset: !adsetName.trim() || !countries.length
+      || (objective === "ENGAGEMENT" && engLoc === "MESSAGING" && (!finalDests.length || (finalDests.includes("WHATSAPP") && !wa)))
+      || (objective === "ENGAGEMENT" && engLoc === "CALLS" && !phone.trim()) || (needsPixel && !pixelId) || (budgetType === "lifetime" && !hasEnd),
     ad: !adName.trim() || !pageDbId || !accId
-      || (setup === "post" ? !postId : (!isMsg && objective !== "AWARENESS" && objective !== "ENGAGEMENT" && !/^https?:\/\//.test(link))),
+      || (setup === "post" ? !postId : (!isMsg && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && engLoc !== "WEBSITE") && !/^https?:\/\//.test(link))),
   };
   const ready = !errs.campaign && !errs.adset && !errs.ad;
 
@@ -221,6 +238,10 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         link: link || undefined,
         cta: setup === "new" && !isMsg ? cta : undefined,
         imageBase64: setup === "new" ? image?.b64 : undefined,
+        ...(objective === "ENGAGEMENT" ? {
+          engagementLocation: engLoc, msgDestinations: engLoc === "MESSAGING" ? finalDests : undefined,
+          whatsappNumber: wa ?? undefined, phoneNumber: engLoc === "CALLS" ? phone.trim() : undefined,
+        } : {}),
         publish,
       });
       toast.success(publish ? "Ad publish হয়েছে — Facebook review-এর পর চালু হবে" : "Draft (বন্ধ অবস্থায়) তৈরি হয়েছে");
@@ -440,9 +461,61 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         </Section>
       )}
       {objective === "ENGAGEMENT" && (
-        <Section title="Conversion">
-          <Field label="Conversion location"><select className={sel} disabled><option>On your ad</option></select></Field>
-          <Field label="Performance goal"><select className={sel} disabled><option>Maximize engagement with a post</option></select></Field>
+        <Section title="Conversion" ok={!errs.adset || !!countries.length}>
+          <Field label="Conversion location">
+            <div className="space-y-0.5 rounded-md border border-fb-border p-2">
+              {([
+                ["MESSAGING", "Message destinations", "Get people to engage with your brand on Messenger or WhatsApp."],
+                ["ON_AD", "On your ad", "Get people to interact with your post or event, or to watch a video."],
+                ["CALLS", "Calls", "Get people to call your business."],
+                ["WEBSITE", "Website", "Get people to engage with your website."],
+              ] as const).map(([v, t, d]) => (
+                <Radio key={v} on={engLoc === v} title={t} desc={d} onClick={() => { setEngLoc(v); setSetup(v === "ON_AD" ? "post" : "new"); }} />
+              ))}
+            </div>
+          </Field>
+          {engLoc === "MESSAGING" && (
+            <>
+              <div className="border-t border-fb-border pt-3">
+                <p className="font-semibold">Facebook Page <span className="font-normal text-fb-muted">• This page will represent your business in your ad and conversation.</span></p>
+                <div className="mt-2 flex items-center gap-2">
+                  {pageInfo?.picture ? <img src={pageInfo.picture} alt="" className="h-9 w-9 rounded-full" /> : <div className="h-9 w-9 rounded-full bg-fb-blue-soft" />}
+                  <div><p className="font-semibold">Facebook Page</p><p className="text-[12px] text-fb-muted">{page?.page_name ?? "—"}</p></div>
+                </div>
+              </div>
+              <div className="rounded-md bg-fb-bg p-3">
+                <p className="mb-1 font-semibold">Message destinations</p>
+                <Radio on={destMode === "auto"} title="Automatic destination (recommended)" desc="We'll send people to the messaging app where they engage most and lower ad costs." onClick={() => setDestMode("auto")} />
+                <Radio on={destMode === "manual"} title="Manual destination" desc="We'll only send people to the messaging apps you choose." onClick={() => setDestMode("manual")} />
+                {destMode === "auto" && (
+                  <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
+                    <span className="rounded bg-background px-2 py-1">Messenger · {page?.page_name}</span>
+                    {wa && <span className="rounded bg-background px-2 py-1">WhatsApp · {wa}</span>}
+                  </div>
+                )}
+                {destMode === "manual" && (
+                  <div className="mt-2 space-y-2 rounded-md bg-background p-2">
+                    <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-fb-blue" checked={dests.includes("MESSENGER")} onChange={(e) => setDests((d) => e.target.checked ? [...d.filter((x) => x !== "MESSENGER"), "MESSENGER"] : d.filter((x) => x !== "MESSENGER"))} />
+                      <span><b>Messenger</b><span className="block text-[12px] text-fb-muted">{page?.page_name}</span></span></label>
+                    <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-fb-blue" disabled={!wa} checked={dests.includes("WHATSAPP")} onChange={(e) => setDests((d) => e.target.checked ? [...d.filter((x) => x !== "WHATSAPP"), "WHATSAPP"] : d.filter((x) => x !== "WHATSAPP"))} />
+                      <span className="flex-1"><b>WhatsApp</b><span className="block text-[12px] text-fb-muted">{wa ?? "এই Page-এ WhatsApp connect করা নেই"}</span></span>
+                      {!wa && pageInfo && <a href="https://www.facebook.com/settings/?tab=linked_whatsapp" target="_blank" rel="noreferrer" className="rounded-md border border-fb-border px-3 py-1 text-[12px] font-semibold">Connect WhatsApp</a>}
+                    </label>
+                    {!finalDests.length && <p className="text-[12px] text-destructive">অন্তত একটা বাছুন</p>}
+                  </div>
+                )}
+                {!wa && pageInfo && destMode === "auto" && <p className="mt-2 text-[12px] text-fb-muted">WhatsApp যোগ করতে Page-এ WhatsApp connect করুন, তারপর এখানে আবার খুলুন।</p>}
+              </div>
+            </>
+          )}
+          {engLoc === "CALLS" && (
+            <Field label="Phone number" req hint="যে নম্বরে মানুষ call করবে (দেশের কোড সহ, যেমন +8801...)">
+              <input className={inp} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+8801XXXXXXXXX" />
+            </Field>
+          )}
+          <Field label="Performance goal" hint="How you measure success for your ads.">
+            <select className={sel} disabled><option>{engLoc === "MESSAGING" ? "Maximize number of conversations" : engLoc === "ON_AD" ? "Maximize engagement with a post" : engLoc === "CALLS" ? "Maximize number of calls" : "Maximize number of link clicks"}</option></select>
+          </Field>
         </Section>
       )}
       <Section title="Budget & schedule" ok={budgetType !== "lifetime" || hasEnd}>
@@ -601,7 +674,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     const sp = setup === "post" ? posts?.find((p) => p.id === postId) : null;
     const text = setup === "post" ? sp?.message : message;
     const img = setup === "post" ? sp?.picture : image?.url;
-    const ctaLabel = isMsg ? "Send message" : CTAS.find((c) => c[0] === cta)?.[1] ?? "Learn more";
+    const ctaLabel = isMsg ? (finalDests.length === 1 && finalDests[0] === "WHATSAPP" ? "Send WhatsApp message" : "Send message") : objective === "ENGAGEMENT" && engLoc === "CALLS" ? "Call now" : CTAS.find((c) => c[0] === cta)?.[1] ?? "Learn more";
     return (
       <div className="rounded-lg border border-fb-border bg-background">
         <div className="flex items-center gap-2 p-3">
