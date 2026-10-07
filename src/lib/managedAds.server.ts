@@ -21,7 +21,7 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
     try {
       const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/ads-manager-campaigns`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-service-key": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "" },
+        headers: { "Content-Type": "application/json", "x-service-key": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`, apikey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "" },
         body: JSON.stringify({ mode: "resolve_token", adAccountId: adAccountDbId }),
       });
       const j = await res.json().catch(() => ({}));
