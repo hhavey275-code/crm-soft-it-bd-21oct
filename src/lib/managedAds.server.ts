@@ -11,7 +11,7 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
   if (!account || !bm?.access_token) throw new Error("Ad account বা Business Manager token পাওয়া যায়নি");
   // Tokens are encrypted with the backend's service key; BM_TOKEN_SECRET lets a host whose
   // SUPABASE_SERVICE_ROLE_KEY string differs still unlock them.
-  const secrets = [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[];
+  const secrets = [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY, cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY)].filter(Boolean) as string[];
   let token: string | null = null;
   for (const sec of secrets) {
     try { token = await decryptToken(bm.access_token, sec); break; } catch { /* try next */ }
