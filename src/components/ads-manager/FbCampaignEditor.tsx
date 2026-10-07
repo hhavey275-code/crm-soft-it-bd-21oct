@@ -93,8 +93,8 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
   const Icon = (l: Level) => (l === "campaign" ? Folder : l === "adset" ? LayoutGrid : FileText);
 
   return (
-    <div className="fb-font fixed inset-0 z-50 flex bg-fb-bg text-fb-text">
-      <aside className="w-72 shrink-0 overflow-y-auto border-r border-fb-border bg-background">
+    <div className="fb-font fixed inset-0 z-50 flex flex-col bg-fb-bg text-fb-text md:flex-row">
+      <aside className="flex max-h-40 shrink-0 flex-col overflow-y-auto border-b border-fb-border bg-background md:max-h-none md:w-72 md:border-b-0 md:border-r">
         {nodes.map((n) => {
           const I = Icon(n.level); const id = String(n.obj.id);
           return (

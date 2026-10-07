@@ -616,7 +616,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               onChange={(e) => setCq(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCountry()} />
           </div>
         </Field>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Field label="Minimum age"><select className={sel} value={ageMin} onChange={(e) => setAgeMin(e.target.value)}>{Array.from({ length: 48 }, (_, i) => 18 + i).map((n) => <option key={n}>{n}</option>)}</select></Field>
           <Field label="Maximum age"><select className={sel} value={ageMax} onChange={(e) => setAgeMax(e.target.value)}>{Array.from({ length: 48 }, (_, i) => 18 + i).map((n) => <option key={n} value={n}>{n === 65 ? "65+" : n}</option>)}</select></Field>
           <Field label="Gender"><select className={sel} value={gender} onChange={(e) => setGender(e.target.value)}><option value="all">All genders</option><option value="male">Men</option><option value="female">Women</option></select></Field>
@@ -835,29 +835,34 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
-        <header className="flex h-12 items-center gap-2 border-b border-fb-border bg-background px-3 text-[13px]">
-          <button onClick={askClose} className="rounded-md p-1.5 hover:bg-fb-bg md:hidden"><X className="h-5 w-5" /></button>
+        <header className="flex h-12 items-center gap-1 overflow-x-auto border-b border-fb-border bg-background px-2 text-[13px] sm:gap-2 sm:px-3">
+          <button onClick={askClose} className="shrink-0 rounded-md p-1.5 hover:bg-fb-bg md:hidden"><X className="h-5 w-5" /></button>
           {tree.map((t, i) => (
-            <span key={i} className="flex min-w-0 items-center gap-1">
+            <span key={i} className="flex min-w-0 shrink-0 items-center gap-1">
               {i > 0 && <span className="text-fb-muted">›</span>}
               <button onClick={() => { setLevel(i as any); setTab("edit"); }} className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-1", level === i ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
-                <t.icon className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[140px] truncate">{i === 0 ? t.name : i === 1 ? "1 Ad set" : "1 Ad"}</span>
+                <t.icon className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[90px] truncate sm:max-w-[140px]">{i === 0 ? t.name : i === 1 ? "1 Ad set" : "1 Ad"}</span>
+                {t.err ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive md:hidden" /> : null}
               </button>
             </span>
           ))}
-          <span className="ml-auto flex items-center gap-1.5 text-fb-muted"><span className="h-2.5 w-2.5 rounded-full border border-fb-muted" />In draft</span>
+          <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-fb-muted sm:flex"><span className="h-2.5 w-2.5 rounded-full border border-fb-muted" />In draft</span>
         </header>
         <div className="flex justify-center gap-2 border-b border-fb-border bg-background py-1.5">
           <button onClick={() => setTab("edit")} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold", tab === "edit" ? "bg-fb-blue-soft text-fb-blue" : "text-fb-text")}><Pencil className="h-3.5 w-3.5" />Edit</button>
           <button onClick={() => setTab("review")} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold", tab === "review" ? "bg-fb-blue-soft text-fb-blue" : "text-fb-text")}><Eye className="h-3.5 w-3.5" />Review</button>
         </div>
+        {/* Mobile step indicator */}
+        <div className="flex gap-1 bg-background px-3 pb-2 pt-1 md:hidden">
+          {[0, 1, 2].map((i) => <div key={i} className={cn("h-1 flex-1 rounded-full", i <= level ? "bg-fb-blue" : "bg-fb-border")} />)}
+        </div>
 
         {/* Body */}
-        <main className="flex-1 overflow-auto bg-gradient-to-br from-fb-bg via-background to-fb-blue-soft/40">
-          <div className="mx-auto grid max-w-[920px] gap-3 p-3 lg:grid-cols-[1fr_300px]">
-            <div className="space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
-            <div className="space-y-3">
-              <div className="rounded-lg border border-fb-border bg-background p-4">
+        <main className="flex-1 overflow-auto overscroll-contain bg-gradient-to-br from-fb-bg via-background to-fb-blue-soft/40">
+          <div className="mx-auto grid max-w-[920px] gap-3 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
+            <div className="min-w-0 space-y-3">
+              <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-full border-4 text-[14px] font-bold", ready ? "border-fb-green" : "border-fb-blue/50")}>{ready ? 100 : 70}</div>
                   <div><p className="text-[14px] font-semibold">Campaign score</p><p className="text-[12px] text-fb-muted">{ready ? "You're using our recommended setup." : "Complete the required fields."}</p></div>
@@ -877,25 +882,25 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 </div>
               )}
               {(level === 2 || tab === "review") && (
-                <div className="space-y-2"><p className="text-[13px] font-semibold">Ad preview</p>{preview}</div>
+                <div className="space-y-2 overflow-hidden"><p className="text-[13px] font-semibold">Ad preview</p>{preview}</div>
               )}
             </div>
           </div>
         </main>
 
         {/* Bottom bar */}
-        <footer className="flex items-center gap-3 border-t border-fb-border bg-background px-4 py-2.5 text-[13px]">
-          <button onClick={askClose} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Close</button>
+        <footer className="flex items-center gap-2 border-t border-fb-border bg-background px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-[13px] sm:gap-3 sm:px-4 sm:py-2.5">
+          <button onClick={askClose} className="hidden h-10 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg sm:block sm:h-9">Close</button>
           <span className="hidden items-center gap-1 text-fb-green sm:flex"><Check className="h-4 w-4" />All edits saved</span>
           {level === 2 && <span className="hidden text-[11px] text-fb-muted lg:inline">By clicking Publish, you acknowledge the Terms and Conditions.</span>}
-          <div className="ml-auto flex gap-2">
-            {level > 0 && <button onClick={() => setLevel((level - 1) as any)} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg">Back</button>}
+          <div className="flex flex-1 gap-2 sm:ml-auto sm:flex-none">
+            {level > 0 && <button onClick={() => setLevel((level - 1) as any)} className="h-10 flex-1 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg sm:h-9 sm:flex-none sm:px-4">Back</button>}
             {level < 2 ? (
-              <button onClick={() => { setLevel((level + 1) as any); setTab("edit"); }} className="h-9 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground">Next</button>
+              <button onClick={() => { setLevel((level + 1) as any); setTab("edit"); }} className="h-10 flex-1 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground sm:h-9 sm:flex-none">Next</button>
             ) : (
               <>
-                <button disabled={saving} onClick={keepDraft} className="h-9 rounded-md border border-fb-border px-4 font-semibold hover:bg-fb-bg disabled:opacity-50">Save as draft</button>
-                <button disabled={saving || !ready} onClick={() => submit(true)} className="inline-flex h-9 items-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40">
+                <button disabled={saving} onClick={keepDraft} className="h-10 flex-1 rounded-md border border-fb-border px-2 font-semibold hover:bg-fb-bg disabled:opacity-50 sm:h-9 sm:flex-none sm:px-4">Draft</button>
+                <button disabled={saving || !ready} onClick={() => submit(true)} className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40 sm:h-9 sm:flex-none">
                   {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Publish
                 </button>
               </>

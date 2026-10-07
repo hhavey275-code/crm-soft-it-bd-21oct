@@ -152,13 +152,22 @@ export default function MyAdsPage() {
     <DashboardLayout fullBleed>
       {wizard}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
-      <div className="fb-font flex h-[calc(100vh-3.5rem)] flex-col bg-fb-bg p-2 text-fb-text">
+      <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
-        <div className="flex flex-wrap items-center gap-3 rounded-t-lg bg-background px-4 py-3 border border-fb-border">
+        <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:gap-3 sm:px-4 sm:py-3">
           <h1 className="text-lg font-bold">Campaigns</h1>
+          <div className="ml-auto flex items-center gap-2 sm:order-last">
+            <span className="hidden text-[13px] text-fb-muted sm:inline">
+              {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
+            </span>
+            <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+              {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
+            </button>
+          </div>
           <Select value={currentAccId ?? ""} onValueChange={pickAccount} disabled={!accounts.length}>
-            <SelectTrigger className="h-9 w-auto min-w-[260px] max-w-[360px] gap-2 border-fb-border text-[13px]">
-              <span className="flex items-center gap-2 truncate">
+            <SelectTrigger className="h-9 w-full gap-2 border-fb-border text-[13px] sm:w-auto sm:min-w-[260px] sm:max-w-[360px]">
+              <span className="flex min-w-0 items-center gap-2 truncate">
                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-destructive text-[11px] font-bold text-background">{(currentAcc?.name || "A").charAt(0).toUpperCase()}</span>
                 <span className="truncate">{currentAcc ? `${currentAcc.name} (${String(currentAcc.account_id).replace(/^act_/, "")})` : "Ad account বাছুন"}</span>
               </span>
@@ -174,26 +183,17 @@ export default function MyAdsPage() {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-fb-border text-[13px] max-w-[260px]">
+          <div className="hidden items-center gap-2 h-9 px-3 rounded-md border border-fb-border text-[13px] max-w-[260px] sm:flex">
             <Megaphone className="h-4 w-4 text-fb-muted shrink-0" />
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>
           </div>
           <FacebookConnectButton label={allPages.length ? "Facebook আবার connect" : "Connect Facebook"} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
           {currentAcc?.kind === "shared" && <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[13px] text-fb-muted">
-              {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
-            </span>
-            <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
-              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-              {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
-            </button>
-          </div>
         </div>
 
         {/* Filter chips + search */}
-        <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-3">
-          <div className="flex flex-wrap gap-2 pt-1">
+        <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
+          <div className="hidden flex-wrap gap-2 pt-1 sm:flex">
             <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border-2 border-fb-blue bg-fb-blue-soft text-[13px] font-semibold text-fb-blue">All ads</span>
             <span className={tbBtn}>Active ads</span>
             <span className={tbBtn}>Had delivery</span>
@@ -202,7 +202,7 @@ export default function MyAdsPage() {
         </div>
 
         {(error || (data?.errors ?? []).length > 0 || (isShared && data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
-          <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-2 text-[13px]">
+          <div className="max-h-32 overflow-auto bg-background border-x border-fb-border px-3 pb-3 space-y-2 text-[13px] sm:max-h-none sm:px-4">
                         {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">এখনো আপনার কোনো ad account CRM-এ যুক্ত নেই।</div>}
             {isShared && data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
             {isShared && data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
@@ -212,24 +212,24 @@ export default function MyAdsPage() {
         )}
 
         {/* Level tabs */}
-        <div className="flex items-end gap-1 bg-background border-x border-fb-border px-4 pt-2">
+        <div className="flex flex-wrap items-end gap-1 bg-background border-x border-fb-border px-2 pt-2 sm:flex-nowrap sm:px-4">
           {([["campaign", "Campaigns"], ["adset", "Ad sets"], ["ad", "Ads"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)}
-              className={cn("flex-1 max-w-[300px] h-11 px-4 text-left text-[15px] font-semibold rounded-t-lg border border-b-0 border-fb-border",
+              className={cn("flex-1 sm:max-w-[300px] h-10 px-2 text-center text-[13px] font-semibold rounded-t-lg border border-b-0 border-fb-border sm:h-11 sm:px-4 sm:text-left sm:text-[15px]",
                 tab === k ? "bg-background text-fb-blue border-t-2 border-t-fb-blue" : "bg-fb-bg text-fb-text")}>
               {l}
-              {k === "adset" && selCampaigns.length > 0 && <span className="ml-2 text-xs font-normal text-fb-blue">for {selCampaigns.length} campaign</span>}
-              {k === "ad" && (selCampaigns.length + selAdsets.length) > 0 && <span className="ml-2 text-xs font-normal text-fb-blue">filtered</span>}
+              {k === "adset" && selCampaigns.length > 0 && <span className="ml-2 hidden text-xs font-normal text-fb-blue sm:inline">for {selCampaigns.length} campaign</span>}
+              {k === "ad" && (selCampaigns.length + selAdsets.length) > 0 && <span className="ml-2 hidden text-xs font-normal text-fb-blue sm:inline">filtered</span>}
             </button>
           ))}
-          <div className="ml-auto pb-1">
+          <div className="order-first w-full pb-1 sm:order-none sm:ml-auto sm:w-auto">
             <FbDateRangePicker value={range} onChange={setRange} />
           </div>
         </div>
 
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {/* Action toolbar */}
-        <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
           <button onClick={() => { setOpenDraftObj(undefined); setCreating(true); }}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
             <Plus className="h-4 w-4" />Create
@@ -242,10 +242,10 @@ export default function MyAdsPage() {
             }}>
             <Pencil className="h-4 w-4" />Edit
           </button>
-          {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length} selected</button>}
+          {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length}</button>}
           <div className="ml-auto flex gap-2">
             <ColumnsPicker keys={extra.keys} toggle={extra.toggle} className={tbBtn} />
-            <span className={tbBtn}>Breakdown</span>
+            <span className={cn(tbBtn, "hidden sm:inline-flex")}>Breakdown</span>
           </div>
         </div>
 
