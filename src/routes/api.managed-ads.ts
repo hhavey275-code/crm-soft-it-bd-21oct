@@ -11,8 +11,17 @@ const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
-  z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional() }),
-  z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(100000), asUserId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
+  z.object({
+    action: z.literal("update"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/),
+    adAccountDbId: z.string().uuid().optional(), asUserId: z.string().uuid().optional(),
+    name: z.string().min(1).max(200).optional(),
+    budgetType: z.enum(["daily", "lifetime"]).optional(), amount: z.number().positive().max(1000000).optional(),
+    countries: z.array(z.string().length(2)).min(1).max(25).optional(),
+    ageMin: z.number().int().min(18).max(65).optional(), ageMax: z.number().int().min(18).max(65).optional(),
+    message: z.string().max(5000).optional(), headline: z.string().max(255).optional(), link: z.string().max(1000).optional(),
+  }),
+  z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
@@ -95,15 +104,46 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
-  if (body.action === "set_status" || body.action === "set_budget") {
-    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true });
-    const list = body.action === "set_budget" ? owned.adsets : body.level === "campaign" ? owned.campaigns : body.level === "adset" ? owned.adsets : owned.ads;
+  if (body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
+    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, onlyAccount: body.adAccountDbId });
+    const lvl = body.action === "set_budget" ? "adset" : body.level;
+    const list = lvl === "campaign" ? owned.campaigns : lvl === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
     if (!obj) throw new Error("এই campaign/ad আপনার নয়");
     const shared = obj.account_kind !== "own"; // own accounts spend their own limit, not the wallet
     const bal = await walletBalance(supabaseAdmin, targetUser);
     if (shared && body.action === "set_status" && body.status === "ACTIVE" && bal <= settings.pauseThreshold) {
       throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন, তারপর চালু করুন`);
+    }
+    if (body.action === "update") {
+      const g = graphClient((await tokenFor(supabaseAdmin, obj.ad_account_db_id)).token);
+      if (shared && !isAdmin && body.amount && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
+      const upd: Record<string, unknown> = {};
+      if (body.name) upd.name = body.name;
+      if (body.amount && body.budgetType && lvl !== "ad") upd[body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"] = String(Math.round(body.amount * 100));
+      if (lvl === "adset" && (body.countries || body.ageMin || body.ageMax)) {
+        const t: any = { ...(obj.targeting ?? {}) };
+        if (body.countries) t.geo_locations = { countries: body.countries, location_types: ["home", "recent"] };
+        if (body.ageMin) t.age_min = body.ageMin;
+        if (body.ageMax) t.age_max = body.ageMax;
+        upd.targeting = t;
+      }
+      if (lvl === "ad" && (body.message !== undefined || body.headline !== undefined || body.link !== undefined)) {
+        const cur = await g.get(body.objectId, { fields: "creative{object_story_spec,name}" });
+        const spec: any = cur?.creative?.object_story_spec;
+        if (!spec?.link_data) throw new Error("এই ad-টি page-এর পুরনো post থেকে বানানো — এর লেখা বদলানো যায় না, নাম/চালু-বন্ধ বদলানো যাবে");
+        const ld = { ...spec.link_data };
+        if (body.message !== undefined) ld.message = body.message;
+        if (body.headline !== undefined) ld.name = body.headline;
+        if (body.link && /^https?:\/\//.test(body.link)) { ld.link = body.link; if (ld.call_to_action?.value?.link) ld.call_to_action = { ...ld.call_to_action, value: { ...ld.call_to_action.value, link: body.link } }; }
+        delete ld.image_url; delete ld.picture;
+        const act = `act_${String(owned.accounts.find((a: any) => a.id === obj.ad_account_db_id)?.account_id ?? "").replace(/^act_/, "")}`;
+        const cr = await g.post(`${act}/adcreatives`, { name: `${cur.creative?.name ?? "ad"} (edited)`, object_story_spec: { ...spec, link_data: ld } });
+        upd.creative = { creative_id: String(cr.id) };
+      }
+      if (!Object.keys(upd).length) throw new Error("কিছু বদলানো হয়নি");
+      await g.post(body.objectId, upd);
+      return { ok: true };
     }
     if (body.action === "set_budget") {
       if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
@@ -126,7 +166,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (!wantAcc) throw new Error("Ad account বাছুন");
   let shared: boolean;
   if ((await sharedAccountIds(supabaseAdmin, page.user_id)).includes(wantAcc)) shared = true;
-  else if ((await ownAccounts(supabaseAdmin, page.user_id)).some((a: any) => a.id === wantAcc)) shared = false;
+  else if ((await ownAccounts(supabaseAdmin, page.user_id, true)).some((a: any) => a.id === wantAcc)) shared = false;
   else throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
   const { token, act, bmId } = await tokenFor(supabaseAdmin, wantAcc);
   const g = graphClient(token);
@@ -206,7 +246,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     }
 
     const targeting: Record<string, unknown> = {
-      geo_locations: { countries: body.countries },
+      geo_locations: { countries: body.countries, location_types: ["home", "recent"] },
       age_min: Math.min(body.ageMin, body.ageMax), age_max: Math.max(body.ageMin, body.ageMax),
       targeting_automation: { advantage_audience: 0 },
     };
