@@ -112,20 +112,40 @@ async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: s
   return undefined;
 }
 
-// Give our Business Manager + its system user "Advertise" rights on the client's Page.
-async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, ownerId: string, bmId?: string | null) {
+// Give our Business Manager "Advertise" rights on the client's Page using the client's saved Page login.
+// Returns a plain-language problem when Facebook refuses, so the client knows exactly what to do.
+async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, ownerId: string, bmId?: string | null): Promise<string | null> {
   const pt = await savedPageToken(supabaseAdmin, pageId, ownerId);
+  const v = "https://graph.facebook.com/v25.0";
   const tasks = ["ADVERTISE", "ANALYZE", "CREATE_CONTENT", "MODERATE", "MESSAGING"];
-  const me = await g.get("me", { fields: "id" }).catch(() => null);
-  if (pt && bmId) {
-    const v = "https://graph.facebook.com/v25.0";
-    const form = (o: Record<string, string>) => new URLSearchParams({ ...o, access_token: pt });
-    await fetch(`${v}/${pageId}/agencies`, { method: "POST", body: form({ business: String(bmId), permitted_tasks: JSON.stringify(tasks) }) }).catch(() => null);
-    if (me?.id) await fetch(`${v}/${pageId}/assigned_users`, { method: "POST", body: form({ user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId) }) }).catch(() => null);
+  if (!pt) return "এই Page-এর Facebook login CRM-এ save নেই — My Ads-এ \"Facebook আবার connect\" চেপে Page-টা টিক দিয়ে login করুন, তারপর আবার Publish দিন";
+  if (!bmId) return "এই ad account-এর Business Manager CRM-এ পাওয়া যায়নি";
+  const already = await fetch(`${v}/${pageId}/agencies?fields=id&access_token=${encodeURIComponent(pt)}`).then((r) => r.json()).catch(() => null);
+  if ((already?.data ?? []).some((a: any) => String(a.id) === String(bmId))) {
+    const me = await g.get("me", { fields: "id" }).catch(() => null);
+    if (me?.id) await g.post(`${pageId}/assigned_users`, { user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId) }).catch(() => null);
+    return null;
   }
-  if (bmId) await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: tasks }).catch(() => null);
-  if (me?.id) await g.post(`${pageId}/assigned_users`, { user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId ?? "") }).catch(() => null);
-  if (!pt) throw new Error("এই Page-এর Facebook login CRM-এ save নেই — My Ads-এ \"Facebook আবার connect\" চেপে Page-টা টিক দিয়ে login করুন, তারপর আবার Publish দিন");
+  const r: any = await fetch(`${v}/${pageId}/agencies`, { method: "POST", body: new URLSearchParams({ business: String(bmId), permitted_tasks: JSON.stringify(tasks), access_token: pt }) }).then((x) => x.json()).catch(() => null);
+  if (r && !r.error) {
+    const me = await g.get("me", { fields: "id" }).catch(() => null);
+    if (me?.id) await g.post(`${pageId}/assigned_users`, { user: String(me.id), tasks: JSON.stringify(tasks), business: String(bmId) }).catch(() => null);
+    return null;
+  }
+  const e = r?.error ?? {};
+  const bm = await g.get(String(bmId), { fields: "name" }).catch(() => null);
+  const bmName = bm?.name ? `"${String(bm.name).trim()}"` : "এই ad account-এর";
+  if (e.error_subcode === 2446325 || /not allowed to advertise/i.test(`${e.error_user_title} ${e.message}`)) {
+    return `${bmName} Business Manager-কে Facebook ad চালানো বন্ধ (restricted) করে রেখেছে, তাই কোনো Page এতে access দেওয়া যাচ্ছে না। Admin-কে বলুন আপনাকে অন্য একটি চালু (active) ad account দিতে`;
+  }
+  // Page belongs to another Business: send a request and point the owner to that exact Business's Requests page.
+  await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] }).catch(() => null);
+  const pb = await fetch(`${v}/${pageId}?fields=business{id,name}&access_token=${encodeURIComponent(pt)}`).then((x) => x.json()).catch(() => null);
+  const owner = pb?.business;
+  const where = owner?.id
+    ? `Page-টা "${owner.name}" Business-এর মালিকানায়। এই লিংকে গিয়ে ${bmName} এর request-এ Approve চাপুন: https://business.facebook.com/latest/settings/requests?business_id=${owner.id}`
+    : `Facebook-এ Page-এর Settings → Page access → Partner requests-এ গিয়ে ${bmName} এর request Approve করুন: https://www.facebook.com/settings/?tab=profile_access`;
+  return `Facebook নিজে থেকে access দিতে দেয়নি (${e.error_user_msg || e.message || "অনুমতি নেই"})। ${where} — তারপর আবার Publish দিন`;
 }
 
 async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
@@ -242,7 +262,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (!picture) picture = `https://graph.facebook.com/${pageId}/picture?type=normal`;
     let wa = wa1?.whatsapp_number || wa2?.whatsapp_display_number || null;
     if (!wa) {
-      const cta = await one("call_to_actions{type,intl_number_with_plus,android_url}");
+      const cta = await one("call_to_actions{type}");
       const w = (cta?.call_to_actions?.data ?? []).find((x: any) => /WHATSAPP/i.test(String(x.type)));
       if (w) wa = w.intl_number_with_plus || "linked";
     }
@@ -328,6 +348,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const budgetKey = body.budgetType === "daily" ? "daily_budget" : "lifetime_budget";
   const cbo = body.budgetLevel === "campaign";
 
+  // Before creating anything: the ad account must be active and our Business must be able to use the Page.
+  const accInfo = await g.get(act, { fields: "account_status,name" }).catch(() => null);
+  if (accInfo && Number(accInfo.account_status) !== 1) {
+    const why: Record<number, string> = { 2: "Disabled", 3: "বিল বাকি (Unsettled)", 7: "Review চলছে", 9: "Grace period", 100: "বন্ধের প্রক্রিয়ায়", 101: "Closed" };
+    throw new Error(`এই ad account (${accInfo.name}) Facebook-এ চালু নেই — অবস্থা: ${why[Number(accInfo.account_status)] ?? accInfo.account_status}। অন্য একটি চালু ad account বেছে নিন বা Admin-কে জানান`);
+  }
+  const accessProblem = await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId);
+
   let campaignId: string | null = null;
   let step = "Campaign";
   try {
@@ -400,7 +428,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     catch (err: any) {
       // Page not yet shared with our ad token: grant access using the client's saved Page login, then retry once.
       if (!/1487202|page permission|full control|ADVERTISE|\(#100\)|\(#200\)/i.test(String(err?.message))) throw err;
-      await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId);
+      const p2 = accessProblem ?? (await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId));
+      if (p2) throw new Error(p2);
       cr = await g.post(`${act}/adcreatives`, creative);
     }
     step = "Ad";
@@ -414,9 +443,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const msg = String(e?.message || "");
     let hint = "";
     if (/1487202|page permission|full control/i.test(msg)) {
-      // Send the partner request so the Page owner only needs to approve it.
-      if (bmId) await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] }).catch(() => null);
-      hint = ` — Page-এ ad চালানোর অনুমতির request পাঠানো হয়েছে। Page-এর মালিক এখানে গিয়ে Approve করুন: https://business.facebook.com/latest/settings/requests — তারপর আবার Publish দিন।`;
+      hint = accessProblem ? ` — ${accessProblem}` : "";
     } else if (/permission|actor|not authorized|\(#200\)|\(#10\)/i.test(msg)) {
       hint = " — সম্ভবত এই Page আমাদের Business Manager-এ access দেয়নি। Ad ধাপে \"Page access request পাঠান\" চাপুন।";
     }
