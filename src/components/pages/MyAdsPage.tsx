@@ -252,7 +252,25 @@ export default function MyAdsPage() {
           <div className="space-y-3 px-3">
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-fb-border bg-background p-4">
               <div><p className="text-[13px] text-fb-muted">Total amount spent</p><p className="text-2xl font-bold">{money(totals.spend)}</p></div>
-              <div><p className="text-[13px] text-fb-muted">{isShared ? "Wallet balance" : "Results"}</p><p className="text-2xl font-bold">{isShared ? money(data?.walletBalance ?? 0) : num(totals.results)}</p></div>
+              {isShared ? (
+                <div><p className="text-[13px] text-fb-muted">Wallet balance</p><p className="text-2xl font-bold">{money(data?.walletBalance ?? 0)}</p></div>
+              ) : (() => {
+                const sm: any = currentAcc ? accSummary?.[currentAcc.id] : null;
+                if (!sm) return <div><p className="text-[13px] text-fb-muted">Spend limit</p><p className="text-sm text-fb-muted">Loading…</p></div>;
+                const cap = Number(sm.spendCap || 0);
+                if (!cap) return <div><p className="text-[13px] text-fb-muted">Spend limit</p><p className="text-2xl font-bold">No limit</p></div>;
+                const left = Math.max(cap - Number(sm.amountSpent || 0), 0);
+                const pct = (left / cap) * 100;
+                const bar = pct <= 20 ? "bg-destructive" : pct <= 50 ? "bg-yellow-500" : "bg-fb-blue";
+                return (
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-fb-muted">Spend limit {money(cap)}</p>
+                    <p className="text-2xl font-bold">{money(left)}</p>
+                    <p className="text-[11px] text-fb-muted">remaining</p>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", bar)} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
+                  </div>
+                );
+              })()}
             </div>
             {(error || (data?.errors ?? []).length > 0) && (
               <div className="rounded-lg bg-background p-3 text-[13px] text-destructive">
