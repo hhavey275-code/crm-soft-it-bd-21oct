@@ -16,6 +16,18 @@ export async function tokenFor(supabaseAdmin: any, adAccountDbId: string) {
   for (const sec of secrets) {
     try { token = await decryptToken(bm.access_token, sec); break; } catch { /* try next */ }
   }
+  if (!token) {
+    // Fallback: the backend that encrypted the token unlocks it for us (server-to-server).
+    try {
+      const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/ads-manager-campaigns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-service-key": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`, apikey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "" },
+        body: JSON.stringify({ mode: "resolve_token", adAccountId: adAccountDbId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j?.token) token = String(j.token);
+    } catch { /* fall through */ }
+  }
   if (!token) throw new Error(`Business Manager "${bm.name ?? ""}"-এর token খোলা যাচ্ছে না — Business Managers পেজে এই BM-এর access token আবার সেভ করুন`);
   const act = String(account.account_id).startsWith("act_") ? account.account_id : `act_${account.account_id}`;
   return { token, act, account, bmId: bm.bm_id ? String(bm.bm_id) : null };
