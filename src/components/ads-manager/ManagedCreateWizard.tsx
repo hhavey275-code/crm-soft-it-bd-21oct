@@ -177,7 +177,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE";
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const [waManual, setWaManual] = useState("");
-  const wa = pageInfo?.whatsappNumber ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : null);
+  const wa = (pageInfo?.whatsappNumber && pageInfo.whatsappNumber !== "linked" ? pageInfo.whatsappNumber : null) ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : pageInfo ? "Page-এর connected WhatsApp" : null);
   const waConnectUrl = `https://www.facebook.com/${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}/settings/?tab=linked_accounts`;
   const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
   const amt = Number(amount) || 0;
@@ -298,7 +298,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         imageBase64: setup === "new" ? image?.b64 : undefined,
         ...(objective === "ENGAGEMENT" ? {
           engagementLocation: engLoc, msgDestinations: engLoc === "MESSAGING" ? finalDests : undefined,
-          whatsappNumber: wa ?? undefined, phoneNumber: engLoc === "CALLS" ? phone.trim() : undefined,
+          whatsappNumber: wa && /\d{8}/.test(wa.replace(/\D/g, "")) ? wa : undefined, phoneNumber: engLoc === "CALLS" ? phone.trim() : undefined,
         } : {}),
         publish,
       });
