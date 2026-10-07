@@ -49,14 +49,20 @@ export async function sharedAccountIds(supabaseAdmin: any, userId: string): Prom
 }
 
 /** Client's own (dedicated) Meta ad accounts — only when Campaign Management is on. */
-export async function ownAccounts(supabaseAdmin: any, userId: string, ignoreToggle = false) {
+export async function ownAccounts(supabaseAdmin: any, userId: string, ignoreToggle = false, allForAdmin = false) {
+  const notTiktok = (a: any) => String(a.platform || "meta").toLowerCase() !== "tiktok";
+  // Admins see every Meta ad account in the CRM.
+  if (allForAdmin) {
+    const { data } = await supabaseAdmin.from("ad_accounts").select("id, account_id, account_name, platform, status").order("account_name").limit(2000);
+    return (data ?? []).filter(notTiktok);
+  }
   const { data: prof } = await supabaseAdmin.from("profiles").select("campaign_management_enabled").eq("user_id", userId).maybeSingle();
   if (!ignoreToggle && !prof?.campaign_management_enabled) return [] as any[];
   const { data: links } = await supabaseAdmin.from("user_ad_accounts").select("ad_account_id").eq("user_id", userId);
   const ids = (links ?? []).map((l: any) => l.ad_account_id);
   if (!ids.length) return [];
   const { data } = await supabaseAdmin.from("ad_accounts").select("id, account_id, account_name, platform, status").in("id", ids);
-  return (data ?? []).filter((a: any) => String(a.platform || "meta").toLowerCase() !== "tiktok");
+  return (data ?? []).filter(notTiktok);
 }
 
 /**
