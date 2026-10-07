@@ -186,17 +186,25 @@ export default function MyAdsPage() {
             <div className="divide-y divide-fb-border">
               {list.map((a) => {
                 const selected = a.id === currentAccId;
-                const n = selected ? campaigns.filter((c) => c.effective_status === "ACTIVE").length : null;
+                const s = accSummary?.[a.id];
+                const st = s ? accountStatusInfo(s) : null;
                 return (
                   <button key={a.id} onClick={() => { pickAccount(a.id); setMobileStep("campaigns"); }} className="flex w-full items-center gap-4 px-4 py-4 text-left active:bg-fb-bg">
                     <span className={cn("h-6 w-6 shrink-0 rounded-full border-2", selected ? "border-[7px] border-fb-blue" : "border-fb-border")} />
                     <span className="min-w-0">
                       <span className="block truncate text-[16px] font-bold">{a.name}</span>
-                      <span className="block text-[15px]">{String(a.account_id).replace(/^act_/, "")} · USD</span>
-                      <span className="mt-0.5 flex items-center gap-2 text-[13px] text-fb-muted">
-                        <span className={cn("h-2 w-2 rounded-full", a.kind === "shared" ? "bg-fb-blue" : n ? "bg-fb-green" : "bg-fb-muted")} />
-                        {a.kind === "shared" ? "Shared (wallet)" : n != null ? (n ? `${n} active campaign` : "No active campaigns") : "Own account"}
+                      <span className="block text-[15px]">{String(a.account_id).replace(/^act_/, "")} · {s?.currency || "USD"}{a.kind === "shared" ? " · Shared (wallet)" : ""}</span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-fb-muted">
+                        {!s ? <span>Loading status…</span> : st && (
+                          <>
+                            <span className={cn("inline-flex items-center gap-1.5 font-semibold", st.tone)}>
+                              <span className={cn("h-2 w-2 rounded-full", st.dot)} />{st.label}
+                            </span>
+                            {s.active != null && <span>· {s.active ? `${s.active} active campaign${s.active > 1 ? "s" : ""}` : "No active campaigns"}</span>}
+                          </>
+                        )}
                       </span>
+                      {st?.billing && <span className="mt-0.5 block text-[12px] font-medium text-destructive">{st.billing}</span>}
                     </span>
                   </button>
                 );
