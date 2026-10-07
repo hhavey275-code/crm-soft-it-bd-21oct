@@ -22,6 +22,7 @@ import { ColumnsPicker, fmtCol, totalCol, useExtraColumns } from "@/components/a
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
 import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-manager/FbDateRangePicker";
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -48,6 +49,9 @@ export default function MyAdsPage() {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState<string | null>(null);
   const [accSel, setAccSel] = useState<string | undefined>(undefined);
+  const isMobile = useIsMobile();
+  const [mobileStep, setMobileStep] = useState<"accounts" | "campaigns">("accounts");
+  const [accSearch, setAccSearch] = useState("");
   useEffect(() => { const v = localStorage.getItem("myads-account"); if (v) setAccSel(v); }, []);
   const [drafts, setDrafts] = useState<CampaignDraft[]>([]);
   const [openDraftObj, setOpenDraftObj] = useState<CampaignDraft | undefined>(undefined);
@@ -147,6 +151,125 @@ export default function MyAdsPage() {
   const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
   const sub = "block text-[11px] text-fb-muted";
   const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
+
+  if (isMobile) {
+    const startCreate = () => { setOpenDraftObj(undefined); setCreating(true); };
+    if (mobileStep === "accounts") {
+      const q = accSearch.trim().toLowerCase();
+      const list = accounts.filter((a) => !q || `${a.name} ${a.account_id}`.toLowerCase().includes(q));
+      return (
+        <DashboardLayout fullBleed>
+          <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
+            <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
+              <h1 className="text-center text-lg font-bold">Select account</h1>
+              <Input className="mt-3 h-11 rounded-full border-fb-border px-4" placeholder="Search accounts" value={accSearch} onChange={(e) => setAccSearch(e.target.value)} />
+            </div>
+            {isFetching && !data && <p className="py-10 text-center text-fb-muted">Loading…</p>}
+            {data && list.length === 0 && <p className="py-10 text-center text-fb-muted">কোনো ad account পাওয়া যায়নি।</p>}
+            <div className="divide-y divide-fb-border">
+              {list.map((a) => {
+                const selected = a.id === currentAccId;
+                const n = selected ? campaigns.filter((c) => c.effective_status === "ACTIVE").length : null;
+                return (
+                  <button key={a.id} onClick={() => { pickAccount(a.id); setMobileStep("campaigns"); }} className="flex w-full items-center gap-4 px-4 py-4 text-left active:bg-fb-bg">
+                    <span className={cn("h-6 w-6 shrink-0 rounded-full border-2", selected ? "border-[7px] border-fb-blue" : "border-fb-border")} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[16px] font-bold">{a.name}</span>
+                      <span className="block text-[15px]">{String(a.account_id).replace(/^act_/, "")} · USD</span>
+                      <span className="mt-0.5 flex items-center gap-2 text-[13px] text-fb-muted">
+                        <span className={cn("h-2 w-2 rounded-full", a.kind === "shared" ? "bg-fb-blue" : n ? "bg-fb-green" : "bg-fb-muted")} />
+                        {a.kind === "shared" ? "Shared (wallet)" : n != null ? (n ? `${n} active campaign` : "No active campaigns") : "Own account"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DashboardLayout>
+      );
+    }
+    const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
+    const q = search.trim().toLowerCase();
+    const mcamps = campaigns.filter((c) => !q || c.name?.toLowerCase().includes(q));
+    return (
+      <DashboardLayout fullBleed>
+        {wizard}
+        {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
+        <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
+          <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <button onClick={() => setMobileStep("accounts")} className="min-w-0 text-left">
+                <span className="flex items-center gap-1"><span className="truncate text-xl font-bold">{currentAcc?.name ?? "Ad account বাছুন"}</span><span className="text-sm">▾</span></span>
+                <span className="flex items-center gap-1.5 text-[13px] text-fb-muted"><span className={cn("h-2 w-2 rounded-full", activeCount ? "bg-fb-green" : "bg-fb-muted")} />{activeCount ? `${activeCount} active campaign` : "No active campaigns"}</span>
+              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fb-border bg-background disabled:opacity-50" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
+                  <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                </button>
+                <button onClick={startCreate} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background">
+                  <Plus className="h-4 w-4" />Create
+                </button>
+              </div>
+            </div>
+            <FbDateRangePicker value={range} onChange={setRange} />
+          </div>
+          <div className="space-y-3 px-3">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-fb-border bg-background p-4">
+              <div><p className="text-[13px] text-fb-muted">Total amount spent</p><p className="text-2xl font-bold">{money(totals.spend)}</p></div>
+              <div><p className="text-[13px] text-fb-muted">{isShared ? "Wallet balance" : "Results"}</p><p className="text-2xl font-bold">{isShared ? money(data?.walletBalance ?? 0) : num(totals.results)}</p></div>
+            </div>
+            {(error || (data?.errors ?? []).length > 0) && (
+              <div className="rounded-lg bg-background p-3 text-[13px] text-destructive">
+                {error && <p>{(error as Error).message}</p>}
+                {(data?.errors ?? []).map((e: string, i: number) => <p key={i}>{e}</p>)}
+              </div>
+            )}
+            {!allPages.length && <FacebookConnectButton label="Connect Facebook" onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />}
+            <div className="flex items-center justify-between pt-1">
+              <h2 className="text-2xl font-bold">Campaigns</h2>
+            </div>
+            <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {isFetching && !data && <p className="py-8 text-center text-fb-muted">Loading…</p>}
+            {drafts.map((d) => (
+              <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <button className="min-w-0 text-left" onClick={() => openDraft(d)}>
+                    <p className="truncate text-[17px]">{d.data.campaignName || "Untitled campaign"}</p>
+                    <p className="text-[13px] text-fb-muted">In draft · {d.data.amount ? money(Number(d.data.amount)) : "—"}</p>
+                  </button>
+                  <button className="p-1 text-fb-muted" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id); }}><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ))}
+            {data && mcamps.length === 0 && !drafts.length && <p className="py-8 text-center text-fb-muted">এখনো কোনো campaign নেই। উপরের Create চাপুন।</p>}
+            {mcamps.map((c) => {
+              const res = resultOf(c.insights);
+              const dv = campaignDelivery(c, data?.adsets ?? [], data?.ads ?? []);
+              const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "bg-fb-blue", amber: "bg-primary" }[dv.tone];
+              const on = c.status === "ACTIVE";
+              return (
+                <div key={c.id} className="rounded-lg border border-fb-border bg-background p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <button className="min-w-0 text-left" onClick={() => setEditCampaign(c)}>
+                      <p className="text-[17px] leading-snug">{c.name}</p>
+                      <p className="flex items-center gap-1.5 text-[13px]"><span className={cn("h-2.5 w-2.5 rounded-full", dot)} /><span className={dv.tone === "green" ? "text-fb-green" : "text-fb-muted"}>{dv.label}</span><span className="text-fb-muted">{String(c.objective || "").replace("OUTCOME_", "").toLowerCase()}</span></p>
+                    </button>
+                    <Switch checked={on} disabled={busy === c.id} onCheckedChange={(v) => toggle("campaign", c, v)} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 divide-x divide-fb-border">
+                    <div className="pr-2"><p className="text-lg font-bold">{res.count ? num(res.count) : "—"}</p><p className="text-[12px] text-fb-muted">Results</p></div>
+                    <div className="px-2"><p className="text-lg font-bold">{res.cost != null ? money(res.cost) : "—"}</p><p className="text-[12px] text-fb-muted">Cost per result</p></div>
+                    <div className="pl-2"><p className="text-lg font-bold">{money(c.insights?.spend ?? 0)}</p><p className="text-[12px] text-fb-muted">Spent</p></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout fullBleed>
