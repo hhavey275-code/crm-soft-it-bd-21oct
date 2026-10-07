@@ -127,6 +127,16 @@ export default function MyAdsPage() {
   const isShared = currentAcc?.kind === "shared";
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
+  const summaryIds = accounts
+    .filter((a) => !accSearch.trim() || `${a.name} ${a.account_id}`.toLowerCase().includes(accSearch.trim().toLowerCase()))
+    .slice(0, 60).map((a) => a.id as string);
+  const { data: accSummary } = useQuery({
+    queryKey: ["managed-ads-acc-summary", summaryIds.join(",")],
+    queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: summaryIds })).summary,
+    enabled: isMobile && mobileStep === "accounts" && summaryIds.length > 0,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
   const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
@@ -186,17 +196,25 @@ export default function MyAdsPage() {
             <div className="divide-y divide-fb-border">
               {list.map((a) => {
                 const selected = a.id === currentAccId;
-                const n = selected ? campaigns.filter((c) => c.effective_status === "ACTIVE").length : null;
+                const s = accSummary?.[a.id];
+                const st = s ? accountStatusInfo(s) : null;
                 return (
                   <button key={a.id} onClick={() => { pickAccount(a.id); setMobileStep("campaigns"); }} className="flex w-full items-center gap-4 px-4 py-4 text-left active:bg-fb-bg">
                     <span className={cn("h-6 w-6 shrink-0 rounded-full border-2", selected ? "border-[7px] border-fb-blue" : "border-fb-border")} />
                     <span className="min-w-0">
                       <span className="block truncate text-[16px] font-bold">{a.name}</span>
-                      <span className="block text-[15px]">{String(a.account_id).replace(/^act_/, "")} · USD</span>
-                      <span className="mt-0.5 flex items-center gap-2 text-[13px] text-fb-muted">
-                        <span className={cn("h-2 w-2 rounded-full", a.kind === "shared" ? "bg-fb-blue" : n ? "bg-fb-green" : "bg-fb-muted")} />
-                        {a.kind === "shared" ? "Shared (wallet)" : n != null ? (n ? `${n} active campaign` : "No active campaigns") : "Own account"}
+                      <span className="block text-[15px]">{String(a.account_id).replace(/^act_/, "")} · {s?.currency || "USD"}{a.kind === "shared" ? " · Shared (wallet)" : ""}</span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-fb-muted">
+                        {!s ? <span>Loading status…</span> : st && (
+                          <>
+                            <span className={cn("inline-flex items-center gap-1.5 font-semibold", st.tone)}>
+                              <span className={cn("h-2 w-2 rounded-full", st.dot)} />{st.label}
+                            </span>
+                            {s.active != null && <span>· {s.active ? `${s.active} active campaign${s.active > 1 ? "s" : ""}` : "No active campaigns"}</span>}
+                          </>
+                        )}
                       </span>
+                      {st?.billing && <span className="mt-0.5 block text-[12px] font-medium text-destructive">{st.billing}</span>}
                     </span>
                   </button>
                 );
@@ -505,4 +523,24 @@ export default function MyAdsPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+// Meta account_status / disable_reason → label shown under each account in the picker.
+function accountStatusInfo(s: any): { label: string; tone: string; dot: string; billing?: string } {
+  if (s.error) return { label: "Status পাওয়া যায়নি", tone: "text-fb-muted", dot: "bg-fb-muted" };
+  const reasons: Record<number, string> = { 1: "Policy violation", 2: "Policy review", 3: "Payment problem (risk payment)", 4: "Account shut down", 5: "Under review", 6: "Business verification", 7: "Permanently closed", 8: "Unused account" };
+  const bad = (label: string, billing?: string) => ({ label, tone: "text-destructive", dot: "bg-destructive", billing });
+  const warn = (label: string, billing?: string) => ({ label, tone: "text-amber-600", dot: "bg-amber-500", billing });
+  const due = s.balance > 0 ? ` — বকেয়া ${s.currency} ${s.balance.toFixed(2)}` : "";
+  switch (s.status) {
+    case 1: return { label: "Active", tone: "text-fb-green", dot: "bg-fb-green", billing: s.balance > 0 ? `Billing: unpaid balance ${s.currency} ${s.balance.toFixed(2)}` : undefined };
+    case 2: return bad("Disabled", s.disableReason ? `Reason: ${reasons[s.disableReason] ?? s.disableReason}` : undefined);
+    case 3: return bad("Unsettled", `Billing: payment failed${due} — payment method ঠিক করে Pay now দিন`);
+    case 7: return warn("Pending risk review");
+    case 8: return warn("Pending settlement", `Billing: payment processing${due}`);
+    case 9: return warn("In grace period", `Billing: payment due${due}`);
+    case 100: return bad("Pending closure");
+    case 101: return bad("Closed");
+    default: return { label: `Status ${s.status}`, tone: "text-fb-muted", dot: "bg-fb-muted" };
+  }
 }
