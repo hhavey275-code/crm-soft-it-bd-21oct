@@ -93,8 +93,8 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
   const Icon = (l: Level) => (l === "campaign" ? Folder : l === "adset" ? LayoutGrid : FileText);
 
   return (
-    <div className="fb-font fixed inset-0 z-50 flex bg-fb-bg text-fb-text">
-      <aside className="w-72 shrink-0 overflow-y-auto border-r border-fb-border bg-background">
+    <div className="fb-font fixed inset-0 z-50 flex flex-col bg-fb-bg text-fb-text md:flex-row">
+      <aside className="flex max-h-40 shrink-0 flex-col overflow-y-auto border-b border-fb-border bg-background md:max-h-none md:w-72 md:border-b-0 md:border-r">
         {nodes.map((n) => {
           const I = Icon(n.level); const id = String(n.obj.id);
           return (
@@ -142,14 +142,14 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
             {node.level === "adset" && (
               <>
                 <Section title="Schedule">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div><Lbl>Start date</Lbl><input type="datetime-local" className={inp} value={fm.startTime} onChange={(e) => set("startTime", e.target.value)} /></div>
                     <div><Lbl>End date (ঐচ্ছিক)</Lbl><input type="datetime-local" className={inp} value={fm.endTime} onChange={(e) => set("endTime", e.target.value)} /></div>
                   </div>
                 </Section>
                 <Section title="Audience">
                   <div><Lbl>Locations (যেমন: BD, IN)</Lbl><input className={inp} value={fm.countries} onChange={(e) => set("countries", e.target.value)} /></div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div><Lbl>Age min</Lbl><input type="number" min="18" max="65" className={inp} value={fm.ageMin} onChange={(e) => set("ageMin", e.target.value)} /></div>
                     <div><Lbl>Age max</Lbl><input type="number" min="18" max="65" className={inp} value={fm.ageMax} onChange={(e) => set("ageMax", e.target.value)} /></div>
                   </div>
@@ -166,7 +166,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
             )}
           </div>
         </div>
-        <div className="flex h-14 items-center justify-between border-t border-fb-border bg-background px-6">
+        <div className="flex h-14 items-center justify-between gap-2 border-t border-fb-border bg-background px-3 pb-[env(safe-area-inset-bottom)] sm:px-6">
           <button onClick={onClose} className="h-9 rounded-md border border-fb-border px-4 text-[13px] font-semibold hover:bg-fb-bg">Close</button>
           <button onClick={publish} disabled={saving || !dirtyIds.length}
             className="inline-flex h-9 items-center gap-2 rounded-md bg-fb-blue px-5 text-[13px] font-semibold text-background disabled:opacity-50">
