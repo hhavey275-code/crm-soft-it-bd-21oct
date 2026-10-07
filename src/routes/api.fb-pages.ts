@@ -123,7 +123,7 @@ async function handle(request: Request): Promise<Response> {
                 try {
                   const r: any = await (await fetch(`${GRAPH}/${p.id}/agencies`, {
                     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ business: bm, permitted_tasks: JSON.stringify(["ADVERTISE", "ANALYZE", "CREATE_CONTENT"]), access_token: p.access_token }),
+                    body: new URLSearchParams({ business: String(bm), permitted_tasks: JSON.stringify(["ADVERTISE", "ANALYZE", "CREATE_CONTENT"]), access_token: p.access_token }),
                   })).json().catch(() => ({}));
                   if (r?.success || !r?.error) bmShared++; else console.warn("page share", p.id, bm, r.error?.message);
                 } catch (e) { console.warn("page share", e); }
