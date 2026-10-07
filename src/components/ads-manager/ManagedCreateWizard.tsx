@@ -128,7 +128,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE";
   const isMsg = objective === "ENGAGEMENT" ? false : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const amt = Number(amount) || 0;
-  const overWallet = acc?.kind !== "own" && amt > walletBalance;
+  const overWallet = acc?.kind === "shared" && amt > walletBalance;
   const label = OBJECTIVES.find((o) => o.v === objective)?.l ?? "";
 
   useEffect(() => {
@@ -405,7 +405,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     );
   }
   function WalletNote() {
-    if (acc?.kind === "own") return null;
+    if (acc?.kind !== "shared") return null;
     return <p className={cn("text-[12px]", overWallet ? "text-destructive" : "text-fb-muted")}>Available balance: {fmt(walletBalance)}{overWallet && " — budget balance-এর বেশি"}</p>;
   }
 
@@ -695,11 +695,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <div><p className="text-[14px] font-semibold">Campaign score</p><p className="text-[12px] text-fb-muted">{ready ? "You're using our recommended setup." : "Complete the required fields."}</p></div>
                 </div>
               </div>
-              {acc?.kind !== "own" && (
-                <div className={cn("rounded-lg border bg-background p-4", ((acc as any)?.kind !== "own" && walletBalance < 1) || overWallet ? "border-destructive" : "border-fb-border")}>
+              {acc?.kind === "shared" && (
+                <div className={cn("rounded-lg border bg-background p-4", ((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet ? "border-destructive" : "border-fb-border")}>
                   <p className="flex items-center gap-2 text-[14px] font-semibold"><Wallet className="h-4 w-4" />Account balance</p>
                   <p className="mt-1 text-[20px] font-bold">{fmt(walletBalance)}</p>
-                  {(((acc as any)?.kind !== "own" && walletBalance < 1) || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
+                  {(((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
                 </div>
               )}
               {level === 1 && tab === "edit" && (
