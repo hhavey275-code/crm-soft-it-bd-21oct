@@ -27,6 +27,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("fb_status") }),
+  z.object({ action: z.literal("account_summary"), ids: z.array(z.string().uuid()).min(1).max(60), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("demographics"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().max(60).optional() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("request_page_access"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
@@ -162,6 +163,32 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
 
   const { getManagedSettings } = await import("@/lib/managedSpend.server");
   const settings = await getManagedSettings(supabaseAdmin);
+
+  if (body.action === "account_summary") {
+    // Per-account Meta status + active campaign count for the account picker.
+    const shared = new Set(await sharedAccountIds(supabaseAdmin, targetUser));
+    const own = new Set((await ownAccounts(supabaseAdmin, targetUser, true, isAdmin && targetUser === user.id)).map((a: any) => a.id));
+    const ids = body.ids.filter((id) => shared.has(id) || own.has(id));
+    const { data: reg } = await supabaseAdmin.from("managed_campaigns").select("campaign_id").eq("user_id", targetUser);
+    const mine = new Set((reg ?? []).map((r: any) => String(r.campaign_id)));
+    const out: Record<string, any> = {};
+    const one = async (id: string) => {
+      try {
+        const { token, act } = await tokenFor(supabaseAdmin, id);
+        const g = graphClient(token);
+        const [info, camps] = await Promise.all([
+          g.get(act, { fields: "account_status,disable_reason,balance,amount_spent,spend_cap,currency" }),
+          g.get(`${act}/campaigns`, { fields: "id", effective_status: JSON.stringify(["ACTIVE"]), limit: "200" }).catch(() => null),
+        ]);
+        let list: any[] = camps?.data ?? [];
+        if (shared.has(id) && !own.has(id) && !isAdmin) list = list.filter((c) => mine.has(String(c.id)));
+        out[id] = { status: Number(info?.account_status), disableReason: Number(info?.disable_reason || 0), active: camps ? list.length : null,
+          balance: Number(info?.balance || 0) / 100, currency: info?.currency || "USD" };
+      } catch (e: any) { out[id] = { error: String(e?.message || "error").slice(0, 120) }; }
+    };
+    for (let i = 0; i < ids.length; i += 6) await Promise.all(ids.slice(i, i + 6).map(one));
+    return { summary: out };
+  }
 
   if (body.action === "list") {
     const { error: keyErr } = await supabaseAdmin.from("ad_accounts").select("id", { head: true, count: "exact" });
