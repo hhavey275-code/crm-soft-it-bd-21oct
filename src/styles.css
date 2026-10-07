@@ -395,3 +395,9 @@
   --color-fb-text: #1c2b33;
   --color-fb-muted: #65676b;
 }
+
+.fb-font {
+  font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}

@@ -16,6 +16,8 @@ import { managedAds, resultOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
+import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
+import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-manager/FbDateRangePicker";
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
 
 type Level = "campaign" | "adset" | "ad";
@@ -30,7 +32,8 @@ const budget = (o: any) =>
 export default function MyAdsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Level>("campaign");
-  const [range, setRange] = useState("7d");
+  const [range, setRange] = useState<FbRange>(() => makeRange("today"));
+  const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
   const [selAdsets, setSelAdsets] = useState<string[]>([]);
   const [selAds, setSelAds] = useState<string[]>([]);
@@ -45,10 +48,7 @@ export default function MyAdsPage() {
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
-  const dates = useMemo(() => {
-    const to = new Date();
-    return { dateFrom: format(subDays(to, RANGES[range]), "yyyy-MM-dd"), dateTo: format(to, "yyyy-MM-dd") };
-  }, [range]);
+  const dates = useMemo(() => ({ dateFrom: range.from, dateTo: range.to }), [range]);
 
   const { data, isFetching, error, refetch } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
@@ -111,9 +111,7 @@ export default function MyAdsPage() {
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
 
-  if (creating) {
-    return (
-      <DashboardLayout>
+  const wizard = creating && (
         <ManagedCreateWizard
           accounts={orderedAccounts}
           allPages={allPages}
@@ -121,9 +119,7 @@ export default function MyAdsPage() {
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); refetch(); }}
         />
-      </DashboardLayout>
-    );
-  }
+  );
 
   const sel = tab === "campaign" ? selCampaigns : tab === "adset" ? selAdsets : selAds;
   const setSel = tab === "campaign" ? setSelCampaigns : tab === "adset" ? setSelAdsets : setSelAds;
@@ -132,7 +128,6 @@ export default function MyAdsPage() {
     t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
   }, { spend: 0, impr: 0, reach: 0, results: 0 });
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
-  const rangeLabel = range === "today" ? "Today" : range === "7d" ? "Last 7 days" : "Last 30 days";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
   const th = "px-3 py-2 text-left text-[13px] font-semibold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
   const td = "px-3 py-2 border-r border-fb-border align-top whitespace-nowrap";
@@ -140,8 +135,10 @@ export default function MyAdsPage() {
   const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
   return (
-    <DashboardLayout>
-      <div className="-m-4 md:-m-6 min-h-full bg-fb-bg p-3 text-fb-text font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif]">
+    <DashboardLayout fullBleed>
+      {wizard}
+      {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
+      <div className="fb-font flex h-[calc(100vh-3.5rem)] flex-col bg-fb-bg p-2 text-fb-text">
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-3 rounded-t-lg bg-background px-4 py-3 border border-fb-border">
           <h1 className="text-lg font-bold">Campaigns</h1>
@@ -212,14 +209,7 @@ export default function MyAdsPage() {
             </button>
           ))}
           <div className="ml-auto pb-1">
-            <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="h-9 w-auto gap-2 border-fb-border text-[13px]"><SelectValue>{rangeLabel}: {dates.dateFrom} – {dates.dateTo}</SelectValue></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
+            <FbDateRangePicker value={range} onChange={setRange} />
           </div>
         </div>
 
@@ -231,7 +221,11 @@ export default function MyAdsPage() {
             <Plus className="h-4 w-4" />Create
           </button>
           <button className={tbBtn} disabled={sel.length !== 1}
-            onClick={() => { const r = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).find((x) => String(x.id) === sel[0]); if (r) setEditing(r); }}>
+            onClick={() => {
+              const r = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).find((x) => String(x.id) === sel[0]); if (!r) return;
+              const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id));
+              if (c) setEditCampaign(c); else setEditing(r);
+            }}>
             <Pencil className="h-4 w-4" />Edit
           </button>
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length} selected</button>}
@@ -242,9 +236,9 @@ export default function MyAdsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-background border-x border-b border-fb-border rounded-b-lg overflow-x-auto">
+        <div className="min-h-0 flex-1 overflow-auto bg-background border-x border-b border-fb-border rounded-b-lg">
           <table className="w-full border-collapse text-[13px]">
-            <thead className="border-b border-fb-border">
+            <thead className="sticky top-0 z-10 bg-background shadow-[0_1px_0_var(--color-fb-border)]">
               <tr>
                 {tab !== "ad" && <th className={cn(th, "w-10")} />}
                 <th className={cn(th, "w-16")}>Off / On</th>
@@ -287,6 +281,7 @@ export default function MyAdsPage() {
                             if (tab === "campaign") { setSelCampaigns([String(r.id)]); setSelAdsets([]); setTab("adset"); }
                             else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
                           }}>{r.name}</button>
+                        <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => { const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id)); if (c) setEditCampaign(c); }}><Pencil className="h-3 w-3" /></button>
                       </div>
                     </td>
                     <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full", dot)} />{deliv}</span></td>
@@ -311,7 +306,7 @@ export default function MyAdsPage() {
               })}
             </tbody>
             {rows.length > 0 && (
-              <tfoot>
+              <tfoot className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_var(--color-fb-border)]">
                 <tr className="font-semibold">
                   {tab !== "ad" && <td className={td} />}
                   <td className={td} />
@@ -330,7 +325,7 @@ export default function MyAdsPage() {
             )}
           </table>
         </div>
-        {isShared && <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>}
+        {isShared && <p className="mt-1 shrink-0 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>}
       </div>
     </DashboardLayout>
   );
