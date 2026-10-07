@@ -316,20 +316,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <p className="text-[12px] text-fb-muted">You can still choose "Learn more" or another option in the ad.</p>
           </div>
         )}
-        <Field label="Ad account" hint={acc?.kind === "own" ? "খরচ এই ad account-এর নিজের limit থেকে যাবে।" : "খরচ আপনার wallet থেকে কাটা হবে।"}>
-          <select className={sel} value={accId} onChange={(e) => setAccId(e.target.value)}>
-            {!accounts.length && <option value="">কোনো ad account দেওয়া হয়নি</option>}
-            {accounts.some((a) => a.kind === "shared") && (
-              <optgroup label="Shared ad account (wallet থেকে খরচ)">
-                {accounts.filter((a) => a.kind === "shared").map((a) => <option key={a.id} value={a.id}>{a.name} ({a.account_id})</option>)}
-              </optgroup>
-            )}
-            {accounts.some((a) => a.kind === "own") && (
-              <optgroup label="আমার নিজের ad account">
-                {accounts.filter((a) => a.kind === "own").map((a) => <option key={a.id} value={a.id}>{a.name} ({a.account_id})</option>)}
-              </optgroup>
-            )}
-          </select>
+        <Field label="Ad account" hint={acc?.kind === "shared" ? "Shared account — খরচ আপনার wallet থেকে কাটা হবে।" : acc ? "আপনার নিজের ad account — wallet লাগবে না।" : "Campaigns পেজের উপর থেকে ad account বাছুন।"}>
+          <div className="rounded-md border border-fb-border bg-fb-bg px-3 py-2 text-[13px]">{acc ? `${acc.name} (${String(acc.account_id).replace(/^act_/, "")})` : "কোনো ad account বাছা হয়নি"}</div>
         </Field>
       </Section>
       <Section title="Budget" ok={amt >= 1 && !overWallet} right={budgetLevel === "campaign" ? <Adv /> : null}>
