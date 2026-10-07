@@ -330,7 +330,7 @@ export default function MyAdsPage() {
             )}
           </table>
         </div>
-        {isShared && <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>
+        {isShared && <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>}
       </div>
     </DashboardLayout>
   );
