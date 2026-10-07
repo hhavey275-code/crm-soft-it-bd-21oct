@@ -127,7 +127,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS">("MESSAGING");
   const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
   const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
-  const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null } | null>(null);
+  const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null; pageTokenMissing?: boolean } | null>(null);
   const [phone, setPhone] = useState("");
   const [infoTick, setInfoTick] = useState(0);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -570,7 +570,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 {!wa && pageInfo && (
                   <div className="mt-2 rounded-md border border-fb-border bg-background p-2 text-[12px]">
                     <p>এই Page-এ WhatsApp পাওয়া যায়নি। Connect করতে: <b>Connect WhatsApp</b> চাপুন → Page settings-এ "Linked accounts → WhatsApp" → নম্বর দিন → WhatsApp-এ আসা code দিন। তারপর এখানে <b>আবার চেক করুন</b> চাপুন।</p>
-                    <p className="mt-1 text-fb-muted">আগে থেকে connect থাকলে "Facebook আবার connect" দিয়ে একবার login করুন, তাহলে নম্বরটা পড়া যাবে।</p>
+                    {pageInfo.pageTokenMissing && <p className="mt-1 font-semibold text-destructive">এই Page-এর Facebook login এখনো CRM-এ save হয়নি। তাই WhatsApp নম্বর পড়া যাচ্ছে না। Campaigns পাতার উপরে "Facebook আবার connect" চেপে login করুন (Page-টা টিক দিয়ে), তারপর "আবার চেক করুন" চাপুন।</p>}
                     <div className="mt-2 flex gap-2">
                       <a href={waConnectUrl} target="_blank" rel="noreferrer" className="rounded-md bg-fb-blue px-3 py-1 font-semibold text-primary-foreground">Connect WhatsApp</a>
                       <button type="button" onClick={() => setInfoTick((t) => t + 1)} className="rounded-md border border-fb-border px-3 py-1 font-semibold">আবার চেক করুন</button>
