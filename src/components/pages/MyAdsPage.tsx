@@ -186,7 +186,7 @@ export default function MyAdsPage() {
 
         {(error || (data?.errors ?? []).length > 0 || (data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
           <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-2 text-[13px]">
-                        {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">{allPages.length === 0 ? "আগে \"My Pages\" থেকে page যুক্ত করুন।" : "এখনো কোনো ad account দেওয়া হয়নি — admin আপনাকে একটি shared ad account দিলে Create চালু হবে।"}</div>}
+                        {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">{allPages.length === 0 && false ? "" : "এখনো কোনো ad account দেওয়া হয়নি — admin আপনাকে একটি shared ad account দিলে Create চালু হবে।"}</div>}
             {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
             {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
             {error && <p className="text-destructive">{(error as Error).message}</p>}

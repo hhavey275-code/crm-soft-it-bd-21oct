@@ -49,9 +49,9 @@ export async function sharedAccountIds(supabaseAdmin: any, userId: string): Prom
 }
 
 /** Client's own (dedicated) Meta ad accounts — only when Campaign Management is on. */
-export async function ownAccounts(supabaseAdmin: any, userId: string) {
+export async function ownAccounts(supabaseAdmin: any, userId: string, ignoreToggle = false) {
   const { data: prof } = await supabaseAdmin.from("profiles").select("campaign_management_enabled").eq("user_id", userId).maybeSingle();
-  if (!prof?.campaign_management_enabled) return [] as any[];
+  if (!ignoreToggle && !prof?.campaign_management_enabled) return [] as any[];
   const { data: links } = await supabaseAdmin.from("user_ad_accounts").select("ad_account_id").eq("user_id", userId);
   const ids = (links ?? []).map((l: any) => l.ad_account_id);
   if (!ids.length) return [];
@@ -64,7 +64,7 @@ export async function ownAccounts(supabaseAdmin: any, userId: string) {
  * Shared accounts: only campaigns of the user's approved pages (these are wallet-charged).
  * includeOwn: also the user's own dedicated accounts (not wallet-charged; spend uses the account's own limit).
  */
-export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string }) {
+export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string; viewAllOwn?: boolean }) {
   const { graphClient } = await import("@/lib/metaGraph.server");
   // All of the client's own pages (any not rejected). Page IDs are globally unique, so one owner per page.
   const { data: allPages } = await supabaseAdmin
@@ -81,7 +81,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   const sharedList = await sharedAccountIds(supabaseAdmin, userId);
   const byAccount = new Map<string, Set<string> | null>();
   for (const id of sharedList) byAccount.set(id, pageIdSet);
-  const own = opts?.includeOwn ? await ownAccounts(supabaseAdmin, userId) : [];
+  const own = opts?.includeOwn ? await ownAccounts(supabaseAdmin, userId, !!opts?.viewAllOwn) : [];
   for (const a of own) if (!byAccount.has(a.id)) byAccount.set(a.id, null);
 
   const sharedIds = [...byAccount.entries()].filter(([, v]) => v).map(([k]) => k);
