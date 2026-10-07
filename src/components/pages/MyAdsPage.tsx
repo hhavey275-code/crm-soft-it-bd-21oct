@@ -175,6 +175,7 @@ export default function MyAdsPage() {
       const list = accounts.filter((a) => !q || `${a.name} ${a.account_id}`.toLowerCase().includes(q));
       return (
         <DashboardLayout fullBleed hideChat>
+          {wizard}
           <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
               <h1 className="text-center text-lg font-bold">Select account</h1>
