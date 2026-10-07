@@ -28,7 +28,7 @@ function useShouldRenderTechBg() {
   return show;
 }
 
-export function DashboardLayout({ children, fullBleed = false }: { children: React.ReactNode; fullBleed?: boolean }) {
+export function DashboardLayout({ children, fullBleed = false, hideChat = false }: { children: React.ReactNode; fullBleed?: boolean; hideChat?: boolean }) {
   const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
   const { isAdmin } = useAuth();
   const showTechBg = useShouldRenderTechBg();
@@ -80,7 +80,7 @@ export function DashboardLayout({ children, fullBleed = false }: { children: Rea
           </main>
         </div>
       </div>
-      {!isAdmin && <ChatWidget />}
+      {!isAdmin && !hideChat && <ChatWidget />}
       <WhatsNewDialog />
     </SidebarProvider>
   );

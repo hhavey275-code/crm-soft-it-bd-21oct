@@ -158,7 +158,7 @@ export default function MyAdsPage() {
       const q = accSearch.trim().toLowerCase();
       const list = accounts.filter((a) => !q || `${a.name} ${a.account_id}`.toLowerCase().includes(q));
       return (
-        <DashboardLayout fullBleed>
+        <DashboardLayout fullBleed hideChat>
           <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
               <h1 className="text-center text-lg font-bold">Select account</h1>
@@ -193,7 +193,7 @@ export default function MyAdsPage() {
     const q = search.trim().toLowerCase();
     const mcamps = campaigns.filter((c) => !q || c.name?.toLowerCase().includes(q));
     return (
-      <DashboardLayout fullBleed>
+      <DashboardLayout fullBleed hideChat>
         {wizard}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
@@ -272,7 +272,7 @@ export default function MyAdsPage() {
   }
 
   return (
-    <DashboardLayout fullBleed>
+    <DashboardLayout fullBleed hideChat>
       {wizard}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
