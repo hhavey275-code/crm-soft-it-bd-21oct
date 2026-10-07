@@ -127,6 +127,16 @@ export default function MyAdsPage() {
   const isShared = currentAcc?.kind === "shared";
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
+  const summaryIds = accounts
+    .filter((a) => !accSearch.trim() || `${a.name} ${a.account_id}`.toLowerCase().includes(accSearch.trim().toLowerCase()))
+    .slice(0, 60).map((a) => a.id as string);
+  const { data: accSummary } = useQuery({
+    queryKey: ["managed-ads-acc-summary", summaryIds.join(",")],
+    queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: summaryIds })).summary,
+    enabled: isMobile && mobileStep === "accounts" && summaryIds.length > 0,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
   const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
