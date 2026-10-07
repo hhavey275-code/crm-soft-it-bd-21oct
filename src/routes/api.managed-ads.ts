@@ -91,7 +91,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   if (body.action === "list") {
-    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, onlyAccount: body.adAccountDbId ?? "first" });
+    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, onlyAccount: body.adAccountDbId ?? "first" });
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
