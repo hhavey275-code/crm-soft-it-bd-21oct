@@ -54,8 +54,18 @@ export function SiteAssistantSettingsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label>Show on website</Label>
-          <Switch checked={enabled} onCheckedChange={setEnabled} />
+          <Label>Voice mic button (On / Off)</Label>
+          <Switch
+            checked={enabled}
+            onCheckedChange={async (v) => {
+              setEnabled(v);
+              const { error } = await (supabase as any).from("site_assistant_settings").update({ enabled: v, updated_at: new Date().toISOString() }).eq("id", 1);
+              if (error) { toast.error(error.message); setEnabled(!v); return; }
+              toast.success(v ? "Voice mic চালু হয়েছে" : "Voice mic বন্ধ হয়েছে");
+              qc.invalidateQueries({ queryKey: ["site-assistant-settings"] });
+              qc.invalidateQueries({ queryKey: ["site-assistant-info"] });
+            }}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Assistant name</Label>
