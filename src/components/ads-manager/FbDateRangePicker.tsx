@@ -58,30 +58,30 @@ export function FbDateRangePicker({ value, onChange }: { value: FbRange; onChang
           <ChevronDown className="h-4 w-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="fb-font w-auto p-0 text-fb-text">
-        <div className="flex">
-          <div className="w-48 max-h-[460px] overflow-y-auto border-r border-fb-border py-3">
-            <p className="px-4 pb-1 text-[13px] font-semibold">Recently used</p>
+      <PopoverContent align="end" className="fb-font w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] p-0 text-fb-text sm:w-auto sm:max-w-none">
+        <div className="flex max-h-[75dvh] flex-col overflow-y-auto sm:max-h-none sm:flex-row sm:overflow-visible">
+          <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-fb-border p-2 sm:block sm:w-48 sm:max-h-[460px] sm:overflow-y-auto sm:border-b-0 sm:border-r sm:p-0 sm:py-3">
+            <p className="hidden px-4 pb-1 text-[13px] font-semibold sm:block">Recently used</p>
             {PRESETS.map(([k, l]) => (
-              <button key={k} onClick={() => pickPreset(k)} className="flex w-full items-center gap-3 px-4 py-1.5 text-left text-[13px] hover:bg-fb-bg">
-                <span className={cn("flex h-5 w-5 items-center justify-center rounded-full border", preset === k ? "border-fb-blue" : "border-fb-muted")}>
+              <button key={k} onClick={() => pickPreset(k)} className={cn("flex shrink-0 items-center gap-3 whitespace-nowrap rounded-full border px-3 py-1 text-left text-[12px] sm:w-full sm:rounded-none sm:border-0 sm:px-4 sm:py-1.5 sm:text-[13px] hover:bg-fb-bg", preset === k ? "border-fb-blue text-fb-blue" : "border-fb-border")}>
+                <span className={cn("hidden h-5 w-5 items-center sm:flex justify-center rounded-full border", preset === k ? "border-fb-blue" : "border-fb-muted")}>
                   {preset === k && <span className="h-2.5 w-2.5 rounded-full bg-fb-blue" />}
                 </span>{l}
               </button>
             ))}
           </div>
-          <div className="flex flex-col p-3">
-            <Calendar mode="range" numberOfMonths={2} selected={range} defaultMonth={range?.from ? subMonths(range.from, 0) : undefined}
+          <div className="flex flex-col p-2 sm:p-3">
+            <Calendar mode="range" numberOfMonths={isMobile ? 1 : 2} selected={range} defaultMonth={range?.from ? subMonths(range.from, 0) : undefined}
               onSelect={(r) => { setRange(r); setPreset("custom"); }} disabled={{ after: new Date() }} />
-            <div className="mt-2 flex items-center gap-2 text-[13px]">
+            <div className="mt-2 hidden items-center gap-2 text-[13px] sm:flex">
               <span className="h-3 w-3 rounded-sm bg-fb-blue-soft" />
               <span className="rounded-md border border-fb-border px-3 py-1.5">{PRESETS.find(([k]) => k === preset)?.[1] ?? "Custom"}</span>
               <span className="rounded-md border border-fb-border px-3 py-1.5">{range?.from ? format(range.from, "MMM d, yyyy") : "—"}</span>
               <span>-</span>
               <span className="rounded-md border border-fb-border px-3 py-1.5">{range?.to ? format(range.to, "MMM d, yyyy") : "—"}</span>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-[11px] text-fb-muted">Dates are shown in Dhaka Time</span>
+            <div className="mt-2 flex items-center justify-between sm:mt-4">
+              <span className="hidden text-[11px] sm:inline text-fb-muted">Dates are shown in Dhaka Time</span>
               <div className="flex gap-2">
                 <button onClick={() => setOpen(false)} className="h-9 rounded-md border border-fb-border px-4 text-[13px] font-semibold hover:bg-fb-bg">Cancel</button>
                 <button disabled={!range?.from}
