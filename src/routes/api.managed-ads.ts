@@ -240,7 +240,12 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const [wa1, wa2, ph, pic, nm] = await Promise.all([one("whatsapp_number"), one("whatsapp_display_number"), one("phone"), one("picture{url}"), one("name")]);
     let picture = pic?.picture?.data?.url ?? null;
     if (!picture) picture = `https://graph.facebook.com/${pageId}/picture?type=normal`;
-    const wa = wa1?.whatsapp_number || wa2?.whatsapp_display_number || null;
+    let wa = wa1?.whatsapp_number || wa2?.whatsapp_display_number || null;
+    if (!wa) {
+      const cta = await one("call_to_actions{type,intl_number_with_plus,android_url}");
+      const w = (cta?.call_to_actions?.data ?? []).find((x: any) => /WHATSAPP/i.test(String(x.type)));
+      if (w) wa = w.intl_number_with_plus || "linked";
+    }
     return { name: nm?.name ?? page.page_name, whatsappNumber: wa ? String(wa) : null, phone: ph?.phone ?? null, picture, pageTokenMissing: !pt };
   }
 
@@ -312,7 +317,6 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (eng === "CALLS") map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
   const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
   const waOnly = map.destination === "WHATSAPP";
-  if (map.destination.includes("WHATSAPP") && !body.whatsappNumber) throw new Error("এই Page-এ WhatsApp number connect করা নেই — আগে Page-এ WhatsApp connect করুন");
   if (eng === "CALLS" && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
   if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
   const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging;
@@ -362,7 +366,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       ...(body.startTime ? { start_time: body.startTime } : {}),
       ...(body.endTime ? { end_time: body.endTime } : {}),
       promoted_object: pixelNeeded ? { pixel_id: body.pixelId, custom_event_type: body.customEvent }
-        : map.destination.includes("WHATSAPP") ? { page_id: pageId, whatsapp_phone_number: body.whatsappNumber } : { page_id: pageId },
+        : map.destination.includes("WHATSAPP") ? (body.whatsappNumber && /\d{8}/.test(body.whatsappNumber.replace(/\D/g, "")) ? { page_id: pageId, whatsapp_phone_number: body.whatsappNumber.replace(/[^\d]/g, "") } : { page_id: pageId }) : { page_id: pageId },
       targeting,
     });
 
