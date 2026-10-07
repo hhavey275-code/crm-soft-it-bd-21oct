@@ -130,12 +130,12 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   if (body.action === "list") {
-    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, onlyAccount: body.adAccountDbId ?? "first" });
+    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first" });
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
   if (body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
-    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, onlyAccount: body.adAccountDbId });
+    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId });
     const lvl = body.action === "set_budget" ? "adset" : body.level;
     const list = lvl === "campaign" ? owned.campaigns : lvl === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
@@ -198,7 +198,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (!wantAcc) throw new Error("Ad account বাছুন");
   let shared: boolean;
   if ((await sharedAccountIds(supabaseAdmin, page.user_id)).includes(wantAcc)) shared = true;
-  else if ((await ownAccounts(supabaseAdmin, page.user_id, true)).some((a: any) => a.id === wantAcc)) shared = false;
+  else if ((await ownAccounts(supabaseAdmin, page.user_id, true, isAdmin)).some((a: any) => a.id === wantAcc)) shared = false;
   else throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
   const { token, act, bmId } = await tokenFor(supabaseAdmin, wantAcc);
   const g = graphClient(token);
