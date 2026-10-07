@@ -5,6 +5,7 @@ import { CalendarDays, ChevronDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export type FbRange = { preset: string; from: string; to: string };
 
@@ -39,6 +40,7 @@ export function makeRange(p: string): FbRange { const r = presetRange(p); return
 const nice = (s: string) => format(new Date(s + "T00:00:00"), "MMM d, yyyy");
 
 export function FbDateRangePicker({ value, onChange }: { value: FbRange; onChange: (v: FbRange) => void }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [preset, setPreset] = useState(value.preset);
   const [range, setRange] = useState<DateRange | undefined>();
