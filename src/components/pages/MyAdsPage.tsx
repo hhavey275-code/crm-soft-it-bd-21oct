@@ -107,6 +107,7 @@ export default function MyAdsPage() {
   const accounts: any[] = data?.accounts ?? [];
   const currentAccId: string | undefined = data?.selectedAccountId ?? accSel;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
+  const isShared = currentAcc?.kind === "shared";
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
 
@@ -167,7 +168,7 @@ export default function MyAdsPage() {
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>
           </div>
           <FacebookConnectButton label={allPages.length ? "Facebook আবার connect" : "Connect Facebook"} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
-          <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>
+          {currentAcc?.kind === "shared" && <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>}
           <div className="ml-auto flex items-center gap-2">
             <span className="text-[13px] text-fb-muted">
               {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
@@ -189,11 +190,11 @@ export default function MyAdsPage() {
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        {(error || (data?.errors ?? []).length > 0 || (data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
+        {(error || (data?.errors ?? []).length > 0 || (isShared && data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
           <div className="bg-background border-x border-fb-border px-4 pb-3 space-y-2 text-[13px]">
                         {!isFetching && data && accounts.length === 0 && <div className="rounded-md bg-fb-bg p-3">এখনো আপনার কোনো ad account CRM-এ যুক্ত নেই।</div>}
-            {data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
-            {data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
+            {isShared && data && Number(data.walletBalance) <= Number(data.pauseThreshold ?? 1) && <div className="rounded-md border border-destructive p-3 text-destructive">Wallet-এ ব্যালেন্স শেষ — আপনার ad গুলো বন্ধ রাখা হয়েছে। Top-up করলে আবার চালু করতে পারবেন।</div>}
+            {isShared && data && Number(data.walletBalance) > Number(data.pauseThreshold ?? 1) && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10) && <div className="rounded-md border border-primary p-3">আপনার wallet-এ ${Number(data.walletBalance).toFixed(2)} বাকি — শেষ হলে ad নিজে থেকেই বন্ধ হয়ে যাবে।</div>}
             {error && <p className="text-destructive">{(error as Error).message}</p>}
             {(data?.errors ?? []).map((e: string, i: number) => <p key={i} className="text-destructive">{e}</p>)}
           </div>
@@ -329,7 +330,7 @@ export default function MyAdsPage() {
             )}
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>
+        {isShared && <p className="mt-2 text-[11px] text-fb-muted">Ad-এর খরচ প্রতি ১৫ মিনিটে wallet থেকে কাটা হয় (Transactions-এ "Ad spend")।</p>}
       </div>
     </DashboardLayout>
   );
