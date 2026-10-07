@@ -161,7 +161,15 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     restored.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { if (restored.current && phase === "edit") saveDraft(draftId, snapshot); });
+  // Save only when the content actually changed (debounced). Saving on every render caused an
+  // endless loop (save -> list refresh -> re-render -> save) that froze the page on mobile.
+  const snapJson = JSON.stringify(snapshot);
+  const lastSaved = useRef<string>("");
+  useEffect(() => {
+    if (!restored.current || phase !== "edit" || snapJson === lastSaved.current) return;
+    const t = setTimeout(() => { lastSaved.current = snapJson; saveDraft(draftId, JSON.parse(snapJson)); }, 600);
+    return () => clearTimeout(t);
+  }, [snapJson, phase, draftId]);
   const clearDraft = () => deleteDraft(draftId);
   const askClose = () => (phase === "edit" ? setConfirmClose(true) : onClose());
   const discard = () => { clearDraft(); setConfirmClose(false); onClose(); };
