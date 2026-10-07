@@ -19,6 +19,24 @@ export async function decryptToken(stored: string, secret: string) {
   return new TextDecoder().decode(decrypted);
 }
 
+export async function encryptToken(plain: string, secret: string) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plain)));
+  const all = new Uint8Array(12 + ct.length);
+  all.set(iv); all.set(ct, 12);
+  let s = ""; for (const b of all) s += String.fromCharCode(b);
+  return "enc:" + btoa(s);
+}
+
 async function metaFetch(url: string, init: { method?: string; body?: string } = {}) {
   const proxySecret = process.env.META_PROXY_SECRET;
   const proxyUrl = process.env.META_PROXY_URL || DEFAULT_META_PROXY_URL;

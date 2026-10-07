@@ -180,7 +180,19 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (body.action === "posts") {
     // Reading posts needs the page's own token, which our Business Manager gets once the page shares access with it.
     let pageToken: string | undefined;
-    try { pageToken = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* no access */ }
+    // 1) Page key the client saved via Facebook login (encrypted, server-only table).
+    try {
+      const { data: saved } = await (supabaseAdmin as any).from("client_page_tokens")
+        .select("access_token").eq("user_id", page.user_id).eq("page_id", pageId).maybeSingle();
+      if (saved?.access_token) {
+        const { decryptToken } = await import("@/lib/metaGraph.server");
+        for (const sec of [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[]) {
+          try { pageToken = await decryptToken(saved.access_token, sec); break; } catch { /* next */ }
+        }
+      }
+    } catch { /* fall back */ }
+    // 2) Business Manager's shared Page access.
+    if (!pageToken) { try { pageToken = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* no access */ } }
     if (!pageToken) return { posts: [], needsAccess: true };
     const pg = graphClient(pageToken);
     const r = await pg.get(`${pageId}/published_posts`, { fields: "id,message,full_picture,created_time,permalink_url", limit: "25" });
