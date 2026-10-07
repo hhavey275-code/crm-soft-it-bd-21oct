@@ -28,7 +28,7 @@ function useShouldRenderTechBg() {
   return show;
 }
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardLayout({ children, fullBleed = false }: { children: React.ReactNode; fullBleed?: boolean }) {
   const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
   const { isAdmin } = useAuth();
   const showTechBg = useShouldRenderTechBg();
@@ -75,8 +75,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <NotificationBell />
             </div>
           </header>
-          <main className="flex-1 p-3 md:p-6 overflow-auto">
-            <div className="mx-auto max-w-[1400px]">{children}</div>
+          <main className={fullBleed ? "flex-1 overflow-hidden" : "flex-1 p-3 md:p-6 overflow-auto"}>
+            {fullBleed ? children : <div className="mx-auto max-w-[1400px]">{children}</div>}
           </main>
         </div>
       </div>
