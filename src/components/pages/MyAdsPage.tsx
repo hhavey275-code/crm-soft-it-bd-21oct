@@ -524,3 +524,23 @@ export default function MyAdsPage() {
     </DashboardLayout>
   );
 }
+
+// Meta account_status / disable_reason → label shown under each account in the picker.
+function accountStatusInfo(s: any): { label: string; tone: string; dot: string; billing?: string } {
+  if (s.error) return { label: "Status পাওয়া যায়নি", tone: "text-fb-muted", dot: "bg-fb-muted" };
+  const reasons: Record<number, string> = { 1: "Policy violation", 2: "Policy review", 3: "Payment problem (risk payment)", 4: "Account shut down", 5: "Under review", 6: "Business verification", 7: "Permanently closed", 8: "Unused account" };
+  const bad = (label: string, billing?: string) => ({ label, tone: "text-destructive", dot: "bg-destructive", billing });
+  const warn = (label: string, billing?: string) => ({ label, tone: "text-amber-600", dot: "bg-amber-500", billing });
+  const due = s.balance > 0 ? ` — বকেয়া ${s.currency} ${s.balance.toFixed(2)}` : "";
+  switch (s.status) {
+    case 1: return { label: "Active", tone: "text-fb-green", dot: "bg-fb-green", billing: s.balance > 0 ? `Billing: unpaid balance ${s.currency} ${s.balance.toFixed(2)}` : undefined };
+    case 2: return bad("Disabled", s.disableReason ? `Reason: ${reasons[s.disableReason] ?? s.disableReason}` : undefined);
+    case 3: return bad("Unsettled", `Billing: payment failed${due} — payment method ঠিক করে Pay now দিন`);
+    case 7: return warn("Pending risk review");
+    case 8: return warn("Pending settlement", `Billing: payment processing${due}`);
+    case 9: return warn("In grace period", `Billing: payment due${due}`);
+    case 100: return bad("Pending closure");
+    case 101: return bad("Closed");
+    default: return { label: `Status ${s.status}`, tone: "text-fb-muted", dot: "bg-fb-muted" };
+  }
+}
