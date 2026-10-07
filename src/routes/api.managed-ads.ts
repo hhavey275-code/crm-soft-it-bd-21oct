@@ -408,8 +408,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       await supabaseAdmin.from("managed_campaigns").delete().eq("campaign_id", campaignId);
     }
     const msg = String(e?.message || "");
-    const hint = /permission|page|actor|not authorized|\(#200\)|\(#10\)/i.test(msg)
-      ? " — সম্ভবত এই Page আমাদের Business Manager-এ access দেয়নি। Ad ধাপে \"Page access request পাঠান\" চাপুন।" : "";
+    let hint = "";
+    if (/1487202|page permission|full control/i.test(msg)) {
+      // Send the partner request so the Page owner only needs to approve it.
+      if (bmId) await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] }).catch(() => null);
+      hint = ` — Page-এ ad চালানোর অনুমতির request পাঠানো হয়েছে। Page-এর মালিক এখানে গিয়ে Approve করুন: https://business.facebook.com/latest/settings/requests — তারপর আবার Publish দিন।`;
+    } else if (/permission|actor|not authorized|\(#200\)|\(#10\)/i.test(msg)) {
+      hint = " — সম্ভবত এই Page আমাদের Business Manager-এ access দেয়নি। Ad ধাপে \"Page access request পাঠান\" চাপুন।";
+    }
     throw new Error(`${step} তৈরি করা যায়নি: ${msg}${hint}`);
   }
 }

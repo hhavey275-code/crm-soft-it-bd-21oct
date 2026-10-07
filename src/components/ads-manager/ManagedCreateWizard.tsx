@@ -178,7 +178,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const [waManual, setWaManual] = useState("");
   const wa = pageInfo?.whatsappNumber ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : null);
-  const waConnectUrl = `https://business.facebook.com/latest/settings/whatsapp_account?asset_id=${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}`;
+  const waConnectUrl = `https://www.facebook.com/${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}/settings/?tab=linked_accounts`;
   const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
   const amt = Number(amount) || 0;
   const overWallet = acc?.kind === "shared" && amt > walletBalance;
