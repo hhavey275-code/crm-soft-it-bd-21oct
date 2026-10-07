@@ -56,6 +56,26 @@ Deno.serve(async (req) => {
   // Reset shared meta counters per invocation
   resetMetaCounters();
 
+  // Server-to-server: CRM server (whose service-key string differs) asks this function to
+  // unlock a BM token. Caller must present a key that passes a service-role-only admin call.
+  const callerKey = req.headers.get("x-service-key");
+  if (callerKey) {
+    const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const url = Deno.env.get("SUPABASE_URL")!;
+    const probe = createClient(url, callerKey, { auth: { persistSession: false } });
+    const { error: probeErr } = await probe.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (probeErr) return json({ error: "Unauthorized" }, 401);
+    const b = await req.json().catch(() => ({}));
+    if (b?.mode !== "resolve_token" || typeof b?.adAccountId !== "string") return json({ error: "Invalid input" }, 400);
+    const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const { data } = await createClient(url, sk).from("ad_accounts").select("business_managers(access_token)").eq("id", b.adAccountId).maybeSingle();
+    const bm: any = Array.isArray((data as any)?.business_managers) ? (data as any).business_managers[0] : (data as any)?.business_managers;
+    if (!bm?.access_token) return json({ error: "Not found" }, 404);
+    const tok = await decryptToken(bm.access_token, sk);
+    if (tok.startsWith("enc:")) return json({ error: "Decrypt failed" }, 500);
+    return json({ token: tok });
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
