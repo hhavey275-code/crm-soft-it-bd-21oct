@@ -482,7 +482,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         name: `${body.adName} creative`,
         object_story_spec: {
           page_id: pageId,
-          link_data: { link, message: body.message || "", name: body.headline || undefined, image_hash: imageHash, call_to_action: cta },
+          link_data: { link, message: body.message || postText || "", name: body.headline || undefined, image_hash: imageHash, call_to_action: cta },
         },
       };
     }
