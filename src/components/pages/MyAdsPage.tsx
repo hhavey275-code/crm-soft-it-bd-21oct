@@ -67,9 +67,24 @@ export default function MyAdsPage() {
 
   const dates = useMemo(() => ({ dateFrom: range.from, dateTo: range.to }), [range]);
 
+  const onAccountPicker = isMobile && mobileStep === "accounts";
   const { data, isFetching, error, refetch } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
     queryFn: () => managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) }),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    enabled: !onAccountPicker,
+  });
+  // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
+  const { data: fastAccounts, isFetching: fastLoading } = useQuery({
+    queryKey: ["managed-ads-accounts"],
+    queryFn: async () => {
+      const r = await managedAds<{ accounts: any[] }>({ action: "accounts" });
+      try { localStorage.setItem("myads-accounts-cache", JSON.stringify(r.accounts)); } catch { /* ignore */ }
+      return r.accounts;
+    },
+    initialData: () => { try { const c = localStorage.getItem("myads-accounts-cache"); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
@@ -121,7 +136,7 @@ export default function MyAdsPage() {
 
   const pages: any[] = data?.pages ?? [];
   const allPages: any[] = data?.allPages ?? pages;
-  const accounts: any[] = data?.accounts ?? [];
+  const accounts: any[] = (data?.accounts?.length ? data.accounts : fastAccounts) ?? [];
   const currentAccId: string | undefined = data?.selectedAccountId ?? accSel;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
   const isShared = currentAcc?.kind === "shared";
@@ -198,7 +213,7 @@ export default function MyAdsPage() {
               <h1 className="text-center text-lg font-bold">Select account</h1>
               <Input className="mt-3 h-11 rounded-full border-fb-border px-4" placeholder="Search accounts" value={accSearch} onChange={(e) => setAccSearch(e.target.value)} />
             </div>
-            {isFetching && !data && <p className="py-10 text-center text-fb-muted">Loading…</p>}
+            {fastLoading && !accounts.length && <p className="py-10 text-center text-fb-muted">Loading…</p>}
             {data && list.length === 0 && <p className="py-10 text-center text-fb-muted">কোনো ad account পাওয়া যায়নি।</p>}
             <div className="divide-y divide-fb-border">
               {list.map((a) => {
