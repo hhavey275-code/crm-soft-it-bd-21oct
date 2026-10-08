@@ -162,7 +162,7 @@ function buildAccountSubUrls(account: any, date?: string, date_from?: string, da
     todayUrl = `https://graph.facebook.com/v23.0/${actId}/insights?fields=spend,actions&time_range={"since":"${yesterdayStr}","until":"${todayStr}"}&time_increment=1`;
     combinedTodayYesterday = true;
   }
-  const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
+  const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=name,balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
   const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details`;
   const campaignFilter = encodeURIComponent(JSON.stringify([
     { field: "effective_status", operator: "IN", value: ["ACTIVE"] }
@@ -233,6 +233,7 @@ function parseAccountBatchResults(account: any, batchResults: any[], parseMeta: 
       ? parseFloat(rawSpendCap) / 100
       : 0;
     adAccountUpdate = { id: account.id, amount_spent: metaAmountSpent, spend_cap: metaSpendCap };
+    if (accountData?.name) adAccountUpdate.account_name = accountData.name;
     const metaStatus = accountData?.account_status;
     if (metaStatus !== undefined && metaStatus !== null) {
       if (metaStatus === 1) adAccountUpdate.status = "active";
@@ -622,7 +623,7 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
       .replace("https://graph.facebook.com/v23.0/", "")
       .replace(/([?&])access_token=[^&]*/g, (m, sep) => (sep === "?" ? "?" : ""))
       .replace(/[?&]$/, "");
-    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
+    const accountFieldsUrl = `https://graph.facebook.com/v23.0/${actId}?fields=name,balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,disable_reason`;
     const paymentCycleUrl = `https://graph.facebook.com/v23.0/${actId}/adspaymentcycle?fields=funding_source_details`;
     const campaignFilter = encodeURIComponent(JSON.stringify([
       { field: "effective_status", operator: "IN", value: ["ACTIVE"] }
@@ -696,6 +697,7 @@ async function processAccount(account, serviceKey, date, date_from, date_to) {
         amount_spent: metaAmountSpent,
         spend_cap: metaSpendCap
       };
+      if (accountData?.name) adAccountUpdate.account_name = accountData.name;
       // Map Meta account_status to CRM status
       const metaStatus = accountData?.account_status;
       if (metaStatus !== undefined && metaStatus !== null) {
@@ -1197,6 +1199,9 @@ Deno.serve(async (req)=>{
             }
             if (item.status !== undefined) {
               updateData.status = item.status;
+            }
+            if (item.account_name) {
+              updateData.account_name = item.account_name;
             }
             await supabase.from("ad_accounts").update(updateData).eq("id", item.id);
           }
