@@ -439,13 +439,34 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     });
 
     let creative: Record<string, unknown>;
-    if (body.existingPostId) {
+    // A plain existing post has no Message/Call button, so Meta rejects it for message/call/website ads
+    // (#1487891). For those, rebuild the ad from the post's own text + photo with the right button.
+    const rebuildFromPost = !!body.existingPostId && (isMsg || eng === "CALLS" || eng === "WEBSITE");
+    let postText: string | undefined; let postImageB64: string | undefined;
+    if (rebuildFromPost) {
+      const storyId = body.existingPostId!.includes("_") ? body.existingPostId! : `${pageId}_${body.existingPostId}`;
+      let pt = await savedPageToken(supabaseAdmin, pageId, page.user_id);
+      if (!pt) { try { pt = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* none */ } }
+      const post: any = await (pt ? graphClient(pt) : g).get(storyId, { fields: "message,full_picture" }).catch(() => null);
+      if (!post) throw new Error("Post টি পড়া যায়নি — Facebook আবার connect করে চেষ্টা করুন বা নতুন ছবি দিয়ে ad বানান");
+      postText = post.message ?? "";
+      if (post.full_picture) {
+        const res = await fetch(post.full_picture);
+        if (res.ok) {
+          const buf = new Uint8Array(await res.arrayBuffer());
+          let s = ""; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+          postImageB64 = btoa(s);
+        }
+      }
+    }
+    if (body.existingPostId && !rebuildFromPost) {
       const storyId = body.existingPostId.includes("_") ? body.existingPostId : `${pageId}_${body.existingPostId}`;
       creative = { name: `${body.adName} creative`, object_story_id: storyId };
     } else {
       let imageHash: string | undefined;
-      if (body.imageBase64) {
-        const up = await g.post(`${act}/adimages`, { bytes: body.imageBase64 });
+      const imgB64 = body.imageBase64 || postImageB64;
+      if (imgB64) {
+        const up = await g.post(`${act}/adimages`, { bytes: imgB64 });
         imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
       }
       // Message ads need Meta's special links, otherwise Meta says "Invalid creative for objective" (#1487891).
