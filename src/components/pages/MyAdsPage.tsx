@@ -136,7 +136,7 @@ export default function MyAdsPage() {
 
   const pages: any[] = data?.pages ?? [];
   const allPages: any[] = data?.allPages ?? pages;
-  const accounts: any[] = data?.accounts ?? [];
+  const accounts: any[] = (data?.accounts?.length ? data.accounts : fastAccounts) ?? [];
   const currentAccId: string | undefined = data?.selectedAccountId ?? accSel;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
   const isShared = currentAcc?.kind === "shared";
@@ -213,7 +213,7 @@ export default function MyAdsPage() {
               <h1 className="text-center text-lg font-bold">Select account</h1>
               <Input className="mt-3 h-11 rounded-full border-fb-border px-4" placeholder="Search accounts" value={accSearch} onChange={(e) => setAccSearch(e.target.value)} />
             </div>
-            {isFetching && !data && <p className="py-10 text-center text-fb-muted">Loading…</p>}
+            {fastLoading && !accounts.length && <p className="py-10 text-center text-fb-muted">Loading…</p>}
             {data && list.length === 0 && <p className="py-10 text-center text-fb-muted">কোনো ad account পাওয়া যায়নি।</p>}
             <div className="divide-y divide-fb-border">
               {list.map((a) => {
