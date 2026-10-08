@@ -11,6 +11,7 @@ const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("accounts"), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({
     action: z.literal("update"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/),
@@ -188,6 +189,20 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     };
     for (let i = 0; i < ids.length; i += 6) await Promise.all(ids.slice(i, i + 6).map(one));
     return { summary: out };
+  }
+
+  if (body.action === "accounts") {
+    // Fast account list from CRM only (no Meta calls) for the account picker.
+    const sharedIds = await sharedAccountIds(supabaseAdmin, targetUser);
+    const own = await ownAccounts(supabaseAdmin, targetUser, true, isAdmin && targetUser === user.id);
+    const { data: sharedRows } = sharedIds.length
+      ? await supabaseAdmin.from("ad_accounts").select("id, account_id, account_name").in("id", sharedIds)
+      : { data: [] as any[] };
+    const accounts = [
+      ...(sharedRows ?? []).map((a: any) => ({ id: a.id, account_id: a.account_id, name: a.account_name || a.account_id, kind: "shared" })),
+      ...own.filter((a: any) => !sharedIds.includes(a.id)).map((a: any) => ({ id: a.id, account_id: a.account_id, name: a.account_name || a.account_id, kind: "own" })),
+    ];
+    return { accounts };
   }
 
   if (body.action === "list") {

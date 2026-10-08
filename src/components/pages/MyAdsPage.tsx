@@ -67,9 +67,24 @@ export default function MyAdsPage() {
 
   const dates = useMemo(() => ({ dateFrom: range.from, dateTo: range.to }), [range]);
 
+  const onAccountPicker = isMobile && mobileStep === "accounts";
   const { data, isFetching, error, refetch } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
     queryFn: () => managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) }),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    enabled: !onAccountPicker,
+  });
+  // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
+  const { data: fastAccounts, isFetching: fastLoading } = useQuery({
+    queryKey: ["managed-ads-accounts"],
+    queryFn: async () => {
+      const r = await managedAds<{ accounts: any[] }>({ action: "accounts" });
+      try { localStorage.setItem("myads-accounts-cache", JSON.stringify(r.accounts)); } catch { /* ignore */ }
+      return r.accounts;
+    },
+    initialData: () => { try { const c = localStorage.getItem("myads-accounts-cache"); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
