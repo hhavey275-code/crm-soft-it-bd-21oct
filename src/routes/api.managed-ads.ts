@@ -32,6 +32,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("demographics"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().max(60).optional() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("request_page_access"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("link_page"), pageUrl: z.string().min(3).max(500), adAccountDbId: z.string().uuid() }),
   z.object({
     action: z.literal("create"),
     pageDbId: z.string().uuid(),
@@ -270,6 +271,39 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (body.action === "set_status") await g.post(body.objectId, { status: body.status });
     else await g.post(body.objectId, { [body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"]: String(Math.round(body.amount * 100)) });
     return { ok: true };
+  }
+
+  // Client pastes a Page link; CRM's BM sends a Page access request the Page admin approves on Facebook.
+  if (body.action === "link_page") {
+    const wantAcc = body.adAccountDbId;
+    const allowed = (await sharedAccountIds(supabaseAdmin, targetUser)).includes(wantAcc)
+      || (await ownAccounts(supabaseAdmin, targetUser, true, isAdmin)).some((a: any) => a.id === wantAcc);
+    if (!allowed) throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
+    const { token, bmId } = await tokenFor(supabaseAdmin, wantAcc);
+    if (!bmId) throw new Error("এই ad account-এর Business Manager CRM-এ পাওয়া যায়নি");
+    const g = graphClient(token);
+    const raw = body.pageUrl.trim();
+    let ref = raw;
+    try {
+      const u = new URL(raw.startsWith("http") ? raw : `https://facebook.com/${raw}`);
+      ref = u.searchParams.get("id") || u.pathname.split("/").filter(Boolean).filter((s) => !["pages", "profile.php", "people"].includes(s)).pop() || raw;
+      const m = u.pathname.match(/-(\d{8,})\/?$/); if (m) ref = m[1];
+    } catch { /* plain id/username */ }
+    const info: any = await g.get(ref, { fields: "id,name,link" }).catch(() => null);
+    const pageId = info?.id ? String(info.id) : /^\d{8,}$/.test(ref) ? ref : null;
+    if (!pageId) throw new Error("Page খুঁজে পাওয়া যায়নি — Page-এর পুরো লিংক বা Page ID দিন");
+    let already = false;
+    try {
+      await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (/already/i.test(msg)) already = true;
+      else throw new Error(`Facebook request পাঠাতে পারেনি: ${msg}`);
+    }
+    const { data: ex } = await supabaseAdmin.from("client_facebook_pages").select("id").eq("user_id", targetUser).eq("page_id", pageId).maybeSingle();
+    if (!ex) await supabaseAdmin.from("client_facebook_pages").insert({ user_id: targetUser, page_id: pageId, page_name: info?.name || `Page ${pageId}`, page_url: info?.link || raw, ad_account_id: wantAcc } as any);
+    const bm: any = await g.get(String(bmId), { fields: "name" }).catch(() => null);
+    return { ok: true, already, pageId, pageName: info?.name ?? null, bmName: bm?.name ?? null, bmId: String(bmId) };
   }
 
   // interests + create need an approved page owned by the caller

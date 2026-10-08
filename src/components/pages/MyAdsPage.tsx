@@ -22,6 +22,7 @@ import { ColumnsPicker, fmtCol, totalCol, useExtraColumns } from "@/components/a
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
 import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-manager/FbDateRangePicker";
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
+import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 type Level = "campaign" | "adset" | "ad";
@@ -301,6 +302,7 @@ export default function MyAdsPage() {
               </div>
             )}
             {!allPages.length && <FacebookConnectButton label="Connect Facebook" onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />}
+            <LinkPageByUrl adAccountDbId={currentAccId} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
             <div className="flex items-center justify-between pt-1">
               <h2 className="text-2xl font-bold">Campaigns</h2>
             </div>
@@ -386,6 +388,7 @@ export default function MyAdsPage() {
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>
           </div>
           <FacebookConnectButton label={allPages.length ? "Facebook আবার connect" : "Connect Facebook"} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
+          <LinkPageByUrl adAccountDbId={currentAccId} onDone={() => qc.invalidateQueries({ queryKey: ["managed-ads-list"] })} />
           {currentAcc?.kind === "shared" && <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>}
         </div>
 
