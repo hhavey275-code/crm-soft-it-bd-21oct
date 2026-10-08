@@ -376,6 +376,7 @@ export function AdminAdAccounts() {
       writeLastFullSync(now);
       setLastFullSyncAt(now);
       refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       // v1.4.2: Mass extension billing sweep removed (Meta-detection risk).
       // For per-account live billing data, use the Sync button on each row.
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
@@ -412,6 +413,7 @@ export function AdminAdAccounts() {
       }
       if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh inventory"),
   });
@@ -442,6 +444,7 @@ export function AdminAdAccounts() {
       }
       if (typeof data?.meta_calls === "number") setLastSyncCalls(data.meta_calls);
       refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
@@ -465,6 +468,7 @@ export function AdminAdAccounts() {
         toast.success("Account updated from Meta");
       }
       refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
     onSettled: () => setSingleRefreshingId(null),
