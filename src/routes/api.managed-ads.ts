@@ -448,7 +448,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         const up = await g.post(`${act}/adimages`, { bytes: body.imageBase64 });
         imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
       }
-      const link = body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
+      // Message ads need Meta's special links, otherwise Meta says "Invalid creative for objective" (#1487891).
+      const link = waOnly ? "https://api.whatsapp.com/send"
+        : isMsg ? "https://fb.com/messenger_doc/"
+        : body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
       const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : (body.cta || map.cta || "LEARN_MORE");
       const cta: Record<string, unknown> = {
         type: ctaType,
