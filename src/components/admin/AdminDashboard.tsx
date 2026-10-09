@@ -21,7 +21,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchSpendOnly, type RateLimitedDetail } from "@/lib/fetchSpendOnly";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
-import { KastOtpCard } from "@/components/admin/KastOtpCard";
 
 
 const DATE_PRESETS = [
@@ -623,7 +622,6 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <KastOtpCard />
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Admin Dashboard</h1>
         <Button
