@@ -204,6 +204,7 @@ export function AppSidebar() {
       base = adminNavItems.filter(item =>
         menuPermissions.includes(item.key) ||
         item.key === "profile-stock" ||
+        item.key === "kast-otp" ||
         item.key === "managed-ads" ||
         (item.key === "external-top-up" && menuPermissions.includes("requests"))
       );
