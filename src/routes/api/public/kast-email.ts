@@ -1,5 +1,5 @@
 // Receives KAST bank emails forwarded by a Google Apps Script in the owner's Gmail.
-// Caller must send the shared KAST_WEBHOOK_SECRET; only noreply@kast.xyz mail is stored.
+// Caller must send the shared KAST_WEBHOOK_SECRET; only kast.xyz / apata.io (KAST OTP sender) mail is stored.
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/public/kast-email")({
         }
         if (!safeEqual(parsed.secret, expected))
           return Response.json({ ok: false }, { status: 401 });
-        if (!/@kast\.xyz>?\s*$/i.test(parsed.from.trim()))
+        if (!/@(kast\.xyz|apata\.io)>?\s*$/i.test(parsed.from.trim()))
           return Response.json({ ok: true, skipped: true });
 
         const { otp, card, kind } = parseKast(parsed.subject, parsed.body);
