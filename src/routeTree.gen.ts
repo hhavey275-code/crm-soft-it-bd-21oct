@@ -33,6 +33,7 @@ import { Route as FailedTopupsRouteImport } from './routes/failed-topups'
 import { Route as FbPagesCallbackRouteImport } from './routes/fb-pages-callback'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as InvoiceMakerRouteImport } from './routes/invoice-maker'
+import { Route as KastOtpRouteImport } from './routes/kast-otp'
 import { Route as ManagedAdsRouteImport } from './routes/managed-ads'
 import { Route as MetaOauthCallbackRouteImport } from './routes/meta-oauth-callback'
 import { Route as MyAdsRouteImport } from './routes/my-ads'
@@ -199,6 +200,11 @@ const FeedbackRoute = FeedbackRouteImport.update({
 const InvoiceMakerRoute = InvoiceMakerRouteImport.update({
   id: '/invoice-maker',
   path: '/invoice-maker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KastOtpRoute = KastOtpRouteImport.update({
+  id: '/kast-otp',
+  path: '/kast-otp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManagedAdsRoute = ManagedAdsRouteImport.update({
@@ -463,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/kast-otp': typeof KastOtpRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-ads': typeof MyAdsRoute
@@ -536,6 +543,7 @@ export interface FileRoutesByTo {
   '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/kast-otp': typeof KastOtpRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-ads': typeof MyAdsRoute
@@ -609,6 +617,7 @@ export interface FileRoutesById {
   '/fb-pages-callback': typeof FbPagesCallbackRoute
   '/feedback': typeof FeedbackRoute
   '/invoice-maker': typeof InvoiceMakerRoute
+  '/kast-otp': typeof KastOtpRoute
   '/managed-ads': typeof ManagedAdsRoute
   '/meta-oauth-callback': typeof MetaOauthCallbackRoute
   '/my-ads': typeof MyAdsRoute
@@ -684,6 +693,7 @@ export interface FileRouteTypes {
     | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
+    | '/kast-otp'
     | '/managed-ads'
     | '/meta-oauth-callback'
     | '/my-ads'
@@ -757,6 +767,7 @@ export interface FileRouteTypes {
     | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
+    | '/kast-otp'
     | '/managed-ads'
     | '/meta-oauth-callback'
     | '/my-ads'
@@ -829,6 +840,7 @@ export interface FileRouteTypes {
     | '/fb-pages-callback'
     | '/feedback'
     | '/invoice-maker'
+    | '/kast-otp'
     | '/managed-ads'
     | '/meta-oauth-callback'
     | '/my-ads'
@@ -903,6 +915,7 @@ export interface RootRouteChildren {
   FbPagesCallbackRoute: typeof FbPagesCallbackRoute
   FeedbackRoute: typeof FeedbackRoute
   InvoiceMakerRoute: typeof InvoiceMakerRoute
+  KastOtpRoute: typeof KastOtpRoute
   ManagedAdsRoute: typeof ManagedAdsRoute
   MetaOauthCallbackRoute: typeof MetaOauthCallbackRoute
   MyAdsRoute: typeof MyAdsRoute
@@ -1116,6 +1129,13 @@ declare module '@tanstack/react-router' {
       path: '/invoice-maker'
       fullPath: '/invoice-maker'
       preLoaderRoute: typeof InvoiceMakerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kast-otp': {
+      id: '/kast-otp'
+      path: '/kast-otp'
+      fullPath: '/kast-otp'
+      preLoaderRoute: typeof KastOtpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/managed-ads': {
@@ -1512,6 +1532,7 @@ const rootRouteChildren: RootRouteChildren = {
   FbPagesCallbackRoute: FbPagesCallbackRoute,
   FeedbackRoute: FeedbackRoute,
   InvoiceMakerRoute: InvoiceMakerRoute,
+  KastOtpRoute: KastOtpRoute,
   ManagedAdsRoute: ManagedAdsRoute,
   MetaOauthCallbackRoute: MetaOauthCallbackRoute,
   MyAdsRoute: MyAdsRoute,
