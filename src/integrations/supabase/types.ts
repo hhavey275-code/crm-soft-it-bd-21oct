@@ -2370,6 +2370,45 @@ export type Database = {
           },
         ]
       }
+      kast_emails: {
+        Row: {
+          body: string | null
+          card_last4: string | null
+          created_at: string
+          from_email: string | null
+          id: string
+          kind: string
+          message_id: string | null
+          otp: string | null
+          received_at: string
+          subject: string | null
+        }
+        Insert: {
+          body?: string | null
+          card_last4?: string | null
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          otp?: string | null
+          received_at?: string
+          subject?: string | null
+        }
+        Update: {
+          body?: string | null
+          card_last4?: string | null
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          otp?: string | null
+          received_at?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
       managed_account_assignments: {
         Row: {
           ad_account_id: string
