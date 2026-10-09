@@ -4,13 +4,41 @@ import { routeTree } from "./routeTree.gen";
 function DefaultErrorComponent({ error: rawError, reset }: import("@tanstack/react-router").ErrorComponentProps) {
   const error = rawError as Error;
   const router = useRouter();
+  const isChunk = /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError|Unexpected token '<'/i.test(
+    String(error?.message || ""),
+  );
   if (typeof window !== "undefined") {
     console.error("[route-error]", error);
-    const msg = String(error?.message || "");
-    if (/dynamically imported module|Importing a module script failed|Loading chunk/i.test(msg) && !sessionStorage.getItem("chunk-reload")) {
-      sessionStorage.setItem("chunk-reload", "1");
-      window.location.reload();
+    if (isChunk) {
+      try {
+        const last = Number(sessionStorage.getItem("chunk-reload-at") || 0);
+        if (Date.now() - last > 30_000) {
+          sessionStorage.setItem("chunk-reload-at", String(Date.now()));
+          void import("@/lib/app-recovery").then((m) => m.recoverFromStaleAssets()).catch(() => window.location.reload());
+        }
+      } catch {
+        window.location.reload();
+      }
     }
+  }
+  if (isChunk) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-xl font-semibold text-foreground">নতুন আপডেট লোড হচ্ছে…</h1>
+          <p className="text-sm text-muted-foreground">কয়েক সেকেন্ডে না খুললে নিচের বাটনে চাপুন।</p>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem("chunk-reload-at");
+              void import("@/lib/app-recovery").then((m) => m.recoverFromStaleAssets());
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
