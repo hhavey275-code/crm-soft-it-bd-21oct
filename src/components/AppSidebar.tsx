@@ -78,6 +78,7 @@ const adminNavItems = [
   { title: "Announcements", url: "/announcements", icon: Megaphone, key: "announcements" },
   { title: "Admin Performance", url: "/admin/performance", icon: Trophy, key: "admin-performance" },
   { title: "Card Vault", url: "/card-vault", icon: CreditCard, key: "card-vault" },
+  { title: "KAST OTP", url: "/kast-otp", icon: Shield, key: "kast-otp" },
   { title: "Profile Stock", url: "/profile-stock", icon: UserCircle, key: "profile-stock" },
   { title: "Managed Ads", url: "/managed-ads", icon: Megaphone, key: "managed-ads" },
   { title: "Documents Vault", url: "/documents", icon: FolderLock, key: "documents-vault" },
