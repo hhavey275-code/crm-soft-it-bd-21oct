@@ -2382,6 +2382,10 @@ export type Database = {
           otp: string | null
           received_at: string
           subject: string | null
+          used_at: string | null
+          used_by: string | null
+          used_by_name: string | null
+          used_device: string | null
         }
         Insert: {
           body?: string | null
@@ -2394,6 +2398,10 @@ export type Database = {
           otp?: string | null
           received_at?: string
           subject?: string | null
+          used_at?: string | null
+          used_by?: string | null
+          used_by_name?: string | null
+          used_device?: string | null
         }
         Update: {
           body?: string | null
@@ -2406,6 +2414,10 @@ export type Database = {
           otp?: string | null
           received_at?: string
           subject?: string | null
+          used_at?: string | null
+          used_by?: string | null
+          used_by_name?: string | null
+          used_device?: string | null
         }
         Relationships: []
       }
