@@ -76,6 +76,7 @@ import { Route as TenantsIdRouteImport } from './routes/tenants.$id'
 import { Route as ApiAdsManagerCampaignsRouteImport } from './routes/api.ads-manager.campaigns'
 import { Route as ApiPublicBmAdAccountsRouteImport } from './routes/api/public/bm-ad-accounts'
 import { Route as ApiPublicCrmTopupRouteImport } from './routes/api/public/crm-topup'
+import { Route as ApiPublicKastEmailRouteImport } from './routes/api/public/kast-email'
 import { Route as ApiPublicManagedAdsSpendRouteImport } from './routes/api/public/managed-ads-spend'
 import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
 import { Route as ApiPublicSiteTtsRouteImport } from './routes/api/public/site-tts'
@@ -415,6 +416,11 @@ const ApiPublicCrmTopupRoute = ApiPublicCrmTopupRouteImport.update({
   path: '/api/public/crm-topup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicKastEmailRoute = ApiPublicKastEmailRouteImport.update({
+  id: '/api/public/kast-email',
+  path: '/api/public/kast-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicManagedAdsSpendRoute =
   ApiPublicManagedAdsSpendRouteImport.update({
     id: '/api/public/managed-ads-spend',
@@ -500,6 +506,7 @@ export interface FileRoutesByFullPath {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/kast-email': typeof ApiPublicKastEmailRoute
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
@@ -571,6 +578,7 @@ export interface FileRoutesByTo {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/kast-email': typeof ApiPublicKastEmailRoute
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
@@ -644,6 +652,7 @@ export interface FileRoutesById {
   '/api/ads-manager/campaigns': typeof ApiAdsManagerCampaignsRoute
   '/api/public/bm-ad-accounts': typeof ApiPublicBmAdAccountsRoute
   '/api/public/crm-topup': typeof ApiPublicCrmTopupRoute
+  '/api/public/kast-email': typeof ApiPublicKastEmailRoute
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
@@ -718,6 +727,7 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
+    | '/api/public/kast-email'
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
@@ -789,6 +799,7 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
+    | '/api/public/kast-email'
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
@@ -861,6 +872,7 @@ export interface FileRouteTypes {
     | '/api/ads-manager/campaigns'
     | '/api/public/bm-ad-accounts'
     | '/api/public/crm-topup'
+    | '/api/public/kast-email'
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
@@ -930,6 +942,7 @@ export interface RootRouteChildren {
   ApiAdsManagerCampaignsRoute: typeof ApiAdsManagerCampaignsRoute
   ApiPublicBmAdAccountsRoute: typeof ApiPublicBmAdAccountsRoute
   ApiPublicCrmTopupRoute: typeof ApiPublicCrmTopupRoute
+  ApiPublicKastEmailRoute: typeof ApiPublicKastEmailRoute
   ApiPublicManagedAdsSpendRoute: typeof ApiPublicManagedAdsSpendRoute
   ApiPublicReferralCronRoute: typeof ApiPublicReferralCronRoute
   ApiPublicSiteTtsRoute: typeof ApiPublicSiteTtsRoute
@@ -1406,6 +1419,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCrmTopupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/kast-email': {
+      id: '/api/public/kast-email'
+      path: '/api/public/kast-email'
+      fullPath: '/api/public/kast-email'
+      preLoaderRoute: typeof ApiPublicKastEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/managed-ads-spend': {
       id: '/api/public/managed-ads-spend'
       path: '/api/public/managed-ads-spend'
@@ -1531,6 +1551,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdsManagerCampaignsRoute: ApiAdsManagerCampaignsRoute,
   ApiPublicBmAdAccountsRoute: ApiPublicBmAdAccountsRoute,
   ApiPublicCrmTopupRoute: ApiPublicCrmTopupRoute,
+  ApiPublicKastEmailRoute: ApiPublicKastEmailRoute,
   ApiPublicManagedAdsSpendRoute: ApiPublicManagedAdsSpendRoute,
   ApiPublicReferralCronRoute: ApiPublicReferralCronRoute,
   ApiPublicSiteTtsRoute: ApiPublicSiteTtsRoute,
