@@ -124,16 +124,18 @@ export function KastOtpCard() {
                 </span>
               </div>
               {r.otp && (
-                <Button size="sm" variant="outline" onClick={() => copyOtp(r)}>
-                  <span className={`font-mono font-bold mr-1 ${r.used_at ? "line-through" : ""}`}>{r.otp}</span>
+                <Button size="sm" variant="outline" onClick={() => copyOtp(r)} className={r.used_at ? "border-emerald-500/50 bg-emerald-500/10" : ""}>
+                  {r.used_at && <CheckCircle2 className="h-4 w-4 mr-1 text-emerald-600" />}
+                  <span className="font-mono font-bold mr-1">{r.otp}</span>
                   <Copy className="h-3 w-3" />
                 </Button>
               )}
             </div>
             {r.used_at && (
-              <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                <CheckCircle2 className="h-3 w-3" />
-                Used by <b>{r.used_by_name}</b> · {r.used_device} · {new Date(r.used_at).toLocaleTimeString()}
+              <div className="mt-1 flex items-center gap-1 text-xs text-emerald-600 flex-wrap">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Used by <b>{r.used_by_name}</b>
+                <span className="text-sky-600">· {r.used_device} · {new Date(r.used_at).toLocaleTimeString()}</span>
               </div>
             )}
             <button className="mt-1 text-left w-full truncate" onClick={() => setOpen(open === r.id ? null : r.id)}>
