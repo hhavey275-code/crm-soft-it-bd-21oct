@@ -303,6 +303,25 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       || (setup === "post" ? !postId : (!isMsg && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && engLoc !== "WEBSITE") && !/^https?:\/\//.test(link))),
   };
   const ready = !errs.campaign && !errs.adset && !errs.ad;
+  const needLink = setup !== "post" && !isMsg && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && engLoc !== "WEBSITE");
+  const missing: { lv: 0 | 1 | 2; t: string }[] = [
+    !accId && { lv: 2 as const, t: "Ad account বাছুন" },
+    !campaignName.trim() && { lv: 0 as const, t: "Campaign name লিখুন" },
+    amt < 1 && { lv: 0 as const, t: "Budget কমপক্ষে 1 দিন" },
+    overWallet && { lv: 0 as const, t: "Budget wallet balance-এর বেশি — কমান বা top-up করুন" },
+    !adsetName.trim() && { lv: 1 as const, t: "Ad set name লিখুন" },
+    !countries.length && { lv: 1 as const, t: "কমপক্ষে একটি দেশ (Location) বাছুন" },
+    needsPixel && !pixelId && { lv: 1 as const, t: "Dataset / Pixel বাছুন" },
+    budgetType === "lifetime" && !hasEnd && { lv: 1 as const, t: "Lifetime budget-এর জন্য End date দিন" },
+    objective === "ENGAGEMENT" && engLoc === "MESSAGING" && !finalDests.length && { lv: 1 as const, t: "Messenger বা WhatsApp বাছুন" },
+    objective === "ENGAGEMENT" && engLoc === "MESSAGING" && finalDests.includes("WHATSAPP") && !wa && { lv: 1 as const, t: "Page-এ WhatsApp number যুক্ত নেই" },
+    objective === "ENGAGEMENT" && engLoc === "CALLS" && !phone.trim() && { lv: 1 as const, t: "Phone number লিখুন" },
+    !adName.trim() && { lv: 2 as const, t: "Ad name লিখুন" },
+    !pageDbId && { lv: 2 as const, t: "Facebook Page বাছুন" },
+    setup === "post" && !postId && { lv: 2 as const, t: "একটি existing post বাছুন" },
+    needLink && !/^https?:\/\//.test(link) && { lv: 2 as const, t: "Website URL দিন (https:// দিয়ে শুরু)" },
+  ].filter(Boolean) as any;
+  const [showMissing, setShowMissing] = useState(false);
 
   const submit = async (publish: boolean) => {
     if (!accId) return toast.error("Ad account বাছুন");
@@ -943,9 +962,17 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
                 </div>
               )}
-              {(level === 2 || tab === "review") && (
-                <div className="space-y-2 overflow-hidden"><p className="text-[13px] font-semibold">Ad preview</p>{preview}</div>
+              {missing.length > 0 && (
+                <div className={cn("rounded-lg border bg-background p-4 text-[13px]", showMissing ? "border-destructive" : "border-fb-border")}>
+                  <p className="flex items-center gap-2 font-semibold text-destructive"><AlertCircle className="h-4 w-4" />Publish করার আগে যা বাকি ({missing.length})</p>
+                  <ul className="mt-2 space-y-1">
+                    {missing.map((m, i) => (
+                      <li key={i}><button onClick={() => { setLevel(m.lv); setTab("edit"); }} className="text-left hover:underline">• {m.t} <span className="text-fb-muted">({m.lv === 0 ? "Campaign" : m.lv === 1 ? "Ad set" : "Ad"})</span></button></li>
+                    ))}
+                  </ul>
+                </div>
               )}
+              <div className="space-y-2 overflow-hidden"><p className="text-[13px] font-semibold">Ad preview</p>{preview}</div>
             </div>
           </div>
         </main>
