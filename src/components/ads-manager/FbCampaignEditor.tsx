@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { Folder, LayoutGrid, FileText, X, Loader2, CheckCircle2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { managedAds } from "@/lib/managedAdsApi";
+import { supabase } from "@/integrations/supabase/client";
+const CTAS = ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP", "GET_OFFER", "CONTACT_US", "SEE_MORE", "BOOK_NOW", "SUBSCRIBE", "DOWNLOAD", "APPLY_NOW", "GET_QUOTE", "SEND_MESSAGE", "MESSAGE_PAGE", "WHATSAPP_MESSAGE", "CALL_NOW", "LIKE_PAGE"];
 
 type Level = "campaign" | "adset" | "ad";
 type Node = { level: Level; obj: any };
@@ -16,7 +18,7 @@ const inp = "h-9 w-full rounded-md border border-fb-border bg-background px-3 te
 
 function initForm(level: Level, o: any) {
   const bt = o.lifetime_budget ? "lifetime" : o.daily_budget ? "daily" : null;
-  const spec = o.creative?.object_story_spec?.link_data;
+  const spec = o.creative?.object_story_spec?.link_data ?? o.creative?.object_story_spec?.video_data;
   return {
     name: o.name ?? "",
     budgetType: bt,
@@ -25,8 +27,11 @@ function initForm(level: Level, o: any) {
     countries: (o.targeting?.geo_locations?.countries ?? []).join(", "),
     ageMin: o.targeting?.age_min ? String(o.targeting.age_min) : "",
     ageMax: o.targeting?.age_max ? String(o.targeting.age_max) : "",
-    message: spec?.message ?? "", headline: spec?.name ?? "", link: spec?.link ?? "",
+    message: spec?.message ?? "", headline: spec?.name ?? spec?.title ?? "", link: spec?.link ?? spec?.call_to_action?.value?.link ?? "",
+    description: spec?.description ?? spec?.link_description ?? "", cta: spec?.call_to_action?.type ?? "",
     editableCreative: !!spec, level,
+    image: null as null | { b64: string; url: string }, video: null as null | { path: string; name: string },
+    newPostId: "", postMessage: "",
   };
 }
 
@@ -54,6 +59,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
     Object.fromEntries(nodes.map((n) => [String(n.obj.id), initForm(n.level, n.obj)])));
   const [cur, setCur] = useState(String(campaign.id));
   const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
   const node = nodes.find((n) => String(n.obj.id) === cur)!;
   const fm = forms[cur];
   const set = (k: string, v: any) => setForms((p) => ({ ...p, [cur]: { ...p[cur], [k]: v } }));
@@ -81,9 +87,19 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
         if (a.message !== b.message) body.message = a.message;
         if (a.headline !== b.headline) body.headline = a.headline;
         if (a.link !== b.link) body.link = a.link;
+        if (a.description !== b.description) body.description = a.description;
+        if (a.cta !== b.cta && a.cta) body.cta = a.cta;
+        if (a.image) body.imageBase64 = a.image.b64;
+        if (a.video) body.videoPath = a.video.path;
+        if (a.newPostId.trim()) body.newPostId = (a.newPostId.match(/(\d{5,}(?:_\d+)?)\/?$/)?.[1] ?? a.newPostId.match(/(?:posts|videos|story_fbid=|fbid=)\/?(\d{5,})/)?.[1] ?? a.newPostId.trim());
+        if (a.postMessage.trim()) body.postMessage = a.postMessage;
       }
       if (Object.keys(body).length <= 4) continue;
-      try { await managedAds(body); ok++; }
+      try {
+        const r: any = await managedAds(body); ok++;
+        if (r?.creativeId) toast.success(`নতুন creative: ${r.creativeId} — ad আবার review-তে যাবে`, { duration: 10000, action: r.previewUrl ? { label: "Preview", onClick: () => window.open(r.previewUrl, "_blank") } : undefined });
+        if (r?.postUpdated) toast.success("Page post-এর লেখা বদলানো হয়েছে");
+      }
       catch (e: any) { toast.error(`${a.name}: ${e.message}`); }
     }
     setSaving(false);
@@ -158,10 +174,43 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
             )}
             {node.level === "ad" && (
               <Section title="Ad creative">
-                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর পুরনো post থেকে — শুধু নাম বদলানো যাবে।</p>}
+                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর post থেকে — post-এর লেখা বদলাতে বা অন্য post বেছে নিতে পারবেন।</p>}
                 <div><Lbl>Primary text</Lbl><textarea rows={4} disabled={!fm.editableCreative} className={cn(inp, "h-auto py-2")} value={fm.message} onChange={(e) => set("message", e.target.value)} /></div>
                 <div><Lbl>Headline</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.headline} onChange={(e) => set("headline", e.target.value)} /></div>
                 <div><Lbl>Website URL</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.link} onChange={(e) => set("link", e.target.value)} /></div>
+                <div><Lbl>Description</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.description} onChange={(e) => set("description", e.target.value)} /></div>
+                {fm.editableCreative && fm.cta && (
+                  <div><Lbl>Call to action</Lbl><select className={inp} value={fm.cta} onChange={(e) => set("cta", e.target.value)}>
+                    {[...new Set([fm.cta, ...CTAS])].map((c) => <option key={c} value={c}>{c.replace(/_/g, " ").toLowerCase().replace(/^./, (x) => x.toUpperCase())}</option>)}
+                  </select></div>
+                )}
+                {fm.editableCreative && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-fb-border px-3 font-semibold">{fm.image ? "ছবি বদলানো হয়েছে ✓" : "নতুন ছবি"}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const u = String(r.result); set("image", { b64: u.split(",")[1], url: u }); set("video", null); }; r.readAsDataURL(f); }} />
+                    </label>
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md border border-fb-border px-3 font-semibold">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{fm.video ? `🎬 ${fm.video.name}` : "নতুন video"}
+                      <input type="file" accept="video/*" className="hidden" disabled={busy} onChange={async (e) => {
+                        const f = e.target.files?.[0]; if (!f) return; setBusy(true);
+                        try {
+                          const { data: u } = await supabase.auth.getUser(); if (!u.user) throw new Error("আবার লগইন করুন");
+                          const path = `${u.user.id}/${crypto.randomUUID()}.${(f.name.split(".").pop() || "mp4").replace(/[^\w]/g, "").slice(0, 5) || "mp4"}`;
+                          const { error } = await supabase.storage.from("ad-media").upload(path, f, { contentType: f.type || "video/mp4" });
+                          if (error) throw error; set("video", { path, name: f.name }); set("image", null);
+                        } catch (er: any) { toast.error(er.message); } finally { setBusy(false); }
+                      }} />
+                    </label>
+                    {fm.image && <img src={fm.image.url} alt="" className="h-9 w-9 rounded object-cover" />}
+                  </div>
+                )}
+                <div><Lbl>অন্য post দিয়ে ad চালান (Post ID বা link)</Lbl><input className={inp} value={fm.newPostId} onChange={(e) => set("newPostId", e.target.value)} placeholder="https://facebook.com/.../posts/123..." /></div>
+                {!fm.editableCreative && (
+                  <div><Lbl>Page post-এর লেখা বদলান</Lbl>
+                    <textarea rows={3} className={cn(inp, "h-auto py-2")} value={fm.postMessage} onChange={(e) => set("postMessage", e.target.value)} placeholder="নতুন লেখা (খালি রাখলে বদলাবে না)" />
+                    <p className="mt-1 text-[12px] text-fb-muted">Post-এর ছবি বদলানো যায় না, শুধু লেখা বদলাবে।</p>
+                  </div>
+                )}
+                <p className="rounded-md bg-fb-blue-soft p-2 text-[12px]">লেখা, ছবি বা button বদলালে ad আবার Facebook review-তে যাবে (In Review)।</p>
               </Section>
             )}
           </div>
