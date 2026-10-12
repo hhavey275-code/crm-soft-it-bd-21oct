@@ -502,7 +502,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       name: body.campaignName, objective: map.objective, status, buying_type: "AUCTION",
       special_ad_categories: body.specialCategories,
       ...(body.format === "catalog" && body.catalogId ? { promoted_object: { product_catalog_id: body.catalogId } } : {}),
-      ...(cbo ? { [budgetKey]: cents, bid_strategy: body.bidStrategy, ...(isRoas && body.bidAmount ? {} : {}) } : { is_adset_budget_sharing_enabled: false }),
+      ...(cbo ? { [budgetKey]: cents, bid_strategy: body.bidStrategy } : { is_adset_budget_sharing_enabled: false }),
     });
     campaignId = String(camp.id);
     if (shared) {
@@ -537,8 +537,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       ...(body.adSchedule?.length && body.budgetType === "lifetime" ? { pacing_type: ["day_parting"], adset_schedule: body.adSchedule.map((x) => ({ ...x, timezone_type: "USER" })) } : {}),
       ...(map.destination ? { destination_type: map.destination } : {}),
       ...(cbo ? {} : { bid_strategy: body.bidStrategy, [budgetKey]: cents }),
-      ...(cbo && !isRoas ? {} : bidFields),
-      ...(cbo && !isRoas ? (body.bidAmount && body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}) : {}),
+      ...bidFields,
       ...(body.startTime ? { start_time: body.startTime } : {}),
       ...(body.endTime ? { end_time: body.endTime } : {}),
       promoted_object: pixelNeeded ? {
