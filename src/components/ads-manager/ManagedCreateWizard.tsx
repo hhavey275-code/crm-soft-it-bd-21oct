@@ -522,9 +522,10 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               <option value="MESSAGING">Message destinations (Messenger)</option>
             </select>
           </Field>
+{!(objective === "SALES" && needsPixel) && (
           <Field label="Performance goal" hint="Set your goal, such as maximizing conversions or conversion value.">
             <select className={sel} disabled><option>{isMsg ? "Maximize number of conversations" : "Maximize number of conversions"}</option></select>
-          </Field>
+          </Field>)}
           {needsPixel && (
             <>
               <Field label="Dataset" req hint="Track actions that people take on your website.">
