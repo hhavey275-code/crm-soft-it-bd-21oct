@@ -25,6 +25,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({ action: z.literal("sales_assets"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(), pixelId: z.string().regex(/^\d+$/).optional(), catalogId: z.string().regex(/^\d+$/).optional() }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("fb_status") }),
@@ -41,17 +42,43 @@ const schema = z.discriminatedUnion("action", [
     conversionLocation: z.enum(["WEBSITE", "MESSAGING"]).default("WEBSITE"),
     budgetLevel: z.enum(["campaign", "adset"]).default("adset"),
     startTime: z.string().optional(),
-    cta: z.enum(["SHOP_NOW", "LEARN_MORE", "SIGN_UP", "ORDER_NOW", "BUY_NOW", "CONTACT_US", "SEND_MESSAGE", "MESSAGE_PAGE", "GET_OFFER", "BOOK_TRAVEL", "SEE_MORE"]).optional(),
+    cta: z.enum(["SHOP_NOW", "LEARN_MORE", "SIGN_UP", "ORDER_NOW", "BUY_NOW", "CONTACT_US", "SEND_MESSAGE", "MESSAGE_PAGE", "GET_OFFER", "BOOK_TRAVEL", "SEE_MORE", "SUBSCRIBE", "DOWNLOAD", "APPLY_NOW", "GET_QUOTE", "BOOK_NOW", "SEE_MENU", "WATCH_MORE", "GET_STARTED", "INQUIRE_NOW", "REQUEST_TIME", "DONATE_NOW", "GET_SHOWTIMES", "LISTEN_NOW", "PLAY_GAME", "INSTALL_APP", "USE_APP", "NO_BUTTON"]).optional(),
     specialCategories: z.array(z.enum(["CREDIT", "EMPLOYMENT", "HOUSING", "ISSUES_ELECTIONS_POLITICS", "FINANCIAL_PRODUCTS_SERVICES"])).max(5).default([]),
     pixelId: z.string().regex(/^\d+$/).optional(),
-    customEvent: z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT", "VIEW_CONTENT"]).optional(),
+    customEvent: z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT", "VIEW_CONTENT", "ADD_PAYMENT_INFO", "ADD_TO_WISHLIST", "SEARCH", "START_TRIAL", "SUBSCRIBE", "SUBMIT_APPLICATION", "SCHEDULE", "DONATE", "FIND_LOCATION", "CUSTOMIZE_PRODUCT", "OTHER"]).optional(),
+    customConversionId: z.string().regex(/^\d+$/).optional(),
+    performanceGoal: z.enum(["CONVERSIONS", "VALUE"]).default("CONVERSIONS"),
+    attribution: z.enum(["7C1V", "7C", "1C", "1C1V"]).default("7C1V"),
+    advantageSales: z.boolean().default(false),
+    advantageAudience: z.boolean().default(false),
+    customAudiences: z.array(z.string().regex(/^\d+$/)).max(50).default([]),
+    excludedAudiences: z.array(z.string().regex(/^\d+$/)).max(50).default([]),
+    locales: z.array(z.number().int()).max(50).default([]),
+    placements: z.object({
+      publisher_platforms: z.array(z.string().max(30)).max(6),
+      facebook_positions: z.array(z.string().max(40)).max(20).optional(),
+      instagram_positions: z.array(z.string().max(40)).max(20).optional(),
+      messenger_positions: z.array(z.string().max(40)).max(10).optional(),
+      audience_network_positions: z.array(z.string().max(40)).max(10).optional(),
+    }).optional(),
+    adSchedule: z.array(z.object({ days: z.array(z.number().int().min(0).max(6)).min(1), start_minute: z.number().int().min(0).max(1440), end_minute: z.number().int().min(0).max(1440) })).max(20).optional(),
+    catalogId: z.string().regex(/^\d+$/).optional(),
+    productSetId: z.string().regex(/^\d+$/).optional(),
+    format: z.enum(["single", "carousel", "catalog"]).default("single"),
+    cards: z.array(z.object({ imageBase64: z.string().max(6_000_000), headline: z.string().max(255).optional(), description: z.string().max(255).optional(), link: z.string().max(1000).optional() })).max(10).optional(),
+    messages: z.array(z.string().max(5000)).max(5).optional(),
+    headlines: z.array(z.string().max(255)).max(5).optional(),
+    description: z.string().max(255).optional(),
+    displayLink: z.string().max(200).optional(),
+    urlTags: z.string().max(1000).optional(),
+    advantageCreative: z.boolean().default(false),
     campaignName: z.string().min(1).max(200),
     adsetName: z.string().min(1).max(200),
     adName: z.string().min(1).max(200),
     budgetType: z.enum(["daily", "lifetime"]),
     amount: z.number().min(1).max(100000),
     endTime: z.string().optional(),
-    bidStrategy: z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP"]),
+    bidStrategy: z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"]),
     bidAmount: z.number().positive().optional(),
     countries: z.array(z.string().length(2)).min(1).max(25),
     ageMin: z.number().int().min(18).max(65),
@@ -348,6 +375,31 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { pixels: (r.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null })) };
   }
 
+  if (body.action === "sales_assets") {
+    const safe = (p: Promise<any>) => p.catch(() => ({ data: [] }));
+    const [cc, ca, sa, cats, ev, ps] = await Promise.all([
+      safe(g.get(`${act}/customconversions`, { fields: "id,name,custom_event_type,pixel{id}", limit: "100" })),
+      safe(g.get(`${act}/customaudiences`, { fields: "id,name,subtype,approximate_count_lower_bound", limit: "200" })),
+      safe(g.get(`${act}/saved_audiences`, { fields: "id,name,targeting", limit: "100" })),
+      bmId ? safe(g.get(`${bmId}/owned_product_catalogs`, { fields: "id,name,product_count", limit: "50" })).then(async (o: any) => {
+        const c = await safe(g.get(`${bmId}/client_product_catalogs`, { fields: "id,name,product_count", limit: "50" }));
+        return { data: [...(o.data ?? []), ...(c.data ?? [])] };
+      }) : Promise.resolve({ data: [] }),
+      body.pixelId ? safe(g.get(`${body.pixelId}/stats`, { aggregation: "event" })) : Promise.resolve({ data: [] }),
+      body.catalogId ? safe(g.get(`${body.catalogId}/product_sets`, { fields: "id,name,product_count", limit: "100" })) : Promise.resolve({ data: [] }),
+    ]);
+    const events = new Set<string>();
+    for (const row of ev.data ?? []) for (const d of row.data ?? [row]) if (d?.value) events.add(String(d.value));
+    return {
+      customConversions: (cc.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, event: x.custom_event_type, pixelId: x.pixel?.id ?? null })),
+      customAudiences: (ca.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, subtype: x.subtype, size: x.approximate_count_lower_bound ?? null })),
+      savedAudiences: (sa.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, targeting: x.targeting ?? null })),
+      catalogs: [...new Map((cats.data ?? []).map((x: any) => [String(x.id), { id: String(x.id), name: x.name, count: x.product_count ?? null }])).values()],
+      productSets: (ps.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, count: x.product_count ?? null })),
+      pixelEvents: [...events],
+    };
+  }
+
   if (body.action === "posts") {
     // Reading posts needs the page's own token, which our Business Manager gets once the page shares access with it.
     let pageToken: string | undefined;
@@ -387,7 +439,9 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
   if (shared && body.publish && bal <= settings.pauseThreshold) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন`);
   if (body.budgetType === "lifetime" && !body.endTime) throw new Error("Lifetime budget-এর জন্য শেষ তারিখ দিন");
-  if (body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && !body.bidAmount) throw new Error("Bid amount দিন");
+  if (body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && !body.bidAmount) throw new Error(body.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal দিন (যেমন 2.0)" : "Bid amount দিন");
+  if (body.format === "carousel" && (body.cards?.length ?? 0) < 2) throw new Error("Carousel-এ কমপক্ষে ২টা card দিন");
+  if (body.format === "catalog" && (!body.catalogId || !body.productSetId)) throw new Error("Catalog ও Product set বাছুন");
   if (body.existingPostId && !body.existingPostId.startsWith(`${page.page_id}_`) && !/^\d+$/.test(body.existingPostId)) {
     throw new Error("Post টি এই page-এর নয়");
   }
@@ -415,12 +469,22 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
   const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging;
   if (eng === "ON_AD" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
-  if (pixelNeeded && (!body.pixelId || !body.customEvent)) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
+  if (pixelNeeded && (!body.pixelId || (!body.customEvent && !body.customConversionId))) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
   if ((pixelNeeded || body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
 
   const cents = String(Math.round(body.amount * 100));
   const budgetKey = body.budgetType === "daily" ? "daily_budget" : "lifetime_budget";
-  const cbo = body.budgetLevel === "campaign";
+  const cbo = body.budgetLevel === "campaign" || body.advantageSales;
+  const isRoas = body.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS";
+  const bidFields = !body.bidAmount || body.bidStrategy === "LOWEST_COST_WITHOUT_CAP" ? {}
+    : isRoas ? { bid_constraints: { roas_average_floor: Math.round(body.bidAmount * 10000) } }
+    : { bid_amount: String(Math.round(body.bidAmount * 100)) };
+  const ATTR: Record<string, { event_type: string; window_days: number }[]> = {
+    "7C1V": [{ event_type: "CLICK_THROUGH", window_days: 7 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
+    "7C": [{ event_type: "CLICK_THROUGH", window_days: 7 }],
+    "1C": [{ event_type: "CLICK_THROUGH", window_days: 1 }],
+    "1C1V": [{ event_type: "CLICK_THROUGH", window_days: 1 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
+  };
 
   // Before creating anything: the ad account must be active and our Business must be able to use the Page.
   const accInfo = await g.get(act, { fields: "account_status,name" }).catch(() => null);
@@ -437,6 +501,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const camp = await g.post(`${act}/campaigns`, {
       name: body.campaignName, objective: map.objective, status, buying_type: "AUCTION",
       special_ad_categories: body.specialCategories,
+      ...(body.format === "catalog" && body.catalogId ? { promoted_object: { product_catalog_id: body.catalogId } } : {}),
       ...(cbo ? { [budgetKey]: cents, bid_strategy: body.bidStrategy } : { is_adset_budget_sharing_enabled: false }),
     });
     campaignId = String(camp.id);
@@ -449,10 +514,16 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const targeting: Record<string, unknown> = {
       geo_locations: { countries: body.countries, location_types: ["home", "recent"] },
       age_min: Math.min(body.ageMin, body.ageMax), age_max: Math.max(body.ageMin, body.ageMax),
-      targeting_automation: { advantage_audience: 0 },
+      targeting_automation: { advantage_audience: body.advantageAudience || body.advantageSales ? 1 : 0 },
     };
+    if (body.customAudiences.length) targeting.custom_audiences = body.customAudiences.map((id) => ({ id }));
+    if (body.excludedAudiences.length) targeting.excluded_custom_audiences = body.excludedAudiences.map((id) => ({ id }));
+    if (body.locales.length) targeting.locales = body.locales;
+    if (body.placements && !body.advantageSales && body.placements.publisher_platforms.length) {
+      Object.assign(targeting, body.placements);
+    }
     if (body.genders.length === 1) targeting.genders = body.genders;
-    if (body.interests.length) {
+    if (body.interests.length && !body.advantageSales) {
       const grp: Record<string, { id: string; name: string }[]> = {};
       for (const i of body.interests) { const k = i.type || "interests"; (grp[k] ??= []).push({ id: i.id, name: i.name }); }
       targeting.flexible_spec = [grp];
@@ -461,13 +532,19 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     step = "Ad set";
     const adset = await g.post(`${act}/adsets`, {
       name: body.adsetName, campaign_id: campaignId, status,
-      billing_event: "IMPRESSIONS", optimization_goal: map.goal,
+      billing_event: "IMPRESSIONS", optimization_goal: pixelNeeded && body.performanceGoal === "VALUE" ? "VALUE" : map.goal,
+      ...(pixelNeeded ? { attribution_spec: ATTR[body.attribution] } : {}),
+      ...(body.adSchedule?.length && body.budgetType === "lifetime" ? { pacing_type: ["day_parting"], adset_schedule: body.adSchedule.map((x) => ({ ...x, timezone_type: "USER" })) } : {}),
       ...(map.destination ? { destination_type: map.destination } : {}),
       ...(cbo ? {} : { bid_strategy: body.bidStrategy, [budgetKey]: cents }),
-      ...(body.bidAmount && body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" ? { bid_amount: String(Math.round(body.bidAmount * 100)) } : {}),
+      ...bidFields,
       ...(body.startTime ? { start_time: body.startTime } : {}),
       ...(body.endTime ? { end_time: body.endTime } : {}),
-      promoted_object: pixelNeeded ? { pixel_id: body.pixelId, custom_event_type: body.customEvent }
+      promoted_object: pixelNeeded ? {
+          pixel_id: body.pixelId,
+          ...(body.customConversionId ? { custom_conversion_id: body.customConversionId, custom_event_type: "OTHER" } : { custom_event_type: body.customEvent }),
+          ...(body.format === "catalog" && body.productSetId ? { product_set_id: body.productSetId } : {}),
+        }
         : map.destination.includes("WHATSAPP") ? (body.whatsappNumber && /\d{8}/.test(body.whatsappNumber.replace(/\D/g, "")) ? { page_id: pageId, whatsapp_phone_number: body.whatsappNumber.replace(/[^\d]/g, "") } : { page_id: pageId }) : { page_id: pageId },
       targeting,
     });
@@ -512,13 +589,41 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         type: ctaType,
         value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : { link },
       };
-      creative = {
-        name: `${body.adName} creative`,
-        object_story_spec: {
-          page_id: pageId,
-          link_data: { link, message: body.message || postText || "", name: body.headline || undefined, image_hash: imageHash, call_to_action: cta },
-        },
-      };
+      const msgs = (body.messages ?? []).map((x) => x.trim()).filter(Boolean);
+      const heads = (body.headlines ?? []).map((x) => x.trim()).filter(Boolean);
+      const primary = msgs[0] || body.message || postText || "";
+      const head = heads[0] || body.headline || undefined;
+      const ld: Record<string, unknown> = { link, message: primary, name: head, image_hash: imageHash, call_to_action: cta };
+      if (body.description) ld.description = body.description;
+      if (body.displayLink) ld.caption = body.displayLink;
+      if (body.format === "carousel" && body.cards?.length) {
+        const kids = [];
+        for (const c of body.cards) {
+          const up = await g.post(`${act}/adimages`, { bytes: c.imageBase64 });
+          const h = (Object.values(up.images ?? {})[0] as any)?.hash;
+          const cl = c.link && /^https?:\/\//.test(c.link) ? c.link : link;
+          kids.push({ link: cl, image_hash: h, name: c.headline || head, description: c.description || undefined, call_to_action: { type: ctaType, value: { link: cl } } });
+        }
+        delete ld.image_hash; delete ld.name;
+        ld.child_attachments = kids; ld.multi_share_optimized = true; ld.multi_share_end_card = false;
+      }
+      if (body.format === "catalog") {
+        delete ld.image_hash;
+        ld.name = head || "{{product.name}}"; ld.description = body.description || "{{product.price}}";
+        creative = { name: `${body.adName} creative`, product_set_id: body.productSetId, object_story_spec: { page_id: pageId, template_data: ld } };
+      } else {
+        creative = { name: `${body.adName} creative`, object_story_spec: { page_id: pageId, link_data: ld } };
+        if (body.format === "single" && (msgs.length > 1 || heads.length > 1)) {
+          creative.asset_feed_spec = {
+            bodies: (msgs.length ? msgs : [primary]).map((text) => ({ text })),
+            titles: (heads.length ? heads : head ? [head] : []).map((text) => ({ text })),
+            ...(body.description ? { descriptions: [{ text: body.description }] } : {}),
+            optimization_type: "DEGREES_OF_FREEDOM",
+          };
+        }
+      }
+      if (body.advantageCreative) creative.degrees_of_freedom_spec = { creative_features_spec: { standard_enhancements: { enroll_status: "OPT_IN" } } };
+      if (body.urlTags) creative.url_tags = body.urlTags.replace(/^\?/, "");
     }
     step = "Ad creative";
     let cr: any;

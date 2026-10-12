@@ -37,3 +37,13 @@ export function resultOf(insights: any): { count: number; cost: number | null } 
   }
   return { count: 0, cost: null };
 }
+
+const PURCHASE = ["offsite_conversion.fb_pixel_purchase", "purchase", "omni_purchase"];
+export function salesOf(insights: any): { purchases: number; value: number; roas: number | null; cpp: number | null } {
+  const pick = (arr: any[] | undefined) => { for (const k of PURCHASE) { const a = (arr ?? []).find((x) => x.action_type === k); if (a) return Number(a.value) || 0; } return 0; };
+  const purchases = pick(insights?.actions);
+  const value = pick(insights?.action_values);
+  const spend = Number(insights?.spend) || 0;
+  const r = pick(insights?.purchase_roas);
+  return { purchases, value, roas: r || (spend && value ? value / spend : null), cpp: purchases ? spend / purchases : null };
+}

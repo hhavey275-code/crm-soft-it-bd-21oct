@@ -7,6 +7,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { managedAds } from "@/lib/managedAdsApi";
+import { SalesAdsetOptions, SalesAdOptions, defaultSalesOpts, salesPayload, type SalesOpts } from "./SalesOptions";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
@@ -22,8 +23,10 @@ const OBJECTIVES: { v: Obj; l: string; icon: any; d: string; good: string[] }[] 
 const EVENTS = [
   ["PURCHASE", "Purchase"], ["ADD_TO_CART", "Add to cart"], ["INITIATE_CHECKOUT", "Initiate checkout"],
   ["LEAD", "Lead"], ["COMPLETE_REGISTRATION", "Complete registration"], ["CONTACT", "Contact"], ["VIEW_CONTENT", "View content"],
+  ["ADD_PAYMENT_INFO", "Add payment info"], ["ADD_TO_WISHLIST", "Add to wishlist"], ["SEARCH", "Search"], ["START_TRIAL", "Start trial"], ["SUBSCRIBE", "Subscribe"],
+  ["SUBMIT_APPLICATION", "Submit application"], ["SCHEDULE", "Schedule"], ["DONATE", "Donate"], ["FIND_LOCATION", "Find location"], ["CUSTOMIZE_PRODUCT", "Customize product"],
 ] as const;
-const CTAS = [["SHOP_NOW", "Shop now"], ["ORDER_NOW", "Order now"], ["BUY_NOW", "Buy now"], ["LEARN_MORE", "Learn more"], ["SIGN_UP", "Sign up"], ["GET_OFFER", "Get offer"], ["CONTACT_US", "Contact us"], ["SEE_MORE", "See more"]] as const;
+const CTAS = [["SHOP_NOW", "Shop now"], ["ORDER_NOW", "Order now"], ["BUY_NOW", "Buy now"], ["LEARN_MORE", "Learn more"], ["SIGN_UP", "Sign up"], ["GET_OFFER", "Get offer"], ["CONTACT_US", "Contact us"], ["SEE_MORE", "See more"], ["BOOK_NOW", "Book now"], ["SUBSCRIBE", "Subscribe"], ["DOWNLOAD", "Download"], ["APPLY_NOW", "Apply now"], ["GET_QUOTE", "Get quote"], ["SEE_MENU", "See menu"], ["WATCH_MORE", "Watch more"], ["GET_STARTED", "Get started"], ["INQUIRE_NOW", "Inquire now"], ["REQUEST_TIME", "Request time"], ["DONATE_NOW", "Donate now"], ["NO_BUTTON", "No button"]] as const;
 const SPECIAL = [["CREDIT", "Credit"], ["EMPLOYMENT", "Employment"], ["HOUSING", "Housing"], ["ISSUES_ELECTIONS_POLITICS", "Social issues, elections or politics"], ["FINANCIAL_PRODUCTS_SERVICES", "Financial products and services"]] as const;
 
 interface Props {
@@ -102,6 +105,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [pixels, setPixels] = useState<any[] | null>(null);
   const [pixelId, setPixelId] = useState("");
   const [customEvent, setCustomEvent] = useState("PURCHASE");
+  const [so, setSoState] = useState<SalesOpts>(defaultSalesOpts);
+  const setSo = (p: Partial<SalesOpts>) => setSoState((o) => ({ ...o, ...p }));
   const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const [startTime, setStartTime] = useState(today);
   const [hasEnd, setHasEnd] = useState(false);
@@ -312,6 +317,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           engagementLocation: engLoc, msgDestinations: engLoc === "MESSAGING" ? finalDests : undefined,
           whatsappNumber: wa && /\d{8}/.test(wa.replace(/\D/g, "")) ? wa : undefined, phoneNumber: engLoc === "CALLS" ? phone.trim() : undefined,
         } : {}),
+        ...(objective === "SALES" && needsPixel ? {
+          ...salesPayload(so, budgetType),
+          ...(so.customConversionId ? { customEvent: undefined } : {}),
+          ...(setup === "new" && !so.useCatalog && so.format === "single" ? { messages: [message, ...so.extraMessages], headlines: [headline, ...so.extraHeadlines] } : {}),
+          ...(so.advantageSales ? { budgetLevel: "campaign" } : {}),
+        } : {}),
         publish,
       });
       clearDraft();
@@ -478,10 +489,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <option value="LOWEST_COST_WITHOUT_CAP">Highest volume or value</option>
             <option value="COST_CAP">Cost per result goal</option>
             <option value="LOWEST_COST_WITH_BID_CAP">Bid cap</option>
+            {objective === "SALES" && <option value="LOWEST_COST_WITH_MIN_ROAS">ROAS goal</option>}
           </select>
         </Field>
         {bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && (
-          <div className="mt-2"><Field label={bidStrategy === "COST_CAP" ? "Cost per result goal ($)" : "Bid cap ($)"}><input type="number" className={inp} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} /></Field></div>
+          <div className="mt-2"><Field label={bidStrategy === "COST_CAP" ? "Cost per result goal ($)" : bidStrategy === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal (যেমন 2.0)" : "Bid cap ($)"}><input type="number" className={inp} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} /></Field></div>
         )}
       </div>
     );
@@ -510,9 +522,10 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               <option value="MESSAGING">Message destinations (Messenger)</option>
             </select>
           </Field>
+{!(objective === "SALES" && needsPixel) && (
           <Field label="Performance goal" hint="Set your goal, such as maximizing conversions or conversion value.">
             <select className={sel} disabled><option>{isMsg ? "Maximize number of conversations" : "Maximize number of conversions"}</option></select>
-          </Field>
+          </Field>)}
           {needsPixel && (
             <>
               <Field label="Dataset" req hint="Track actions that people take on your website.">
@@ -528,10 +541,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   {EVENTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
-              <Field label="Attribution model"><select className={sel} disabled><option>Standard</option></select></Field>
             </>
           )}
         </Section>
+      )}
+      {objective === "SALES" && needsPixel && (
+        <SalesAdsetOptions o={so} set={setSo} pageDbId={pageDbId} accId={accId} pixelId={pixelId} budgetType={budgetType} />
       )}
       {objective === "ENGAGEMENT" && (
         <Section title="Conversion" ok={!errs.adset || !!countries.length}>
@@ -774,6 +789,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           )}
         </Section>
       )}
+      {objective === "SALES" && needsPixel && setup === "new" && <SalesAdOptions o={so} set={setSo} />}
       {needsPixel && (
         <Section title="Tracking">
           <p className="text-fb-muted">This ad account's selected conversion dataset will be tracked by default.</p>

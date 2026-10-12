@@ -142,7 +142,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
 
       if (dateRange && ownCamps.length) {
         const tr = JSON.stringify(dateRange);
-        const fields = "spend,impressions,reach,frequency,clicks,cpc,ctr,cpm,inline_link_clicks,cost_per_inline_link_click,actions,cost_per_action_type,purchase_roas";
+        const fields = "spend,impressions,reach,frequency,clicks,cpc,ctr,cpm,inline_link_clicks,cost_per_inline_link_click,actions,cost_per_action_type,action_values,purchase_roas";
         const [ci, si, ai] = await Promise.all(
           (["campaign", "adset", "ad"] as const).map((level) =>
             g.get(`${act}/insights`, { level, fields: `${level}_id,${fields}`, time_range: tr, limit: "500" }).catch(() => ({ data: [] })),
