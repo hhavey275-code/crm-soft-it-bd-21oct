@@ -22,6 +22,11 @@ const schema = z.discriminatedUnion("action", [
     ageMin: z.number().int().min(18).max(65).optional(), ageMax: z.number().int().min(18).max(65).optional(),
     message: z.string().max(5000).optional(), headline: z.string().max(255).optional(), link: z.string().max(1000).optional(),
     startTime: z.string().max(40).optional(), endTime: z.string().max(40).optional(),
+    description: z.string().max(255).optional(), cta: z.string().regex(/^[A-Z_]{3,30}$/).optional(),
+    imageBase64: z.string().max(8_000_000).optional(),
+    videoPath: z.string().max(300).regex(/^[0-9a-f-]{36}\/[\w.-]+$/).optional(),
+    newPostId: z.string().regex(/^\d+(_\d+)?$/).optional(),
+    postMessage: z.string().max(5000).optional(),
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
@@ -132,6 +137,14 @@ async function ctx(request: Request) {
 }
 
 // Page key the client saved via Facebook login (any CRM user who connected that page).
+function friendly(e: any): string {
+  const m = String(e?.message || e || "");
+  if (/\(#200\)|permission/i.test(m)) return `Permission নেই — Page/ad account-এ access দিন (${m})`;
+  if (/\(#100\)|invalid/i.test(m)) return `Facebook এই তথ্য মানছে না, ঠিক করে আবার দিন (${m})`;
+  if (/cannot be edited|in review|being reviewed/i.test(m)) return `এখন এই ad বদলানো যাবে না, review শেষ হলে চেষ্টা করুন (${m})`;
+  return m;
+}
+
 async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: string): Promise<string | undefined> {
   try {
     const { data } = await supabaseAdmin.from("client_page_tokens").select("access_token,user_id").eq("page_id", pageId).limit(10);
@@ -275,22 +288,84 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         if (body.ageMax) t.age_max = body.ageMax;
         upd.targeting = t;
       }
-      if (lvl === "ad" && (body.message !== undefined || body.headline !== undefined || body.link !== undefined)) {
-        const cur = await g.get(body.objectId, { fields: "creative{object_story_spec,name}" });
-        const spec: any = cur?.creative?.object_story_spec;
-        if (!spec?.link_data) throw new Error("এই ad-টি page-এর পুরনো post থেকে বানানো — এর লেখা বদলানো যায় না, নাম/চালু-বন্ধ বদলানো যাবে");
-        const ld = { ...spec.link_data };
-        if (body.message !== undefined) ld.message = body.message;
-        if (body.headline !== undefined) ld.name = body.headline;
-        if (body.link && /^https?:\/\//.test(body.link)) { ld.link = body.link; if (ld.call_to_action?.value?.link) ld.call_to_action = { ...ld.call_to_action, value: { ...ld.call_to_action.value, link: body.link } }; }
-        delete ld.image_url; delete ld.picture;
+      let out: Record<string, unknown> = { ok: true };
+      const creativeChange = body.message !== undefined || body.headline !== undefined || body.link !== undefined || body.description !== undefined
+        || body.cta !== undefined || !!body.imageBase64 || !!body.videoPath || !!body.newPostId;
+      if (lvl === "ad" && (creativeChange || body.postMessage !== undefined)) {
+        if (body.videoPath && !body.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
         const act = `act_${String(owned.accounts.find((a: any) => a.id === obj.ad_account_db_id)?.account_id ?? "").replace(/^act_/, "")}`;
-        const cr = await g.post(`${act}/adcreatives`, { name: `${cur.creative?.name ?? "ad"} (edited)`, object_story_spec: { ...spec, link_data: ld } });
-        upd.creative = { creative_id: String(cr.id) };
+        const cur = await g.get(body.objectId, { fields: "creative{object_story_spec,object_story_id,effective_object_story_id,name,url_tags}" });
+        const c: any = cur?.creative ?? {};
+        const postId: string | undefined = c.object_story_id || c.effective_object_story_id;
+        const pageId = String(c.object_story_spec?.page_id ?? postId?.split("_")[0] ?? "");
+        if (body.postMessage !== undefined) {
+          if (!postId) throw new Error("এই ad-এর সাথে কোনো page post নেই");
+          const pt = await savedPageToken(supabaseAdmin, pageId, targetUser);
+          if (!pt) throw new Error("Page-এর লেখা বদলাতে Facebook আবার connect করতে হবে (Page access দরকার)");
+          await graphClient(pt).post(postId, { message: body.postMessage }).catch((e: any) => { throw new Error(`Post-এর লেখা বদলানো যায়নি: ${friendly(e)}`); });
+          out.postUpdated = true;
+        }
+        if (creativeChange) {
+          let creative: Record<string, unknown>;
+          if (body.newPostId) {
+            const sid = body.newPostId.includes("_") ? body.newPostId : `${pageId}_${body.newPostId}`;
+            if (!sid.startsWith(`${pageId}_`)) throw new Error("Post টি এই page-এর নয়");
+            creative = { name: `Edited Creative - ${Date.now()}`, object_story_id: sid };
+          } else {
+            const spec: any = c.object_story_spec;
+            if (!spec?.link_data && !spec?.video_data) throw new Error("এই ad-টি page-এর post থেকে বানানো — অন্য post বেছে নিন বা post-এর লেখা বদলান");
+            let ld: any = spec.link_data ? { ...spec.link_data } : null;
+            let vd: any = spec.video_data ? { ...spec.video_data } : null;
+            let imageHash: string | undefined;
+            if (body.imageBase64) {
+              const up = await g.post(`${act}/adimages`, { bytes: body.imageBase64 });
+              imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
+            }
+            if (body.videoPath) {
+              const { data: su } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(body.videoPath, 3600);
+              if (!su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
+              const vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: body.name ?? "edited video" });
+              let thumb: string | undefined;
+              for (let i = 0; i < 10 && !thumb; i++) {
+                await new Promise((r) => setTimeout(r, 3000));
+                const t = await g.get(`${vid.id}/thumbnails`, { fields: "uri,is_preferred" }).catch(() => null);
+                thumb = (t?.data ?? []).find((x: any) => x.is_preferred)?.uri ?? t?.data?.[0]?.uri;
+              }
+              if (!thumb) throw new Error("Facebook এখনো video প্রসেস করছে — ১-২ মিনিট পর আবার চেষ্টা করুন");
+              const src = ld ?? vd ?? {};
+              vd = { video_id: String(vid.id), image_url: thumb, message: src.message, title: src.name ?? src.title, call_to_action: src.call_to_action, link_description: src.description ?? src.link_description };
+              ld = null;
+            } else if (imageHash) {
+              const src = ld ?? vd ?? {};
+              ld = { link: src.link ?? src.call_to_action?.value?.link ?? `https://facebook.com/${pageId}`, message: src.message, name: src.name ?? src.title, description: src.description ?? src.link_description, call_to_action: src.call_to_action, image_hash: imageHash };
+              vd = null;
+            }
+            const d: any = ld ?? vd;
+            if (ld) { delete ld.image_url; delete ld.picture; }
+            if (body.message !== undefined) d.message = body.message;
+            if (body.headline !== undefined) { if (ld) ld.name = body.headline; else vd.title = body.headline; }
+            if (body.description !== undefined) { if (ld) ld.description = body.description; else vd.link_description = body.description; }
+            if (body.link && /^https?:\/\//.test(body.link)) {
+              if (ld) ld.link = body.link;
+              if (d.call_to_action) d.call_to_action = { ...d.call_to_action, value: { ...(d.call_to_action.value ?? {}), link: body.link } };
+            }
+            if (body.cta && d.call_to_action) d.call_to_action = { ...d.call_to_action, type: body.cta };
+            creative = { name: `Edited Creative - ${Date.now()}`, object_story_spec: { ...spec, link_data: ld ?? undefined, video_data: vd ?? undefined }, ...(c.url_tags ? { url_tags: c.url_tags } : {}) };
+          }
+          const cr = await g.post(`${act}/adcreatives`, creative).catch((e: any) => { throw new Error(friendly(e)); });
+          upd.creative = { creative_id: String(cr.id) };
+          out.creativeId = String(cr.id);
+        }
       }
+      if (!Object.keys(upd).length && out.postUpdated) return out;
       if (!Object.keys(upd).length) throw new Error("কিছু বদলানো হয়নি");
-      await g.post(body.objectId, upd);
-      return { ok: true };
+      await g.post(body.objectId, upd).catch((e: any) => { throw new Error(friendly(e)); });
+      if (out.creativeId) {
+        const pv = await g.get(`${body.objectId}/previews`, { ad_format: "DESKTOP_FEED_STANDARD" }).catch(() => null);
+        const m = String(pv?.data?.[0]?.body ?? "").match(/src="([^"]+)"/);
+        if (m) out.previewUrl = m[1].replace(/&amp;/g, "&");
+      }
+      return out;
     }
     if (body.action === "set_budget") {
       if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
