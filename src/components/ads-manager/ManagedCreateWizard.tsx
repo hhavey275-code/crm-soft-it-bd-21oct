@@ -989,7 +989,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             ) : (
               <>
                 <button disabled={saving} onClick={keepDraft} className="h-10 flex-1 rounded-md border border-fb-border px-2 font-semibold hover:bg-fb-bg disabled:opacity-50 sm:h-9 sm:flex-none sm:px-4">Draft</button>
-                <button disabled={saving || !ready} onClick={() => submit(true)} className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40 sm:h-9 sm:flex-none">
+                <button disabled={saving} onClick={() => { if (!ready) { setShowMissing(true); return toast.error("কিছু তথ্য বাকি — ডান পাশের তালিকা দেখুন"); } submit(true); }} className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40 sm:h-9 sm:flex-none">
                   {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Publish
                 </button>
               </>
