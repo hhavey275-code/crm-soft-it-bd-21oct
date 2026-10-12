@@ -592,10 +592,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       const link = waOnly ? "https://api.whatsapp.com/send"
         : isMsg ? "https://fb.com/messenger_doc/"
         : body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : (body.cta || map.cta || "LEARN_MORE");
+      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
       const cta: Record<string, unknown> = {
         type: ctaType,
-        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : { link },
+        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
       };
       const msgs = (body.messages ?? []).map((x) => x.trim()).filter(Boolean);
       const heads = (body.headlines ?? []).map((x) => x.trim()).filter(Boolean);
