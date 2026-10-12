@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [ ] Fix My Ads Create availability when account status cannot be verified; preserve clear Disabled/Unsettled instructions.
 - [x] Hide Mark everywhere; show a Bengali voice invitation on sign-up and keep the microphone visible on mobile (2026-09-27).
 - [x] Release CRM Helper v2.00 with verified package, reliable active status, and automatic post-top-up Meta cap refresh (2026-09-27).
 - [x] Diagnose and fix Meta BM ad-account creation responses; make Helper show verified server connectivity instead of only saved-token status (2026-09-27).
