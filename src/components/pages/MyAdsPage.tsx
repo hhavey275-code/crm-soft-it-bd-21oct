@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { managedAds, resultOf } from "@/lib/managedAdsApi";
+import { managedAds, resultOf, salesOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
@@ -467,12 +467,13 @@ export default function MyAdsPage() {
                 <th className={cn(th, "text-right")}>Impressions</th>
                 <th className={cn(th, "text-right")}>Reach</th>
                 <th className={cn(th, "text-right")}>CTR</th>
+                <th className={cn(th, "text-right")}>Purchases</th><th className={cn(th, "text-right")}>Cost per purchase</th><th className={cn(th, "text-right")}>Purchase value</th><th className={cn(th, "text-right")}>ROAS</th>
                 {extra.cols.map((c) => <th key={c.key} className={cn(th, "text-right max-w-[140px] whitespace-normal")}>{c.label}</th>)}
               </tr>
             </thead>
             <tbody>
-              {isFetching && !data && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">Loading…</td></tr>}
-              {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={12} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
+              {isFetching && !data && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">Loading…</td></tr>}
+              {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
               {tab === "campaign" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
                 <tr key={d.id} className="border-b border-fb-border hover:bg-fb-blue-soft/50">
                   <td className={td} />
@@ -488,6 +489,7 @@ export default function MyAdsPage() {
                   <td className={td}><span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-fb-muted" />In draft</span></td>
                   <td className={td}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
                   <td className={cn(td, "text-right")}>{d.data.amount ? money(Number(d.data.amount)) : "—"}<span className={sub}>{d.data.budgetType === "lifetime" ? "Lifetime" : "Daily"}</span></td>
+                  <td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
                   <td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
                   {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>—</td>)}
                 </tr>
@@ -536,6 +538,12 @@ export default function MyAdsPage() {
                     <td className={cn(td, "text-right")}>{num(r.insights?.impressions)}</td>
                     <td className={cn(td, "text-right")}>{num(r.insights?.reach)}</td>
                     <td className={cn(td, "text-right")}>{r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—"}</td>
+                    {(() => { const s = salesOf(r.insights); return (<>
+                      <td className={cn(td, "text-right")}>{s.purchases || "—"}</td>
+                      <td className={cn(td, "text-right")}>{s.cpp != null ? money(s.cpp) : "—"}</td>
+                      <td className={cn(td, "text-right")}>{s.value ? money(s.value) : "—"}</td>
+                      <td className={cn(td, "text-right")}>{s.roas ? s.roas.toFixed(2) : "—"}</td>
+                    </>); })()}
                     {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, c.get(r.insights))}</td>)}
                   </tr>
                 );
@@ -556,6 +564,12 @@ export default function MyAdsPage() {
                   <td className={cn(td, "text-right")}>{num(rowTotals.impr)}<span className={sub}>Total</span></td>
                   <td className={cn(td, "text-right")}>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></td>
                   <td className={td} />
+                  {(() => { const t = rows.reduce((a: any, r: any) => { const s = salesOf(r.insights); a.p += s.purchases; a.v += s.value; a.sp += Number(r.insights?.spend || 0); return a; }, { p: 0, v: 0, sp: 0 }); return (<>
+                    <td className={cn(td, "text-right")}>{t.p || "—"}</td>
+                    <td className={cn(td, "text-right")}>{t.p ? money(t.sp / t.p) : "—"}</td>
+                    <td className={cn(td, "text-right")}>{t.v ? money(t.v) : "—"}</td>
+                    <td className={cn(td, "text-right")}>{t.v && t.sp ? (t.v / t.sp).toFixed(2) : "—"}</td>
+                  </>); })()}
                   {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, totalCol(c, rows))}<span className={sub}>{c.sub}</span></td>)}
                 </tr>
               </tfoot>
