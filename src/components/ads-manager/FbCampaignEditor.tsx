@@ -181,7 +181,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
                 <div><Lbl>Description</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.description} onChange={(e) => set("description", e.target.value)} /></div>
                 {fm.editableCreative && fm.cta && (
                   <div><Lbl>Call to action</Lbl><select className={inp} value={fm.cta} onChange={(e) => set("cta", e.target.value)}>
-                    {[...new Set([fm.cta, ...CTAS])].map((c) => <option key={c} value={c}>{c.replace(/_/g, " ").toLowerCase().replace(/^./, (x) => x.toUpperCase())}</option>)}
+                    {[...new Set([fm.cta, ...CTAS])].map((c) => <option key={c} value={c}>{c.replace(/_/g, " ").toLowerCase().replace(/^./, (x: string) => x.toUpperCase())}</option>)}
                   </select></div>
                 )}
                 {fm.editableCreative && (
