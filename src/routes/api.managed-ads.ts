@@ -90,7 +90,9 @@ const schema = z.discriminatedUnion("action", [
     headline: z.string().max(255).optional(),
     link: z.string().max(1000).optional(),
     imageBase64: z.string().max(8_000_000).optional(),
-    engagementLocation: z.enum(["ON_AD", "MESSAGING", "WEBSITE", "CALLS"]).optional(),
+    engagementLocation: z.enum(["ON_AD", "MESSAGING", "WEBSITE", "CALLS", "PAGE_LIKES", "EVENT"]).optional(),
+    videoPath: z.string().max(300).regex(/^[0-9a-f-]{36}\/[\w.-]+$/).optional(),
+    connections: z.enum(["all", "include", "exclude"]).default("all"),
     msgDestinations: z.array(z.enum(["MESSENGER", "WHATSAPP"])).max(2).optional(),
     whatsappNumber: z.string().max(30).optional(),
     phoneNumber: z.string().max(30).optional(),
@@ -463,6 +465,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
   if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
   if (eng === "CALLS") map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
+  if (eng === "PAGE_LIKES") map = { ...base, goal: "PAGE_LIKES", destination: "ON_PAGE", cta: "LIKE_PAGE" };
+  if (eng === "EVENT") map = { ...base, goal: "EVENT_RESPONSES", destination: "ON_EVENT", cta: "" };
+  if (eng === "EVENT" && !body.existingPostId) throw new Error("Event response-এর জন্য page-এর event post বাছুন");
+  if (body.videoPath && !body.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
   const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
   const waOnly = map.destination === "WHATSAPP";
   if (eng === "CALLS" && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
@@ -516,6 +522,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       age_min: Math.min(body.ageMin, body.ageMax), age_max: Math.max(body.ageMin, body.ageMax),
       targeting_automation: { advantage_audience: body.advantageAudience || body.advantageSales ? 1 : 0 },
     };
+    if (body.connections === "include") targeting.connections = [{ id: pageId }];
+    if (body.connections === "exclude") targeting.excluded_connections = [{ id: pageId }];
     if (body.customAudiences.length) targeting.custom_audiences = body.customAudiences.map((id) => ({ id }));
     if (body.excludedAudiences.length) targeting.excluded_custom_audiences = body.excludedAudiences.map((id) => ({ id }));
     if (body.locales.length) targeting.locales = body.locales;
@@ -584,10 +592,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       const link = waOnly ? "https://api.whatsapp.com/send"
         : isMsg ? "https://fb.com/messenger_doc/"
         : body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : (body.cta || map.cta || "LEARN_MORE");
+      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
       const cta: Record<string, unknown> = {
         type: ctaType,
-        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : { link },
+        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
       };
       const msgs = (body.messages ?? []).map((x) => x.trim()).filter(Boolean);
       const heads = (body.headlines ?? []).map((x) => x.trim()).filter(Boolean);
@@ -623,6 +631,23 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         }
       }
       if (body.advantageCreative) creative.degrees_of_freedom_spec = { creative_features_spec: { standard_enhancements: { enroll_status: "OPT_IN" } } };
+      if (body.videoPath && body.format !== "carousel" && body.format !== "catalog") {
+        const { data: su, error: se } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(body.videoPath, 3600);
+        if (se || !su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
+        step = "Video upload";
+        const vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: body.adName });
+        let thumb: string | undefined;
+        for (let i = 0; i < 10 && !thumb; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const t = await g.get(`${vid.id}/thumbnails`, { fields: "uri,is_preferred" }).catch(() => null);
+          thumb = (t?.data ?? []).find((x: any) => x.is_preferred)?.uri ?? t?.data?.[0]?.uri;
+        }
+        if (!thumb) throw new Error("Facebook এখনো video প্রসেস করছে — ১-২ মিনিট পর আবার চেষ্টা করুন");
+        const vd: Record<string, unknown> = { video_id: String(vid.id), image_url: thumb, message: ld.message, title: ld.name, call_to_action: ld.call_to_action };
+        if (body.description) vd.link_description = body.description;
+        creative.object_story_spec = { page_id: pageId, video_data: vd };
+        delete creative.asset_feed_spec;
+      }
       if (body.urlTags) creative.url_tags = body.urlTags.replace(/^\?/, "");
     }
     step = "Ad creative";
