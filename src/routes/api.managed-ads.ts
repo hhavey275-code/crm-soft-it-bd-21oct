@@ -25,6 +25,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({ action: z.literal("sales_assets"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(), pixelId: z.string().regex(/^\d+$/).optional(), catalogId: z.string().regex(/^\d+$/).optional() }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("fb_status") }),
@@ -71,6 +72,12 @@ const schema = z.discriminatedUnion("action", [
     displayLink: z.string().max(200).optional(),
     urlTags: z.string().max(1000).optional(),
     advantageCreative: z.boolean().default(false),
+    campaignName: z.string().min(1).max(200),
+    adsetName: z.string().min(1).max(200),
+    adName: z.string().min(1).max(200),
+    budgetType: z.enum(["daily", "lifetime"]),
+    amount: z.number().min(1).max(100000),
+    endTime: z.string().optional(),
     bidStrategy: z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"]),
     bidAmount: z.number().positive().optional(),
     countries: z.array(z.string().length(2)).min(1).max(25),
@@ -366,6 +373,31 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (body.action === "pixels") {
     const r = await g.get(`${act}/adspixels`, { fields: "id,name,last_fired_time", limit: "50" });
     return { pixels: (r.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null })) };
+  }
+
+  if (body.action === "sales_assets") {
+    const safe = (p: Promise<any>) => p.catch(() => ({ data: [] }));
+    const [cc, ca, sa, cats, ev, ps] = await Promise.all([
+      safe(g.get(`${act}/customconversions`, { fields: "id,name,custom_event_type,pixel{id}", limit: "100" })),
+      safe(g.get(`${act}/customaudiences`, { fields: "id,name,subtype,approximate_count_lower_bound", limit: "200" })),
+      safe(g.get(`${act}/saved_audiences`, { fields: "id,name,targeting", limit: "100" })),
+      bmId ? safe(g.get(`${bmId}/owned_product_catalogs`, { fields: "id,name,product_count", limit: "50" })).then(async (o: any) => {
+        const c = await safe(g.get(`${bmId}/client_product_catalogs`, { fields: "id,name,product_count", limit: "50" }));
+        return { data: [...(o.data ?? []), ...(c.data ?? [])] };
+      }) : Promise.resolve({ data: [] }),
+      body.pixelId ? safe(g.get(`${body.pixelId}/stats`, { aggregation: "event" })) : Promise.resolve({ data: [] }),
+      body.catalogId ? safe(g.get(`${body.catalogId}/product_sets`, { fields: "id,name,product_count", limit: "100" })) : Promise.resolve({ data: [] }),
+    ]);
+    const events = new Set<string>();
+    for (const row of ev.data ?? []) for (const d of row.data ?? [row]) if (d?.value) events.add(String(d.value));
+    return {
+      customConversions: (cc.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, event: x.custom_event_type, pixelId: x.pixel?.id ?? null })),
+      customAudiences: (ca.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, subtype: x.subtype, size: x.approximate_count_lower_bound ?? null })),
+      savedAudiences: (sa.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, targeting: x.targeting ?? null })),
+      catalogs: [...new Map((cats.data ?? []).map((x: any) => [String(x.id), { id: String(x.id), name: x.name, count: x.product_count ?? null }])).values()],
+      productSets: (ps.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, count: x.product_count ?? null })),
+      pixelEvents: [...events],
+    };
   }
 
   if (body.action === "posts") {
