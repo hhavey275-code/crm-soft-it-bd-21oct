@@ -24,6 +24,7 @@ import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-man
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
 import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { myAdsAvailability } from "@/lib/myAdsAvailability";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -91,7 +92,12 @@ export default function MyAdsPage() {
   });
 
   const cooldownLeft = Math.max(0, lastManual + COOLDOWN_MS - now);
-  const manualRefresh = () => { setLastManual(Date.now()); refetch(); };
+  const manualRefresh = () => {
+    setLastManual(Date.now());
+    refetch();
+    qc.invalidateQueries({ queryKey: ["managed-ads-cur-summary"] });
+    qc.invalidateQueries({ queryKey: ["managed-ads-acc-summary"] });
+  };
 
   const campaigns: any[] = data?.campaigns ?? [];
   const adsets: any[] = (data?.adsets ?? []).filter((s: any) => !selCampaigns.length || selCampaigns.includes(String(s.campaign_id)));
@@ -138,7 +144,7 @@ export default function MyAdsPage() {
   const pages: any[] = data?.pages ?? [];
   const allPages: any[] = data?.allPages ?? pages;
   const accounts: any[] = (data?.accounts?.length ? data.accounts : fastAccounts) ?? [];
-  const currentAccId: string | undefined = data?.selectedAccountId ?? accSel;
+  const currentAccId: string | undefined = accSel ?? data?.selectedAccountId ?? accounts[0]?.id;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
   const isShared = currentAcc?.kind === "shared";
   const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
@@ -154,34 +160,30 @@ export default function MyAdsPage() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: curSummary } = useQuery({
+  const { data: curSummary, error: curSummaryError } = useQuery({
     queryKey: ["managed-ads-cur-summary", currentAcc?.id],
-    queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc!.id] })).summary,
+    queryFn: async () => {
+      if (!currentAcc?.id) return {};
+      return (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc.id] })).summary;
+    },
     enabled: !!currentAcc?.id,
     staleTime: 2 * 60_000,
     refetchOnWindowFocus: false,
   });
   const curSm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
-  const blockedStatus = curSm && !curSm.error && [2, 3, 100, 101].includes(Number(curSm.status)) ? Number(curSm.status) : null;
-  const blockedInfo = blockedStatus ? accountStatusInfo(curSm) : null;
-  const blockedBanner = blockedInfo && (
+  const availability = myAdsAvailability(curSm, curSummaryError?.message);
+  const createDisabled = !currentAcc || !availability.canCreate;
+  const blockedInfo = curSm && !curSm.error ? accountStatusInfo(curSm) : null;
+  const blockedBanner = currentAcc && createDisabled && (
     <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-[13px] text-destructive">
-      <p className="font-bold">
-        {blockedStatus === 3 ? "এই ad account Unsettled (বকেয়া আছে)" : blockedStatus === 2 ? "এই ad account Facebook-এ Disabled" : "এই ad account বন্ধ (Closed)"}
-      </p>
-      <p className="mt-1">
-        {blockedStatus === 3
-          ? "Facebook-এ পেমেন্ট ফেইল হয়েছে। Billing-এ গিয়ে বকেয়া পরিশোধ (Pay now) করুন, তারপর নতুন ad বানাতে পারবেন।"
-          : blockedStatus === 2
-          ? "Facebook এই account বন্ধ করে দিয়েছে, তাই এখানে নতুন ad বানানো যাবে না। অন্য account বেছে নিন বা Admin-কে জানান।"
-          : "এই account আর ব্যবহার করা যাবে না। অন্য account বেছে নিন।"}
-      </p>
-      {blockedInfo.billing && <p className="mt-1 text-[12px]">{blockedInfo.billing}</p>}
+      <p className="font-bold">{availability.title}</p>
+      <p className="mt-1">{availability.instruction}</p>
+      {blockedInfo?.billing && <p className="mt-1 text-[12px]">{blockedInfo.billing}</p>}
     </div>
   );
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
   const startNew = () => {
-    if (blockedStatus) { toast.error(blockedStatus === 3 ? "Account Unsettled — আগে বকেয়া পরিশোধ করুন" : "Account Disabled — এখানে ad বানানো যাবে না"); return; }
+    if (createDisabled) { toast.error(currentAcc ? availability.title : "আগে ad account বেছে নিন"); return; }
     const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id);
   };
   const closeWizard = () => { setCreating(false); setOpenDraftObj(undefined); sessionStorage.removeItem("myads-wizard"); };
@@ -286,9 +288,9 @@ export default function MyAdsPage() {
                 <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fb-border bg-background disabled:opacity-50" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
                   <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                 </button>
-                <button onClick={startCreate} disabled={!!blockedStatus} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
+                <Button onClick={startCreate} disabled={createDisabled} title={createDisabled ? availability.title : undefined} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
                   <Plus className="h-4 w-4" />Create
-                </button>
+                </Button>
               </div>
             </div>
             <FbDateRangePicker value={range} onChange={setRange} />
@@ -454,10 +456,10 @@ export default function MyAdsPage() {
         {blockedBanner && <div className="bg-background border-x border-t border-fb-border px-2 pt-2 sm:px-4">{blockedBanner}</div>}
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
-          <button onClick={startNew} disabled={!!blockedStatus} title={blockedStatus ? "এই account-এ ad বানানো যাবে না" : undefined}
+          <Button onClick={startNew} disabled={createDisabled} title={createDisabled ? availability.title : undefined}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
             <Plus className="h-4 w-4" />Create
-          </button>
+          </Button>
           <button className={tbBtn} disabled={sel.length !== 1}
             onClick={() => {
               const r = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).find((x) => String(x.id) === sel[0]); if (!r) return;
