@@ -157,12 +157,33 @@ export default function MyAdsPage() {
   const { data: curSummary } = useQuery({
     queryKey: ["managed-ads-cur-summary", currentAcc?.id],
     queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc!.id] })).summary,
-    enabled: !!currentAcc?.id && currentAcc?.kind !== "shared",
+    enabled: !!currentAcc?.id,
     staleTime: 2 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const curSm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
+  const blockedStatus = curSm && !curSm.error && [2, 3, 100, 101].includes(Number(curSm.status)) ? Number(curSm.status) : null;
+  const blockedInfo = blockedStatus ? accountStatusInfo(curSm) : null;
+  const blockedBanner = blockedInfo && (
+    <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-[13px] text-destructive">
+      <p className="font-bold">
+        {blockedStatus === 3 ? "এই ad account Unsettled (বকেয়া আছে)" : blockedStatus === 2 ? "এই ad account Facebook-এ Disabled" : "এই ad account বন্ধ (Closed)"}
+      </p>
+      <p className="mt-1">
+        {blockedStatus === 3
+          ? "Facebook-এ পেমেন্ট ফেইল হয়েছে। Billing-এ গিয়ে বকেয়া পরিশোধ (Pay now) করুন, তারপর নতুন ad বানাতে পারবেন।"
+          : blockedStatus === 2
+          ? "Facebook এই account বন্ধ করে দিয়েছে, তাই এখানে নতুন ad বানানো যাবে না। অন্য account বেছে নিন বা Admin-কে জানান।"
+          : "এই account আর ব্যবহার করা যাবে না। অন্য account বেছে নিন।"}
+      </p>
+      {blockedInfo.billing && <p className="mt-1 text-[12px]">{blockedInfo.billing}</p>}
+    </div>
+  );
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
-  const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
+  const startNew = () => {
+    if (blockedStatus) { toast.error(blockedStatus === 3 ? "Account Unsettled — আগে বকেয়া পরিশোধ করুন" : "Account Disabled — এখানে ad বানানো যাবে না"); return; }
+    const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id);
+  };
   const closeWizard = () => { setCreating(false); setOpenDraftObj(undefined); sessionStorage.removeItem("myads-wizard"); };
   // Restore view + open wizard if the page was reloaded/remounted (e.g. on mobile)
   useEffect(() => {
@@ -265,7 +286,7 @@ export default function MyAdsPage() {
                 <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fb-border bg-background disabled:opacity-50" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
                   <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                 </button>
-                <button onClick={startCreate} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background">
+                <button onClick={startCreate} disabled={!!blockedStatus} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
                   <Plus className="h-4 w-4" />Create
                 </button>
               </div>
@@ -273,6 +294,7 @@ export default function MyAdsPage() {
             <FbDateRangePicker value={range} onChange={setRange} />
           </div>
           <div className="space-y-3 px-3">
+            {blockedBanner}
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-fb-border bg-background p-4">
               <div><p className="text-[13px] text-fb-muted">Total amount spent</p><p className="text-2xl font-bold">{money(totals.spend)}</p></div>
               {isShared ? (
@@ -429,10 +451,11 @@ export default function MyAdsPage() {
         </div>
 
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
+        {blockedBanner && <div className="bg-background border-x border-t border-fb-border px-2 pt-2 sm:px-4">{blockedBanner}</div>}
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
-          <button onClick={startNew}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
+          <button onClick={startNew} disabled={!!blockedStatus} title={blockedStatus ? "এই account-এ ad বানানো যাবে না" : undefined}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
             <Plus className="h-4 w-4" />Create
           </button>
           <button className={tbBtn} disabled={sel.length !== 1}
