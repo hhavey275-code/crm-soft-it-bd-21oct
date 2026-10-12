@@ -142,6 +142,7 @@ function friendly(e: any): string {
   if (/\(#200\)|permission/i.test(m)) return `Permission নেই — Page/ad account-এ access দিন (${m})`;
   if (/\(#100\)|invalid/i.test(m)) return `Facebook এই তথ্য মানছে না, ঠিক করে আবার দিন (${m})`;
   if (/cannot be edited|in review|being reviewed/i.test(m)) return `এখন এই ad বদলানো যাবে না, review শেষ হলে চেষ্টা করুন (${m})`;
+  if (/\(#1\)|unknown error/i.test(m)) return `Facebook সাময়িকভাবে কাজটি করতে পারেনি — ad account disabled/unsettled হলে এমন হয়। Account-এর status ঠিক আছে কি না দেখে কয়েক মিনিট পর আবার চেষ্টা করুন (${m})`;
   return m;
 }
 
