@@ -294,6 +294,7 @@ export default function MyAdsPage() {
             <FbDateRangePicker value={range} onChange={setRange} />
           </div>
           <div className="space-y-3 px-3">
+            {blockedBanner}
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-fb-border bg-background p-4">
               <div><p className="text-[13px] text-fb-muted">Total amount spent</p><p className="text-2xl font-bold">{money(totals.spend)}</p></div>
               {isShared ? (
@@ -450,10 +451,11 @@ export default function MyAdsPage() {
         </div>
 
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
+        {blockedBanner && <div className="bg-background border-x border-t border-fb-border px-2 pt-2 sm:px-4">{blockedBanner}</div>}
         {/* Action toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
-          <button onClick={startNew}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:opacity-50">
+          <button onClick={startNew} disabled={!!blockedStatus} title={blockedStatus ? "এই account-এ ad বানানো যাবে না" : undefined}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
             <Plus className="h-4 w-4" />Create
           </button>
           <button className={tbBtn} disabled={sel.length !== 1}
