@@ -157,12 +157,33 @@ export default function MyAdsPage() {
   const { data: curSummary } = useQuery({
     queryKey: ["managed-ads-cur-summary", currentAcc?.id],
     queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc!.id] })).summary,
-    enabled: !!currentAcc?.id && currentAcc?.kind !== "shared",
+    enabled: !!currentAcc?.id,
     staleTime: 2 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const curSm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
+  const blockedStatus = curSm && !curSm.error && [2, 3, 100, 101].includes(Number(curSm.status)) ? Number(curSm.status) : null;
+  const blockedInfo = blockedStatus ? accountStatusInfo(curSm) : null;
+  const blockedBanner = blockedInfo && (
+    <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-[13px] text-destructive">
+      <p className="font-bold">
+        {blockedStatus === 3 ? "এই ad account Unsettled (বকেয়া আছে)" : blockedStatus === 2 ? "এই ad account Facebook-এ Disabled" : "এই ad account বন্ধ (Closed)"}
+      </p>
+      <p className="mt-1">
+        {blockedStatus === 3
+          ? "Facebook-এ পেমেন্ট ফেইল হয়েছে। Billing-এ গিয়ে বকেয়া পরিশোধ (Pay now) করুন, তারপর নতুন ad বানাতে পারবেন।"
+          : blockedStatus === 2
+          ? "Facebook এই account বন্ধ করে দিয়েছে, তাই এখানে নতুন ad বানানো যাবে না। অন্য account বেছে নিন বা Admin-কে জানান।"
+          : "এই account আর ব্যবহার করা যাবে না। অন্য account বেছে নিন।"}
+      </p>
+      {blockedInfo.billing && <p className="mt-1 text-[12px]">{blockedInfo.billing}</p>}
+    </div>
+  );
   const openDraft = (d: CampaignDraft) => { setOpenDraftObj(d); setCreating(true); sessionStorage.setItem("myads-wizard", d.id); };
-  const startNew = () => { const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id); };
+  const startNew = () => {
+    if (blockedStatus) { toast.error(blockedStatus === 3 ? "Account Unsettled — আগে বকেয়া পরিশোধ করুন" : "Account Disabled — এখানে ad বানানো যাবে না"); return; }
+    const id = crypto.randomUUID(); setNewDraftId(id); setOpenDraftObj(undefined); setCreating(true); sessionStorage.setItem("myads-wizard", id);
+  };
   const closeWizard = () => { setCreating(false); setOpenDraftObj(undefined); sessionStorage.removeItem("myads-wizard"); };
   // Restore view + open wizard if the page was reloaded/remounted (e.g. on mobile)
   useEffect(() => {
