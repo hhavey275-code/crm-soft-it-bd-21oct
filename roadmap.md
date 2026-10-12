@@ -6,7 +6,7 @@
 - [x] Diagnose and fix Meta BM ad-account creation responses; make Helper show verified server connectivity instead of only saved-token status (2026-09-27).
 - [x] External CRM "Limit বাড়েনি": show reason; client Retry (Meta check → else queue helper, once); admin Manually done → Meta check → else auto helper retry. No 2-min auto retry (2026-09-27).
 - [x] Block Google/direct sign-ups from every protected page until full name, business name, phone, address, and monthly spend are complete (2026-09-26).
-- [ ] Confirm Supabase project connection for remixed project (user asked to connect `crm soft it bd` — current env points to ref dhswrfzdqcavgmymllat). Blocker: confirm with user that ref matches `crm soft it bd`.
+- [ ] Confirm Supabase project connection for remixed project (user asked to connect `crm soft it bd` — current env points to ref dhswrfzdqcavgmymllat). Blocker: awaiting user confirmation that ref dhswrfzdqcavgmymllat is the `crm soft it bd` project (2026-10-13).
 - [ ] Re-enter secrets after remix: CRM_JOB_SECRET, GOOGLE_API_KEY, META_APP_ID, META_APP_SECRET, KAST_WEBHOOK_SECRET. Blocker: user will submit values via secure form.
 - [x] WhatsApp secrets dropped — WhatsApp API not needed for this project (user decision 2026-10-13).
 - [x] Credit Line wallet: due limit (admin control + client view), payment order Main → Credit Line → Secondary, invoice split row, client Main→Credit Line/Secondary transfer (2026-09-20).
