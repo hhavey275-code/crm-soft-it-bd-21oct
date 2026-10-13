@@ -9,7 +9,7 @@ import { MonthlyUsageExport } from "@/components/client/MonthlyUsageExport";
 export function ClientTransactions() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { secondaryEnabled } = useWallets(user?.id);
+  const { secondaryEnabled, creditLineEnabled } = useWallets(user?.id);
 
   const { data: transactions } = useQuery({
     queryKey: ["client-transactions", user?.id],
@@ -86,6 +86,7 @@ export function ClientTransactions() {
         adAccounts={adAccounts}
         resolveProcessedBy={getProcessedBy}
         secondaryEnabled={secondaryEnabled}
+        creditLineEnabled={creditLineEnabled}
         isMobile={isMobile}
       />
     </div>
