@@ -60,6 +60,7 @@ interface TransactionHistoryPanelProps {
   /** Resolves the "Processed By" label for a transaction. */
   resolveProcessedBy?: (tx: any) => string;
   secondaryEnabled?: boolean;
+  creditLineEnabled?: boolean;
   isMobile?: boolean;
   canRemoveTransaction?: boolean;
   removingTransactionId?: string | null;
@@ -181,6 +182,7 @@ export function TransactionHistoryPanel({
   adAccounts,
   resolveProcessedBy,
   secondaryEnabled = false,
+  creditLineEnabled = false,
   isMobile = false,
   canRemoveTransaction = false,
   removingTransactionId,
