@@ -60,6 +60,7 @@ interface TransactionHistoryPanelProps {
   /** Resolves the "Processed By" label for a transaction. */
   resolveProcessedBy?: (tx: any) => string;
   secondaryEnabled?: boolean;
+  creditLineEnabled?: boolean;
   isMobile?: boolean;
   canRemoveTransaction?: boolean;
   removingTransactionId?: string | null;
@@ -181,11 +182,15 @@ export function TransactionHistoryPanel({
   adAccounts,
   resolveProcessedBy,
   secondaryEnabled = false,
+  creditLineEnabled = false,
   isMobile = false,
   canRemoveTransaction = false,
   removingTransactionId,
   onRemoveTransaction,
 }: TransactionHistoryPanelProps) {
+  // Show the Main / Secondary / Credit Line split whenever any extra wallet is on,
+  // so a credit-line-only client still sees the wallets separately.
+  const showWalletSplit = secondaryEnabled || creditLineEnabled;
   const extIds = useMemo(
     () =>
       [...new Set((rawTransactions ?? [])
@@ -496,7 +501,7 @@ export function TransactionHistoryPanel({
         <span className="text-muted-foreground">
           Taken (spent): <span className="font-bold text-destructive">{money(totals.spent)}</span>
         </span>
-        {secondaryEnabled && (
+        {showWalletSplit && (
           <span className="text-muted-foreground">
             Main: <span className="font-bold text-blue-600">{money(totals.spentMain)}</span>
             <span className="mx-1.5">·</span>
@@ -544,7 +549,7 @@ export function TransactionHistoryPanel({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Transaction History</h2>
-        {secondaryEnabled && (
+        {showWalletSplit && (
           <Tabs value={walletTab} onValueChange={(v) => setWalletTab(v as any)}>
             <TabsList className="h-8">
               <TabsTrigger value="all" className="text-xs px-3">

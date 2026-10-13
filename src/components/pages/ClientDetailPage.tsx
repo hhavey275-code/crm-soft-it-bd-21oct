@@ -3253,6 +3253,7 @@ export default function ClientDetailPage() {
               transactions={transactions}
               adAccounts={adAccounts}
               secondaryEnabled={wallets.secondaryEnabled}
+              creditLineEnabled={wallets.creditLineEnabled}
               isMobile={isMobile}
               canRemoveTransaction={canRemoveTransactions}
               removingTransactionId={removingTransactionId}
