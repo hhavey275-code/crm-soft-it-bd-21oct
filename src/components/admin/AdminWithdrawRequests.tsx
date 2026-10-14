@@ -209,6 +209,7 @@ export function AdminWithdrawRequests() {
                       {getAccount(r.ad_account_id)?.account_id && (
                         <p className="font-mono text-[11px] text-muted-foreground">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</p>
                       )}
+                      <BillingLink accountId={getAccount(r.ad_account_id)?.account_id} />
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Amount</p>
@@ -271,6 +272,7 @@ export function AdminWithdrawRequests() {
                         {getAccount(r.ad_account_id)?.account_id && (
                           <div className="text-xs text-muted-foreground font-mono">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</div>
                         )}
+                        <BillingLink accountId={getAccount(r.ad_account_id)?.account_id} />
                       </TableCell>
                       <TableCell className="font-semibold">${Number(r.amount_usd).toFixed(2)}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
