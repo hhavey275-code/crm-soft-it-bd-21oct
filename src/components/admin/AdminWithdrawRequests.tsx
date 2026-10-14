@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, ExternalLink } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
