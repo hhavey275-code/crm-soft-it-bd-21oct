@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, ExternalLink } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -69,6 +69,26 @@ export function AdminWithdrawRequests() {
     },
   });
   const getAccount = (id: string) => (accounts as any[]).find((a) => a.id === id);
+
+  const billingUrl = (accountId?: string) => {
+    const num = String(accountId ?? "").replace(/^act_/, "");
+    return num ? `https://business.facebook.com/billing_hub/accounts/details?asset_id=${num}` : null;
+  };
+
+  const BillingLink = ({ accountId }: { accountId?: string }) => {
+    const url = billingUrl(accountId);
+    if (!url) return null;
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+      >
+        <ExternalLink className="h-3 w-3" /> Billing
+      </a>
+    );
+  };
 
   const resolve = async () => {
     if (!active) return;
@@ -189,6 +209,7 @@ export function AdminWithdrawRequests() {
                       {getAccount(r.ad_account_id)?.account_id && (
                         <p className="font-mono text-[11px] text-muted-foreground">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</p>
                       )}
+                      <BillingLink accountId={getAccount(r.ad_account_id)?.account_id} />
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Amount</p>
@@ -251,6 +272,7 @@ export function AdminWithdrawRequests() {
                         {getAccount(r.ad_account_id)?.account_id && (
                           <div className="text-xs text-muted-foreground font-mono">{String(getAccount(r.ad_account_id)?.account_id).replace(/^act_/, "")}</div>
                         )}
+                        <BillingLink accountId={getAccount(r.ad_account_id)?.account_id} />
                       </TableCell>
                       <TableCell className="font-semibold">${Number(r.amount_usd).toFixed(2)}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
