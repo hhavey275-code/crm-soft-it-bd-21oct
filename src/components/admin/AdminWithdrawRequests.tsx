@@ -70,6 +70,26 @@ export function AdminWithdrawRequests() {
   });
   const getAccount = (id: string) => (accounts as any[]).find((a) => a.id === id);
 
+  const billingUrl = (accountId?: string) => {
+    const num = String(accountId ?? "").replace(/^act_/, "");
+    return num ? `https://business.facebook.com/billing_hub/accounts/details?asset_id=${num}` : null;
+  };
+
+  const BillingLink = ({ accountId }: { accountId?: string }) => {
+    const url = billingUrl(accountId);
+    if (!url) return null;
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+      >
+        <ExternalLink className="h-3 w-3" /> Billing
+      </a>
+    );
+  };
+
   const resolve = async () => {
     if (!active) return;
     const { row, decision } = active;
