@@ -228,7 +228,8 @@ async function toInlineImage(imageUrl: string): Promise<{ b64: string; mime: str
 }
 
 async function callGemini(imageUrl: string): Promise<OcrResult> {
-  const apiKey = Deno.env.get("GOOGLE_API_KEY") || Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
+  // Prefer the key the admin saved in Settings (paid), then the older shared keys.
+  const apiKey = Deno.env.get("USER_GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY") || Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("USER_GEMINI_API_KEY/GEMINI_API_KEY/GOOGLE_API_KEY not configured");
   const { b64, mime } = await toInlineImage(imageUrl);
 
