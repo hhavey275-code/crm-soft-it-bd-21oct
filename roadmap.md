@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [x] Diagnose Softmatic/Branding Solution account rename failure and show the actual server error instead of generic non-2xx. Meta permission remains an owner-controlled blocker; rename logs also show an invalid placeholder proxy URL (2026-10-20).
 - [x] Fix My Ads Create availability for Disabled/Unsettled and failed/pending status reads; refresh rechecks status. Seven availability tests pass.
 - [ ] Verify My Ads Disabled account warning and blurred Create in the signed-in UI. Blocker: external Supabase session unavailable in sandbox; browser redirects to sign-in.
 - [x] Hide Mark everywhere; show a Bengali voice invitation on sign-up and keep the microphone visible on mobile (2026-09-27).
