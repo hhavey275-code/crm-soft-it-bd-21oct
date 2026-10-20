@@ -269,7 +269,20 @@ export default function AdAccountDetailPage() {
         const { data, error } = await supabase.functions.invoke("rename-ad-account", {
           body: { ad_account_id: id, new_name: newName },
         });
-        if (error) throw error;
+        if (error) {
+          // Supabase puts the useful server error in the response body,
+          // not in FunctionsHttpError.message (which only says non-2xx).
+          let message = error.message;
+          const response = error.context;
+          if (response instanceof Response) {
+            const body = await response.clone().json().catch(() => null);
+            if (typeof body?.error === "string") message = body.error;
+          }
+          if (/NOT grant|ads_management|ads_read/i.test(message)) {
+            message = "Facebook এই account-এর নাম বদলানোর অনুমতি দিচ্ছে না। BM-এর People/System users থেকে CRM-এ ব্যবহৃত ব্যবহারকারীকে এই ad account-এর Manage ad accounts অনুমতি দিন, তারপর আবার চেষ্টা করুন।";
+          }
+          throw new Error(message);
+        }
         if (data?.error) throw new Error(data.error);
         return data;
       }
