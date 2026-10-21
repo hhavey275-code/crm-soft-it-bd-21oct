@@ -15,11 +15,30 @@ export const Route = createFileRoute("/api/public/webhooks/softcards-deposit")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { secretMatches, tryAutoMatch } = await import("@/lib/softcards.server");
+        const { secretMatches, tryAutoMatch, sweepPending } = await import("@/lib/softcards.server");
+        const rawBody = await request.json().catch(() => null);
+
+        // DB trigger pings this when a new bank SMS arrives. No secret needed:
+        // it only runs the auto-match sweep, is throttled to once per 30s, and
+        // returns nothing but counts.
+        if (rawBody?.action === "sms_ping") {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const db = supabaseAdmin as any;
+          const now = Date.now();
+          const { data: last } = await db.from("site_settings").select("value").eq("key", "softcards_last_sweep").maybeSingle();
+          const lastTs = last?.value ? Date.parse(last.value) : 0;
+          if (now - lastTs < 30000) return Response.json({ ok: true, skipped: true });
+          const nowIso = new Date(now).toISOString();
+          const { data: upd } = await db.from("site_settings").update({ value: nowIso }).eq("key", "softcards_last_sweep").select("key");
+          if (!upd?.length) await db.from("site_settings").insert({ key: "softcards_last_sweep", value: nowIso });
+          const r = await sweepPending();
+          return Response.json({ ok: true, ...r });
+        }
+
         if (!secretMatches(request.headers.get("x-deposit-sync-secret"))) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const parsed = Body.safeParse(await request.json().catch(() => null));
+        const parsed = Body.safeParse(rawBody);
         if (!parsed.success) return Response.json({ error: "Invalid body" }, { status: 400 });
         const b = parsed.data;
         const created = b.created_at && !isNaN(Date.parse(b.created_at)) ? new Date(b.created_at).toISOString() : null;
