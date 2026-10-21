@@ -50,6 +50,7 @@ import { Route as SellersRouteImport } from './routes/sellers'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SignupSuccessRouteImport } from './routes/signup-success'
+import { Route as SoftcardsTopupsRouteImport } from './routes/softcards-topups'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SystemLogsRouteImport } from './routes/system-logs'
 import { Route as SystemTopupRouteImport } from './routes/system-topup'
@@ -81,6 +82,7 @@ import { Route as ApiPublicKastEmailRouteImport } from './routes/api/public/kast
 import { Route as ApiPublicManagedAdsSpendRouteImport } from './routes/api/public/managed-ads-spend'
 import { Route as ApiPublicReferralCronRouteImport } from './routes/api/public/referral-cron'
 import { Route as ApiPublicSiteTtsRouteImport } from './routes/api/public/site-tts'
+import { Route as ApiPublicWebhooksSoftcardsDepositRouteImport } from './routes/api/public/webhooks/softcards-deposit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -287,6 +289,11 @@ const SignupSuccessRoute = SignupSuccessRouteImport.update({
   path: '/signup-success',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SoftcardsTopupsRoute = SoftcardsTopupsRouteImport.update({
+  id: '/softcards-topups',
+  path: '/softcards-topups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubscriptionsRoute = SubscriptionsRouteImport.update({
   id: '/subscriptions',
   path: '/subscriptions',
@@ -443,6 +450,12 @@ const ApiPublicSiteTtsRoute = ApiPublicSiteTtsRouteImport.update({
   path: '/api/public/site-tts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWebhooksSoftcardsDepositRoute =
+  ApiPublicWebhooksSoftcardsDepositRouteImport.update({
+    id: '/api/public/webhooks/softcards-deposit',
+    path: '/api/public/webhooks/softcards-deposit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -486,6 +499,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -517,6 +531,7 @@ export interface FileRoutesByFullPath {
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
+  '/api/public/webhooks/softcards-deposit': typeof ApiPublicWebhooksSoftcardsDepositRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -560,6 +575,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -590,6 +606,7 @@ export interface FileRoutesByTo {
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
+  '/api/public/webhooks/softcards-deposit': typeof ApiPublicWebhooksSoftcardsDepositRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -634,6 +651,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
+  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -665,6 +683,7 @@ export interface FileRoutesById {
   '/api/public/managed-ads-spend': typeof ApiPublicManagedAdsSpendRoute
   '/api/public/referral-cron': typeof ApiPublicReferralCronRoute
   '/api/public/site-tts': typeof ApiPublicSiteTtsRoute
+  '/api/public/webhooks/softcards-deposit': typeof ApiPublicWebhooksSoftcardsDepositRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -710,6 +729,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -741,6 +761,7 @@ export interface FileRouteTypes {
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
+    | '/api/public/webhooks/softcards-deposit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -784,6 +805,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -814,6 +836,7 @@ export interface FileRouteTypes {
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
+    | '/api/public/webhooks/softcards-deposit'
   id:
     | '__root__'
     | '/'
@@ -857,6 +880,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
+    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -888,6 +912,7 @@ export interface FileRouteTypes {
     | '/api/public/managed-ads-spend'
     | '/api/public/referral-cron'
     | '/api/public/site-tts'
+    | '/api/public/webhooks/softcards-deposit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -932,6 +957,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SignupSuccessRoute: typeof SignupSuccessRoute
+  SoftcardsTopupsRoute: typeof SoftcardsTopupsRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   SystemLogsRoute: typeof SystemLogsRoute
   SystemTopupRoute: typeof SystemTopupRoute
@@ -959,6 +985,7 @@ export interface RootRouteChildren {
   ApiPublicManagedAdsSpendRoute: typeof ApiPublicManagedAdsSpendRoute
   ApiPublicReferralCronRoute: typeof ApiPublicReferralCronRoute
   ApiPublicSiteTtsRoute: typeof ApiPublicSiteTtsRoute
+  ApiPublicWebhooksSoftcardsDepositRoute: typeof ApiPublicWebhooksSoftcardsDepositRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1250,6 +1277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/softcards-topups': {
+      id: '/softcards-topups'
+      path: '/softcards-topups'
+      fullPath: '/softcards-topups'
+      preLoaderRoute: typeof SoftcardsTopupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subscriptions': {
       id: '/subscriptions'
       path: '/subscriptions'
@@ -1467,6 +1501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSiteTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/softcards-deposit': {
+      id: '/api/public/webhooks/softcards-deposit'
+      path: '/api/public/webhooks/softcards-deposit'
+      fullPath: '/api/public/webhooks/softcards-deposit'
+      preLoaderRoute: typeof ApiPublicWebhooksSoftcardsDepositRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1549,6 +1590,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SignupSuccessRoute: SignupSuccessRoute,
+  SoftcardsTopupsRoute: SoftcardsTopupsRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   SystemLogsRoute: SystemLogsRoute,
   SystemTopupRoute: SystemTopupRoute,
@@ -1576,6 +1618,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicManagedAdsSpendRoute: ApiPublicManagedAdsSpendRoute,
   ApiPublicReferralCronRoute: ApiPublicReferralCronRoute,
   ApiPublicSiteTtsRoute: ApiPublicSiteTtsRoute,
+  ApiPublicWebhooksSoftcardsDepositRoute:
+    ApiPublicWebhooksSoftcardsDepositRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
