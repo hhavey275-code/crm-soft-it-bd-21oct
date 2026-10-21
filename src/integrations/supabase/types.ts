@@ -3487,6 +3487,99 @@ export type Database = {
         }
         Relationships: []
       }
+      softcard_callback_log: {
+        Row: {
+          action: string
+          created_at: string
+          deposit_id: string
+          error: string | null
+          http_status: number | null
+          id: string
+          ok: boolean
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          deposit_id: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          ok: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          deposit_id?: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          ok?: boolean
+        }
+        Relationships: []
+      }
+      softcard_topups: {
+        Row: {
+          amount_cents: number
+          callback_attempts: number
+          client_name: string | null
+          created_at: string
+          decided_by: string | null
+          decided_via: string | null
+          deposit_id: string
+          id: string
+          last_callback_error: string | null
+          local_amount_minor: number | null
+          local_currency: string | null
+          matched_update_id: number | null
+          pending_action: string | null
+          pending_note: string | null
+          reference: string | null
+          source_created_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          callback_attempts?: number
+          client_name?: string | null
+          created_at?: string
+          decided_by?: string | null
+          decided_via?: string | null
+          deposit_id: string
+          id?: string
+          last_callback_error?: string | null
+          local_amount_minor?: number | null
+          local_currency?: string | null
+          matched_update_id?: number | null
+          pending_action?: string | null
+          pending_note?: string | null
+          reference?: string | null
+          source_created_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          callback_attempts?: number
+          client_name?: string | null
+          created_at?: string
+          decided_by?: string | null
+          decided_via?: string | null
+          deposit_id?: string
+          id?: string
+          last_callback_error?: string | null
+          local_amount_minor?: number | null
+          local_currency?: string | null
+          matched_update_id?: number | null
+          pending_action?: string | null
+          pending_note?: string | null
+          reference?: string | null
+          source_created_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       spend_cap_withdraw_requests: {
         Row: {
           ad_account_id: string
