@@ -206,7 +206,7 @@ export function AppSidebar() {
         item.key === "profile-stock" ||
         item.key === "kast-otp" ||
         item.key === "managed-ads" ||
-        ((item.key === "external-top-up" || item.key === "softcards-topups") && menuPermissions.includes("requests"))
+        (item.key === "external-top-up" && menuPermissions.includes("requests"))
       );
     }
     navItems = isTenantMode ? base.filter(i => !tenantHiddenKeys.includes(i.key)) : base;

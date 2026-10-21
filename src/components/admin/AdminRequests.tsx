@@ -234,6 +234,18 @@ export function AdminRequests() {
     refetchInterval: 20000,
   });
 
+  const { data: pendingSoftcardCount = 0 } = useQuery({
+    queryKey: ["admin-softcard-pending-count"],
+    queryFn: async () => {
+      const { count } = await (supabase as any)
+        .from("softcard_topups")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+      return count || 0;
+    },
+    refetchInterval: 15000,
+  });
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl md:text-2xl font-bold">Requests</h1>
@@ -264,10 +276,22 @@ export function AdminRequests() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="softcards" className="gap-1.5 flex-1 md:flex-none text-xs md:text-sm">
+            SoftCards
+            {pendingSoftcardCount > 0 && (
+              <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                {pendingSoftcardCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="withdraw">
           <AdminWithdrawRequests />
+        </TabsContent>
+
+        <TabsContent value="softcards">
+          <AdminSoftcardTopups />
         </TabsContent>
 
 
