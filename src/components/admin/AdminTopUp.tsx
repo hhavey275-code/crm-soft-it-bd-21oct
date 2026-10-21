@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MissingCreditsCard } from "@/components/admin/MissingCreditsCard";
+import { AdminSoftcardTopups } from "@/components/admin/AdminSoftcardTopups";
 import { format, startOfDay, endOfDay, subDays, isWithinInterval, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
@@ -813,6 +814,7 @@ export function AdminTopUp() {
             <MessageSquareText className="h-3.5 w-3.5" />
             SMS
           </TabsTrigger>
+          <TabsTrigger value="softcards" className={cn(isMobile && "text-xs px-1")}>SoftCards</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -835,7 +837,9 @@ export function AdminTopUp() {
         )}
       </div>
 
-      {statusFilter === "bank_sms" ? (
+      {statusFilter === "softcards" ? (
+        <AdminSoftcardTopups />
+      ) : statusFilter === "bank_sms" ? (
         <BankSmsTab />
       ) : isMobile ? (
         /* Mobile Card Layout */
