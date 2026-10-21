@@ -50,7 +50,6 @@ import { Route as SellersRouteImport } from './routes/sellers'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SignupSuccessRouteImport } from './routes/signup-success'
-import { Route as SoftcardsTopupsRouteImport } from './routes/softcards-topups'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SystemLogsRouteImport } from './routes/system-logs'
 import { Route as SystemTopupRouteImport } from './routes/system-topup'
@@ -289,11 +288,6 @@ const SignupSuccessRoute = SignupSuccessRouteImport.update({
   path: '/signup-success',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SoftcardsTopupsRoute = SoftcardsTopupsRouteImport.update({
-  id: '/softcards-topups',
-  path: '/softcards-topups',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SubscriptionsRoute = SubscriptionsRouteImport.update({
   id: '/subscriptions',
   path: '/subscriptions',
@@ -499,7 +493,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
-  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -575,7 +568,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
-  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -651,7 +643,6 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/signup-success': typeof SignupSuccessRoute
-  '/softcards-topups': typeof SoftcardsTopupsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/system-logs': typeof SystemLogsRoute
   '/system-topup': typeof SystemTopupRoute
@@ -729,7 +720,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
-    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -805,7 +795,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
-    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -880,7 +869,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/signup-success'
-    | '/softcards-topups'
     | '/subscriptions'
     | '/system-logs'
     | '/system-topup'
@@ -957,7 +945,6 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SignupSuccessRoute: typeof SignupSuccessRoute
-  SoftcardsTopupsRoute: typeof SoftcardsTopupsRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   SystemLogsRoute: typeof SystemLogsRoute
   SystemTopupRoute: typeof SystemTopupRoute
@@ -1277,13 +1264,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/softcards-topups': {
-      id: '/softcards-topups'
-      path: '/softcards-topups'
-      fullPath: '/softcards-topups'
-      preLoaderRoute: typeof SoftcardsTopupsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/subscriptions': {
       id: '/subscriptions'
       path: '/subscriptions'
@@ -1590,7 +1570,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SignupSuccessRoute: SignupSuccessRoute,
-  SoftcardsTopupsRoute: SoftcardsTopupsRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   SystemLogsRoute: SystemLogsRoute,
   SystemTopupRoute: SystemTopupRoute,
