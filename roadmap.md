@@ -20,3 +20,4 @@
 - [x] Shared ad account step 2: page-filtered Campaigns/Ad Sets/Ads manager "My Ads" (2026-10-06). Custom audiences pending.
 - [ ] Shared ad account step 3: cached batch insights sync + refresh cooldown.
 - [x] Shared ad account step 4: wallet budget guard, 15-min spend deduction, auto-pause + admin thresholds (2026-10-06). Needs publish for the scheduler URL.
+- [ ] Confirm whether Supabase ref dhswrfzdqcavgmymllat is the "crm soft it bd" project; if not, user connects it via Settings → General → External Supabase
