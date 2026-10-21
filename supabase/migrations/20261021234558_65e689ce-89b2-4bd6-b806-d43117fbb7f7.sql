@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.softcards_ping_on_sms() FROM anon, authenticated, public;
