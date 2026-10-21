@@ -60,7 +60,6 @@ const adminNavItems = [
   { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
   { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
   { title: "External Top-Up", url: "/external-top-up", icon: Zap, key: "external-top-up" },
-  { title: "SoftCards Top-Ups", url: "/softcards-topups", icon: ArrowUpCircle, key: "softcards-topups" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Clients", url: "/clients", icon: Users, key: "clients" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },

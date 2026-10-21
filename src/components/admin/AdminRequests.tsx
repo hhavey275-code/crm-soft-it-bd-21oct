@@ -17,6 +17,7 @@ import { Check, X, Search, Loader2 } from "lucide-react";
 import { logSystemAction } from "@/lib/systemLog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AdminWithdrawRequests } from "@/components/admin/AdminWithdrawRequests";
+import { AdminSoftcardTopups } from "@/components/admin/AdminSoftcardTopups";
 
 
 export function AdminRequests() {
