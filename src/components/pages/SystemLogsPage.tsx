@@ -94,15 +94,34 @@ export default function SystemLogsPage() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ["system-logs"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const [systemResult, softcardResult] = await Promise.all([
+        (supabase as any)
         .from("system_logs")
         .select("*")
         .not("action", "in", `(${[...HIDDEN_ACTIONS].map((a) => `"${a}"`).join(",")})`)
         .order("created_at", { ascending: false })
-        .limit(1000);
-      if (error) throw error;
-      return ((data as any[]) ?? []).filter((log) => !HIDDEN_ACTIONS.has(log.action));
+        .limit(1000),
+        (supabase as any)
+          .from("softcard_callback_log")
+          .select("id, deposit_id, action, http_status, error, created_at")
+          .eq("ok", false)
+          .order("created_at", { ascending: false })
+          .limit(1000),
+      ]);
+      if (systemResult.error) throw systemResult.error;
+      if (softcardResult.error) throw softcardResult.error;
+      const softcardLogs = (softcardResult.data ?? []).map((log: any) => ({
+        id: `softcards-${log.id}`,
+        created_at: log.created_at,
+        user_name: "SoftCards",
+        action: "SoftCards Callback Failed",
+        details: `${log.deposit_id} | ${log.action} | ${log.http_status ?? "network"} — ${log.error ?? "Unknown error"}`,
+      }));
+      return [...((systemResult.data as any[]) ?? []), ...softcardLogs]
+        .filter((log) => !HIDDEN_ACTIONS.has(log.action))
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
     },
+    refetchInterval: 15000,
   });
 
   const uniqueActions = [...new Set(logs?.map((l: any) => l.action) ?? [])];

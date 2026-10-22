@@ -29,18 +29,10 @@ export function AdminSoftcardTopups() {
     },
     refetchInterval: 15000,
   });
-  const { data: logs = [] } = useQuery({
-    queryKey: ["softcard-callback-log"],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("softcard_callback_log").select("*").eq("ok", false).order("created_at", { ascending: false }).limit(30);
-      return (data ?? []) as any[];
-    },
-    refetchInterval: 15000,
-  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["softcard-topups"] });
-    qc.invalidateQueries({ queryKey: ["softcard-callback-log"] });
+    qc.invalidateQueries({ queryKey: ["system-logs"] });
     qc.invalidateQueries({ queryKey: ["admin-softcard-pending-count"] });
   };
 
@@ -120,21 +112,6 @@ export function AdminSoftcardTopups() {
           </Table>
         </CardContent>
       </Card>
-
-      {logs.length > 0 && (
-        <Card className="border-destructive/40">
-          <CardHeader><CardTitle className="text-base">Failed callback log</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-xs">
-            {logs.map((l) => (
-              <div key={l.id} className="flex flex-wrap gap-2 border-b py-1">
-                <span className="text-muted-foreground">{format(new Date(l.created_at), "dd MMM, h:mm a")}</span>
-                <span className="font-mono">{l.deposit_id}</span><span>{l.action}</span>
-                <span className="text-destructive">{l.http_status ?? "network"} — {l.error}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">History</CardTitle></CardHeader>
