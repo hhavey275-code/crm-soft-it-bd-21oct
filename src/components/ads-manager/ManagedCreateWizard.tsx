@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   Loader2, X, Megaphone, MousePointer2, MessagesSquare, Filter, Users, ShoppingBag, Folder, LayoutGrid, FileText,
   CheckCircle2, AlertCircle, Pencil, Eye, Info, ChevronDown, ChevronUp, Sparkles, Check, ImagePlus, Wallet, MoreHorizontal,
+  Plus, Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,48 @@ interface Props {
   onCreated: () => void;
   draft?: CampaignDraft;
   newDraftId?: string;
+}
+
+// One ad inside an ad set.
+interface AdDraft {
+  adName: string;
+  setup: "new" | "post";
+  postId: string;
+  message: string;
+  headline: string;
+  link: string;
+  cta: string;
+  postCta: string;
+  image: { b64: string; url: string } | null;
+  video: { id: string; name: string; picture?: string | null; src?: string | null } | null;
+}
+
+// One ad set with its own audience/budget/schedule and its ads.
+interface AdsetDraft {
+  adsetName: string;
+  location: "WEBSITE" | "MESSAGING";
+  pixelId: string;
+  customEvent: string;
+  so: SalesOpts;
+  startTime: string;
+  hasEnd: boolean;
+  endTime: string;
+  countries: string[];
+  ageMin: string;
+  ageMax: string;
+  gender: string;
+  interests: { id: string; name: string; type?: string }[];
+  connections: "all" | "include" | "exclude";
+  mainDest: "WEBSITE" | "CALL" | "BOTH";
+  phone: string;
+  engLoc: "ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT";
+  destMode: "auto" | "manual";
+  dests: ("MESSENGER" | "WHATSAPP")[];
+  budgetType: "daily" | "lifetime";
+  amount: string;
+  bidStrategy: string;
+  bidAmount: string;
+  ads: AdDraft[];
 }
 
 // ---------- small Facebook-style building blocks ----------
@@ -95,14 +138,14 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   // campaign
   const [campaignName, setCampaignName] = useState("New Sales Campaign");
   const [budgetLevel, setBudgetLevel] = useState<"campaign" | "adset">("campaign");
-  const [budgetType, setBudgetType] = useState<"daily" | "lifetime">("daily");
-  const [amount, setAmount] = useState("5.00");
-  const [bidStrategy, setBidStrategy] = useState("LOWEST_COST_WITHOUT_CAP");
-  const [bidAmount, setBidAmount] = useState("");
+  const [cBudgetType, setCBudgetType] = useState<"daily" | "lifetime">("daily");
+  const [cAmount, setCAmount] = useState("5.00");
+  const [cBidStrategy, setCBidStrategy] = useState("LOWEST_COST_WITHOUT_CAP");
+  const [cBidAmount, setCBidAmount] = useState("");
   const [special, setSpecial] = useState<string[]>([]);
   const [showSpecial, setShowSpecial] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(true);
-  // ad set
+  // ad set (editing buffer for the selected ad set)
   const [adsetName, setAdsetName] = useState("New Sales Ad Set");
   const [location, setLocation] = useState<"WEBSITE" | "MESSAGING">("WEBSITE");
   const [pixels, setPixels] = useState<any[] | null>(null);
@@ -123,7 +166,17 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [iq, setIq] = useState("");
   const [iResults, setIResults] = useState<any[]>([]);
   const [placements, setPlacements] = useState<"auto" | "manual">("auto");
-  // ad
+  const [connections, setConnections] = useState<"all" | "include" | "exclude">("all");
+  const [mainDest, setMainDest] = useState<"WEBSITE" | "CALL" | "BOTH">("WEBSITE");
+  const [phone, setPhone] = useState("");
+  const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT">("MESSAGING");
+  const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
+  const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
+  const [budgetType, setBudgetType] = useState<"daily" | "lifetime">("daily");
+  const [amount, setAmount] = useState("5.00");
+  const [bidStrategy, setBidStrategy] = useState("LOWEST_COST_WITHOUT_CAP");
+  const [bidAmount, setBidAmount] = useState("");
+  // ad (editing buffer for the selected ad)
   const [adName, setAdName] = useState("New Sales Ad");
   const [setup, setSetup] = useState<"new" | "post">("new");
   const [postId, setPostId] = useState("");
@@ -135,17 +188,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [link, setLink] = useState("");
   const [cta, setCta] = useState("SHOP_NOW");
   const [image, setImage] = useState<{ b64: string; url: string } | null>(null);
-  const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT">("MESSAGING");
-  const [connections, setConnections] = useState<"all" | "include" | "exclude">("all");
   const [video, setVideo] = useState<{ id: string; name: string; picture?: string | null; src?: string | null } | null>(null);
+  const [postCta, setPostCta] = useState("");
+  // shared
   const [force, setForce] = useState(0);
   const [videoBusy, setVideoBusy] = useState(false);
-  const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
-  const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
   const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null; pageTokenMissing?: boolean } | null>(null);
-  const [phone, setPhone] = useState("");
-  const [mainDest, setMainDest] = useState<"WEBSITE" | "CALL" | "BOTH">("WEBSITE");
-  const [postCta, setPostCta] = useState("");
   const [libOpen, setLibOpen] = useState(false);
   const [infoTick, setInfoTick] = useState(0);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -153,24 +201,149 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [demoItems, setDemoItems] = useState<any[] | null>(null);
   const restored = useRef(false);
 
+  // ---- multi ad set / multi ad store ----
+  // The form fields above are the editing buffer for the SELECTED ad set/ad.
+  // `adsets` holds a flushed copy of every ad set; navigation flushes the buffer first.
+  const [adsets, setAdsets] = useState<AdsetDraft[]>([{
+    adsetName: "New Sales Ad Set", location: "WEBSITE", pixelId: "", customEvent: "PURCHASE", so: defaultSalesOpts,
+    startTime: today, hasEnd: false, endTime: "", countries: ["BD"], ageMin: "18", ageMax: "65", gender: "all",
+    interests: [], connections: "all", mainDest: "WEBSITE", phone: "", engLoc: "MESSAGING", destMode: "auto", dests: ["MESSENGER"],
+    budgetType: "daily", amount: "5.00", bidStrategy: "LOWEST_COST_WITHOUT_CAP", bidAmount: "",
+    ads: [{ adName: "New Sales Ad", setup: "new", postId: "", message: "", headline: "", link: "", cta: "SHOP_NOW", postCta: "", image: null, video: null }],
+  }]);
+  const [selPos, setSelPos] = useState<{ a: number; d: number }>({ a: 0, d: 0 });
+
+  const label = OBJECTIVES.find((o) => o.v === objective)?.l ?? "";
+  const mkAd = (name: string): AdDraft => ({ adName: name, setup: "new", postId: "", message: "", headline: "", link: "", cta: objective === "LEADS" ? "SIGN_UP" : objective === "SALES" ? "SHOP_NOW" : "LEARN_MORE", postCta: "", image: null, video: null });
+  const collectAd = (): AdDraft => ({
+    adName, setup, postId, message, headline, link, cta, postCta, image,
+    video: video ? { ...video, src: video.src?.startsWith("blob:") ? null : video.src } : null,
+  });
+  const collectAdset = (ads: AdDraft[]): AdsetDraft => ({
+    adsetName, location, pixelId, customEvent, so, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender,
+    interests, connections, mainDest, phone, engLoc, destMode, dests, budgetType, amount, bidStrategy, bidAmount, ads,
+  });
+  // Every ad set with the current buffer merged in.
+  const flushed = (): AdsetDraft[] =>
+    adsets.map((s, i) => (i === selPos.a ? collectAdset(s.ads.map((ad, j) => (j === selPos.d ? collectAd() : ad))) : s));
+  const loadAd = (a: AdDraft) => {
+    setAdName(a.adName); setSetup(a.setup); setPostId(a.postId); setMessage(a.message); setHeadline(a.headline);
+    setLink(a.link); setCta(a.cta); setPostCta(a.postCta); setImage(a.image); setVideo(a.video);
+  };
+  const loadAdset = (s: AdsetDraft, d: number) => {
+    setAdsetName(s.adsetName); setLocation(s.location); setPixelId(s.pixelId); setCustomEvent(s.customEvent);
+    setSoState(s.so); setStartTime(s.startTime); setHasEnd(s.hasEnd); setEndTime(s.endTime); setCountries(s.countries);
+    setAgeMin(s.ageMin); setAgeMax(s.ageMax); setGender(s.gender); setInterests(s.interests); setConnections(s.connections);
+    setMainDest(s.mainDest); setPhone(s.phone); setEngLoc(s.engLoc); setDestMode(s.destMode); setDests(s.dests);
+    setBudgetType(s.budgetType); setAmount(s.amount); setBidStrategy(s.bidStrategy); setBidAmount(s.bidAmount);
+    loadAd(s.ads[Math.max(0, Math.min(d, s.ads.length - 1))] ?? s.ads[0]);
+  };
+  const goto = (a: number, d: number) => {
+    const f = flushed();
+    setAdsets(f);
+    const s = f[a];
+    if (!s) return;
+    const dd = d < 0 ? 0 : Math.min(d, s.ads.length - 1);
+    loadAdset(s, dd);
+    setSelPos({ a, d: dd });
+    setLevel(d < 0 ? 1 : 2);
+    setTab("edit");
+  };
+  const gotoCampaign = () => { setAdsets(flushed()); setLevel(0); setTab("edit"); };
+  const addAdset = () => {
+    const f = flushed();
+    // Copy the current ad set's audience/budget so the new one starts from a sensible place.
+    const cur = collectAdset([]);
+    const nu: AdsetDraft = { ...cur, adsetName: `New ${label} Ad Set ${f.length + 1}`, ads: [mkAd(`New ${label} Ad 1`)] };
+    const next = [...f, nu];
+    setAdsets(next);
+    loadAdset(nu, 0);
+    setSelPos({ a: next.length - 1, d: 0 });
+    setLevel(1);
+    setTab("edit");
+  };
+  const addAd = () => {
+    const f = flushed();
+    const s = f[selPos.a];
+    const nu = mkAd(`New ${label} Ad ${s.ads.length + 1}`);
+    s.ads = [...s.ads, nu];
+    setAdsets(f);
+    loadAd(nu);
+    setSelPos({ a: selPos.a, d: s.ads.length - 1 });
+    setLevel(2);
+    setTab("edit");
+  };
+  const removeAdset = (i: number) => {
+    if (adsets.length <= 1) return;
+    const f = flushed().filter((_, x) => x !== i);
+    const ni = Math.min(i, f.length - 1);
+    setAdsets(f);
+    loadAdset(f[ni], 0);
+    setSelPos({ a: ni, d: 0 });
+  };
+  const removeAd = (j: number) => {
+    const f = flushed();
+    const s = f[selPos.a];
+    if (s.ads.length <= 1) return;
+    s.ads = s.ads.filter((_, x) => x !== j);
+    const nj = Math.min(j, s.ads.length - 1);
+    setAdsets(f);
+    loadAd(s.ads[nj]);
+    setSelPos({ a: selPos.a, d: nj });
+  };
+
   // ---- drafts: every new campaign gets its own draft; Edit on a draft reopens exactly that one ----
   const draftId = useRef(draft?.id ?? newDraftId ?? crypto.randomUUID()).current;
-  const snapshot = { phase, pick, objective, level, pageDbId, accId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
-    adsetName, location, customEvent, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender, interests, adName, setup, postId,
-    message, headline, link, cta, engLoc, destMode, dests, phone, postCta, video: video ? { ...video, src: video.src?.startsWith("blob:") ? null : video.src } : null };
+  const snapshot = {
+    phase, pick, objective, level, selPos, pageDbId, accId, campaignName, budgetLevel,
+    cBudgetType, cAmount, cBidStrategy, cBidAmount, special,
+    // Images are too big for localStorage — keep everything else.
+    adsets: flushed().map((s) => ({ ...s, ads: s.ads.map((a) => ({ ...a, image: null })) })),
+  };
   useEffect(() => {
     try {
       const d = draft?.data;
       if (d) {
-        const S: Record<string, (v: any) => void> = { phase: setPhase, pick: setPick, objective: setObjective, level: setLevel, campaignName: setCampaignName,
-          budgetLevel: setBudgetLevel, budgetType: setBudgetType, amount: setAmount, bidStrategy: setBidStrategy, bidAmount: setBidAmount, special: setSpecial,
-          adsetName: setAdsetName, location: setLocation, customEvent: setCustomEvent, startTime: setStartTime, hasEnd: setHasEnd, endTime: setEndTime,
-          countries: setCountries, ageMin: setAgeMin, ageMax: setAgeMax, gender: setGender, interests: setInterests, adName: setAdName, setup: setSetup,
-          message: setMessage, headline: setHeadline, link: setLink, cta: setCta, engLoc: setEngLoc, destMode: setDestMode, dests: setDests, phone: setPhone, postCta: setPostCta, video: setVideo };
-        for (const [k, f] of Object.entries(S)) if (d[k] !== undefined) f(d[k]);
+        if (d.phase) setPhase(d.phase);
+        if (d.pick) setPick(d.pick);
+        if (d.objective) setObjective(d.objective);
+        if (d.level !== undefined) setLevel(d.level);
+        if (d.campaignName !== undefined) setCampaignName(d.campaignName);
+        if (d.budgetLevel) setBudgetLevel(d.budgetLevel);
+        if (d.cBudgetType) setCBudgetType(d.cBudgetType);
+        if (d.cAmount !== undefined) setCAmount(d.cAmount);
+        if (d.cBidStrategy) setCBidStrategy(d.cBidStrategy);
+        if (d.cBidAmount !== undefined) setCBidAmount(d.cBidAmount);
+        if (d.special) setSpecial(d.special);
+        let sets: AdsetDraft[] | null = null;
+        if (Array.isArray(d.adsets) && d.adsets.length) {
+          sets = d.adsets;
+        } else if (d.adsetName !== undefined) {
+          // Legacy single-ad-set draft — wrap it into the new shape.
+          sets = [{
+            adsetName: d.adsetName ?? "", location: d.location ?? "WEBSITE", pixelId: "", customEvent: d.customEvent ?? "PURCHASE",
+            so: defaultSalesOpts, startTime: d.startTime ?? today, hasEnd: !!d.hasEnd, endTime: d.endTime ?? "",
+            countries: d.countries ?? ["BD"], ageMin: d.ageMin ?? "18", ageMax: d.ageMax ?? "65", gender: d.gender ?? "all",
+            interests: d.interests ?? [], connections: "all", mainDest: "WEBSITE", phone: d.phone ?? "",
+            engLoc: d.engLoc ?? "MESSAGING", destMode: d.destMode ?? "auto", dests: d.dests ?? ["MESSENGER"],
+            budgetType: d.budgetType ?? "daily", amount: d.amount ?? "5.00",
+            bidStrategy: d.bidStrategy ?? "LOWEST_COST_WITHOUT_CAP", bidAmount: d.bidAmount ?? "",
+            ads: [{
+              adName: d.adName ?? "", setup: d.setup ?? "new", postId: d.postId ?? "", message: d.message ?? "",
+              headline: d.headline ?? "", link: d.link ?? "", cta: d.cta ?? "SHOP_NOW", postCta: d.postCta ?? "",
+              image: null, video: d.video ?? null,
+            }],
+          }];
+        }
+        if (sets) {
+          sets = sets.map((s) => ({ ...defaultAdsetShape, ...s, so: { ...defaultSalesOpts, ...s.so }, ads: s.ads?.length ? s.ads : [mkAd("New Ad")] }));
+          setAdsets(sets);
+          const sp = d.selPos && d.selPos.a < sets.length ? d.selPos : { a: 0, d: 0 };
+          loadAdset(sets[sp.a], sp.d);
+          setSelPos({ a: sp.a, d: sp.d });
+        }
         if (d.pageDbId && pages.some((p) => p.id === d.pageDbId)) setPageDbId(d.pageDbId);
         if (d.accId && accounts.some((a) => a.id === d.accId)) setAccId(d.accId);
-        setTimeout(() => d.postId && setPostId(d.postId), 50);
       }
     } catch { /* ignore */ }
     restored.current = true;
@@ -201,6 +374,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("beforeunload", onUnload); };
   }, [phase]);
 
+  // Flags for the SELECTED ad set (buffer) — drive the form sections.
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const canCall = (objective === "SALES" || objective === "LEADS" || objective === "TRAFFIC") && !isMsg;
   const callMode = objective === "ENGAGEMENT" ? engLoc === "CALLS" : canCall && mainDest === "CALL";
@@ -210,9 +384,33 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const wa = (pageInfo?.whatsappNumber && pageInfo.whatsappNumber !== "linked" ? pageInfo.whatsappNumber : null) ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : pageInfo?.whatsappNumber === "linked" ? "WhatsApp connected ✓ (Page-এর Primary নম্বর)" : null);
   const waConnectUrl = `https://www.facebook.com/${encodeURIComponent(String((pages.find((p) => p.id === pageDbId) as any)?.page_id ?? ""))}/settings/?tab=linked_accounts`;
   const finalDests: ("MESSENGER" | "WHATSAPP")[] = destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : dests;
-  const amt = Number(amount) || 0;
-  const overWallet = acc?.kind === "shared" && amt > walletBalance;
-  const label = OBJECTIVES.find((o) => o.v === objective)?.l ?? "";
+  const cAmt = Number(cAmount) || 0;
+  const totalBudget = budgetLevel === "campaign" ? cAmt : flushed().reduce((t, s) => t + (Number(s.amount) || 0), 0);
+  const overWallet = acc?.kind === "shared" && totalBudget > walletBalance;
+
+  // Flags for ANY ad set (used for validation of the whole tree).
+  const flagsFor = (s: AdsetDraft) => {
+    const msg = objective === "ENGAGEMENT" ? s.engLoc === "MESSAGING" : s.location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
+    const canC = (objective === "SALES" || objective === "LEADS" || objective === "TRAFFIC") && !msg;
+    const call = objective === "ENGAGEMENT" ? s.engLoc === "CALLS" : canC && s.mainDest === "CALL";
+    const both = (objective === "SALES" || objective === "LEADS") && s.location === "WEBSITE" && s.mainDest === "BOTH";
+    const np = (objective === "SALES" || objective === "LEADS") && s.location === "WEBSITE" && !call;
+    const fd: ("MESSENGER" | "WHATSAPP")[] = s.destMode === "auto" ? (wa ? ["MESSENGER", "WHATSAPP"] : ["MESSENGER"]) : s.dests;
+    return { msg, canC, call, both, np, fd };
+  };
+  const adsetErr = (s: AdsetDraft) => {
+    const f = flagsFor(s);
+    return !s.adsetName.trim() || !s.countries.length
+      || (objective === "ENGAGEMENT" && s.engLoc === "MESSAGING" && (!f.fd.length || (f.fd.includes("WHATSAPP") && !wa)))
+      || ((f.call || f.both) && !s.phone.trim()) || (f.np && !s.pixelId)
+      || (s.budgetType === "lifetime" && !s.hasEnd)
+      || (budgetLevel === "adset" && (Number(s.amount) || 0) < 1);
+  };
+  const adErr = (a: AdDraft, s: AdsetDraft) => {
+    const f = flagsFor(s);
+    const nl = (a.setup !== "post" || !!a.postCta) && !f.msg && !f.call && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && s.engLoc !== "WEBSITE");
+    return !a.adName.trim() || !pageDbId || !accId || (a.setup === "post" && !a.postId) || (nl && !/^https?:\/\//.test(a.link));
+  };
 
   useEffect(() => {
     setPixels(null); setPixelId("");
@@ -292,84 +490,115 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     if (!pick || pick === "APP") return;
     setObjective(pick);
     const n = OBJECTIVES.find((o) => o.v === pick)!.l;
-    setCampaignName(`New ${n} Campaign`); setAdsetName(`New ${n} Ad Set`); setAdName(`New ${n} Ad`);
+    setCampaignName(`New ${n} Campaign`);
+    const firstAd = mkAd(`New ${n} Ad`);
+    if (pick === "ENGAGEMENT") firstAd.setup = engLoc === "ON_AD" ? "post" : "new";
+    const first: AdsetDraft = { ...collectAdset([firstAd]), adsetName: `New ${n} Ad Set`, ads: [firstAd] };
+    setAdsets([first]);
+    loadAdset(first, 0);
+    setSelPos({ a: 0, d: 0 });
     setCta(pick === "SALES" ? "SHOP_NOW" : pick === "LEADS" ? "SIGN_UP" : "LEARN_MORE");
-    if (pick === "ENGAGEMENT") setSetup(engLoc === "ON_AD" ? "post" : "new");
+    setLevel(0);
     setPhase("edit");
   };
 
   const needLink = (setup !== "post" || !!postCta) && !isMsg && !callMode && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && engLoc !== "WEBSITE");
   // validation per level (drives red icons like Facebook)
   const errs = {
-    campaign: !campaignName.trim() || amt < 1 || overWallet,
-    adset: !adsetName.trim() || !countries.length
-      || (objective === "ENGAGEMENT" && engLoc === "MESSAGING" && (!finalDests.length || (finalDests.includes("WHATSAPP") && !wa)))
-      || ((callMode || bothMode) && !phone.trim()) || (needsPixel && !pixelId) || (budgetType === "lifetime" && !hasEnd),
-    ad: !adName.trim() || !pageDbId || !accId
-      || (setup === "post" && !postId) || (needLink && !/^https?:\/\//.test(link)),
+    campaign: !campaignName.trim() || (budgetLevel === "campaign" && cAmt < 1) || overWallet,
   };
-  const ready = !errs.campaign && !errs.adset && !errs.ad;
-  const missing: { lv: 0 | 1 | 2; t: string }[] = [
-    !accId && { lv: 2 as const, t: "Ad account বাছুন" },
-    !campaignName.trim() && { lv: 0 as const, t: "Campaign name লিখুন" },
-    amt < 1 && { lv: 0 as const, t: "Budget কমপক্ষে 1 দিন" },
-    overWallet && { lv: 0 as const, t: "Budget wallet balance-এর বেশি — কমান বা top-up করুন" },
-    !adsetName.trim() && { lv: 1 as const, t: "Ad set name লিখুন" },
-    !countries.length && { lv: 1 as const, t: "কমপক্ষে একটি দেশ (Location) বাছুন" },
-    needsPixel && !pixelId && { lv: 1 as const, t: "Dataset / Pixel বাছুন" },
-    budgetType === "lifetime" && !hasEnd && { lv: 1 as const, t: "Lifetime budget-এর জন্য End date দিন" },
-    objective === "ENGAGEMENT" && engLoc === "MESSAGING" && !finalDests.length && { lv: 1 as const, t: "Messenger বা WhatsApp বাছুন" },
-    objective === "ENGAGEMENT" && engLoc === "MESSAGING" && finalDests.includes("WHATSAPP") && !wa && { lv: 1 as const, t: "Page-এ WhatsApp number যুক্ত নেই" },
-    (callMode || bothMode) && !phone.trim() && { lv: 1 as const, t: "Phone number লিখুন" },
-    !adName.trim() && { lv: 2 as const, t: "Ad name লিখুন" },
-    !pageDbId && { lv: 2 as const, t: "Facebook Page বাছুন" },
-    setup === "post" && !postId && { lv: 2 as const, t: "একটি existing post বাছুন" },
-    needLink && !/^https?:\/\//.test(link) && { lv: 2 as const, t: "Website URL দিন (https:// দিয়ে শুরু)" },
+  const fAll = flushed();
+  const ready = !errs.campaign && fAll.every((s) => !adsetErr(s) && s.ads.every((a) => !adErr(a, s)));
+  const missing: { go: () => void; t: string }[] = [
+    !accId && { go: () => goto(0, 0), t: "Ad account বাছুন" },
+    !campaignName.trim() && { go: gotoCampaign, t: "Campaign name লিখুন" },
+    budgetLevel === "campaign" && cAmt < 1 && { go: gotoCampaign, t: "Campaign budget কমপক্ষে 1 দিন" },
+    overWallet && { go: gotoCampaign, t: "Budget wallet balance-এর বেশি — কমান বা top-up করুন" },
   ].filter(Boolean) as any;
+  fAll.forEach((s, i) => {
+    const fl = flagsFor(s);
+    if (!s.adsetName.trim()) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: নাম লিখুন` });
+    if (!s.countries.length) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: কমপক্ষে একটি দেশ (Location) বাছুন` });
+    if (fl.np && !s.pixelId) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Dataset / Pixel বাছুন` });
+    if (s.budgetType === "lifetime" && !s.hasEnd) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Lifetime budget-এর জন্য End date দিন` });
+    if (budgetLevel === "adset" && (Number(s.amount) || 0) < 1) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Budget কমপক্ষে 1 দিন` });
+    if (objective === "ENGAGEMENT" && s.engLoc === "MESSAGING" && !fl.fd.length) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Messenger বা WhatsApp বাছুন` });
+    if (objective === "ENGAGEMENT" && s.engLoc === "MESSAGING" && fl.fd.includes("WHATSAPP") && !wa) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Page-এ WhatsApp number যুক্ত নেই` });
+    if ((fl.call || fl.both) && !s.phone.trim()) missing.push({ go: () => goto(i, -1), t: `Ad set ${i + 1}: Phone number লিখুন` });
+    s.ads.forEach((a, j) => {
+      const nl = (a.setup !== "post" || !!a.postCta) && !fl.msg && !fl.call && objective !== "AWARENESS" && !(objective === "ENGAGEMENT" && s.engLoc !== "WEBSITE");
+      if (!a.adName.trim()) missing.push({ go: () => goto(i, j), t: `Ad set ${i + 1} › Ad ${j + 1}: নাম লিখুন` });
+      if (a.setup === "post" && !a.postId) missing.push({ go: () => goto(i, j), t: `Ad set ${i + 1} › Ad ${j + 1}: একটি existing post বাছুন` });
+      if (nl && !/^https?:\/\//.test(a.link)) missing.push({ go: () => goto(i, j), t: `Ad set ${i + 1} › Ad ${j + 1}: Website URL দিন (https:// দিয়ে শুরু)` });
+    });
+  });
+  if (!pageDbId) missing.push({ go: () => goto(0, 0), t: "Facebook Page বাছুন" });
   const [showMissing, setShowMissing] = useState(false);
 
   const submit = async (publish: boolean) => {
     if (!accId) return toast.error("Ad account বাছুন");
     if (!pageDbId) return toast.error("Facebook Page বাছুন");
     if (overWallet) return toast.error("Wallet balance-এর বেশি budget দেওয়া যাবে না");
-    if (errs.campaign) { setLevel(0); return toast.error("Campaign-এর তথ্য সম্পূর্ণ করুন"); }
-    if (errs.adset) { setLevel(1); return toast.error("Ad set-এর তথ্য সম্পূর্ণ করুন"); }
-    if (errs.ad) { setLevel(2); return toast.error("Ad-এর তথ্য সম্পূর্ণ করুন"); }
+    const f = flushed();
+    if (errs.campaign) { gotoCampaign(); return toast.error("Campaign-এর তথ্য সম্পূর্ণ করুন"); }
+    for (let i = 0; i < f.length; i++) {
+      if (adsetErr(f[i])) { goto(i, -1); return toast.error(`Ad set "${f[i].adsetName}"-এর তথ্য সম্পূর্ণ করুন`); }
+      for (let j = 0; j < f[i].ads.length; j++) {
+        if (adErr(f[i].ads[j], f[i])) { goto(i, j); return toast.error(`Ad "${f[i].ads[j].adName}"-এর তথ্য সম্পূর্ণ করুন`); }
+      }
+    }
     setSaving(true);
     try {
-      const apiObjective = objective === "ENGAGEMENT" ? "ENGAGEMENT" : objective;
       await managedAds({
-        action: "create", pageDbId, adAccountDbId: accId, objective: apiObjective,
-        conversionLocation: location, budgetLevel,
-        pixelId: needsPixel ? pixelId : undefined, customEvent: needsPixel ? customEvent : undefined,
-        campaignName, adsetName, adName, budgetType, amount: amt,
-        startTime: startTime ? new Date(startTime).toISOString() : undefined,
-        endTime: hasEnd && endTime ? new Date(endTime).toISOString() : undefined,
-        bidStrategy, bidAmount: bidAmount ? Number(bidAmount) : undefined,
-        specialCategories: special,
-        countries, ageMin: Number(ageMin), ageMax: Number(ageMax),
-        genders: gender === "male" ? [1] : gender === "female" ? [2] : [],
-        interests,
-        existingPostId: setup === "post" && postId ? parsePostId(postId) : undefined,
-        message: setup === "new" ? message : undefined,
-        headline: setup === "new" ? headline : undefined,
-        link: link || undefined,
-        cta: isMsg || callMode ? undefined : setup === "new" ? cta : postCta || undefined,
-        mainDestination: canCall ? mainDest : undefined,
-        phoneNumber: callMode || bothMode ? phone.trim() : undefined,
-        imageBase64: setup === "new" ? image?.b64 : undefined,
-        videoId: setup === "new" && video ? video.id : undefined,
-        connections,
-        ...(objective === "ENGAGEMENT" ? {
-          engagementLocation: engLoc, msgDestinations: engLoc === "MESSAGING" ? finalDests : undefined,
-          whatsappNumber: wa && /\d{8}/.test(wa.replace(/\D/g, "")) ? wa : undefined, 
-        } : {}),
-        ...(objective === "SALES" && needsPixel ? {
-          ...salesPayload(so, budgetType),
-          ...(so.customConversionId ? { customEvent: undefined } : {}),
-          ...(setup === "new" && !so.useCatalog && so.format === "single" ? { messages: [message, ...so.extraMessages], headlines: [headline, ...so.extraHeadlines] } : {}),
-          ...(so.advantageSales ? { budgetLevel: "campaign" } : {}),
-        } : {}),
+        action: "create", pageDbId, adAccountDbId: accId, objective,
+        campaignName, budgetLevel, specialCategories: special,
+        budgetType: cBudgetType, amount: cAmt, bidStrategy: cBidStrategy, bidAmount: cBidAmount ? Number(cBidAmount) : undefined,
+        // Legacy single-ad-set fields (first ad set) — the server uses `adsets` when present.
+        adsetName: f[0].adsetName, adName: f[0].ads[0].adName,
+        countries: f[0].countries, ageMin: Number(f[0].ageMin), ageMax: Number(f[0].ageMax),
+        genders: f[0].gender === "male" ? [1] : f[0].gender === "female" ? [2] : [], interests: f[0].interests,
+        adsets: f.map((s) => {
+          const fl = flagsFor(s);
+          return {
+            adsetName: s.adsetName, conversionLocation: s.location,
+            pixelId: fl.np ? s.pixelId : undefined, customEvent: fl.np ? s.customEvent : undefined,
+            startTime: s.startTime ? new Date(s.startTime).toISOString() : undefined,
+            endTime: s.hasEnd && s.endTime ? new Date(s.endTime).toISOString() : undefined,
+            budgetType: s.budgetType, amount: Number(s.amount) || 0,
+            bidStrategy: s.bidStrategy, bidAmount: s.bidAmount ? Number(s.bidAmount) : undefined,
+            countries: s.countries, ageMin: Number(s.ageMin), ageMax: Number(s.ageMax),
+            genders: s.gender === "male" ? [1] : s.gender === "female" ? [2] : [],
+            interests: s.interests, connections: s.connections,
+            mainDestination: fl.canC ? s.mainDest : undefined,
+            phoneNumber: fl.call || fl.both ? s.phone.trim() : undefined,
+            ...(objective === "ENGAGEMENT" ? {
+              engagementLocation: s.engLoc, msgDestinations: s.engLoc === "MESSAGING" ? fl.fd : undefined,
+              whatsappNumber: wa && /\d{8}/.test(wa.replace(/\D/g, "")) ? wa : undefined,
+            } : {}),
+            ...(objective === "SALES" && fl.np ? {
+              ...salesPayload(s.so, s.budgetType),
+              ...(s.so.customConversionId ? { customEvent: undefined } : {}),
+              ...(s.so.advantageSales ? { budgetLevel: "campaign" } : {}),
+            } : {}),
+            ads: s.ads.map((a) => ({
+              adName: a.adName,
+              existingPostId: a.setup === "post" && a.postId ? parsePostId(a.postId) : undefined,
+              message: a.setup === "new" ? a.message : undefined,
+              headline: a.setup === "new" ? a.headline : undefined,
+              link: a.link || undefined,
+              cta: fl.msg || fl.call ? undefined : a.setup === "new" ? a.cta : a.postCta || undefined,
+              imageBase64: a.setup === "new" ? a.image?.b64 : undefined,
+              videoId: a.setup === "new" && a.video ? a.video.id : undefined,
+              ...(objective === "SALES" && fl.np && a.setup === "new" ? {
+                format: s.so.useCatalog ? "catalog" : s.so.format,
+                cards: s.so.format === "carousel" && !s.so.useCatalog ? s.so.cards.map((c) => ({ imageBase64: c.b64, headline: c.headline || undefined, description: c.description || undefined, link: c.link || undefined })) : undefined,
+                description: s.so.description || undefined, displayLink: s.so.displayLink || undefined, urlTags: s.so.urlTags || undefined,
+                advantageCreative: s.so.advantageCreative,
+                ...(!s.so.useCatalog && s.so.format === "single" ? { messages: [a.message, ...s.so.extraMessages], headlines: [a.headline, ...s.so.extraHeadlines] } : {}),
+              } : {}),
+            })),
+          };
+        }),
         publish,
       });
       clearDraft();
@@ -447,11 +676,6 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   }
 
   // ================= Phase 2: 3-level editor =================
-  const tree = [
-    { icon: Folder, name: campaignName || "Campaign", err: errs.campaign, pad: "pl-3" },
-    { icon: LayoutGrid, name: adsetName || "Ad set", err: errs.adset, pad: "pl-7" },
-    { icon: FileText, name: adName || "Ad", err: errs.ad, pad: "pl-11" },
-  ];
   const fmt = (n: number) => `$${n.toFixed(2)}`;
 
   const campaignView = (
@@ -472,7 +696,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="rounded-md border border-fb-border bg-fb-bg px-3 py-2 text-[13px]">{acc ? `${acc.name} (${String(acc.account_id).replace(/^act_/, "")})` : "কোনো ad account বাছা হয়নি"}</div>
         </Field>
       </Section>
-      <Section title="Budget" ok={amt >= 1 && !overWallet} right={budgetLevel === "campaign" ? <Adv /> : null}>
+      <Section title="Budget" ok={!errs.campaign} right={budgetLevel === "campaign" ? <Adv /> : null}>
         <button type="button" onClick={() => setBudgetOpen(!budgetOpen)} className="flex w-full items-center justify-between rounded-md bg-fb-blue-soft px-3 py-2 font-semibold">
           Budget strategy <Info className="ml-1 h-3 w-3" />{budgetOpen ? <ChevronUp className="ml-auto h-4 w-4" /> : <ChevronDown className="ml-auto h-4 w-4" />}
         </button>
@@ -482,9 +706,10 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <Radio on={budgetLevel === "adset"} onClick={() => setBudgetLevel("adset")} title="Ad set budget" desc="Set different bid strategies or budget schedules for each ad set." />
           </div>
         )}
-        {budgetLevel === "campaign" && BudgetInputs()}
-        {budgetLevel === "campaign" && BidStrategy()}
-        {WalletNote()}
+        {budgetLevel === "campaign" && <BudgetInputs bt={cBudgetType} setBt={setCBudgetType} am={cAmount} setAm={setCAmount} />}
+        {budgetLevel === "campaign" && <BidStrategy bs={cBidStrategy} setBs={setCBidStrategy} ba={cBidAmount} setBa={setCBidAmount} />}
+        {budgetLevel === "adset" && <p className="text-[12px] text-fb-muted">প্রতিটা ad set-এর budget আলাদা করে সেই ad set-এর ধাপে দেবেন।</p>}
+        <WalletNote />
       </Section>
       <Section title="A/B test" right={<span className="flex items-center gap-2 text-fb-muted">Off <Switch disabled /></span>}>
         <p className="text-[12px] text-fb-muted">Compare versions of your ad to see what works best.</p>
@@ -509,45 +734,46 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     </>
   );
 
-  function BudgetInputs() {
+  function BudgetInputs({ bt, setBt, am, setAm }: { bt: "daily" | "lifetime"; setBt: (v: "daily" | "lifetime") => void; am: string; setAm: (v: string) => void }) {
+    const n = Number(am) || 0;
     return (
       <>
         <div className="grid grid-cols-2 overflow-hidden rounded-md border border-fb-border">
-          <select className="h-9 border-r border-fb-border bg-background px-3 text-[13px]" value={budgetType} onChange={(e) => { setBudgetType(e.target.value as any); if (e.target.value === "lifetime") setHasEnd(true); }}>
+          <select className="h-9 border-r border-fb-border bg-background px-3 text-[13px]" value={bt} onChange={(e) => { setBt(e.target.value as any); if (e.target.value === "lifetime") setHasEnd(true); }}>
             <option value="daily">Daily budget</option><option value="lifetime">Lifetime budget</option>
           </select>
           <div className="flex items-center px-3"><span>$</span>
-            <input type="number" min={1} step="0.01" className="h-9 w-full bg-background px-1 text-[13px] outline-none" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <input type="number" min={1} step="0.01" className="h-9 w-full bg-background px-1 text-[13px] outline-none" value={am} onChange={(e) => setAm(e.target.value)} />
             <span className="text-fb-muted">USD</span>
           </div>
         </div>
-        {budgetType === "daily" && amt > 0 && (
-          <p className="text-[12px]">We'll spend around <b>{fmt(amt)}</b> per day. Your maximum daily spend is <b>{fmt(amt * 1.75)}</b> and your maximum weekly spend is <b>{fmt(amt * 7)}</b>.</p>
+        {bt === "daily" && n > 0 && (
+          <p className="text-[12px]">We'll spend around <b>{fmt(n)}</b> per day. Your maximum daily spend is <b>{fmt(n * 1.75)}</b> and your maximum weekly spend is <b>{fmt(n * 7)}</b>.</p>
         )}
         <p className="text-[12px] text-fb-muted">Spending may be higher some days and lower on others.</p>
       </>
     );
   }
-  function BidStrategy() {
+  function BidStrategy({ bs, setBs, ba, setBa }: { bs: string; setBs: (v: string) => void; ba: string; setBa: (v: string) => void }) {
     return (
       <div className="border-t border-fb-border pt-3">
         <Field label="Campaign bid strategy">
-          <select className={sel} value={bidStrategy} onChange={(e) => setBidStrategy(e.target.value)}>
+          <select className={sel} value={bs} onChange={(e) => setBs(e.target.value)}>
             <option value="LOWEST_COST_WITHOUT_CAP">Highest volume or value</option>
             <option value="COST_CAP">Cost per result goal</option>
             <option value="LOWEST_COST_WITH_BID_CAP">Bid cap</option>
             {objective === "SALES" && <option value="LOWEST_COST_WITH_MIN_ROAS">ROAS goal</option>}
           </select>
         </Field>
-        {bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && (
-          <div className="mt-2"><Field label={bidStrategy === "COST_CAP" ? "Cost per result goal ($)" : bidStrategy === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal (যেমন 2.0)" : "Bid cap ($)"}><input type="number" className={inp} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} /></Field></div>
+        {bs !== "LOWEST_COST_WITHOUT_CAP" && (
+          <div className="mt-2"><Field label={bs === "COST_CAP" ? "Cost per result goal ($)" : bs === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal (যেমন 2.0)" : "Bid cap ($)"}><input type="number" className={inp} value={ba} onChange={(e) => setBa(e.target.value)} /></Field></div>
         )}
       </div>
     );
   }
   function WalletNote() {
     if (acc?.kind !== "shared") return null;
-    return <p className={cn("text-[12px]", overWallet ? "text-destructive" : "text-fb-muted")}>Available balance: {fmt(walletBalance)}{overWallet && " — budget balance-এর বেশি"}</p>;
+    return <p className={cn("text-[12px]", overWallet ? "text-destructive" : "text-fb-muted")}>Available balance: {fmt(walletBalance)}{overWallet && " — মোট budget balance-এর বেশি"}</p>;
   }
 
   const addCountry = () => {
@@ -609,7 +835,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         <SalesAdsetOptions o={so} set={setSo} pageDbId={pageDbId} accId={accId} pixelId={pixelId} budgetType={budgetType} />
       )}
       {objective === "ENGAGEMENT" && (
-        <Section title="Conversion" ok={!errs.adset || !!countries.length}>
+        <Section title="Conversion" ok={countries.length > 0}>
           <Field label="Conversion location">
             <div className="space-y-0.5 rounded-md border border-fb-border p-2">
               {([
@@ -686,8 +912,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       )}
       <Section title="Budget & schedule" ok={budgetType !== "lifetime" || hasEnd}>
         {budgetLevel === "campaign" ? (
-          <div><p className="font-semibold">Budget strategy</p><p className="text-[12px] text-fb-muted">Your campaign budget automatically distributes your {budgetType} budget of {fmt(amt)} across ad sets to get the best performance.</p></div>
-        ) : (<>{BudgetInputs()}{BidStrategy()}{WalletNote()}</>)}
+          <div><p className="font-semibold">Budget strategy</p><p className="text-[12px] text-fb-muted">Your campaign budget automatically distributes your {cBudgetType} budget of {fmt(cAmt)} across ad sets to get the best performance.</p></div>
+        ) : (<><BudgetInputs bt={budgetType} setBt={setBudgetType} am={amount} setAm={setAmount} /><BidStrategy bs={bidStrategy} setBs={setBidStrategy} ba={bidAmount} setBa={setBidAmount} /><WalletNote /></>)}
         <p className="pt-2 font-semibold">Schedule</p>
         <Field label="Start date"><input type="datetime-local" className={inp} value={startTime} onChange={(e) => setStartTime(e.target.value)} /></Field>
         <label className="flex items-center gap-2"><input type="checkbox" checked={hasEnd} disabled={budgetType === "lifetime"} onChange={(e) => setHasEnd(e.target.checked)} />Set an end date</label>
@@ -753,6 +979,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         <Radio on={placements === "auto"} onClick={() => setPlacements("auto")} title="Advantage+ placements (recommended)" desc="Use Advantage+ placements to maximize your budget and help show your ads to more people." />
         <Radio on={placements === "manual"} onClick={() => setPlacements("auto")} disabled title="Manual placements" desc="শীঘ্রই আসছে" />
       </Section>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={addAdset} className="inline-flex h-9 items-center gap-1 rounded-md border border-fb-border bg-background px-3 text-[13px] font-semibold text-fb-blue hover:bg-fb-bg"><Plus className="h-4 w-4" />আরেকটা Ad set যোগ করুন</button>
+        {adsets.length > 1 && (
+          <button type="button" onClick={() => removeAdset(selPos.a)} className="inline-flex h-9 items-center gap-1 rounded-md border border-destructive/40 bg-background px-3 text-[13px] font-semibold text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" />এই Ad set মুছুন</button>
+        )}
+      </div>
     </>
   );
 
@@ -903,6 +1135,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           </div>
         </Section>
       )}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={addAd} className="inline-flex h-9 items-center gap-1 rounded-md border border-fb-border bg-background px-3 text-[13px] font-semibold text-fb-blue hover:bg-fb-bg"><Plus className="h-4 w-4" />এই Ad set-এ আরেকটা Ad যোগ করুন</button>
+        {(adsets[selPos.a]?.ads.length ?? 1) > 1 && (
+          <button type="button" onClick={() => removeAd(selPos.d)} className="inline-flex h-9 items-center gap-1 rounded-md border border-destructive/40 bg-background px-3 text-[13px] font-semibold text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" />এই Ad মুছুন</button>
+        )}
+      </div>
     </>
   );
 
@@ -937,47 +1175,86 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     <Section title="Review">
       {[
         ["Campaign", `${campaignName} · ${label}`],
-        ["Budget", `${fmt(amt)} ${budgetType} · ${budgetLevel === "campaign" ? "Campaign budget" : "Ad set budget"}`],
+        ["Budget", budgetLevel === "campaign" ? `${fmt(cAmt)} ${cBudgetType} · Campaign budget` : `প্রতিটা ad set-এর নিজের budget`],
         ["Ad account", acc ? `${acc.name} (${acc.account_id})` : "—"],
-        ["Ad set", `${adsetName} · ${countries.join(", ")} · ${ageMin}-${ageMax}`],
-        needsPixel ? ["Dataset", `${pixels?.find((p) => p.id === pixelId)?.name ?? "—"} · ${customEvent}`] : null,
-        ["Ad", `${adName} · ${page?.page_name ?? "No page"} · ${setup === "post" ? "Existing post" : "New creative"}`],
-      ].filter(Boolean).map((r: any) => (
-        <div key={r[0]} className="flex justify-between gap-3 border-b border-fb-border pb-2 last:border-0"><span className="font-semibold">{r[0]}</span><span className="text-right text-fb-muted">{r[1]}</span></div>
+      ].map((r) => (
+        <div key={r[0]} className="flex justify-between gap-3 border-b border-fb-border pb-2"><span className="font-semibold">{r[0]}</span><span className="text-right text-fb-muted">{r[1]}</span></div>
       ))}
+      {fAll.map((s, i) => {
+        const fl = flagsFor(s);
+        return (
+          <div key={i} className="border-b border-fb-border pb-2 last:border-0">
+            <p className="font-semibold">Ad set {i + 1}: {s.adsetName}</p>
+            <p className="text-fb-muted">
+              {s.countries.join(", ")} · Age {s.ageMin}-{s.ageMax}
+              {budgetLevel === "adset" ? ` · ${fmt(Number(s.amount) || 0)} ${s.budgetType}` : ""}
+              {fl.np ? ` · ${pixels?.find((p) => p.id === s.pixelId)?.name ?? "Dataset"} · ${s.customEvent}` : ""}
+            </p>
+            {s.ads.map((a, j) => (
+              <p key={j} className="text-fb-muted">• {a.adName} · {page?.page_name ?? "No page"} · {a.setup === "post" ? "Existing post" : "New creative"}</p>
+            ))}
+          </div>
+        );
+      })}
     </Section>
   );
+
+  const curAdset = fAll[selPos.a];
+  const curAd = curAdset?.ads[selPos.d];
 
   return (
     <div className="fixed inset-0 z-50 flex h-[100dvh] bg-fb-bg font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
       {/* Left tree */}
-      <aside className="hidden w-72 shrink-0 border-r border-fb-border bg-background md:block">
+      <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-fb-border bg-background md:block">
         <div className="flex h-12 items-center border-b border-fb-border px-2">
           <button onClick={askClose} className="rounded-md p-2 hover:bg-fb-bg"><X className="h-5 w-5" /></button>
         </div>
-        {tree.map((t, i) => (
-          <button key={i} onClick={() => { setLevel(i as any); setTab("edit"); }}
-            className={cn("flex w-full items-center gap-2 py-2.5 pr-3 text-left text-[13px]", t.pad, level === i ? "bg-fb-blue-soft font-semibold" : "hover:bg-fb-bg")}>
-            <t.icon className={cn("h-4 w-4 shrink-0", level === i ? "text-fb-blue" : "text-fb-muted")} />
-            <span className="truncate">{t.name}</span>
-            {t.err ? <AlertCircle className="ml-auto h-4 w-4 shrink-0 text-destructive" /> : <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-fb-muted" />}
-          </button>
+        <button onClick={gotoCampaign}
+          className={cn("flex w-full items-center gap-2 py-2.5 pl-3 pr-3 text-left text-[13px]", level === 0 ? "bg-fb-blue-soft font-semibold" : "hover:bg-fb-bg")}>
+          <Folder className={cn("h-4 w-4 shrink-0", level === 0 ? "text-fb-blue" : "text-fb-muted")} />
+          <span className="truncate">{campaignName || "Campaign"}</span>
+          {errs.campaign ? <AlertCircle className="ml-auto h-4 w-4 shrink-0 text-destructive" /> : <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-fb-muted" />}
+        </button>
+        {fAll.map((s, i) => (
+          <div key={i}>
+            <button onClick={() => goto(i, -1)}
+              className={cn("flex w-full items-center gap-2 py-2.5 pl-7 pr-3 text-left text-[13px]", level === 1 && selPos.a === i ? "bg-fb-blue-soft font-semibold" : "hover:bg-fb-bg")}>
+              <LayoutGrid className={cn("h-4 w-4 shrink-0", level === 1 && selPos.a === i ? "text-fb-blue" : "text-fb-muted")} />
+              <span className="truncate">{s.adsetName || `Ad set ${i + 1}`}</span>
+              {adsetErr(s) ? <AlertCircle className="ml-auto h-4 w-4 shrink-0 text-destructive" /> : <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-fb-muted" />}
+            </button>
+            {s.ads.map((a, j) => (
+              <button key={j} onClick={() => goto(i, j)}
+                className={cn("flex w-full items-center gap-2 py-2.5 pl-11 pr-3 text-left text-[13px]", level === 2 && selPos.a === i && selPos.d === j ? "bg-fb-blue-soft font-semibold" : "hover:bg-fb-bg")}>
+                <FileText className={cn("h-4 w-4 shrink-0", level === 2 && selPos.a === i && selPos.d === j ? "text-fb-blue" : "text-fb-muted")} />
+                <span className="truncate">{a.adName || `Ad ${j + 1}`}</span>
+                {adErr(a, s) ? <AlertCircle className="ml-auto h-4 w-4 shrink-0 text-destructive" /> : <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-fb-muted" />}
+              </button>
+            ))}
+          </div>
         ))}
+        <button onClick={addAdset} className="flex w-full items-center gap-2 py-2.5 pl-7 pr-3 text-left text-[13px] font-semibold text-fb-blue hover:bg-fb-bg">
+          <Plus className="h-4 w-4 shrink-0" />Ad set যোগ করুন
+        </button>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="flex h-12 items-center gap-1 overflow-x-auto border-b border-fb-border bg-background px-2 text-[13px] sm:gap-2 sm:px-3">
           <button onClick={askClose} className="shrink-0 rounded-md p-1.5 hover:bg-fb-bg md:hidden"><X className="h-5 w-5" /></button>
-          {tree.map((t, i) => (
-            <span key={i} className="flex min-w-0 shrink-0 items-center gap-1">
-              {i > 0 && <span className="text-fb-muted">›</span>}
-              <button onClick={() => { setLevel(i as any); setTab("edit"); }} className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-1", level === i ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
-                <t.icon className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[90px] truncate sm:max-w-[140px]">{i === 0 ? t.name : i === 1 ? "1 Ad set" : "1 Ad"}</span>
-                {t.err ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive md:hidden" /> : null}
-              </button>
-            </span>
-          ))}
+          <span className="flex min-w-0 shrink-0 items-center gap-1">
+            <button onClick={gotoCampaign} className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-1", level === 0 ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
+              <Folder className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[90px] truncate sm:max-w-[140px]">{campaignName || "Campaign"}</span>
+            </button>
+            <span className="text-fb-muted">›</span>
+            <button onClick={() => goto(selPos.a, -1)} className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-1", level === 1 ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
+              <LayoutGrid className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[90px] truncate sm:max-w-[140px]">{curAdset?.adsetName || "Ad set"}{fAll.length > 1 ? ` (${selPos.a + 1}/${fAll.length})` : ""}</span>
+            </button>
+            <span className="text-fb-muted">›</span>
+            <button onClick={() => goto(selPos.a, selPos.d)} className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-1", level === 2 ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
+              <FileText className="h-3.5 w-3.5 shrink-0" /><span className="max-w-[90px] truncate sm:max-w-[140px]">{curAd?.adName || "Ad"}{(curAdset?.ads.length ?? 1) > 1 ? ` (${selPos.d + 1}/${curAdset?.ads.length})` : ""}</span>
+            </button>
+          </span>
           <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-fb-muted sm:flex"><span className="h-2.5 w-2.5 rounded-full border border-fb-muted" />In draft</span>
         </header>
         <div className="flex justify-center gap-2 border-b border-fb-border bg-background py-1.5">
@@ -1018,7 +1295,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <p className="flex items-center gap-2 font-semibold text-destructive"><AlertCircle className="h-4 w-4" />Publish করার আগে যা বাকি ({missing.length})</p>
                   <ul className="mt-2 space-y-1">
                     {missing.map((m, i) => (
-                      <li key={i}><button onClick={() => { setLevel(m.lv); setTab("edit"); }} className="text-left hover:underline">• {m.t} <span className="text-fb-muted">({m.lv === 0 ? "Campaign" : m.lv === 1 ? "Ad set" : "Ad"})</span></button></li>
+                      <li key={i}><button onClick={m.go} className="text-left hover:underline">• {m.t}</button></li>
                     ))}
                   </ul>
                 </div>
@@ -1034,9 +1311,9 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <span className="hidden items-center gap-1 text-fb-green sm:flex"><Check className="h-4 w-4" />All edits saved</span>
           {level === 2 && <span className="hidden text-[11px] text-fb-muted lg:inline">By clicking Publish, you acknowledge the Terms and Conditions.</span>}
           <div className="flex flex-1 gap-2 sm:ml-auto sm:flex-none">
-            {level > 0 && <button onClick={() => setLevel((level - 1) as any)} className="h-10 flex-1 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg sm:h-9 sm:flex-none sm:px-4">Back</button>}
+            {level > 0 && <button onClick={() => (level === 2 ? goto(selPos.a, -1) : gotoCampaign())} className="h-10 flex-1 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg sm:h-9 sm:flex-none sm:px-4">Back</button>}
             {level < 2 ? (
-              <button onClick={() => { setLevel((level + 1) as any); setTab("edit"); }} className="h-10 flex-1 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground sm:h-9 sm:flex-none">Next</button>
+              <button onClick={() => (level === 0 ? goto(selPos.a, -1) : goto(selPos.a, selPos.d))} className="h-10 flex-1 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground sm:h-9 sm:flex-none">Next</button>
             ) : (
               <>
                 <button disabled={saving} onClick={keepDraft} className="h-10 flex-1 rounded-md border border-fb-border px-2 font-semibold hover:bg-fb-bg disabled:opacity-50 sm:h-9 sm:flex-none sm:px-4">Draft</button>
@@ -1067,3 +1344,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     </div>
   );
 }
+
+// Used when restoring old drafts that predate some ad-set fields.
+const defaultAdsetShape = {
+  location: "WEBSITE", pixelId: "", customEvent: "PURCHASE", hasEnd: false, endTime: "",
+  countries: ["BD"], ageMin: "18", ageMax: "65", gender: "all", interests: [], connections: "all",
+  mainDest: "WEBSITE", phone: "", engLoc: "MESSAGING", destMode: "auto", dests: ["MESSENGER"],
+  budgetType: "daily", amount: "5.00", bidStrategy: "LOWEST_COST_WITHOUT_CAP", bidAmount: "",
+} as const;
