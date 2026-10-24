@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import { FACEBOOK_CONNECT_SCOPES } from "./facebookPermissions";
 
 describe("Facebook campaign connection permissions", () => {
   it("requests ads_management to run campaigns", () => {
-    expect(FACEBOOK_CONNECT_SCOPES.split(",")).toContain("ads_management");
+    assert.equal(FACEBOOK_CONNECT_SCOPES.split(",").includes("ads_management"), true);
   });
 
   it("requests ads_read to read campaigns", () => {
-    expect(FACEBOOK_CONNECT_SCOPES.split(",")).toContain("ads_read");
+    assert.equal(FACEBOOK_CONNECT_SCOPES.split(",").includes("ads_read"), true);
   });
 });
