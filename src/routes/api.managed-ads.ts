@@ -531,12 +531,26 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined);
     const pageId = info.id;
     let already = false;
-    try {
-      await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
-    } catch (e: any) {
-      const msg = String(e?.message || "");
-      if (/already/i.test(msg)) already = true;
-      else throw new Error(`Facebook request পাঠাতে পারেনি: ${msg}`);
+    let granted = false;
+    // 1) Client is the Page admin and connected Facebook: grant our BM directly with their Page login (no approval needed).
+    if (await savedPageToken(supabaseAdmin, pageId, targetUser)) {
+      const problem = await ensurePageAccess(g, supabaseAdmin, pageId, targetUser, bmId);
+      if (!problem) granted = true;
+    }
+    // 2) Otherwise send a BM request that the Page admin approves on Facebook.
+    if (!granted) {
+      try {
+        await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
+      } catch (e: any) {
+        const msg = String(e?.message || "");
+        if (/already/i.test(msg)) already = true;
+        else {
+          const hasLogin = !!(await savedPageToken(supabaseAdmin, pageId, targetUser));
+          throw new Error(hasLogin
+            ? `Facebook নিজে থেকে access দিতে ও request পাঠাতে দুটোই রাজি হয়নি: ${msg}। Page কোনো Business portfolio-র মালিকানায় থাকলে সেই Business-এর admin-কে Settings → Requests থেকে approve করতে হবে।`
+            : `Facebook request পাঠাতে পারেনি: ${msg}। সহজ উপায়: ‘Facebook থেকে Page ও ID আনুন’ চেপে Page-এর admin Facebook দিয়ে login করুন ও এই Page-এ টিক দিন — তাহলে request ছাড়াই access নিজে থেকে যুক্ত হবে।`);
+        }
+      }
     }
     const { data: ex } = await supabaseAdmin.from("client_facebook_pages").select("id").eq("user_id", targetUser).eq("page_id", pageId).maybeSingle();
     if (!ex) await supabaseAdmin.from("client_facebook_pages").insert({ user_id: targetUser, page_id: pageId, page_name: info?.name || `Page ${pageId}`, page_url: info?.link || raw, ad_account_id: wantAcc } as any);
