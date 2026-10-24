@@ -477,6 +477,7 @@ export default function MyAdsPage() {
             </div>
             {quickFilters}
             <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {sortPicker}
             {(quick === "all" ? drafts : []).map((d) => (
               <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -568,7 +569,10 @@ export default function MyAdsPage() {
 
         {/* Filter chips + search */}
         <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
-          {quickFilters}
+          <div className="flex flex-wrap items-center gap-2">
+            {quickFilters}
+            {sortPicker}
+          </div>
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
