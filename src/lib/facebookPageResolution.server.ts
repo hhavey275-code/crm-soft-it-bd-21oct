@@ -37,10 +37,11 @@ export async function resolveFacebookPage(input: string, bm: GraphReader, client
   if (client) {
     let after: string | undefined;
     for (let i = 0; i < 5; i++) {
-      const result = await client.get("me/accounts", { fields: "id,name,link", limit: "100", ...(after ? { after } : {}) }).catch(() => null);
+      const result = await client.get("me/accounts", { fields: "id,name,link,username", limit: "100", ...(after ? { after } : {}) }).catch(() => null);
       if (!result) break;
       const page = (result.data ?? []).find((p: any) => {
         if (String(p.id) === ref) return true;
+        if (p.username && String(p.username).toLowerCase() === ref.toLowerCase()) return true;
         try { return p.link && facebookPageReference(p.link).toLowerCase() === ref.toLowerCase(); } catch { return false; }
       });
       if (page) return { id: String(page.id), name: page.name, link: page.link };
