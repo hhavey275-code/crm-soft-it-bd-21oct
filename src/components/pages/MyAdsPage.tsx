@@ -118,6 +118,8 @@ export default function MyAdsPage() {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    // Date changes keep the same account's rows on screen (only the thin bar shows); an account switch clears them so the full loader appears.
+    placeholderData: (prev: any, prevQuery: any) => (prevQuery?.queryKey?.[2] === accSel ? prev : undefined),
     enabled: !!uid && !onAccountPicker,
   });
   const refetch = () => { forceFresh.current = true; return refetchQuery(); };
@@ -439,7 +441,6 @@ export default function MyAdsPage() {
         {wizard}
         {deleteDialog}
         {isFetching && !data && <MetaLoading />}
-        {isFetching && <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
           <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
@@ -458,6 +459,7 @@ export default function MyAdsPage() {
               </div>
             </div>
             <FbDateRangePicker value={range} onChange={setRange} />
+            {isFetching && data && <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
           </div>
           <div className="space-y-3 px-3">
             {blockedBanner}
@@ -543,7 +545,6 @@ export default function MyAdsPage() {
       {wizard}
       {deleteDialog}
       {isFetching && !data && <MetaLoading />}
-      {isFetching && <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
@@ -608,7 +609,8 @@ export default function MyAdsPage() {
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {blockedBanner && <div className="bg-background border-x border-t border-fb-border px-2 pt-2 sm:px-4">{blockedBanner}</div>}
         {/* Action toolbar */}
-        <div className="flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
+        <div className="relative flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
+          {isFetching && data && <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
           <Button onClick={startNew} disabled={createDisabled} title={createDisabled ? availability.title : undefined}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
             <Plus className="h-4 w-4" />Create
