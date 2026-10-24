@@ -1,6 +1,9 @@
 # Roadmap
 
 ## Open tasks
+- [x] Make My Ads Active/Had delivery filters consistent and add confirmed Meta deletion for campaigns, ad sets and ads. Fifteen filter, cache and existing permission/availability tests passed.
+- [ ] Verify Active filtering and real Meta deletion while signed in. Blocker: external Supabase authentication unavailable in sandbox; /my-ads redirects to /auth. No live ads were deleted during testing.
+- [x] Explain legitimate Meta app tester setup and its limits; current My Ads mutations still use saved BM credentials, not client Facebook consent tokens.
 - [x] Request ads_management and ads_read in both client Facebook connection flows; existing OAuth callback auto-connects Pages for My Ads. Permission and availability tests: 9 passed.
 - [ ] Verify Facebook consent → saved Page → campaign creation with a real client. Blocker: external Supabase session and client's Facebook consent unavailable in sandbox; Meta App Advanced Access/Live settings remain unverified.
 - [x] Diagnose Softmatic/Branding Solution account rename failure and show the actual server error instead of generic non-2xx. Meta permission remains an owner-controlled blocker; rename logs also show an invalid placeholder proxy URL (2026-10-20).

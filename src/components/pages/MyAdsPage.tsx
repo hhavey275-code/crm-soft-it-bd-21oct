@@ -26,6 +26,8 @@ import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { myAdsAvailability } from "@/lib/myAdsAvailability";
 import { MetaLoading } from "@/components/ads-manager/MetaLoading";
+import { matchesAdsFilter, removeAdsObject } from "@/lib/myAdsRows";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -49,6 +51,7 @@ export default function MyAdsPage() {
   const [search, setSearch] = useState("");
   const [quick, setQuick] = useState<"all" | "active" | "delivery">("all");
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ level: Level; objects: any[] } | null>(null);
   const [lastManual, setLastManual] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState<string | null>(null);
@@ -113,7 +116,7 @@ export default function MyAdsPage() {
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
   ));
   const rows = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
-    (quick === "all" || (quick === "active" ? r.status === "ACTIVE" : Number(r.insights?.impressions || r.insights?.spend || 0) > 0)) &&
+    matchesAdsFilter(r, quick) &&
     (!search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase())),
   );
 
@@ -156,7 +159,7 @@ export default function MyAdsPage() {
   const currentAccId: string | undefined = accSel ?? data?.selectedAccountId ?? accounts[0]?.id;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
   const isShared = currentAcc?.kind === "shared";
-  const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); };
+  const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); setSelAds([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
   const summaryIds = accounts
     .filter((a) => !accSearch.trim() || `${a.name} ${a.account_id}`.toLowerCase().includes(accSearch.trim().toLowerCase()))
@@ -227,6 +230,61 @@ export default function MyAdsPage() {
     t.spend += Number(r.insights?.spend || 0); t.impr += Number(r.insights?.impressions || 0);
     t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
   }, { spend: 0, impr: 0, reach: 0, results: 0 });
+  const deleteObjects = async () => {
+    if (!deleteTarget || busy) return;
+    const { level, objects } = deleteTarget;
+    const queryKey = ["managed-ads-list", dates, accSel];
+    setBusy("deleting");
+    const failed: any[] = [];
+    let deleted = 0;
+    for (const object of objects) {
+      try {
+        await managedAds({ action: "delete", level, objectId: String(object.id), adAccountDbId: object.ad_account_db_id });
+        qc.setQueryData(queryKey, (old: any) => old ? removeAdsObject(old, level, String(object.id)) : old);
+        deleted += 1;
+      } catch (error: any) {
+        failed.push(object);
+        toast.error(`${object.name}: ${error.message}`);
+      }
+    }
+    // Failed objects remain available to retry; successful ones disappear only after Meta confirms.
+    const failedIds = failed.map(object => String(object.id));
+    if (level === "campaign") { setSelCampaigns(failedIds); setSelAdsets([]); setSelAds([]); }
+    else if (level === "adset") { setSelAdsets(failedIds); setSelAds([]); }
+    else setSelAds(failedIds);
+    setDeleteTarget(failed.length ? { level, objects: failed } : null);
+    setBusy(null);
+    if (deleted) toast.success(`${deleted}টি ${level === "campaign" ? "campaign" : level === "adset" ? "ad set" : "ad"} মুছে ফেলা হয়েছে`);
+    if (deleted) {
+      qc.invalidateQueries({ queryKey: ["managed-ads-list"] });
+      qc.invalidateQueries({ queryKey: ["managed-ads-cur-summary"] });
+      qc.invalidateQueries({ queryKey: ["managed-ads-acc-summary"] });
+    }
+  };
+  const deleteDialog = (
+    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !busy) setDeleteTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {deleteTarget?.level === "campaign" ? "campaign" : deleteTarget?.level === "adset" ? "ad set" : "ad"}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {deleteTarget?.objects.map(object => object.name).join(", ")} — Facebook থেকেও মুছে যাবে।
+            {deleteTarget?.level !== "ad" && " এর নিচের বিজ্ঞাপনগুলোও মুছে যাবে।"} এটি ফিরিয়ে আনা যাবে না।
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={!!busy}>Cancel</AlertDialogCancel>
+          <Button variant="destructive" disabled={!!busy} onClick={deleteObjects}><Trash2 className="h-4 w-4" />{busy === "deleting" ? "Deleting…" : "Delete"}</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+  const quickFilters = (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {([["all", "All ads"], ["active", "Active ads"], ["delivery", "Had delivery"]] as const).map(([key, label]) => (
+        <Button key={key} variant="outline" aria-pressed={quick === key} onClick={() => setQuick(key)} className={cn("h-9 px-3 text-[13px]", quick === key && "border-fb-blue bg-fb-blue-soft text-fb-blue")}>{label}</Button>
+      ))}
+    </div>
+  );
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
   const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
@@ -281,11 +339,11 @@ export default function MyAdsPage() {
       );
     }
     const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
-    const q = search.trim().toLowerCase();
-    const mcamps = campaigns.filter((c) => !q || c.name?.toLowerCase().includes(q));
+    const mcamps = campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase())));
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
+        {deleteDialog}
         {isFetching && <MetaLoading />}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
@@ -341,8 +399,9 @@ export default function MyAdsPage() {
             <div className="flex items-center justify-between pt-1">
               <h2 className="text-2xl font-bold">Campaigns</h2>
             </div>
+            {quickFilters}
             <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
-            {drafts.map((d) => (
+            {(quick === "all" ? drafts : []).map((d) => (
               <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
                   <button className="min-w-0 text-left" onClick={() => openDraft(d)}>
@@ -366,7 +425,8 @@ export default function MyAdsPage() {
                       <p className="text-[17px] leading-snug">{c.name}</p>
                       <p className="flex items-center gap-1.5 text-[13px]"><span className={cn("h-2.5 w-2.5 rounded-full", dot)} /><span className={dv.tone === "green" ? "text-fb-green" : "text-fb-muted"}>{dv.label}</span><span className="text-fb-muted">{String(c.objective || "").replace("OUTCOME_", "").toLowerCase()}</span></p>
                     </button>
-                    <Switch checked={on} disabled={busy === c.id} onCheckedChange={(v) => toggle("campaign", c, v)} />
+                    <Button variant="ghost" size="icon" title="Delete campaign" aria-label={`Delete ${c.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: "campaign", objects: [c] })}><Trash2 className="h-4 w-4" /></Button>
+                    <Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle("campaign", c, v)} />
                   </div>
                   <div className="mt-3 grid grid-cols-3 divide-x divide-fb-border">
                     <div className="pr-2"><p className="text-lg font-bold">{res.count ? num(res.count) : "—"}</p><p className="text-[12px] text-fb-muted">Results</p></div>
@@ -385,6 +445,7 @@ export default function MyAdsPage() {
   return (
     <DashboardLayout fullBleed hideChat>
       {wizard}
+      {deleteDialog}
       {isFetching && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
@@ -429,11 +490,7 @@ export default function MyAdsPage() {
 
         {/* Filter chips + search */}
         <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
-          <div className="hidden flex-wrap gap-2 pt-1 sm:flex">
-            {([["all", "All ads"], ["active", "Active ads"], ["delivery", "Had delivery"]] as const).map(([k, l]) => (
-              <button key={k} type="button" onClick={() => setQuick(k)} className={quick === k ? "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border-2 border-fb-blue bg-fb-blue-soft text-[13px] font-semibold text-fb-blue" : tbBtn}>{l}</button>
-            ))}
-          </div>
+          {quickFilters}
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
@@ -479,6 +536,10 @@ export default function MyAdsPage() {
             }}>
             <Pencil className="h-4 w-4" />Edit
           </button>
+          <Button variant="outline" className={tbBtn} title="Delete selected" disabled={!sel.length || !!busy || isFetching}
+            onClick={() => { const objects = rows.filter(row => sel.includes(String(row.id))); if (objects.length) setDeleteTarget({ level: tab, objects }); }}>
+            <Trash2 className="h-4 w-4" />Delete
+          </Button>
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length}</button>}
           <div className="ml-auto flex gap-2">
             <ColumnsPicker keys={extra.keys} toggle={extra.toggle} className={tbBtn} />
@@ -491,7 +552,7 @@ export default function MyAdsPage() {
           <table className="w-full border-collapse text-[13px]">
             <thead className="sticky top-0 z-10 bg-background shadow-[0_1px_0_var(--color-fb-border)]">
               <tr>
-                {tab !== "ad" && <th className={cn(th, "w-10")} />}
+                <th className={cn(th, "w-10")} />
                 <th className={cn(th, "w-16")}>Off / On</th>
                 <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
                 <th className={cn(th, "text-fb-blue")}>Delivery</th>
@@ -509,7 +570,7 @@ export default function MyAdsPage() {
             </thead>
             <tbody>
               {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
-              {tab === "campaign" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
+              {tab === "campaign" && quick === "all" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
                 <tr key={d.id} className="border-b border-fb-border hover:bg-fb-blue-soft/50">
                   <td className={td} />
                   <td className={td}><Switch checked={false} disabled /></td>
@@ -538,13 +599,11 @@ export default function MyAdsPage() {
                 const canBudget = tab === "adset" && (r.daily_budget || r.lifetime_budget);
                 return (
                   <tr key={r.id} className={cn("border-b border-fb-border hover:bg-fb-blue-soft/50", i % 2 && "bg-fb-bg/50")}>
-                    {tab !== "ad" && (
-                      <td className={td}>
+                    <td className={td}>
                         <input type="checkbox" className="h-4 w-4 accent-fb-blue" checked={sel.includes(String(r.id))}
                           onChange={(e) => setSel((s) => e.target.checked ? [...s, String(r.id)] : s.filter((x) => x !== String(r.id)))} />
                       </td>
-                    )}
-                    <td className={td}><Switch checked={on} disabled={busy === r.id} onCheckedChange={(v) => toggle(tab, r, v)} className="data-[state=checked]:bg-fb-blue" /></td>
+                    <td className={td}><Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle(tab, r, v)} className="data-[state=checked]:bg-fb-blue" /></td>
                     <td className={cn(td, "whitespace-normal")}>
                       <div className="flex items-center gap-2">
                         {tab === "ad" && r.thumbnail_url && <img src={r.thumbnail_url} alt="" className="h-9 w-9 rounded object-cover" />}
@@ -554,6 +613,7 @@ export default function MyAdsPage() {
                             else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
                           }}>{r.name}</button>
                         <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => { const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id)); if (c) setEditCampaign(c); }}><Pencil className="h-3 w-3" /></button>
+                        <Button variant="ghost" size="icon" title="Delete" aria-label={`Delete ${r.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: tab, objects: [r] })} className="h-7 w-7 text-fb-muted hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </td>
                     <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-3 w-3 rounded-full", dot)} />{deliv}</span></td>
@@ -587,14 +647,14 @@ export default function MyAdsPage() {
             {rows.length > 0 && (
               <tfoot className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_var(--color-fb-border)]">
                 <tr className="font-semibold">
-                  {tab !== "ad" && <td className={td} />}
+                  <td className={td} />
                   <td className={td} />
                   <td className={td}>Results from {rows.length} {levelName}</td>
                   <td className={td} />
                   <td className={td}>Multiple attribution settings</td>
                   <td className={cn(td, "text-right")}>{num(rowTotals.results)}<span className={sub}>Results</span></td>
                   <td className={cn(td, "text-right")}>{rowTotals.results ? money(rowTotals.spend / rowTotals.results) : "—"}<span className={sub}>Per result</span></td>
-                  {tab !== "ad" && <td className={td} />}
+                  <td className={td} />
                   <td className={cn(td, "text-right")}>{money(rowTotals.spend)}<span className={sub}>Total spent</span></td>
                   <td className={cn(td, "text-right")}>{num(rowTotals.impr)}<span className={sub}>Total</span></td>
                   <td className={cn(td, "text-right")}>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></td>
