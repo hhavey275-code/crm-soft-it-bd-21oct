@@ -9,6 +9,78 @@ import { tokenFor, loadOwned, walletBalance, ownAccounts, sharedAccountIds } fro
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
+// Shared enums for the create payload (top-level legacy fields + per-ad-set/ad items).
+const CTA_ENUM = z.enum(["SHOP_NOW", "LEARN_MORE", "SIGN_UP", "ORDER_NOW", "BUY_NOW", "CONTACT_US", "SEND_MESSAGE", "MESSAGE_PAGE", "GET_OFFER", "BOOK_TRAVEL", "SEE_MORE", "SUBSCRIBE", "DOWNLOAD", "APPLY_NOW", "GET_QUOTE", "BOOK_NOW", "SEE_MENU", "WATCH_MORE", "GET_STARTED", "INQUIRE_NOW", "REQUEST_TIME", "DONATE_NOW", "GET_SHOWTIMES", "LISTEN_NOW", "PLAY_GAME", "INSTALL_APP", "USE_APP", "NO_BUTTON"]);
+const EVENT_ENUM = z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT", "VIEW_CONTENT", "ADD_PAYMENT_INFO", "ADD_TO_WISHLIST", "SEARCH", "START_TRIAL", "SUBSCRIBE", "SUBMIT_APPLICATION", "SCHEDULE", "DONATE", "FIND_LOCATION", "CUSTOMIZE_PRODUCT", "OTHER"]);
+const BID_ENUM = z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"]);
+const PLACEMENTS_SCHEMA = z.object({
+  publisher_platforms: z.array(z.string().max(30)).max(6),
+  facebook_positions: z.array(z.string().max(40)).max(20).optional(),
+  instagram_positions: z.array(z.string().max(40)).max(20).optional(),
+  messenger_positions: z.array(z.string().max(40)).max(10).optional(),
+  audience_network_positions: z.array(z.string().max(40)).max(10).optional(),
+});
+const AD_SCHEDULE_SCHEMA = z.array(z.object({ days: z.array(z.number().int().min(0).max(6)).min(1), start_minute: z.number().int().min(0).max(1440), end_minute: z.number().int().min(0).max(1440) })).max(20);
+
+// One ad inside an ad set (multi-ad campaigns).
+const adInSchema = z.object({
+  adName: z.string().min(1).max(200),
+  existingPostId: z.string().max(80).optional(),
+  message: z.string().max(5000).optional(),
+  headline: z.string().max(255).optional(),
+  link: z.string().max(1000).optional(),
+  cta: CTA_ENUM.optional(),
+  imageBase64: z.string().max(8_000_000).optional(),
+  videoId: z.string().regex(/^\d+$/).optional(),
+  videoPath: z.string().max(300).regex(/^[0-9a-f-]{36}\/[\w.-]+$/).optional(),
+  messages: z.array(z.string().max(5000)).max(5).optional(),
+  headlines: z.array(z.string().max(255)).max(5).optional(),
+  description: z.string().max(255).optional(),
+  displayLink: z.string().max(200).optional(),
+  urlTags: z.string().max(1000).optional(),
+  advantageCreative: z.boolean().default(false),
+  format: z.enum(["single", "carousel", "catalog"]).default("single"),
+  cards: z.array(z.object({ imageBase64: z.string().max(6_000_000), headline: z.string().max(255).optional(), description: z.string().max(255).optional(), link: z.string().max(1000).optional() })).max(10).optional(),
+});
+
+// One ad set with its own audience/budget/schedule and its ads.
+const adsetInSchema = z.object({
+  adsetName: z.string().min(1).max(200),
+  conversionLocation: z.enum(["WEBSITE", "MESSAGING"]).default("WEBSITE"),
+  pixelId: z.string().regex(/^\d+$/).optional(),
+  customEvent: EVENT_ENUM.optional(),
+  customConversionId: z.string().regex(/^\d+$/).optional(),
+  performanceGoal: z.enum(["CONVERSIONS", "VALUE"]).default("CONVERSIONS"),
+  attribution: z.enum(["7C1V", "7C", "1C", "1C1V"]).default("7C1V"),
+  advantageSales: z.boolean().default(false),
+  advantageAudience: z.boolean().default(false),
+  customAudiences: z.array(z.string().regex(/^\d+$/)).max(50).default([]),
+  excludedAudiences: z.array(z.string().regex(/^\d+$/)).max(50).default([]),
+  locales: z.array(z.number().int()).max(50).default([]),
+  placements: PLACEMENTS_SCHEMA.optional(),
+  adSchedule: AD_SCHEDULE_SCHEMA.optional(),
+  catalogId: z.string().regex(/^\d+$/).optional(),
+  productSetId: z.string().regex(/^\d+$/).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  budgetType: z.enum(["daily", "lifetime"]),
+  amount: z.number().min(1).max(100000),
+  bidStrategy: BID_ENUM,
+  bidAmount: z.number().positive().optional(),
+  countries: z.array(z.string().length(2)).min(1).max(25),
+  ageMin: z.number().int().min(18).max(65),
+  ageMax: z.number().int().min(18).max(65),
+  genders: z.array(z.union([z.literal(1), z.literal(2)])).max(2),
+  interests: z.array(z.object({ id: z.string(), name: z.string(), type: z.string().max(40).optional() })).max(25),
+  connections: z.enum(["all", "include", "exclude"]).default("all"),
+  msgDestinations: z.array(z.enum(["MESSENGER", "WHATSAPP"])).max(2).optional(),
+  whatsappNumber: z.string().max(30).optional(),
+  phoneNumber: z.string().max(30).optional(),
+  mainDestination: z.enum(["WEBSITE", "CALL", "BOTH"]).optional(),
+  engagementLocation: z.enum(["ON_AD", "MESSAGING", "WEBSITE", "CALLS", "PAGE_LIKES", "EVENT"]).optional(),
+  ads: z.array(adInSchema).min(1).max(10),
+});
+
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("accounts"), asUserId: z.string().uuid().optional() }),
@@ -109,6 +181,8 @@ const schema = z.discriminatedUnion("action", [
     videoId: z.string().regex(/^\d+$/).optional(),
     mainDestination: z.enum(["WEBSITE", "CALL", "BOTH"]).optional(),
     publish: z.boolean(),
+    // Multi ad set / multi ad create. When present, the top-level adset/ad fields are ignored.
+    adsets: z.array(adsetInSchema).min(1).max(10).optional(),
   }),
 ]);
 
