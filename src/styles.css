@@ -401,3 +401,8 @@
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
+
+@keyframes myads-bar {
+  0% { transform: translateX(300%); }
+  100% { transform: translateX(-100%); }
+}
