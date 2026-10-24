@@ -54,5 +54,14 @@ export async function resolveFacebookPage(input: string, bm: GraphReader, client
   // A typed Page ID (e.g. from Page transparency) that our BM can't read yet: let Facebook's
   // access request itself validate it. Not verified identity, and never for readable non-Pages.
   if (!info && /^\d{8,25}$/.test(input.trim())) return { id: ref, name: undefined, link: undefined, unverified: true };
+  // Username link (facebook.com/scaleup): find its numeric ID, then let Facebook's request validate it.
+  if (!/^\d+$/.test(ref) && lookup) {
+    const found = await lookup(ref).catch(() => null);
+    if (found?.id) {
+      const again = await bm.get(found.id, { fields: "id,name,link,category" }).catch(() => null);
+      if (again?.id && again?.category) return { id: String(again.id), name: again.name, link: again.link };
+      if (!again) return { id: found.id, name: found.name, link: input.trim(), unverified: true };
+    }
+  }
   throw new Error("এই লিংক থেকে Facebook Page নিশ্চিত করা যায়নি। ‘Facebook থেকে Page ও ID আনুন’ চেপে ওই Page-এর admin Facebook দিয়ে connect করুন ও Page-এর অনুমতি দিন, তারপর তালিকা থেকে Page বাছুন। শুধু লিংকের সংখ্যা দিয়ে request পাঠানো হয়নি।");
 }

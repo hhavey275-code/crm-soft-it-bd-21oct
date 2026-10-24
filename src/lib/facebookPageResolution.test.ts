@@ -21,6 +21,11 @@ describe("Facebook Page request resolution", () => {
   it("does not treat a person id/name lookup as proof of a Page", async () => {
     await assert.rejects(resolveFacebookPage("100078746184144", { get: async () => ({ id: "100078746184144", name: "A person" }) }), /Page নিশ্চিত করা যায়নি/);
   });
+  it("turns a username Page link into its numeric ID for the BM request", async () => {
+    const page: any = await resolveFacebookPage("https://www.facebook.com/scaleup", { get: async () => { throw new Error("denied"); } }, undefined, async () => ({ id: "61593375281848", name: "ScaleUp" }));
+    assert.equal(page.id, "61593375281848");
+    assert.equal(page.unverified, true);
+  });
   it("accepts a BM-readable Page with a Page-specific category", async () => {
     const page = await resolveFacebookPage("ITCorner", { get: async () => ({ id: "123456789012345", name: "IT Corner", category: "Business" }) });
     assert.equal(page.id, "123456789012345");
