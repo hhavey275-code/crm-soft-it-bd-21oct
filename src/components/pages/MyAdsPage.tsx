@@ -92,14 +92,24 @@ export default function MyAdsPage() {
   const dates = useMemo(() => ({ dateFrom: range.from, dateTo: range.to }), [range]);
 
   const onAccountPicker = isMobile && mobileStep === "accounts";
-  const { data, isFetching, error, refetch } = useQuery({
+  const forceFresh = useRef(false);
+  const { data, isFetching, error, refetch: refetchQuery } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
     queryFn: async () => {
+      const ck = `myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`;
+      // Saved result for this account + date range opens instantly; only an explicit refresh asks Facebook.
+      if (!forceFresh.current && uid) {
+        const saved = await cacheGet(ck);
+        if (saved) return saved as any;
+      }
+      forceFresh.current = false;
       const r: any = await managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) });
-      try { if (uid) localStorage.setItem(`myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`, JSON.stringify(r)); } catch { /* storage full */ }
+      if (uid) {
+        void cacheSet(ck, r);
+        try { localStorage.setItem(ck, JSON.stringify(r)); } catch { /* too big for localStorage; IndexedDB keeps it */ }
+      }
       return r;
     },
-    // Show the last saved list instantly; only "Update now" (or a first-ever visit) asks Facebook again.
     // The cache key carries the user id, so another user on this device never sees it.
     initialData: () => { try { if (!uid) return undefined; const c = localStorage.getItem(`myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
     staleTime: Infinity,
@@ -109,6 +119,7 @@ export default function MyAdsPage() {
     refetchOnReconnect: false,
     enabled: !!uid && !onAccountPicker,
   });
+  const refetch = () => { forceFresh.current = true; return refetchQuery(); };
   // On each fresh login, pull the latest data from Facebook once automatically;
   // after that the cached list stays until the client presses "Update now".
   useEffect(() => {
