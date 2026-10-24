@@ -683,7 +683,7 @@ export default function MyAdsPage() {
                 <th className={th}>Attribution setting</th>
                 {sortTh("results", "Results")}
                 {sortTh("cost", "Cost per result")}
-                {tab !== "ad" && {sortTh("budget", "Budget")}}
+                {tab !== "ad" && sortTh("budget", "Budget")}
                 {sortTh("spend", "Amount spent")}
                 {sortTh("impressions", "Impressions")}
                 {sortTh("reach", "Reach")}
