@@ -459,7 +459,7 @@ export default function MyAdsPage() {
               {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
             </span>
             <button className={tbBtn} onClick={() => setLibOpen(true)} title="Video library"><Film className="h-4 w-4" /><span className="hidden sm:inline">Video library</span></button>
-            <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} />
+            <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={currentAccId} />
             <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
               <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
               {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}

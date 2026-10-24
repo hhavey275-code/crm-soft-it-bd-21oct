@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { managedAds } from "@/lib/managedAdsApi";
 import { supabase } from "@/integrations/supabase/client";
 import { SalesAdsetOptions, SalesAdOptions, defaultSalesOpts, salesPayload, type SalesOpts } from "./SalesOptions";
-import { VideoLibrary } from "./VideoLibrary";
+import { VideoLibrary, uploadToAccount } from "./VideoLibrary";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
@@ -136,7 +136,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [image, setImage] = useState<{ b64: string; url: string } | null>(null);
   const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT">("MESSAGING");
   const [connections, setConnections] = useState<"all" | "include" | "exclude">("all");
-  const [video, setVideo] = useState<{ path: string; name: string } | null>(null);
+  const [video, setVideo] = useState<{ id: string; name: string } | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
   const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
   const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
@@ -272,19 +272,15 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     reader.onload = () => { const s = String(reader.result); setImage({ b64: s.split(",")[1], url: s }); };
     reader.readAsDataURL(f);
   };
+  const [videoPct, setVideoPct] = useState(0);
   const onVideo = async (f?: File) => {
     if (!f) return;
-    if (f.size > 1024 * 1024 * 1024) return toast.error("Video ১GB-এর কম হতে হবে");
-    setVideoBusy(true);
+    if (!accId) return toast.error("আগে ad account বাছুন");
+    setVideoBusy(true); setVideoPct(0);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error("আবার লগইন করুন");
-      const ext = (f.name.split(".").pop() || "mp4").replace(/[^\w]/g, "").slice(0, 5) || "mp4";
-      const path = `${u.user.id}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("ad-media").upload(path, f, { contentType: f.type || "video/mp4" });
-      if (error) throw error;
-      setVideo({ path, name: f.name });
-      toast.success("Video upload হয়েছে");
+      const v = await uploadToAccount(accId, f, setVideoPct);
+      setVideo({ id: v.id, name: f.name });
+      toast.success("Video ad account-এর library-তে upload হয়েছে");
     } catch (e: any) { toast.error(e.message || "Video upload হয়নি"); } finally { setVideoBusy(false); }
   };
   const parsePostId = (v: string) => { const m = v.match(/(?:posts|videos|permalink\/|story_fbid=|fbid=)\/?(\d{5,})/); return m ? m[1] : v.trim(); };
@@ -359,7 +355,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         mainDestination: canCall ? mainDest : undefined,
         phoneNumber: callMode ? phone.trim() : undefined,
         imageBase64: setup === "new" ? image?.b64 : undefined,
-        videoPath: setup === "new" && video ? video.path : undefined,
+        videoId: setup === "new" && video ? video.id : undefined,
         connections,
         ...(objective === "ENGAGEMENT" ? {
           engagementLocation: engLoc, msgDestinations: engLoc === "MESSAGING" ? finalDests : undefined,
@@ -862,7 +858,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
               <input type="file" accept="image/*" className="hidden" onChange={(e) => onImage(e.target.files?.[0])} />
             </label>
             <label className="ml-2 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg">
-              {videoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{video ? "Change video" : "Upload video"}
+              {videoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{videoBusy ? `Uploading ${videoPct}%` : video ? "Change video" : "Upload video"}
               <input type="file" accept="video/*" className="hidden" disabled={videoBusy} onChange={(e) => onVideo(e.target.files?.[0])} />
             </label>
             <button type="button" onClick={() => setLibOpen(true)} className="ml-2 inline-flex h-9 items-center gap-2 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg">
@@ -870,7 +866,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             </button>
             {video && <p className="mt-1 text-[12px] text-fb-green">🎬 {video.name} — <button type="button" className="text-fb-muted underline" onClick={() => setVideo(null)}>বাদ দিন</button></p>}
           </Field>
-          <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} selected={video?.path} onPick={(v) => setVideo({ path: v.path, name: v.name })} />
+          <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={accId || undefined} selected={video?.id} onPick={(v) => setVideo({ id: v.id, name: v.title })} />
           <Field label="Primary text"><textarea rows={4} className="w-full rounded-md border border-fb-border bg-background p-2 text-[13px]" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Tell people what your ad is about" /></Field>
           <Field label="Headline"><input className={inp} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Write a short headline" /></Field>
           {!isMsg && (
