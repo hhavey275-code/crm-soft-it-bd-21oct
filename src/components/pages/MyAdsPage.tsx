@@ -137,18 +137,19 @@ export default function MyAdsPage() {
     enabled: !!uid && !onAccountPicker,
   });
   const refetch = () => { forceFresh.current = true; return refetchQuery(); };
-  // On each fresh login, pull the latest data from Facebook once automatically;
-  // after that the cached list stays until the client presses "Update now".
+  // Only once per login (keyed by the login time) pull fresh data from Facebook;
+  // every reload / new tab after that shows the saved data until "Update now".
+  const loginStamp = (user as any)?.last_sign_in_at ?? "";
   useEffect(() => {
     if (!uid || onAccountPicker) return;
-    const key = `myads-session-fetched:${uid}`;
+    const key = `myads-login-fetched:${uid}`;
     try {
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, "1");
+      if (localStorage.getItem(key) === loginStamp) return;
+      localStorage.setItem(key, loginStamp);
     } catch { /* ignore */ }
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid, onAccountPicker]);
+  }, [uid, onAccountPicker, loginStamp]);
   // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
   const { data: fastAccounts, isFetching: fastLoading } = useQuery({
     queryKey: ["managed-ads-accounts", uid],

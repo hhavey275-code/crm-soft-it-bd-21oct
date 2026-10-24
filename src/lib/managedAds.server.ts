@@ -107,11 +107,15 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   const other = new Set<string>();
   const accName = (id: string) => accounts.find((a) => a.id === id)?.name ?? id;
   // Meta rejects big nested requests with (#1); retry the same call with a smaller page.
+  // Only switched-on / in-review objects are listed; anything that delivered in the chosen dates
+  // is added back from insights (backfill), so thousands of old off campaigns are never read.
+  const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED"] }]);
   const getSmall = async (g: any, path: string, fields: string) => {
-    try { return await g.get(path, { fields, limit: "100" }); }
+    const base = path.endsWith("/campaigns") ? { filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"] }]) } : { filtering: liveFilter };
+    try { return await g.get(path, { fields, limit: "100", ...base }); }
     catch (e: any) {
       if (!/reduce the amount of data|\(#1\)/i.test(String(e?.message))) throw e;
-      return await g.get(path, { fields, limit: "25" });
+      return await g.get(path, { fields, limit: "25", ...base });
     }
   };
 
