@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cacheGet, cacheSet } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
@@ -438,6 +439,7 @@ export default function MyAdsPage() {
         {wizard}
         {deleteDialog}
         {isFetching && !data && <MetaLoading />}
+        {isFetching && <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
           <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
@@ -541,6 +543,7 @@ export default function MyAdsPage() {
       {wizard}
       {deleteDialog}
       {isFetching && !data && <MetaLoading />}
+      {isFetching && <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
