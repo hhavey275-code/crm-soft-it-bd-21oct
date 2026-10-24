@@ -65,6 +65,7 @@ import { Route as AdminProblemAccountsRouteImport } from './routes/admin.problem
 import { Route as AdminStripeLinksRouteImport } from './routes/admin.stripe-links'
 import { Route as AdsManagerAccountIdRouteImport } from './routes/ads-manager.$accountId'
 import { Route as AgenciesIdRouteImport } from './routes/agencies.$id'
+import { Route as ApiAdsAssistantRouteImport } from './routes/api.ads-assistant'
 import { Route as ApiFbPagesRouteImport } from './routes/api.fb-pages'
 import { Route as ApiManagedAdsRouteImport } from './routes/api.managed-ads'
 import { Route as ApiMetaProxyRouteImport } from './routes/api.meta-proxy'
@@ -363,6 +364,11 @@ const AgenciesIdRoute = AgenciesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AgenciesRoute,
 } as any)
+const ApiAdsAssistantRoute = ApiAdsAssistantRouteImport.update({
+  id: '/api/ads-assistant',
+  path: '/api/ads-assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFbPagesRoute = ApiFbPagesRouteImport.update({
   id: '/api/fb-pages',
   path: '/api/fb-pages',
@@ -508,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/ads-assistant': typeof ApiAdsAssistantRoute
   '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
@@ -582,6 +589,7 @@ export interface FileRoutesByTo {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/ads-assistant': typeof ApiAdsAssistantRoute
   '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
@@ -658,6 +666,7 @@ export interface FileRoutesById {
   '/admin/stripe-links': typeof AdminStripeLinksRoute
   '/ads-manager/$accountId': typeof AdsManagerAccountIdRoute
   '/agencies/$id': typeof AgenciesIdRoute
+  '/api/ads-assistant': typeof ApiAdsAssistantRoute
   '/api/fb-pages': typeof ApiFbPagesRoute
   '/api/managed-ads': typeof ApiManagedAdsRoute
   '/api/meta-proxy': typeof ApiMetaProxyRoute
@@ -735,6 +744,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/ads-assistant'
     | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
@@ -809,6 +819,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/ads-assistant'
     | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
@@ -884,6 +895,7 @@ export interface FileRouteTypes {
     | '/admin/stripe-links'
     | '/ads-manager/$accountId'
     | '/agencies/$id'
+    | '/api/ads-assistant'
     | '/api/fb-pages'
     | '/api/managed-ads'
     | '/api/meta-proxy'
@@ -958,6 +970,7 @@ export interface RootRouteChildren {
   AdminProblemAccountsRoute: typeof AdminProblemAccountsRoute
   AdminStripeLinksRoute: typeof AdminStripeLinksRoute
   AdsManagerAccountIdRoute: typeof AdsManagerAccountIdRoute
+  ApiAdsAssistantRoute: typeof ApiAdsAssistantRoute
   ApiFbPagesRoute: typeof ApiFbPagesRoute
   ApiManagedAdsRoute: typeof ApiManagedAdsRoute
   ApiMetaProxyRoute: typeof ApiMetaProxyRoute
@@ -1369,6 +1382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgenciesIdRouteImport
       parentRoute: typeof AgenciesRoute
     }
+    '/api/ads-assistant': {
+      id: '/api/ads-assistant'
+      path: '/api/ads-assistant'
+      fullPath: '/api/ads-assistant'
+      preLoaderRoute: typeof ApiAdsAssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/fb-pages': {
       id: '/api/fb-pages'
       path: '/api/fb-pages'
@@ -1583,6 +1603,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProblemAccountsRoute: AdminProblemAccountsRoute,
   AdminStripeLinksRoute: AdminStripeLinksRoute,
   AdsManagerAccountIdRoute: AdsManagerAccountIdRoute,
+  ApiAdsAssistantRoute: ApiAdsAssistantRoute,
   ApiFbPagesRoute: ApiFbPagesRoute,
   ApiManagedAdsRoute: ApiManagedAdsRoute,
   ApiMetaProxyRoute: ApiMetaProxyRoute,
