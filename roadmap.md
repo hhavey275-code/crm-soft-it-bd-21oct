@@ -31,3 +31,4 @@
 - [x] Shared ad account step 4: wallet budget guard, 15-min spend deduction, auto-pause + admin thresholds (2026-10-06). Needs publish for the scheduler URL.
 - [ ] Confirm whether Supabase ref dhswrfzdqcavgmymllat is the "crm soft it bd" project; if not, user connects it via Settings → General → External Supabase
 - [x] WhatsApp secrets dropped from remix setup — user confirmed not needed (2026-10-22)
+- [x] AI Ads Assistant in My Ads (English chat -> campaign draft -> confirm & create) (2026-10-25).
