@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
+
 - Share My Ads filtering and deletion-cache rules between screen sizes in a browser-safe helper; delete Meta objects only through the API's existing ownership-checked mutation path.
 
 - Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.

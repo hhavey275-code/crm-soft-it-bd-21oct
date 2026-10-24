@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { format, subDays } from "date-fns";
 import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
+import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 import { useAuth } from "@/contexts/AuthContext";
 import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
@@ -540,24 +541,7 @@ export default function MyAdsPage() {
               {cooldownLeft > 0 ? <span>{Math.ceil(cooldownLeft / 1000)}s</span> : <span className="hidden sm:inline">Update now</span>}
             </button>
           </div>
-          <Select value={currentAccId ?? ""} onValueChange={pickAccount} disabled={!accounts.length}>
-            <SelectTrigger className="h-9 w-full gap-2 border-fb-border text-[13px] sm:w-auto sm:min-w-[260px] sm:max-w-[360px]">
-              <span className="flex min-w-0 items-center gap-2 truncate">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-destructive text-[11px] font-bold text-background">{(currentAcc?.name || "A").charAt(0).toUpperCase()}</span>
-                <span className="truncate">{currentAcc ? `${currentAcc.name} (${String(currentAcc.account_id).replace(/^act_/, "")})` : "Ad account বাছুন"}</span>
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {(["own", "shared"] as const).map((k) => accounts.some((a) => a.kind === k) && (
-                <div key={k}>
-                  <div className="px-2 py-1 text-[11px] font-semibold text-fb-muted">{k === "own" ? "আপনার Ad Accounts" : "Shared Ad Accounts (wallet)"}</div>
-                  {accounts.filter((a) => a.kind === k).map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name} ({String(a.account_id).replace(/^act_/, "")})</SelectItem>
-                  ))}
-                </div>
-              ))}
-            </SelectContent>
-          </Select>
+          <AccountPicker accounts={accounts} value={currentAccId} onChange={pickAccount} />
           <div className="hidden items-center gap-2 h-9 px-3 rounded-md border border-fb-border text-[13px] max-w-[260px] sm:flex">
             <Megaphone className="h-4 w-4 text-fb-muted shrink-0" />
             <span className="truncate">{allPages.length ? allPages.map((p) => p.page_name).join(", ") : "No page"}</span>
