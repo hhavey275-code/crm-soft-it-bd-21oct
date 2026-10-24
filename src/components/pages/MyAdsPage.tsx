@@ -438,7 +438,7 @@ export default function MyAdsPage() {
                     <p className="truncate text-[17px]">{d.data.campaignName || "Untitled campaign"}</p>
                     <p className="text-[13px] text-fb-muted">In draft · {d.data.amount ? money(Number(d.data.amount)) : "—"}</p>
                   </button>
-                  <button className="p-1 text-fb-muted" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id); }}><Trash2 className="h-4 w-4" /></button>
+                  <button className="p-1 text-fb-muted" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id, uid); }}><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
             ))}
@@ -610,7 +610,7 @@ export default function MyAdsPage() {
                     <div className="flex items-center gap-2">
                       <button className="text-left text-fb-blue hover:underline" onClick={() => openDraft(d)}>{d.data.campaignName || "Untitled campaign"}</button>
                       <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => openDraft(d)}><Pencil className="h-3 w-3" /></button>
-                      <button title="Draft মুছুন" className="text-fb-muted hover:text-destructive" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id); }}><Trash2 className="h-3 w-3" /></button>
+                      <button title="Draft মুছুন" className="text-fb-muted hover:text-destructive" onClick={() => { if (confirm("এই draft মুছে ফেলবেন?")) deleteDraft(d.id, uid); }}><Trash2 className="h-3 w-3" /></button>
                     </div>
                     <span className={sub}>Edited {new Date(d.updatedAt).toLocaleString()}</span>
                   </td>
