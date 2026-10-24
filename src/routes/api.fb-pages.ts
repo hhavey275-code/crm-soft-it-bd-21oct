@@ -151,7 +151,7 @@ async function handle(request: Request): Promise<Response> {
                   const out = await sharePageWithBm({ pageId: String(p.id), pageToken: p.access_token, bmId: bm.bmId, bmToken: bm.token, systemUserId: bm.systemUserId });
                   if (out.status === "granted" || out.status === "already") bmShared++;
                   else if (out.status === "requested") bmRequested++;
-                  else { bmFailed.push({ page: String(p.name ?? p.id), message: out.message }); console.warn("page share", p.id, bm.bmId, out.message); }
+                  else if (out.status === "failed") { bmFailed.push({ page: String(p.name ?? p.id), message: out.message }); console.warn("page share", p.id, bm.bmId, out.message); }
                 } catch (e) { console.warn("page share", e); }
               }
             }
