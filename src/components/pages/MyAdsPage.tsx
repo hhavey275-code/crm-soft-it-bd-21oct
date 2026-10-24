@@ -100,11 +100,17 @@ export default function MyAdsPage() {
     qc.invalidateQueries({ queryKey: ["managed-ads-acc-summary"] });
   };
 
-  const campaigns: any[] = data?.campaigns ?? [];
-  const adsets: any[] = (data?.adsets ?? []).filter((s: any) => !selCampaigns.length || selCampaigns.includes(String(s.campaign_id)));
-  const ads: any[] = (data?.ads ?? []).filter((a: any) =>
+  // Facebook order: switched-on items first, then newest first.
+  const fbOrder = (list: any[]) => [...list].sort((a, b) => {
+    const ra = a.status === "ACTIVE" ? 0 : 1, rb = b.status === "ACTIVE" ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    return String(b.created_time || b.updated_time || "").localeCompare(String(a.created_time || a.updated_time || "")) || String(b.id).localeCompare(String(a.id));
+  });
+  const campaigns: any[] = fbOrder(data?.campaigns ?? []);
+  const adsets: any[] = fbOrder((data?.adsets ?? []).filter((s: any) => !selCampaigns.length || selCampaigns.includes(String(s.campaign_id))));
+  const ads: any[] = fbOrder((data?.ads ?? []).filter((a: any) =>
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
-  );
+  ));
   const rows = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
     !search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase()),
   );
