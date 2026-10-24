@@ -47,6 +47,7 @@ export default function MyAdsPage() {
   const [selAds, setSelAds] = useState<string[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [search, setSearch] = useState("");
+  const [quick, setQuick] = useState<"all" | "active" | "delivery">("all");
   const [creating, setCreating] = useState(false);
   const [lastManual, setLastManual] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -112,7 +113,8 @@ export default function MyAdsPage() {
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
   ));
   const rows = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
-    !search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase()),
+    (quick === "all" || (quick === "active" ? r.status === "ACTIVE" : Number(r.insights?.impressions || r.insights?.spend || 0) > 0)) &&
+    (!search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase())),
   );
 
   const totals = useMemo(() => campaigns.reduce((t, c) => {
@@ -428,9 +430,9 @@ export default function MyAdsPage() {
         {/* Filter chips + search */}
         <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
           <div className="hidden flex-wrap gap-2 pt-1 sm:flex">
-            <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border-2 border-fb-blue bg-fb-blue-soft text-[13px] font-semibold text-fb-blue">All ads</span>
-            <span className={tbBtn}>Active ads</span>
-            <span className={tbBtn}>Had delivery</span>
+            {([["all", "All ads"], ["active", "Active ads"], ["delivery", "Had delivery"]] as const).map(([k, l]) => (
+              <button key={k} type="button" onClick={() => setQuick(k)} className={quick === k ? "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border-2 border-fb-blue bg-fb-blue-soft text-[13px] font-semibold text-fb-blue" : tbBtn}>{l}</button>
+            ))}
           </div>
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
