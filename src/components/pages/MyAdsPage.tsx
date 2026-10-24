@@ -109,6 +109,15 @@ export default function MyAdsPage() {
       }
       forceFresh.current = false;
       const r: any = await managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) });
+      // Facebook limits how often one ad account can be read. Then keep the last saved numbers on screen
+      // and never overwrite them with an empty answer.
+      const limited = (r?.errors ?? []).some((m: string) => /too many (api )?calls|#17\b|#80004|#613|#4\b|request limit/i.test(String(m)));
+      if (limited) {
+        const msg = "Facebook এই ad account থেকে অল্প সময়ে অনেক বার তথ্য চাওয়ায় সাময়িক বিরতি দিয়েছে। ১০–১৫ মিনিট পরে Update now চাপুন।";
+        const saved: any = uid ? await cacheGet(ck) : undefined;
+        if (saved) return { ...saved, errors: [msg + " এখন শেষবার সেভ করা তথ্য দেখানো হচ্ছে।"] };
+        return { ...r, errors: [msg] };
+      }
       if (uid) {
         void cacheSet(ck, r);
         try { localStorage.setItem(ck, JSON.stringify(r)); } catch { /* too big for localStorage; IndexedDB keeps it */ }
