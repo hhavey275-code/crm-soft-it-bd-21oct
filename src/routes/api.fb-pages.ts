@@ -92,6 +92,18 @@ async function handle(request: Request): Promise<Response> {
           } catch (e) { console.error("page token save", e); }
         }
 
+        // Save the client's own Facebook login (encrypted) so ads can run with their own access
+        // when our Business Manager has no access to their Page.
+        if (userId) {
+          try {
+            const { encryptToken } = await import("@/lib/metaGraph.server");
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const sec = process.env.BM_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+            const me: any = await fetch(`${GRAPH}/me?fields=id&access_token=${encodeURIComponent(userToken)}`).then((r) => r.json()).catch(() => null);
+            await (supabaseAdmin as any).from("client_user_tokens").upsert({ user_id: userId, fb_user_id: me?.id ?? null, access_token: await encryptToken(userToken, sec), updated_at: new Date().toISOString() });
+          } catch (e) { console.error("user token save", e); }
+        }
+
         // Auto-add the pages to the client's list (no separate My Pages / approval step),
         // then share each page with the Business Managers of the client's ad accounts.
         let added = 0; let bmShared = 0;

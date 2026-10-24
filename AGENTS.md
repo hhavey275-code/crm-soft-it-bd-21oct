@@ -3,6 +3,7 @@
 - Share My Ads filtering and deletion-cache rules between screen sizes in a browser-safe helper; delete Meta objects only through the API's existing ownership-checked mutation path.
 
 - Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.
+- On the client's own ad accounts, My Ads uses the client's saved Facebook login (client_user_tokens, server-only) when it can read the account, so Pages our Business Manager cannot access still work; shared accounts keep the BM token.
 
 - Derive My Ads Create availability from the selected account's verified Meta summary through the browser-safe availability helper; failed or pending reads cannot enable creation, and Refresh must recheck the summary.
 
