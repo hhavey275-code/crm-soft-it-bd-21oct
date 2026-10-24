@@ -816,7 +816,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     catch (err: any) {
       // Page not yet shared with our ad token: grant access using the client's saved Page login, then retry once.
       if (!/1487202|page permission|full control|ADVERTISE|\(#100\)|\(#200\)/i.test(String(err?.message))) throw err;
-      const p2 = accessProblem ?? (await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId));
+      const p2 = usingClientLogin ? null : accessProblem ?? (await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId));
       if (p2) throw new Error(p2);
       cr = await g.post(`${act}/adcreatives`, creative);
     }
