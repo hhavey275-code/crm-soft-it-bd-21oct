@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil, Trash2 } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film } from "lucide-react";
+import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -211,6 +212,7 @@ export default function MyAdsPage() {
       setCreating(true);
     }
   }, []);
+  const [libOpen, setLibOpen] = useState(false);
   const wizard = creating && (
         <ManagedCreateWizard
           key={openDraftObj?.id ?? newDraftId ?? "new"}
@@ -456,6 +458,8 @@ export default function MyAdsPage() {
             <span className="hidden text-[13px] text-fb-muted sm:inline">
               {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
             </span>
+            <button className={tbBtn} onClick={() => setLibOpen(true)} title="Video library"><Film className="h-4 w-4" /><span className="hidden sm:inline">Video library</span></button>
+            <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} />
             <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
               <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
               {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
