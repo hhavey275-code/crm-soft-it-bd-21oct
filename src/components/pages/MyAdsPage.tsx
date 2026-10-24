@@ -3,7 +3,7 @@ import { cacheGet, cacheSet } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
@@ -58,6 +58,10 @@ export default function MyAdsPage() {
   const [search, setSearch] = useState("");
   const [quick, setQuick] = useState<"all" | "active" | "delivery">("all");
   const [sortBy, setSortBy] = useState<"fb" | "results" | "cost" | "spend" | "newest">("fb");
+  type ColKey = "results" | "cost" | "budget" | "spend" | "impressions" | "reach" | "ctr";
+  const [colSort, setColSort] = useState<{ key: ColKey; dir: "asc" | "desc" } | null>(null);
+  // Click a column header: big→small, then small→big, then back to the normal order.
+  const toggleCol = (key: ColKey) => setColSort((c) => (!c || c.key !== key ? { key, dir: "desc" } : c.dir === "desc" ? { key, dir: "asc" } : null));
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ level: Level; objects: any[] } | null>(null);
   const [lastManual, setLastManual] = useState(0);
@@ -172,6 +176,26 @@ export default function MyAdsPage() {
   ));
   // Optional re-ordering on top of the Facebook order: best results / lowest cost per result first, etc.
   const sortRows = (list: any[]) => {
+    if (colSort) {
+      const val = (r: any): number | null => {
+        const i = r.insights || {};
+        if (colSort.key === "results") return resultOf(i).count;
+        if (colSort.key === "cost") return resultOf(i).cost ?? null;
+        if (colSort.key === "budget") { const b = Number(r.daily_budget || r.lifetime_budget || 0); return b ? b / 100 : null; }
+        if (colSort.key === "spend") return Number(i.spend || 0);
+        if (colSort.key === "impressions") return Number(i.impressions || 0);
+        if (colSort.key === "reach") return Number(i.reach || 0);
+        const imp = Number(i.impressions || 0); return imp ? Number(i.clicks || 0) / imp : null;
+      };
+      const m = colSort.dir === "asc" ? 1 : -1;
+      return [...list].sort((a, b) => {
+        const A = val(a), B = val(b);
+        if (A == null && B == null) return 0;
+        if (A == null) return 1;
+        if (B == null) return -1;
+        return (A - B) * m;
+      });
+    }
     if (sortBy === "fb") return list;
     const metric = (r: any) => {
       const res = resultOf(r.insights);
@@ -190,8 +214,13 @@ export default function MyAdsPage() {
       return B.t.localeCompare(A.t);
     });
   };
+  // "Active ads" = what the Delivery column shows as running, not just the switch being on.
+  const isLive = (level: "campaign" | "adset" | "ad", r: any) => {
+    const d = level === "campaign" ? campaignDelivery(r, data?.adsets ?? [], data?.ads ?? []) : level === "adset" ? adsetDelivery(r, data?.ads ?? []) : adDelivery(r);
+    return d.label === "Active" || d.label === "Learning" || d.label === "Learning limited";
+  };
   const rows = sortRows((tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
-    matchesAdsFilter(r, quick) &&
+    matchesAdsFilter(r, quick) && (quick !== "active" || isLive(tab, r)) &&
     (!search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase())),
   ));
 
@@ -383,6 +412,14 @@ export default function MyAdsPage() {
   );
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
+  const sortTh = (key: ColKey, label: string) => (
+    <th className={cn(th, "text-right")}>
+      <button type="button" onClick={() => toggleCol(key)} className={cn("inline-flex items-center gap-1 hover:text-fb-blue", colSort?.key === key && "text-fb-blue")} title="ছোট থেকে বড় / বড় থেকে ছোট">
+        {label}
+        {colSort?.key === key ? (colSort.dir === "desc" ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />) : <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />}
+      </button>
+    </th>
+  );
   const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
   const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
   const sub = "block text-[11px] text-fb-muted";
@@ -435,7 +472,7 @@ export default function MyAdsPage() {
       );
     }
     const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
-    const mcamps = sortRows(campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))));
+    const mcamps = sortRows(campaigns.filter((c) => matchesAdsFilter(c, quick) && (quick !== "active" || isLive("campaign", c)) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))));
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
@@ -644,13 +681,13 @@ export default function MyAdsPage() {
                 <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
                 <th className={cn(th, "text-fb-blue")}>Delivery</th>
                 <th className={th}>Attribution setting</th>
-                <th className={cn(th, "text-right")}>Results</th>
-                <th className={cn(th, "text-right")}>Cost per result</th>
-                {tab !== "ad" && <th className={cn(th, "text-right")}>Budget</th>}
-                <th className={cn(th, "text-right")}>Amount spent</th>
-                <th className={cn(th, "text-right")}>Impressions</th>
-                <th className={cn(th, "text-right")}>Reach</th>
-                <th className={cn(th, "text-right")}>CTR</th>
+                {sortTh("results", "Results")}
+                {sortTh("cost", "Cost per result")}
+                {tab !== "ad" && sortTh("budget", "Budget")}
+                {sortTh("spend", "Amount spent")}
+                {sortTh("impressions", "Impressions")}
+                {sortTh("reach", "Reach")}
+                {sortTh("ctr", "CTR")}
                 <th className={cn(th, "text-right")}>Purchases</th><th className={cn(th, "text-right")}>Cost per purchase</th><th className={cn(th, "text-right")}>Purchase value</th><th className={cn(th, "text-right")}>ROAS</th>
                 {extra.cols.map((c) => <th key={c.key} className={cn(th, "text-right max-w-[140px] whitespace-normal")}>{c.label}</th>)}
               </tr>
