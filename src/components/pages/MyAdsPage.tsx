@@ -45,7 +45,8 @@ export default function MyAdsPage() {
   const { user } = useAuth();
   const uid = user?.id;
   const [tab, setTab] = useState<Level>("campaign");
-  const [range, setRange] = useState<FbRange>(() => makeRange("today"));
+  // Default to the last 7 days like Facebook Ads Manager, so results/spend are not empty on "today".
+  const [range, setRange] = useState<FbRange>(() => makeRange("7d"));
   const extra = useExtraColumns();
   const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
@@ -54,6 +55,7 @@ export default function MyAdsPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [search, setSearch] = useState("");
   const [quick, setQuick] = useState<"all" | "active" | "delivery">("all");
+  const [sortBy, setSortBy] = useState<"fb" | "results" | "cost" | "spend" | "newest">("fb");
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ level: Level; objects: any[] } | null>(null);
   const [lastManual, setLastManual] = useState(0);
@@ -106,6 +108,18 @@ export default function MyAdsPage() {
     refetchOnReconnect: false,
     enabled: !!uid && !onAccountPicker,
   });
+  // On each fresh login, pull the latest data from Facebook once automatically;
+  // after that the cached list stays until the client presses "Update now".
+  useEffect(() => {
+    if (!uid || onAccountPicker) return;
+    const key = `myads-session-fetched:${uid}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { /* ignore */ }
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, onAccountPicker]);
   // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
   const { data: fastAccounts, isFetching: fastLoading } = useQuery({
     queryKey: ["managed-ads-accounts", uid],
@@ -141,10 +155,30 @@ export default function MyAdsPage() {
   const ads: any[] = fbOrder((data?.ads ?? []).filter((a: any) =>
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
   ));
-  const rows = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
+  // Optional re-ordering on top of the Facebook order: best results / lowest cost per result first, etc.
+  const sortRows = (list: any[]) => {
+    if (sortBy === "fb") return list;
+    const metric = (r: any) => {
+      const res = resultOf(r.insights);
+      return { res: res.count, cost: res.cost, spend: Number(r.insights?.spend || 0), t: String(r.created_time || r.updated_time || "") };
+    };
+    return [...list].sort((a, b) => {
+      const A = metric(a), B = metric(b);
+      if (sortBy === "results") return B.res - A.res || B.spend - A.spend;
+      if (sortBy === "cost") {
+        if (A.cost == null && B.cost == null) return B.spend - A.spend;
+        if (A.cost == null) return 1;
+        if (B.cost == null) return -1;
+        return A.cost - B.cost;
+      }
+      if (sortBy === "spend") return B.spend - A.spend;
+      return B.t.localeCompare(A.t);
+    });
+  };
+  const rows = sortRows((tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
     matchesAdsFilter(r, quick) &&
     (!search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase())),
-  );
+  ));
 
   const totals = useMemo(() => campaigns.reduce((t, c) => {
     t.spend += Number(c.insights?.spend || 0); t.impr += Number(c.insights?.impressions || 0); t.clicks += Number(c.insights?.clicks || 0);
@@ -315,6 +349,18 @@ export default function MyAdsPage() {
       ))}
     </div>
   );
+  const sortPicker = (
+    <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+      <SelectTrigger className="h-9 w-full border-fb-border text-[13px] sm:w-[240px]"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="fb">Facebook order (Active আগে)</SelectItem>
+        <SelectItem value="results">বেশি result আগে</SelectItem>
+        <SelectItem value="cost">কম খরচে result আগে</SelectItem>
+        <SelectItem value="spend">বেশি খরচ আগে</SelectItem>
+        <SelectItem value="newest">নতুন আগে</SelectItem>
+      </SelectContent>
+    </Select>
+  );
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
   const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
@@ -369,7 +415,7 @@ export default function MyAdsPage() {
       );
     }
     const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
-    const mcamps = campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase())));
+    const mcamps = sortRows(campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))));
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
@@ -431,6 +477,7 @@ export default function MyAdsPage() {
             </div>
             {quickFilters}
             <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {sortPicker}
             {(quick === "all" ? drafts : []).map((d) => (
               <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -522,7 +569,10 @@ export default function MyAdsPage() {
 
         {/* Filter chips + search */}
         <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
-          {quickFilters}
+          <div className="flex flex-wrap items-center gap-2">
+            {quickFilters}
+            {sortPicker}
+          </div>
           <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
