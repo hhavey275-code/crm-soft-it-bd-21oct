@@ -133,7 +133,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       const allPages = async (level: string) => {
         const out: any[] = []; let after: string | undefined;
         for (let i = 0; i < 20; i++) {
-          const r: any = await g.get(`${act}/insights`, { level, fields: `${level}_id,${insightsFields}`, time_range: JSON.stringify(dateRange), limit: "500", ...(after ? { after } : {}) }).catch(() => null);
+          const r: any = await g.get(`${act}/insights`, { level, fields: `${level}_id,${insightsFields}`, time_range: JSON.stringify(dateRange), limit: "2000", ...(after ? { after } : {}) }).catch(() => null);
           if (!r) break; out.push(...(r.data ?? []));
           after = r.paging?.next ? r.paging?.cursors?.after : undefined; if (!after) break;
         }
