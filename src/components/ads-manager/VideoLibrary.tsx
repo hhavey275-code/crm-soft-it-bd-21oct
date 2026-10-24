@@ -3,8 +3,9 @@ import { Loader2, Upload, Check, X, Film } from "lucide-react";
 import { toast } from "sonner";
 import { managedAds } from "@/lib/managedAdsApi";
 import { cn } from "@/lib/utils";
+import { cached } from "@/lib/adsCache";
 
-export type LibraryVideo = { id: string; title: string; picture?: string | null };
+export type LibraryVideo = { id: string; title: string; picture?: string | null; source?: string | null };
 
 function toB64(buf: ArrayBuffer) {
   const b = new Uint8Array(buf);
@@ -32,11 +33,11 @@ export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open:
   const [items, setItems] = useState<LibraryVideo[] | null>(null);
   const [pct, setPct] = useState<number | null>(null);
 
-  const load = async () => {
+  const load = async (force = false) => {
     if (!accId) return setItems([]);
     setItems(null);
     try {
-      const r = await managedAds<{ videos: LibraryVideo[] }>({ action: "videos", adAccountDbId: accId });
+      const r = await cached(`videos:${accId}`, () => managedAds<{ videos: LibraryVideo[] }>({ action: "videos", adAccountDbId: accId }), force);
       setItems(r.videos);
     } catch (e: any) { toast.error(e.message); setItems([]); }
   };
@@ -48,7 +49,7 @@ export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open:
     try {
       for (const f of Array.from(files)) await uploadToAccount(accId, f, setPct);
       toast.success("Video ad account-এর library-তে চলে গেছে");
-      await load();
+      await load(true);
     } catch (e: any) { toast.error(e.message || "Upload হয়নি"); } finally { setPct(null); }
   };
 
@@ -63,6 +64,7 @@ export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open:
               {pct !== null ? <><Loader2 className="h-4 w-4 animate-spin" />{pct}%</> : <><Upload className="h-4 w-4" />Upload video</>}
               <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
             </label>
+            <button onClick={() => load(true)} disabled={items === null} className="h-9 rounded-md border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-60">Update now</button>
             <button onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-muted"><X className="h-5 w-5" /></button>
           </div>
         </div>

@@ -10,6 +10,7 @@ import { managedAds } from "@/lib/managedAdsApi";
 import { supabase } from "@/integrations/supabase/client";
 import { SalesAdsetOptions, SalesAdOptions, defaultSalesOpts, salesPayload, type SalesOpts } from "./SalesOptions";
 import { VideoLibrary, uploadToAccount } from "./VideoLibrary";
+import { cached } from "@/lib/adsCache";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
@@ -136,7 +137,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [image, setImage] = useState<{ b64: string; url: string } | null>(null);
   const [engLoc, setEngLoc] = useState<"ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT">("MESSAGING");
   const [connections, setConnections] = useState<"all" | "include" | "exclude">("all");
-  const [video, setVideo] = useState<{ id: string; name: string } | null>(null);
+  const [video, setVideo] = useState<{ id: string; name: string; picture?: string | null; src?: string | null } | null>(null);
+  const [force, setForce] = useState(0);
   const [videoBusy, setVideoBusy] = useState(false);
   const [destMode, setDestMode] = useState<"auto" | "manual">("auto");
   const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
@@ -215,30 +217,30 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   useEffect(() => {
     setPixels(null); setPixelId("");
     if (!needsPixel || !accId || !pageDbId || phase !== "edit") return;
-    managedAds<{ pixels: any[] }>({ action: "pixels", pageDbId, adAccountDbId: accId })
+    cached(`pixels:${accId}:${pageDbId}`, () => managedAds<{ pixels: any[] }>({ action: "pixels", pageDbId, adAccountDbId: accId }), force > 0)
       .then((r) => { setPixels(r.pixels); if (r.pixels[0]) setPixelId(r.pixels[0].id); })
       .catch((e) => { setPixels([]); toast.error(e.message); });
-  }, [needsPixel, accId, pageDbId, phase]);
+  }, [needsPixel, accId, pageDbId, phase, force]);
 
   useEffect(() => {
     setPageInfo(null);
     if (!accId || !pageDbId || phase !== "edit") return;
-    managedAds<any>({ action: "page_info", pageDbId, adAccountDbId: accId })
+    cached<any>(`pageinfo:${accId}:${pageDbId}`, () => managedAds<any>({ action: "page_info", pageDbId, adAccountDbId: accId }), infoTick > 0 || force > 0)
       .then((r) => { setPageInfo(r); if (r.phone) setPhone((p) => p || r.phone); })
       .catch(() => setPageInfo({ whatsappNumber: null, phone: null, picture: null }));
-  }, [accId, pageDbId, phase, infoTick]);
+  }, [accId, pageDbId, phase, infoTick, force]);
 
-  const loadPosts = async () => {
+  const loadPosts = async (fresh = true) => {
     if (!accId || !pageDbId) return;
     setLoadingPosts(true);
     try {
-      const r = await managedAds<{ posts: any[]; needsAccess?: boolean }>({ action: "posts", pageDbId, adAccountDbId: accId });
+      const r = await cached(`posts:${accId}:${pageDbId}`, () => managedAds<{ posts: any[]; needsAccess?: boolean }>({ action: "posts", pageDbId, adAccountDbId: accId }), fresh);
       setPosts(r.posts); setPostsNeedAccess(!!r.needsAccess);
     } catch (e: any) { setPosts([]); toast.error(e.message); } finally { setLoadingPosts(false); }
   };
   const firstPage = useRef(true);
   useEffect(() => { setPosts(null); if (firstPage.current) { firstPage.current = false; return; } setPostId(""); }, [accId, pageDbId]);
-  useEffect(() => { if (level === 2 && setup === "post" && posts === null) loadPosts(); }, [level, setup, posts]);
+  useEffect(() => { if (level === 2 && setup === "post" && posts === null) loadPosts(false); }, [level, setup, posts]);
 
   const requestAccess = async () => {
     try {
@@ -280,7 +282,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     setVideoBusy(true); setVideoPct(0);
     try {
       const v = await uploadToAccount(accId, f, setVideoPct);
-      setVideo({ id: v.id, name: f.name });
+      setVideo({ id: v.id, name: f.name, src: URL.createObjectURL(f) });
       toast.success("Video ad account-এর library-তে upload হয়েছে");
     } catch (e: any) { toast.error(e.message || "Video upload হয়নি"); } finally { setVideoBusy(false); }
   };
@@ -785,7 +787,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-semibold">{page?.page_name ?? "Page"} — posts</p>
-              <button className="text-fb-blue" disabled={loadingPosts} onClick={loadPosts}>{loadingPosts ? "Loading…" : "Refresh"}</button>
+              <button className="text-fb-blue" disabled={loadingPosts} onClick={() => loadPosts(true)}>{loadingPosts ? "Loading…" : "Refresh"}</button>
             </div>
             {postsNeedAccess && (
               <div className="space-y-2 rounded-md border border-destructive/50 p-3">
@@ -880,7 +882,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             </button>
             {video && <p className="mt-1 text-[12px] text-fb-green">🎬 {video.name} — <button type="button" className="text-fb-muted underline" onClick={() => setVideo(null)}>বাদ দিন</button></p>}
           </Field>
-          <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={accId || undefined} selected={video?.id} onPick={(v) => setVideo({ id: v.id, name: v.title })} />
+          <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={accId || undefined} selected={video?.id} onPick={(v) => setVideo({ id: v.id, name: v.title, picture: v.picture, src: v.source })} />
           <Field label="Primary text"><textarea rows={4} className="w-full rounded-md border border-fb-border bg-background p-2 text-[13px]" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Tell people what your ad is about" /></Field>
           <Field label="Headline"><input className={inp} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Write a short headline" /></Field>
           {!isMsg && (
@@ -912,12 +914,14 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     return (
       <div className="rounded-lg border border-fb-border bg-background">
         <div className="flex items-center gap-2 p-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-fb-blue-soft text-[13px] font-bold text-fb-blue">{(page?.page_name ?? "P")[0]}</div>
+          {pageInfo?.picture ? <img src={pageInfo.picture} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-fb-blue-soft text-[13px] font-bold text-fb-blue">{(page?.page_name ?? "P")[0]}</div>}
           <div className="flex-1"><p className="text-[13px] font-semibold">{page?.page_name ?? "Your Page"}</p><p className="text-[11px] text-fb-muted">Sponsored · 🌐</p></div>
           <MoreHorizontal className="h-4 w-4 text-fb-muted" />
         </div>
         {text ? <p className="whitespace-pre-line px-3 pb-2 text-[13px] line-clamp-6">{text}</p> : <p className="px-3 pb-2 text-[13px] text-fb-muted">Primary text</p>}
-        {img ? <img src={img} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted"><ImagePlus className="h-8 w-8" /></div>}
+        {setup === "new" && video ? (video.src ? <video key={video.src} src={video.src} poster={video.picture ?? undefined} controls muted playsInline className="aspect-square w-full bg-foreground object-contain" />
+          : video.picture ? <img src={video.picture} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted">🎬 {video.name}</div>)
+        : img ? <img src={img} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted"><ImagePlus className="h-8 w-8" /></div>}
         {(setup === "new" || isMsg || callMode || (setup === "post" && !!postCta) || (objective === "ENGAGEMENT" && engLoc !== "ON_AD")) && (
           <div className="flex items-center justify-between gap-2 bg-fb-bg p-3">
             <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{isMsg ? (finalDests.includes("WHATSAPP") && finalDests.length === 1 ? "WhatsApp" : "Messenger") : link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com"}</p><p className="truncate text-[13px] font-semibold">{setup === "new" ? (headline || "Headline") : (page?.page_name ?? "")}</p></div>
@@ -1019,7 +1023,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   </ul>
                 </div>
               )}
-              <div className="space-y-2 overflow-hidden"><p className="text-[13px] font-semibold">Ad preview</p>{preview}</div>
+              <div className="space-y-2 overflow-hidden"><div className="flex items-center justify-between"><p className="text-[13px] font-semibold">Ad preview</p><button type="button" className="text-[12px] font-semibold text-fb-blue" onClick={() => { setForce((x) => x + 1); if (posts !== null) loadPosts(true); }}>Update now</button></div>{preview}</div>
             </div>
           </div>
         </main>
