@@ -574,7 +574,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   {pixels?.length === 0 && <option value="">কোনো Dataset নেই</option>}
                   {(pixels ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                {pixels?.length === 0 && <p className="mt-1 text-[12px] text-destructive">এই ad account-এ কোনো Pixel/Dataset নেই — admin-কে বলুন।</p>}
+                {pixels?.length === 0 && (
+                  <p className="mt-1 text-[12px] text-destructive">
+                    {acc?.kind === "shared"
+                      ? "এই ad account-এ কোনো Pixel/Dataset নেই — admin-কে বলুন।"
+                      : "এই ad account-এ কোনো Pixel/Dataset নেই। Meta Events Manager (business.facebook.com/events_manager) থেকে এই account-এর জন্য একটি Dataset বানান, তারপর এখানে ফিরে এসে আবার চেষ্টা করুন।"}
+                  </p>
+                )}
               </Field>
               <Field label="Conversion event" req hint="The action you want people to take when they see your ads.">
                 <select className={sel} value={customEvent} onChange={(e) => setCustomEvent(e.target.value)}>
