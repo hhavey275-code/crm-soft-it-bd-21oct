@@ -153,6 +153,16 @@ function friendly(e: any): string {
   return m;
 }
 
+async function clientUserToken(supabaseAdmin: any, userId: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabaseAdmin.from("client_user_tokens").select("access_token").eq("user_id", userId).maybeSingle();
+    if (!data?.access_token) return undefined;
+    const sec = process.env.BM_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const { decryptToken } = await import("@/lib/metaGraph.server");
+    return await decryptToken(data.access_token, sec);
+  } catch { return undefined; }
+}
+
 async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: string): Promise<string | undefined> {
   try {
     const { data } = await supabaseAdmin.from("client_page_tokens").select("access_token,user_id").eq("page_id", pageId).limit(10);
@@ -478,7 +488,19 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if ((await sharedAccountIds(supabaseAdmin, page.user_id)).includes(wantAcc)) shared = true;
   else if ((await ownAccounts(supabaseAdmin, page.user_id, true, isAdmin)).some((a: any) => a.id === wantAcc)) shared = false;
   else throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
-  const { token, act, bmId } = await tokenFor(supabaseAdmin, wantAcc);
+  const tf = await tokenFor(supabaseAdmin, wantAcc);
+  const { act, bmId } = tf;
+  let token = tf.token;
+  // Own account: prefer the client's own Facebook login when it can use this ad account,
+  // so their Page works even if our Business Manager has no access to it.
+  let usingClientLogin = false;
+  if (!shared) {
+    const ut = await clientUserToken(supabaseAdmin, page.user_id);
+    if (ut) {
+      const ok: any = await graphClient(ut).get(act, { fields: "id" }).catch(() => null);
+      if (ok?.id) { token = ut; usingClientLogin = true; }
+    }
+  }
   const g = graphClient(token);
   const pageId = String(page.page_id);
 
@@ -631,7 +653,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const why: Record<number, string> = { 2: "Disabled", 3: "বিল বাকি (Unsettled)", 7: "Review চলছে", 9: "Grace period", 100: "বন্ধের প্রক্রিয়ায়", 101: "Closed" };
     throw new Error(`এই ad account (${accInfo.name}) Facebook-এ চালু নেই — অবস্থা: ${why[Number(accInfo.account_status)] ?? accInfo.account_status}। অন্য একটি চালু ad account বেছে নিন বা Admin-কে জানান`);
   }
-  const accessProblem = await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId);
+  const accessProblem = usingClientLogin ? null : await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId);
 
   let campaignId: string | null = null;
   let step = "Campaign";
