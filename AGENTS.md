@@ -1,6 +1,6 @@
 # Project Architecture Rules
 
-- Resolve pasted Facebook Page links through the consenting client's me/accounts list or a Page-specific BM read before requesting access; never treat a numeric fallback as verified Page identity.
+- Resolve pasted Facebook Page links through the consenting client's me/accounts list or a Page-specific BM read before requesting access; a bare typed Page ID nobody can read may only be sent as a BM request (Facebook validates it), flagged unverified, never as verified identity.
 
 - Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
 
