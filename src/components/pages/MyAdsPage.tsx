@@ -291,10 +291,15 @@ export default function MyAdsPage() {
 
   const sel = tab === "campaign" ? selCampaigns : tab === "adset" ? selAdsets : selAds;
   const setSel = tab === "campaign" ? setSelCampaigns : tab === "adset" ? setSelAdsets : setSelAds;
-  const rowTotals = rows.reduce((t, r) => {
+  const summed = rows.reduce((t, r) => {
     t.spend += Number(r.insights?.spend || 0); t.impr += Number(r.insights?.impressions || 0);
     t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
   }, { spend: 0, impr: 0, reach: 0, results: 0 });
+  // Reach is de-duplicated by Meta, so unfiltered totals come from the account-level read.
+  const acct = (data as any)?.accountTotals;
+  const rowTotals = acct && quick === "all" && !search.trim()
+    ? { ...summed, spend: Number(acct.spend || 0), impr: Number(acct.impressions || 0), reach: Number(acct.reach || 0) }
+    : summed;
   const deleteObjects = async () => {
     if (!deleteTarget || busy) return;
     const { level, objects } = deleteTarget;

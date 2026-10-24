@@ -127,6 +127,39 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
         getSmall(g, `${act}/adsets`, "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
         getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
       ]);
+      // Meta pages lists at 100; big accounts (2000+ campaigns) lost most delivered rows.
+      // Read every insights page, then fetch any delivered object missing from the first page.
+      const insightsFields = "spend,impressions,reach,frequency,clicks,cpc,ctr,cpm,inline_link_clicks,cost_per_inline_link_click,actions,cost_per_action_type,action_values,purchase_roas";
+      const allPages = async (level: string) => {
+        const out: any[] = []; let after: string | undefined;
+        for (let i = 0; i < 20; i++) {
+          const r: any = await g.get(`${act}/insights`, { level, fields: `${level}_id,${insightsFields}`, time_range: JSON.stringify(dateRange), limit: "500", ...(after ? { after } : {}) }).catch(() => null);
+          if (!r) break; out.push(...(r.data ?? []));
+          after = r.paging?.next ? r.paging?.cursors?.after : undefined; if (!after) break;
+        }
+        return out;
+      };
+      const backfill = async (list: any[], ids: string[], fields: string) => {
+        const have = new Set(list.map((o: any) => String(o.id)));
+        const miss = ids.filter((id) => !have.has(id));
+        for (let i = 0; i < miss.length; i += 50) {
+          const r: any = await g.get("", { ids: miss.slice(i, i + 50).join(","), fields }).catch(() => null);
+          if (r) list.push(...Object.values(r));
+        }
+      };
+      let ci: any[] = [], si: any[] = [], ai: any[] = [], accTotal: any = null;
+      if (dateRange) {
+        [ci, si, ai, accTotal] = await Promise.all([
+          allPages("campaign"), allPages("adset"), allPages("ad"),
+          g.get(`${act}/insights`, { level: "account", fields: insightsFields, time_range: JSON.stringify(dateRange) }).then((r: any) => r.data?.[0] ?? null).catch(() => null),
+        ]);
+        camps.data = camps.data ?? []; adsets.data = adsets.data ?? []; ads.data = ads.data ?? [];
+        await Promise.all([
+          backfill(camps.data, ci.map((r) => String(r.campaign_id)), "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
+          backfill(adsets.data, si.map((r) => String(r.adset_id)), "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
+          backfill(ads.data, ai.map((r) => String(r.ad_id)), "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,effective_object_story_id,thumbnail_url}"),
+        ]);
+      }
       let ownAds: any[], ownSets: any[], ownCamps: any[];
       if (pageIds === null) {
         ownAds = ads.data ?? []; ownSets = adsets.data ?? []; ownCamps = camps.data ?? [];
@@ -140,19 +173,14 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
         ownCamps = (camps.data ?? []).filter((c: any) => owned.has(String(c.id)));
       }
 
-      if (dateRange && ownCamps.length) {
-        const tr = JSON.stringify(dateRange);
-        const fields = "spend,impressions,reach,frequency,clicks,cpc,ctr,cpm,inline_link_clicks,cost_per_inline_link_click,actions,cost_per_action_type,action_values,purchase_roas";
-        const [ci, si, ai] = await Promise.all(
-          (["campaign", "adset", "ad"] as const).map((level) =>
-            g.get(`${act}/insights`, { level, fields: `${level}_id,${fields}`, time_range: tr, limit: "500" }).catch(() => ({ data: [] })),
-          ),
-        );
+      if (dateRange) {
         const map = (rows: any[], key: string) => new Map(rows.map((r: any) => [String(r[key]), r]));
-        const cm = map(ci.data ?? [], "campaign_id"), sm = map(si.data ?? [], "adset_id"), am = map(ai.data ?? [], "ad_id");
+        const cm = map(ci, "campaign_id"), sm = map(si, "adset_id"), am = map(ai, "ad_id");
         ownCamps.forEach((c: any) => (c.insights = cm.get(String(c.id))));
         ownSets.forEach((s: any) => (s.insights = sm.get(String(s.id))));
         ownAds.forEach((a: any) => (a.insights = am.get(String(a.id))));
+        // Account-wide total only for own accounts; shared accounts may hold other clients' spend.
+        if (pageIds === null && accTotal) (result as any).accountTotals = accTotal;
       }
       const kind = pageIds === null ? "own" : "shared";
       const tag = (o: any) => ({ ...o, ad_account_db_id: accId, account_kind: kind });
