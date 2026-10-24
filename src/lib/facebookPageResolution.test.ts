@@ -10,8 +10,13 @@ describe("Facebook Page request resolution", () => {
     const page = await resolveFacebookPage("https://www.facebook.com/profile.php?id=100078746184144", { get: async () => { throw new Error("no BM access"); } }, { get: async () => ({ data: [{ id: "950812028110247", name: "IT Corner", link: "https://facebook.com/profile.php?id=100078746184144" }] }) });
     assert.equal(page.id, "950812028110247");
   });
-  it("does not request access using an unverified numeric fallback", async () => {
-    await assert.rejects(resolveFacebookPage("100078746184144", { get: async () => { throw new Error("denied"); } }), /Page নিশ্চিত করা যায়নি/);
+  it("lets Facebook validate a typed Page ID the BM cannot read yet, marked unverified", async () => {
+    const page: any = await resolveFacebookPage("61593375281848", { get: async () => { throw new Error("denied"); } });
+    assert.equal(page.id, "61593375281848");
+    assert.equal(page.unverified, true);
+  });
+  it("does not use a profile.php link number when unverifiable", async () => {
+    await assert.rejects(resolveFacebookPage("https://www.facebook.com/profile.php?id=100078746184144", { get: async () => { throw new Error("denied"); } }), /Page নিশ্চিত করা যায়নি/);
   });
   it("does not treat a person id/name lookup as proof of a Page", async () => {
     await assert.rejects(resolveFacebookPage("100078746184144", { get: async () => ({ id: "100078746184144", name: "A person" }) }), /Page নিশ্চিত করা যায়নি/);
