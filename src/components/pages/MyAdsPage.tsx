@@ -358,7 +358,7 @@ export default function MyAdsPage() {
       <DashboardLayout fullBleed hideChat>
         {wizard}
         {deleteDialog}
-        {isFetching && <MetaLoading />}
+        {isFetching && !data && <MetaLoading />}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
           <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
@@ -460,7 +460,7 @@ export default function MyAdsPage() {
     <DashboardLayout fullBleed hideChat>
       {wizard}
       {deleteDialog}
-      {isFetching && <MetaLoading />}
+      {isFetching && !data && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
@@ -474,7 +474,7 @@ export default function MyAdsPage() {
             <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={currentAccId} />
             <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
               <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-              {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
+              {cooldownLeft > 0 ? <span>{Math.ceil(cooldownLeft / 1000)}s</span> : <span className="hidden sm:inline">Update now</span>}
             </button>
           </div>
           <Select value={currentAccId ?? ""} onValueChange={pickAccount} disabled={!accounts.length}>
