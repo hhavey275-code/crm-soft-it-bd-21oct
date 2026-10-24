@@ -526,9 +526,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (!bmId) throw new Error("এই ad account-এর Business Manager CRM-এ পাওয়া যায়নি");
     const g = graphClient(token);
     const raw = body.pageUrl.trim();
-    const { resolveFacebookPage } = await import("@/lib/facebookPageResolution.server");
+    const { resolveFacebookPage, lookupPageIdByUsername } = await import("@/lib/facebookPageResolution.server");
     const userToken = await clientUserToken(supabaseAdmin, targetUser);
-    const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined);
+    const appToken = process.env.META_APP_ID && process.env.META_APP_SECRET ? `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}` : undefined;
+    const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined, (u) => lookupPageIdByUsername(u, appToken));
     const pageId = info.id;
     let already = false;
     let granted = false;
