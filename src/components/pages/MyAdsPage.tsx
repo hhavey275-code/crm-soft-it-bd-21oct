@@ -45,7 +45,8 @@ export default function MyAdsPage() {
   const { user } = useAuth();
   const uid = user?.id;
   const [tab, setTab] = useState<Level>("campaign");
-  const [range, setRange] = useState<FbRange>(() => makeRange("today"));
+  // Default to the last 7 days like Facebook Ads Manager, so results/spend are not empty on "today".
+  const [range, setRange] = useState<FbRange>(() => makeRange("7d"));
   const extra = useExtraColumns();
   const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
@@ -54,6 +55,7 @@ export default function MyAdsPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [search, setSearch] = useState("");
   const [quick, setQuick] = useState<"all" | "active" | "delivery">("all");
+  const [sortBy, setSortBy] = useState<"fb" | "results" | "cost" | "spend" | "newest">("fb");
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ level: Level; objects: any[] } | null>(null);
   const [lastManual, setLastManual] = useState(0);
