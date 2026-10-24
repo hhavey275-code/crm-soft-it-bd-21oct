@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Share My Ads filtering and deletion-cache rules between screen sizes in a browser-safe helper; delete Meta objects only through the API's existing ownership-checked mutation path.
+
 - Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.
 
 - Derive My Ads Create availability from the selected account's verified Meta summary through the browser-safe availability helper; failed or pending reads cannot enable creation, and Refresh must recheck the summary.
