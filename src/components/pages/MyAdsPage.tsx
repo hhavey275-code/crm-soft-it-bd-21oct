@@ -5,6 +5,7 @@ import { format, subDays } from "date-fns";
 import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
+import { useAuth } from "@/contexts/AuthContext";
 import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +42,8 @@ const budget = (o: any) =>
 
 export default function MyAdsPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const uid = user?.id;
   const [tab, setTab] = useState<Level>("campaign");
   const [range, setRange] = useState<FbRange>(() => makeRange("today"));
   const extra = useExtraColumns();
@@ -62,14 +65,24 @@ export default function MyAdsPage() {
   const setMobileStep = (v: "accounts" | "campaigns") => { setMobileStepRaw(v); sessionStorage.setItem("myads-mobile-step", v); };
   const [newDraftId, setNewDraftId] = useState<string | undefined>(undefined);
   const [accSearch, setAccSearch] = useState("");
-  useEffect(() => { const v = localStorage.getItem("myads-account"); if (v) setAccSel(v); }, []);
+  // One-time cleanup: these caches used to be shared across logins on the same device,
+  // so one client could see another client's accounts/campaigns. Now every key is per-user.
+  useEffect(() => {
+    try {
+      localStorage.removeItem("myads-account");
+      localStorage.removeItem("myads-accounts-cache");
+      localStorage.removeItem("myads-drafts-v2");
+      Object.keys(localStorage).filter((k) => k.startsWith("myads-list:")).forEach((k) => localStorage.removeItem(k));
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { if (!uid) return; const v = localStorage.getItem(`myads-account:${uid}`); if (v) setAccSel(v); }, [uid]);
   const [drafts, setDrafts] = useState<CampaignDraft[]>([]);
   const [openDraftObj, setOpenDraftObj] = useState<CampaignDraft | undefined>(undefined);
   useEffect(() => {
-    const load = () => setDrafts(listDrafts());
+    const load = () => setDrafts(listDrafts(uid));
     load(); window.addEventListener("myads-drafts", load);
     return () => window.removeEventListener("myads-drafts", load);
-  }, []);
+  }, [uid]);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
@@ -80,31 +93,33 @@ export default function MyAdsPage() {
     queryKey: ["managed-ads-list", dates, accSel],
     queryFn: async () => {
       const r: any = await managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) });
-      try { localStorage.setItem(`myads-list:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`, JSON.stringify(r)); } catch { /* storage full */ }
+      try { if (uid) localStorage.setItem(`myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`, JSON.stringify(r)); } catch { /* storage full */ }
       return r;
     },
     // Show the last saved list instantly; only "Update now" (or a first-ever visit) asks Facebook again.
-    initialData: () => { try { const c = localStorage.getItem(`myads-list:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    // The cache key carries the user id, so another user on this device never sees it.
+    initialData: () => { try { if (!uid) return undefined; const c = localStorage.getItem(`myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    enabled: !onAccountPicker,
+    enabled: !!uid && !onAccountPicker,
   });
   // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
   const { data: fastAccounts, isFetching: fastLoading } = useQuery({
-    queryKey: ["managed-ads-accounts"],
+    queryKey: ["managed-ads-accounts", uid],
     queryFn: async () => {
       const r = await managedAds<{ accounts: any[] }>({ action: "accounts" });
-      try { localStorage.setItem("myads-accounts-cache", JSON.stringify(r.accounts)); } catch { /* ignore */ }
+      try { if (uid) localStorage.setItem(`myads-accounts-cache:${uid}`, JSON.stringify(r.accounts)); } catch { /* ignore */ }
       return r.accounts;
     },
-    initialData: () => { try { const c = localStorage.getItem("myads-accounts-cache"); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    initialData: () => { try { if (!uid) return undefined; const c = localStorage.getItem(`myads-accounts-cache:${uid}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
     initialDataUpdatedAt: 0,
     staleTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    enabled: !!uid,
   });
 
   const cooldownLeft = Math.max(0, lastManual + COOLDOWN_MS - now);
@@ -170,7 +185,7 @@ export default function MyAdsPage() {
   const currentAccId: string | undefined = accSel ?? data?.selectedAccountId ?? accounts[0]?.id;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
   const isShared = currentAcc?.kind === "shared";
-  const pickAccount = (id: string) => { setAccSel(id); localStorage.setItem("myads-account", id); setSelCampaigns([]); setSelAdsets([]); setSelAds([]); };
+  const pickAccount = (id: string) => { setAccSel(id); if (uid) localStorage.setItem(`myads-account:${uid}`, id); setSelCampaigns([]); setSelAdsets([]); setSelAds([]); };
   const orderedAccounts = currentAcc ? [currentAcc, ...accounts.filter((a) => a.id !== currentAcc.id)] : accounts;
   const summaryIds = accounts
     .filter((a) => !accSearch.trim() || `${a.name} ${a.account_id}`.toLowerCase().includes(accSearch.trim().toLowerCase()))
@@ -216,14 +231,14 @@ export default function MyAdsPage() {
   useEffect(() => {
     const st = sessionStorage.getItem("myads-mobile-step");
     // Returning client with a saved account goes straight to campaigns — no re-selecting.
-    if (st === "campaigns" || (!st && !!localStorage.getItem("myads-account"))) setMobileStepRaw("campaigns");
+    if (st === "campaigns" || (!st && !!uid && !!localStorage.getItem(`myads-account:${uid}`))) setMobileStepRaw("campaigns");
     const wid = sessionStorage.getItem("myads-wizard");
     if (wid) {
-      const d = listDrafts().find((x) => x.id === wid);
+      const d = listDrafts(uid).find((x) => x.id === wid);
       if (d) setOpenDraftObj(d); else setNewDraftId(wid);
       setCreating(true);
     }
-  }, []);
+  }, [uid]);
   const [libOpen, setLibOpen] = useState(false);
   const wizard = creating && (
         <ManagedCreateWizard
@@ -233,6 +248,7 @@ export default function MyAdsPage() {
           allPages={allPages}
           walletBalance={Number(data?.walletBalance ?? 0)}
           draft={openDraftObj}
+          userId={uid}
           onClose={closeWizard}
           onCreated={() => { closeWizard(); refetch(); }}
         />

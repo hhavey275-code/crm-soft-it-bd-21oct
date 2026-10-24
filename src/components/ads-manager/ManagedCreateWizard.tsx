@@ -41,6 +41,7 @@ interface Props {
   onCreated: () => void;
   draft?: CampaignDraft;
   newDraftId?: string;
+  userId?: string;
 }
 
 // One ad inside an ad set.
@@ -121,7 +122,7 @@ function Radio({ on, title, desc, onClick, disabled }: { on: boolean; title: str
 }
 const Adv = () => <span className="inline-flex items-center gap-1 rounded-full bg-fb-green/10 px-2 py-0.5 text-[11px] font-semibold text-fb-green"><Sparkles className="h-3 w-3" />Advantage+ on</span>;
 
-export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft, newDraftId }: Props) {
+export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft, newDraftId, userId }: Props) {
   const pages = allPages.filter((p) => p.status !== "rejected");
   const [phase, setPhase] = useState<"objective" | "edit">("objective");
   const [pick, setPick] = useState<Obj | null>(null);
@@ -355,13 +356,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const lastSaved = useRef<string>("");
   useEffect(() => {
     if (!restored.current || phase !== "edit" || snapJson === lastSaved.current) return;
-    const t = setTimeout(() => { lastSaved.current = snapJson; saveDraft(draftId, JSON.parse(snapJson)); }, 600);
+    const t = setTimeout(() => { lastSaved.current = snapJson; saveDraft(draftId, JSON.parse(snapJson), userId); }, 600);
     return () => clearTimeout(t);
-  }, [snapJson, phase, draftId]);
-  const clearDraft = () => deleteDraft(draftId);
+  }, [snapJson, phase, draftId, userId]);
+  const clearDraft = () => deleteDraft(draftId, userId);
   const askClose = () => (phase === "edit" ? setConfirmClose(true) : onClose());
   const discard = () => { clearDraft(); setConfirmClose(false); onClose(); };
-  const keepDraft = () => { saveDraft(draftId, snapshot); setConfirmClose(false); toast.success("Draft হিসেবে রাখা হয়েছে — list-এ দেখা যাবে"); onClose(); };
+  const keepDraft = () => { saveDraft(draftId, snapshot, userId); setConfirmClose(false); toast.success("Draft হিসেবে রাখা হয়েছে — list-এ দেখা যাবে"); onClose(); };
 
   // Browser back / reload should not silently lose the campaign.
   useEffect(() => {
