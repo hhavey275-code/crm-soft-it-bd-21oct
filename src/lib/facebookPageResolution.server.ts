@@ -13,7 +13,25 @@ export function facebookPageReference(input: string): string {
 }
 
 /** A profile.php URL can use an ID different from /me/accounts' canonical Page ID. */
-export async function resolveFacebookPage(input: string, bm: GraphReader, client?: GraphReader) {
+/** Username Page link → numeric Page ID via Meta app read, then public page HTML. Unverified. */
+export async function lookupPageIdByUsername(username: string, appToken?: string): Promise<{ id: string; name?: string } | null> {
+  if (!/^[A-Za-z0-9.\-_]{2,100}$/.test(username)) return null;
+  if (appToken) {
+    const r: any = await fetch(`https://graph.facebook.com/v25.0/${encodeURIComponent(username)}?fields=id,name&access_token=${encodeURIComponent(appToken)}`).then((x) => x.json()).catch(() => null);
+    if (r?.id && /^\d+$/.test(String(r.id))) return { id: String(r.id), name: r.name };
+  }
+  for (const host of ["https://www.facebook.com", "https://m.facebook.com"]) {
+    const html = await fetch(`${host}/${encodeURIComponent(username)}`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36", "Accept-Language": "en-US" } }).then((x) => x.text()).catch(() => "");
+    const m = html.match(/"pageID":"(\d{8,25})"/) || html.match(/fb:\/\/(?:page|profile)\/(?:\?id=)?(\d{8,25})/) || html.match(/"delegate_page":\{[^}]*"id":"(\d{8,25})"/) || html.match(/"userID":"(\d{8,25})"/);
+    if (m) {
+      const name = html.match(/<meta property="og:title" content="([^"]+)"/)?.[1];
+      return { id: m[1], name };
+    }
+  }
+  return null;
+}
+
+export async function resolveFacebookPage(input: string, bm: GraphReader, client?: GraphReader, lookup?: (username: string) => Promise<{ id: string; name?: string } | null>) {
   const ref = facebookPageReference(input);
   if (!ref) throw new Error("Page-এর পুরো লিংক বা Page ID দিন");
   if (client) {
