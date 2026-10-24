@@ -102,6 +102,7 @@ const schema = z.discriminatedUnion("action", [
     msgDestinations: z.array(z.enum(["MESSENGER", "WHATSAPP"])).max(2).optional(),
     whatsappNumber: z.string().max(30).optional(),
     phoneNumber: z.string().max(30).optional(),
+    mainDestination: z.enum(["WEBSITE", "CALL"]).optional(),
     publish: z.boolean(),
   }),
 ]);
@@ -547,19 +548,20 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   let map: { objective: string; goal: string; destination: string; cta: string } = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
   if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
   if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
-  if (eng === "CALLS") map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
+  const callAd = eng === "CALLS" || (!eng && !msging && body.mainDestination === "CALL" && ["SALES", "LEADS", "TRAFFIC"].includes(body.objective));
+  if (callAd) map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
   if (eng === "PAGE_LIKES") map = { ...base, goal: "PAGE_LIKES", destination: "ON_PAGE", cta: "LIKE_PAGE" };
   if (eng === "EVENT") map = { ...base, goal: "EVENT_RESPONSES", destination: "ON_EVENT", cta: "" };
   if (eng === "EVENT" && !body.existingPostId) throw new Error("Event response-এর জন্য page-এর event post বাছুন");
   if (body.videoPath && !body.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
   const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
   const waOnly = map.destination === "WHATSAPP";
-  if (eng === "CALLS" && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
+  if (callAd && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
   if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
-  const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging;
+  const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging && !callAd;
   if (eng === "ON_AD" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
   if (pixelNeeded && (!body.pixelId || (!body.customEvent && !body.customConversionId))) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
-  if ((pixelNeeded || body.objective === "TRAFFIC") && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
+  if ((pixelNeeded || (body.objective === "TRAFFIC" && !callAd)) && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
 
   const cents = String(Math.round(body.amount * 100));
   const budgetKey = body.budgetType === "daily" ? "daily_budget" : "lifetime_budget";
@@ -643,7 +645,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     let creative: Record<string, unknown>;
     // A plain existing post has no Message/Call button, so Meta rejects it for message/call/website ads
     // (#1487891). For those, rebuild the ad from the post's own text + photo with the right button.
-    const rebuildFromPost = !!body.existingPostId && (isMsg || eng === "CALLS" || eng === "WEBSITE");
+    // Also rebuild when the client picked a button (e.g. Order Now) for an existing post.
+    const rebuildFromPost = !!body.existingPostId && (isMsg || callAd || eng === "WEBSITE" || (!!body.cta && body.objective !== "AWARENESS" && eng !== "ON_AD" && eng !== "EVENT"));
     let postText: string | undefined; let postImageB64: string | undefined;
     if (rebuildFromPost) {
       const storyId = body.existingPostId!.includes("_") ? body.existingPostId! : `${pageId}_${body.existingPostId}`;
@@ -675,10 +678,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       const link = waOnly ? "https://api.whatsapp.com/send"
         : isMsg ? "https://fb.com/messenger_doc/"
         : body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : eng === "CALLS" ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
+      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : callAd ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
       const cta: Record<string, unknown> = {
         type: ctaType,
-        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : eng === "CALLS" ? { link: `tel:${body.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
+        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : callAd ? { link: `tel:${body.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
       };
       const msgs = (body.messages ?? []).map((x) => x.trim()).filter(Boolean);
       const heads = (body.headlines ?? []).map((x) => x.trim()).filter(Boolean);
