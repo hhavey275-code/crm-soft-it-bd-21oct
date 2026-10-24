@@ -555,7 +555,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const { data: ex } = await supabaseAdmin.from("client_facebook_pages").select("id").eq("user_id", targetUser).eq("page_id", pageId).maybeSingle();
     if (!ex) await supabaseAdmin.from("client_facebook_pages").insert({ user_id: targetUser, page_id: pageId, page_name: info?.name || `Page ${pageId}`, page_url: info?.link || raw, ad_account_id: wantAcc } as any);
     const bm: any = await g.get(String(bmId), { fields: "name" }).catch(() => null);
-    return { ok: true, already, pageId, pageName: info?.name ?? null, bmName: bm?.name ?? null, bmId: String(bmId) };
+    return { ok: true, already, granted, pageId, pageName: info?.name ?? null, bmName: bm?.name ?? null, bmId: String(bmId) };
   }
 
   // interests + create need an approved page owned by the caller
