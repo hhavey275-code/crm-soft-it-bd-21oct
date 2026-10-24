@@ -157,7 +157,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const draftId = useRef(draft?.id ?? newDraftId ?? crypto.randomUUID()).current;
   const snapshot = { phase, pick, objective, level, pageDbId, accId, campaignName, budgetLevel, budgetType, amount, bidStrategy, bidAmount, special,
     adsetName, location, customEvent, startTime, hasEnd, endTime, countries, ageMin, ageMax, gender, interests, adName, setup, postId,
-    message, headline, link, cta, engLoc, destMode, dests, phone };
+    message, headline, link, cta, engLoc, destMode, dests, phone, postCta, video: video ? { ...video, src: video.src?.startsWith("blob:") ? null : video.src } : null };
   useEffect(() => {
     try {
       const d = draft?.data;
@@ -166,7 +166,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           budgetLevel: setBudgetLevel, budgetType: setBudgetType, amount: setAmount, bidStrategy: setBidStrategy, bidAmount: setBidAmount, special: setSpecial,
           adsetName: setAdsetName, location: setLocation, customEvent: setCustomEvent, startTime: setStartTime, hasEnd: setHasEnd, endTime: setEndTime,
           countries: setCountries, ageMin: setAgeMin, ageMax: setAgeMax, gender: setGender, interests: setInterests, adName: setAdName, setup: setSetup,
-          message: setMessage, headline: setHeadline, link: setLink, cta: setCta, engLoc: setEngLoc, destMode: setDestMode, dests: setDests, phone: setPhone };
+          message: setMessage, headline: setHeadline, link: setLink, cta: setCta, engLoc: setEngLoc, destMode: setDestMode, dests: setDests, phone: setPhone, postCta: setPostCta, video: setVideo };
         for (const [k, f] of Object.entries(S)) if (d[k] !== undefined) f(d[k]);
         if (d.pageDbId && pages.some((p) => p.id === d.pageDbId)) setPageDbId(d.pageDbId);
         if (d.accId && accounts.some((a) => a.id === d.accId)) setAccId(d.accId);
