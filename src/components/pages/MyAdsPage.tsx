@@ -78,9 +78,18 @@ export default function MyAdsPage() {
   const onAccountPicker = isMobile && mobileStep === "accounts";
   const { data, isFetching, error, refetch } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
-    queryFn: () => managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) }),
-    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const r: any = await managedAds({ action: "list", ...dates, ...(accSel ? { adAccountDbId: accSel } : {}) });
+      try { localStorage.setItem(`myads-list:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`, JSON.stringify(r)); } catch { /* storage full */ }
+      return r;
+    },
+    // Show the last saved list instantly; only "Update now" (or a first-ever visit) asks Facebook again.
+    initialData: () => { try { const c = localStorage.getItem(`myads-list:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     enabled: !onAccountPicker,
   });
   // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
@@ -93,7 +102,8 @@ export default function MyAdsPage() {
     },
     initialData: () => { try { const c = localStorage.getItem("myads-accounts-cache"); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
     initialDataUpdatedAt: 0,
-    staleTime: 5 * 60_000,
+    staleTime: Infinity,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
 
@@ -169,7 +179,8 @@ export default function MyAdsPage() {
     queryKey: ["managed-ads-acc-summary", summaryIds.join(",")],
     queryFn: async () => (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: summaryIds })).summary,
     enabled: isMobile && mobileStep === "accounts" && summaryIds.length > 0,
-    staleTime: 5 * 60_000,
+    staleTime: Infinity,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
 
@@ -180,7 +191,8 @@ export default function MyAdsPage() {
       return (await managedAds<{ summary: Record<string, any> }>({ action: "account_summary", ids: [currentAcc.id] })).summary;
     },
     enabled: !!currentAcc?.id,
-    staleTime: 2 * 60_000,
+    staleTime: Infinity,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
   const curSm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
@@ -346,7 +358,7 @@ export default function MyAdsPage() {
       <DashboardLayout fullBleed hideChat>
         {wizard}
         {deleteDialog}
-        {isFetching && <MetaLoading />}
+        {isFetching && !data && <MetaLoading />}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
         <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
           <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
@@ -448,7 +460,7 @@ export default function MyAdsPage() {
     <DashboardLayout fullBleed hideChat>
       {wizard}
       {deleteDialog}
-      {isFetching && <MetaLoading />}
+      {isFetching && !data && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
@@ -459,10 +471,10 @@ export default function MyAdsPage() {
               {isFetching ? "Updating…" : updatedAgo == null ? "" : updatedAgo < 1 ? "Updated just now" : `Updated ${updatedAgo} min ago`}
             </span>
             <button className={tbBtn} onClick={() => setLibOpen(true)} title="Video library"><Film className="h-4 w-4" /><span className="hidden sm:inline">Video library</span></button>
-            <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} />
+            <VideoLibrary open={libOpen} onClose={() => setLibOpen(false)} accId={currentAccId} />
             <button className={tbBtn} disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
               <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-              {cooldownLeft > 0 && <span>{Math.ceil(cooldownLeft / 1000)}s</span>}
+              {cooldownLeft > 0 ? <span>{Math.ceil(cooldownLeft / 1000)}s</span> : <span className="hidden sm:inline">Update now</span>}
             </button>
           </div>
           <Select value={currentAccId ?? ""} onValueChange={pickAccount} disabled={!accounts.length}>
