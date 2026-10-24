@@ -25,6 +25,7 @@ import { FacebookConnectButton } from "@/components/client/FacebookConnectButton
 import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { myAdsAvailability } from "@/lib/myAdsAvailability";
+import { MetaLoading } from "@/components/ads-manager/MetaLoading";
 
 type Level = "campaign" | "adset" | "ad";
 const COOLDOWN_MS = 2 * 60_000;
@@ -237,7 +238,7 @@ export default function MyAdsPage() {
               <h1 className="text-center text-lg font-bold">Select account</h1>
               <Input className="mt-3 h-11 rounded-full border-fb-border px-4" placeholder="Search accounts" value={accSearch} onChange={(e) => setAccSearch(e.target.value)} />
             </div>
-            {fastLoading && !accounts.length && <p className="py-10 text-center text-fb-muted">Loading…</p>}
+            {fastLoading && !accounts.length && <MetaLoading label="Ad account খুঁজছি…" />}
             {data && list.length === 0 && <p className="py-10 text-center text-fb-muted">কোনো ad account পাওয়া যায়নি।</p>}
             <div className="divide-y divide-fb-border">
               {list.map((a) => {
@@ -331,7 +332,7 @@ export default function MyAdsPage() {
               <h2 className="text-2xl font-bold">Campaigns</h2>
             </div>
             <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
-            {isFetching && !data && <p className="py-8 text-center text-fb-muted">Loading…</p>}
+            {isFetching && !data && <MetaLoading label="Campaign আনছি…" />}
             {drafts.map((d) => (
               <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -497,7 +498,7 @@ export default function MyAdsPage() {
               </tr>
             </thead>
             <tbody>
-              {isFetching && !data && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">Loading…</td></tr>}
+              {isFetching && !data && <tr><td colSpan={16}><MetaLoading label="Campaign আনছি…" /></td></tr>}
               {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
               {tab === "campaign" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
                 <tr key={d.id} className="border-b border-fb-border hover:bg-fb-blue-soft/50">
