@@ -288,6 +288,9 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   }
 
   if (body.action === "list") {
+    const listP = loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first" });
+    const walletP = walletBalance(supabaseAdmin, targetUser);
+    listP.catch(() => null); walletP.catch(() => null);
     const { error: keyErr } = await supabaseAdmin.from("ad_accounts").select("id", { head: true, count: "exact" });
     if (keyErr) {
       const { describeKey } = await import("@/lib/serverKey");
@@ -297,8 +300,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         : k.projectRef && k.projectRef !== "dhswrfzdqcavgmymllat" ? "key-টা অন্য Supabase project-এর" : `সার্ভার বলছে: ${keyErr.message || keyErr.code || "অনুমতি নেই"}`;
       throw new Error(`সার্ভারের গোপন key (SUPABASE_SERVICE_ROLE_KEY) ঠিক নেই — ${why}। Vercel-এ সঠিক service_role key বসিয়ে Redeploy করুন`);
     }
-    const data = await loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first" });
-    return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
+    const [data, wb] = await Promise.all([listP, walletP]);
+    return { ...data, ...settings, walletBalance: wb, fetchedAt: new Date().toISOString() };
   }
 
   if (body.action === "delete" || body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
