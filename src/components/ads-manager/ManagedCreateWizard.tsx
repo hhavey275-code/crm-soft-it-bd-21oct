@@ -142,7 +142,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [dests, setDests] = useState<("MESSENGER" | "WHATSAPP")[]>(["MESSENGER"]);
   const [pageInfo, setPageInfo] = useState<{ whatsappNumber: string | null; phone: string | null; picture: string | null; pageTokenMissing?: boolean } | null>(null);
   const [phone, setPhone] = useState("");
-  const [mainDest, setMainDest] = useState<"WEBSITE" | "CALL">("WEBSITE");
+  const [mainDest, setMainDest] = useState<"WEBSITE" | "CALL" | "BOTH">("WEBSITE");
   const [postCta, setPostCta] = useState("");
   const [libOpen, setLibOpen] = useState(false);
   const [infoTick, setInfoTick] = useState(0);
@@ -202,6 +202,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const isMsg = objective === "ENGAGEMENT" ? engLoc === "MESSAGING" : location === "MESSAGING" && (objective === "SALES" || objective === "LEADS");
   const canCall = (objective === "SALES" || objective === "LEADS" || objective === "TRAFFIC") && !isMsg;
   const callMode = objective === "ENGAGEMENT" ? engLoc === "CALLS" : canCall && mainDest === "CALL";
+  const bothMode = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE" && mainDest === "BOTH";
   const needsPixel = (objective === "SALES" || objective === "LEADS") && location === "WEBSITE" && !callMode;
   const [waManual, setWaManual] = useState("");
   const wa = (pageInfo?.whatsappNumber && pageInfo.whatsappNumber !== "linked" ? pageInfo.whatsappNumber : null) ?? (waManual.replace(/[^\d+]/g, "").length >= 8 ? waManual.replace(/[^\d+]/g, "") : pageInfo?.whatsappNumber === "linked" ? "WhatsApp connected ✓ (Page-এর Primary নম্বর)" : null);
@@ -301,7 +302,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     campaign: !campaignName.trim() || amt < 1 || overWallet,
     adset: !adsetName.trim() || !countries.length
       || (objective === "ENGAGEMENT" && engLoc === "MESSAGING" && (!finalDests.length || (finalDests.includes("WHATSAPP") && !wa)))
-      || (callMode && !phone.trim()) || (needsPixel && !pixelId) || (budgetType === "lifetime" && !hasEnd),
+      || ((callMode || bothMode) && !phone.trim()) || (needsPixel && !pixelId) || (budgetType === "lifetime" && !hasEnd),
     ad: !adName.trim() || !pageDbId || !accId
       || (setup === "post" && !postId) || (needLink && !/^https?:\/\//.test(link)),
   };
@@ -317,7 +318,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     budgetType === "lifetime" && !hasEnd && { lv: 1 as const, t: "Lifetime budget-এর জন্য End date দিন" },
     objective === "ENGAGEMENT" && engLoc === "MESSAGING" && !finalDests.length && { lv: 1 as const, t: "Messenger বা WhatsApp বাছুন" },
     objective === "ENGAGEMENT" && engLoc === "MESSAGING" && finalDests.includes("WHATSAPP") && !wa && { lv: 1 as const, t: "Page-এ WhatsApp number যুক্ত নেই" },
-    callMode && !phone.trim() && { lv: 1 as const, t: "Phone number লিখুন" },
+    (callMode || bothMode) && !phone.trim() && { lv: 1 as const, t: "Phone number লিখুন" },
     !adName.trim() && { lv: 2 as const, t: "Ad name লিখুন" },
     !pageDbId && { lv: 2 as const, t: "Facebook Page বাছুন" },
     setup === "post" && !postId && { lv: 2 as const, t: "একটি existing post বাছুন" },
@@ -353,7 +354,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         link: link || undefined,
         cta: isMsg || callMode ? undefined : setup === "new" ? cta : postCta || undefined,
         mainDestination: canCall ? mainDest : undefined,
-        phoneNumber: callMode ? phone.trim() : undefined,
+        phoneNumber: callMode || bothMode ? phone.trim() : undefined,
         imageBase64: setup === "new" ? image?.b64 : undefined,
         videoId: setup === "new" && video ? video.id : undefined,
         connections,
@@ -561,12 +562,14 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       {(objective === "SALES" || objective === "LEADS") && (
         <Section title="Conversion" ok={!needsPixel || !!pixelId}>
           <Field label="Conversion location">
-            <select className={sel} value={location === "WEBSITE" && mainDest === "CALL" ? "CALLS" : location} onChange={(e) => {
+            <select className={sel} value={location === "WEBSITE" && mainDest === "CALL" ? "CALLS" : location === "WEBSITE" && mainDest === "BOTH" ? "BOTH" : location} onChange={(e) => {
               const v = e.target.value;
               if (v === "CALLS") { setLocation("WEBSITE" as any); setMainDest("CALL"); }
+              else if (v === "BOTH") { setLocation("WEBSITE" as any); setMainDest("BOTH"); }
               else { setLocation(v as any); setMainDest("WEBSITE"); }
             }}>
               <option value="WEBSITE">Website</option>
+              <option value="BOTH">Website and calls</option>
               <option value="CALLS">Calls</option>
               <option value="MESSAGING">Message destinations (Messenger)</option>
             </select>
@@ -808,10 +811,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         )}
       </Section>
       {!isMsg && objective !== "AWARENESS" && (objective !== "ENGAGEMENT" || engLoc === "WEBSITE") && (
-        <Section title="Destination" ok={callMode ? !!phone.trim() : !needLink || /^https?:\/\//.test(link)}>
+        <Section title="Destination" ok={callMode ? !!phone.trim() : bothMode ? !!phone.trim() && /^https?:\/\//.test(link) : !needLink || /^https?:\/\//.test(link)}>
           <Field label="Main destination">
             <select className={sel} value={canCall ? mainDest : "WEBSITE"} disabled={!canCall} onChange={(e) => setMainDest(e.target.value as any)}>
               <option value="WEBSITE">Website</option>
+              {canCall && (objective === "SALES" || objective === "LEADS") && <option value="BOTH">Website and calls</option>}
               {canCall && <option value="CALL">Calls</option>}
             </select>
           </Field>
@@ -822,6 +826,11 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           ) : (
             <Field label="Website URL" req={needLink}>
               <input className={cn(inp, needLink && !/^https?:\/\//.test(link) && "border-destructive")} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Enter the URL people visit after your ad" />
+            </Field>
+          )}
+          {bothMode && (
+            <Field label="Call now" req hint="Website-এ ঢোকার পরও মানুষ এই নম্বরে Call now চেপে call করতে পারবে।">
+              <input className={cn(inp, !phone.trim() && "border-destructive")} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+8809647222999" />
             </Field>
           )}
           {setup === "post" && !callMode && (
