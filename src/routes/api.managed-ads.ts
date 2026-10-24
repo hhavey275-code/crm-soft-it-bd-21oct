@@ -226,7 +226,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const g = graphClient(token);
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
-      return { videos: (r.data ?? []).map((v: any) => ({ id: String(v.id), title: v.title || "Video", picture: v.picture ?? null, length: v.length ?? null, source: v.source ?? null, created: v.created_time ?? null })) };
+      const list = r.data ?? [];
+      // Some videos come back without a playable link in the list; ask each one directly.
+      await Promise.all(list.filter((v: any) => !v.source).map(async (v: any) => {
+        const one = await g.get(String(v.id), { fields: "source,picture" }).catch(() => null);
+        if (one?.source) v.source = one.source;
+        if (!v.picture && one?.picture) v.picture = one.picture;
+      }));
+      return { videos: list.map((v: any) => ({ id: String(v.id), title: v.title || "Video", picture: v.picture ?? null, length: v.length ?? null, source: v.source ?? null, created: v.created_time ?? null })) };
     }
     if (body.action === "video_start") {
       const r = await g.post(`${act}/advideos`, { upload_phase: "start", file_size: body.fileSize });

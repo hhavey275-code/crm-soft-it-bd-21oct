@@ -111,7 +111,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newUserId = newSession?.user?.id ?? null;
       setSession(newSession);
       setUser(newSession?.user ?? null);
-      if (newUserId !== currentUserId.current) {
+      const changed = newUserId !== currentUserId.current;
+      if (changed) {
         // User changed → clear stale role/profile immediately to avoid wrong UI
         currentUserId.current = newUserId;
         retryCount.current = 0;
@@ -119,6 +120,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
       if (newUserId) {
+        // Same user (token refresh when returning to the tab): keep the page mounted,
+        // otherwise open forms like the campaign wizard lose what was typed.
+        if (!changed) return;
         setLoading(true);
         void fetchUserData(newUserId);
         return;
