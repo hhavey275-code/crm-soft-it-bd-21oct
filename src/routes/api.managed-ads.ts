@@ -107,7 +107,7 @@ const schema = z.discriminatedUnion("action", [
     whatsappNumber: z.string().max(30).optional(),
     phoneNumber: z.string().max(30).optional(),
     videoId: z.string().regex(/^\d+$/).optional(),
-    mainDestination: z.enum(["WEBSITE", "CALL"]).optional(),
+    mainDestination: z.enum(["WEBSITE", "CALL", "BOTH"]).optional(),
     publish: z.boolean(),
   }),
 ]);
@@ -588,6 +588,8 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
   if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
   const callAd = eng === "CALLS" || (!eng && !msging && body.mainDestination === "CALL" && ["SALES", "LEADS", "TRAFFIC"].includes(body.objective));
+  const bothAd = !eng && !msging && body.mainDestination === "BOTH" && ["SALES", "LEADS"].includes(body.objective);
+  if (bothAd) map = { ...base, destination: "WEBSITE_AND_PHONE_CALL" };
   if (callAd) map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
   if (eng === "PAGE_LIKES") map = { ...base, goal: "PAGE_LIKES", destination: "ON_PAGE", cta: "LIKE_PAGE" };
   if (eng === "EVENT") map = { ...base, goal: "EVENT_RESPONSES", destination: "ON_EVENT", cta: "" };
@@ -595,7 +597,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   if (body.videoPath && !body.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
   const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
   const waOnly = map.destination === "WHATSAPP";
-  if (callAd && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
+  if ((callAd || bothAd) && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
   if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
   const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging && !callAd;
   if (eng === "ON_AD" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
@@ -685,7 +687,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     // A plain existing post has no Message/Call button, so Meta rejects it for message/call/website ads
     // (#1487891). For those, rebuild the ad from the post's own text + photo with the right button.
     // Also rebuild when the client picked a button (e.g. Order Now) for an existing post.
-    const rebuildFromPost = !!body.existingPostId && (isMsg || callAd || eng === "WEBSITE" || (!!body.cta && body.objective !== "AWARENESS" && eng !== "ON_AD" && eng !== "EVENT"));
+    const rebuildFromPost = !!body.existingPostId && (isMsg || callAd || bothAd || eng === "WEBSITE" || (!!body.cta && body.objective !== "AWARENESS" && eng !== "ON_AD" && eng !== "EVENT"));
     let postText: string | undefined; let postImageB64: string | undefined;
     if (rebuildFromPost) {
       const storyId = body.existingPostId!.includes("_") ? body.existingPostId! : `${pageId}_${body.existingPostId}`;
