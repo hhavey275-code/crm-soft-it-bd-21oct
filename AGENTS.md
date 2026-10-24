@@ -19,3 +19,4 @@
 - Display SoftCards callback failures from their existing log table in System Log, not the top-up tab, so historic and new errors share one diagnostic view without duplicate storage.
 - The My Ads create wizard supports multiple ad sets and ads per campaign: the form fields are an editing buffer for the selected node, flushed into an adsets[] store on navigation, and /api/managed-ads create accepts an adsets[] payload (wrapping legacy single-ad-set calls into the same shape), so one code path handles both.
 - Scope every My Ads browser cache and draft key (localStorage/sessionStorage) by the logged-in user id, so one client never sees another client's accounts, campaigns or drafts on a shared device.
+- On every client Facebook connect, share each returned Page with every Business Manager behind the client's ad accounts through the server-only Page-to-BM share helper (direct grant with the Page token, else BM request), so Pages never need manual linking one by one.
