@@ -12,6 +12,7 @@ const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("accounts"), asUserId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("delete"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({
     action: z.literal("update"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/),
@@ -263,12 +264,18 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { ...data, ...settings, walletBalance: await walletBalance(supabaseAdmin, targetUser), fetchedAt: new Date().toISOString() };
   }
 
-  if (body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
+  if (body.action === "delete" || body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
     const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId });
     const lvl = body.action === "set_budget" ? "adset" : body.level;
     const list = lvl === "campaign" ? owned.campaigns : lvl === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
     if (!obj) throw new Error("এই campaign/ad আপনার নয়");
+    if (body.action === "delete") {
+      const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
+      const result = await graphClient(token).post(body.objectId, { status: "DELETED" });
+      if (result?.success !== true) throw new Error("Facebook বিজ্ঞাপন মুছে দেওয়া নিশ্চিত করেনি — Refresh দিয়ে আবার দেখুন");
+      return { ok: true };
+    }
     const shared = obj.account_kind !== "own"; // own accounts spend their own limit, not the wallet
     const bal = await walletBalance(supabaseAdmin, targetUser);
     if (shared && body.action === "set_status" && body.status === "ACTIVE" && bal <= settings.pauseThreshold) {
