@@ -349,6 +349,18 @@ export default function MyAdsPage() {
       ))}
     </div>
   );
+  const sortPicker = (
+    <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+      <SelectTrigger className="h-9 w-full border-fb-border text-[13px] sm:w-[240px]"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="fb">Facebook order (Active আগে)</SelectItem>
+        <SelectItem value="results">বেশি result আগে</SelectItem>
+        <SelectItem value="cost">কম খরচে result আগে</SelectItem>
+        <SelectItem value="spend">বেশি খরচ আগে</SelectItem>
+        <SelectItem value="newest">নতুন আগে</SelectItem>
+      </SelectContent>
+    </Select>
+  );
   const levelName = tab === "campaign" ? "campaigns" : tab === "adset" ? "ad sets" : "ads";
   const updatedAgo = data?.fetchedAt ? Math.round((now - new Date(data.fetchedAt).getTime()) / 60000) : null;
   const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
@@ -403,7 +415,7 @@ export default function MyAdsPage() {
       );
     }
     const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
-    const mcamps = campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase())));
+    const mcamps = sortRows(campaigns.filter((c) => matchesAdsFilter(c, quick) && (!search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))));
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
