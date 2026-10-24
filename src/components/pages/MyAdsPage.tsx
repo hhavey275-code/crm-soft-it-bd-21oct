@@ -191,7 +191,8 @@ export default function MyAdsPage() {
   // Restore view + open wizard if the page was reloaded/remounted (e.g. on mobile)
   useEffect(() => {
     const st = sessionStorage.getItem("myads-mobile-step");
-    if (st === "campaigns") setMobileStepRaw("campaigns");
+    // Returning client with a saved account goes straight to campaigns — no re-selecting.
+    if (st === "campaigns" || (!st && !!localStorage.getItem("myads-account"))) setMobileStepRaw("campaigns");
     const wid = sessionStorage.getItem("myads-wizard");
     if (wid) {
       const d = listDrafts().find((x) => x.id === wid);
