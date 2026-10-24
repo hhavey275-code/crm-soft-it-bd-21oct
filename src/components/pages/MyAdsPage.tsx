@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { managedAds, resultOf, salesOf } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
+import { AdsAssistant } from "@/components/ads-manager/AdsAssistant";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
 import { ColumnsPicker, fmtCol, totalCol, useExtraColumns } from "@/components/ads-manager/fbColumns";
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
@@ -442,6 +443,7 @@ export default function MyAdsPage() {
       return (
         <DashboardLayout fullBleed hideChat>
           {wizard}
+        {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
           {fastLoading && !accounts.length && <MetaLoading />}
           <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
@@ -485,6 +487,7 @@ export default function MyAdsPage() {
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
+        {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
         {deleteDialog}
         {isFetching && !data && <MetaLoading />}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
