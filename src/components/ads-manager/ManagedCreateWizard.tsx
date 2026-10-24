@@ -561,8 +561,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       {(objective === "SALES" || objective === "LEADS") && (
         <Section title="Conversion" ok={!needsPixel || !!pixelId}>
           <Field label="Conversion location">
-            <select className={sel} value={location} onChange={(e) => setLocation(e.target.value as any)}>
+            <select className={sel} value={location === "WEBSITE" && mainDest === "CALL" ? "CALLS" : location} onChange={(e) => {
+              const v = e.target.value;
+              if (v === "CALLS") { setLocation("WEBSITE" as any); setMainDest("CALL"); }
+              else { setLocation(v as any); setMainDest("WEBSITE"); }
+            }}>
               <option value="WEBSITE">Website</option>
+              <option value="CALLS">Calls</option>
               <option value="MESSAGING">Message destinations (Messenger)</option>
             </select>
           </Field>
@@ -904,7 +909,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         </div>
         {text ? <p className="whitespace-pre-line px-3 pb-2 text-[13px] line-clamp-6">{text}</p> : <p className="px-3 pb-2 text-[13px] text-fb-muted">Primary text</p>}
         {img ? <img src={img} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted"><ImagePlus className="h-8 w-8" /></div>}
-        {(setup === "new" || isMsg || (objective === "ENGAGEMENT" && engLoc !== "ON_AD")) && (
+        {(setup === "new" || isMsg || callMode || (setup === "post" && !!postCta) || (objective === "ENGAGEMENT" && engLoc !== "ON_AD")) && (
           <div className="flex items-center justify-between gap-2 bg-fb-bg p-3">
             <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{isMsg ? (finalDests.includes("WHATSAPP") && finalDests.length === 1 ? "WhatsApp" : "Messenger") : link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com"}</p><p className="truncate text-[13px] font-semibold">{setup === "new" ? (headline || "Headline") : (page?.page_name ?? "")}</p></div>
             <span className="shrink-0 rounded-md bg-fb-border px-3 py-1.5 text-[12px] font-semibold text-foreground">{ctaLabel}</span>
