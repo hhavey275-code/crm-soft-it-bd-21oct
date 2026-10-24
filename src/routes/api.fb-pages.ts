@@ -160,7 +160,7 @@ async function handle(request: Request): Promise<Response> {
         }
 
         return json({
-          added, bmShared, signedIn: !!userId,
+          added, bmShared, bmRequested, bmFailed: bmFailed.slice(0, 10), noBm, signedIn: !!userId,
           saved,
           pages: pages.map((p) => ({
             id: String(p.id), name: String(p.name ?? ""),
