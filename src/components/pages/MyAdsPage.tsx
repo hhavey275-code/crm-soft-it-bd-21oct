@@ -49,7 +49,7 @@ export default function MyAdsPage() {
   const uid = user?.id;
   const [tab, setTab] = useState<Level>("campaign");
   // Default to the last 7 days like Facebook Ads Manager, so results/spend are not empty on "today".
-  const [range, setRange] = useState<FbRange>(() => makeRange("7d"));
+  const [range, setRange] = useState<FbRange>(() => makeRange("today"));
   const extra = useExtraColumns();
   const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
