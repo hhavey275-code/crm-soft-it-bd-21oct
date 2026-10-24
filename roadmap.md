@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Open tasks
-- [ ] Remove My Ads account initial badge and add searchable account dropdown; diagnose Facebook Page access request rejection (#100).
+- [x] Remove My Ads account initial badge and add searchable account dropdown. Isolated browser checks passed for name/ID search, selection and empty results; signed-in My Ads unavailable with external Supabase. Diagnose Page request #100: Meta rejects the submitted ID for client_pages; profile.php links can identify profiles or Pages, so correct Page ID/access must be confirmed before retrying.
 - [x] Make My Ads Active/Had delivery filters consistent and add confirmed Meta deletion for campaigns, ad sets and ads. Fifteen filter, cache and existing permission/availability tests passed.
 - [ ] Verify Active filtering and real Meta deletion while signed in. Blocker: external Supabase authentication unavailable in sandbox; /my-ads redirects to /auth. No live ads were deleted during testing.
 - [x] Explain legitimate Meta app tester setup and its limits; current My Ads mutations still use saved BM credentials, not client Facebook consent tokens.
