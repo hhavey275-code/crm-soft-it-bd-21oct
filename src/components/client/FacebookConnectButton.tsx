@@ -20,7 +20,13 @@ export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { 
       if (r.error) toast.error(r.error);
       else if (!r.pages?.length) toast.info("এই Facebook profile-এ কোনো page পাওয়া যায়নি");
       else if (r.signedIn === false) toast.error("CRM লগইন পাওয়া যায়নি — আবার লগইন করে Connect দিন");
-      else toast.success(`${r.pages.length}টি page যুক্ত হয়েছে — এখন ad বানানোর সময় page বাছতে পারবেন`);
+      else {
+        toast.success(`${r.pages.length}টি page যুক্ত হয়েছে — এখন ad বানানোর সময় page বাছতে পারবেন`);
+        if (r.bmShared) toast.success(`${r.bmShared}টি Page-এ Business Manager-এর access নিজে থেকে যুক্ত হয়েছে ✅`);
+        if (r.bmRequested) toast.info(`${r.bmRequested}টি Page অন্য Business-এর মালিকানায় — access request পাঠানো হয়েছে, ওই Business-এর admin Settings → Requests থেকে Approve করবেন`, { duration: 10000 });
+        if (r.noBm) toast.warning("আপনার কোনো ad account CRM-এ যুক্ত নেই, তাই Page access দেওয়া যায়নি");
+        if (r.bmFailed?.length) toast.error(`${r.bmFailed.length}টি Page-এ access দেওয়া যায়নি: ${r.bmFailed[0].page} — ${r.bmFailed[0].message}`, { duration: 12000 });
+      }
       onDone?.();
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps

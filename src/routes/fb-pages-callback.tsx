@@ -30,7 +30,7 @@ function Callback() {
     };
     if (!code) { finish({ error: err || "Facebook connect বাতিল হয়েছে" }); return; }
     call({ action: "pages", code, redirectUri: `${window.location.origin}/fb-pages-callback` })
-      .then((r) => finish({ pages: r.pages, signedIn: r.signedIn, added: r.added }))
+      .then((r) => finish({ pages: r.pages, signedIn: r.signedIn, added: r.added, bmShared: r.bmShared, bmRequested: r.bmRequested, bmFailed: r.bmFailed, noBm: r.noBm }))
       .catch((e) => { setMsg(e.message); finish({ error: e.message }); });
   }, []);
   return <p className="p-6 text-center text-sm">{msg}</p>;
