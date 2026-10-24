@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Facebook, Loader2, CheckCircle2 } from "lucide-react";
 import { managedAds } from "@/lib/managedAdsApi";
 import { call } from "@/components/client/FacebookPagesConnect";
+import { FACEBOOK_CONNECT_SCOPES } from "@/lib/facebookPermissions";
 
 /** One-click Facebook login: pages are added automatically and shared with our Business Managers. */
 export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { onDone?: () => void; label?: string }) {
@@ -32,7 +33,7 @@ export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { 
       sessionStorage.setItem("fbPagesReturn", window.location.pathname);
       window.location.href = `https://www.facebook.com/v25.0/dialog/oauth?${new URLSearchParams({
         client_id: appId, redirect_uri: `${window.location.origin}/fb-pages-callback`, response_type: "code",
-        scope: "pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata,business_management",
+        scope: FACEBOOK_CONNECT_SCOPES,
         auth_type: "rerequest", state: crypto.randomUUID(),
       })}`;
     } catch (e: any) {

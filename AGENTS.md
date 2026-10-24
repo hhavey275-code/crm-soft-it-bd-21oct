@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.
+
 - Derive My Ads Create availability from the selected account's verified Meta summary through the browser-safe availability helper; failed or pending reads cannot enable creation, and Refresh must recheck the summary.
 
 - Keep external CRM retry business logic in a server-only helper shared by authenticated server functions and the public API route, so both admin and client actions enforce identical checks.

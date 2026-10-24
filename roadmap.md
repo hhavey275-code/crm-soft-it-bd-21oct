@@ -1,6 +1,8 @@
 # Roadmap
 
 ## Open tasks
+- [x] Request ads_management and ads_read in both client Facebook connection flows; existing OAuth callback auto-connects Pages for My Ads. Permission and availability tests: 9 passed.
+- [ ] Verify Facebook consent → saved Page → campaign creation with a real client. Blocker: external Supabase session and client's Facebook consent unavailable in sandbox; Meta App Advanced Access/Live settings remain unverified.
 - [x] Diagnose Softmatic/Branding Solution account rename failure and show the actual server error instead of generic non-2xx. Meta permission remains an owner-controlled blocker; rename logs also show an invalid placeholder proxy URL (2026-10-20).
 - [x] Fix My Ads Create availability for Disabled/Unsettled and failed/pending status reads; refresh rechecks status. Seven availability tests pass.
 - [ ] Verify My Ads Disabled account warning and blurred Create in the signed-in UI. Blocker: external Supabase session unavailable in sandbox; browser redirects to sign-in.
