@@ -16,6 +16,7 @@ export function LinkPageByUrl({ adAccountDbId, onDone, pages = [] }: { adAccount
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<any>(null);
   const [selectedPageId, setSelectedPageId] = useState("");
+  const [requestError, setRequestError] = useState("");
   const availablePages = Array.from(new Map(pages.filter((p) => p.status !== "rejected").map((p) => [String(p.page_id), p])).values());
   const copyId = async () => {
     try { await navigator.clipboard.writeText(selectedPageId); toast.success("Page ID কপি হয়েছে"); }
@@ -26,16 +27,17 @@ export function LinkPageByUrl({ adAccountDbId, onDone, pages = [] }: { adAccount
     if (!adAccountDbId) return toast.error("আগে উপরে একটি ad account বাছুন");
     if (url.trim().length < 3) return toast.error("Page বাছুন অথবা Page-এর লিংক / ID দিন");
     setBusy(true);
+    setRequestError("");
     try {
       const r = await managedAds({ action: "link_page", pageUrl: url.trim(), adAccountDbId });
       setRes(r);
       onDone();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { setRequestError(e.message || "Request পাঠানো যায়নি"); }
     setBusy(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setRes(null); setUrl(""); setSelectedPageId(""); } }}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setRes(null); setUrl(""); setSelectedPageId(""); setRequestError(""); } }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2"><Link2 className="h-4 w-4" />Page লিংক দিয়ে যুক্ত</Button>
       </DialogTrigger>
@@ -52,6 +54,7 @@ export function LinkPageByUrl({ adAccountDbId, onDone, pages = [] }: { adAccount
             </Select>
             {selectedPageId && <div className="flex items-center justify-between gap-2"><span className="min-w-0 break-all text-sm">Page ID: {selectedPageId}</span><Button variant="ghost" size="icon" aria-label="Page ID কপি করুন" title="Page ID কপি করুন" onClick={copyId}><Copy className="h-4 w-4" /></Button></div>}
             <Input aria-label="Page লিংক বা ID" placeholder="Page লিংক অথবা Page ID" value={url} onChange={(e) => { setUrl(e.target.value); setSelectedPageId(""); }} disabled={busy} />
+            {requestError && <p role="alert" className="break-words text-sm text-destructive">{requestError}</p>}
             <Button className="w-full" onClick={send} disabled={busy}>
               {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Request পাঠান
             </Button>

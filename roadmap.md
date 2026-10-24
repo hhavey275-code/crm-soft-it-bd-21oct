@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [ ] Diagnose IT Corner pasted Page link; resolve canonical Page IDs using the client's Facebook Page list before BM requests, and show failures inside the dialog.
 - [x] Add Page name/ID selection, copy ID and Facebook connection inside the My Ads Page-link dialog. Isolated browser selection/copy checks passed; real Facebook consent and BM request unavailable without client login.
 - [x] Remove My Ads account initial badge and add searchable account dropdown. Isolated browser checks passed for name/ID search, selection and empty results; signed-in My Ads unavailable with external Supabase. Diagnose Page request #100: Meta rejects the submitted ID for client_pages; profile.php links can identify profiles or Pages, so correct Page ID/access must be confirmed before retrying.
 - [x] Make My Ads Active/Had delivery filters consistent and add confirmed Meta deletion for campaigns, ad sets and ads. Fifteen filter, cache and existing permission/availability tests passed.

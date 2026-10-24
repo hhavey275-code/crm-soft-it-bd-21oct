@@ -526,15 +526,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     if (!bmId) throw new Error("এই ad account-এর Business Manager CRM-এ পাওয়া যায়নি");
     const g = graphClient(token);
     const raw = body.pageUrl.trim();
-    let ref = raw;
-    try {
-      const u = new URL(raw.startsWith("http") ? raw : `https://facebook.com/${raw}`);
-      ref = u.searchParams.get("id") || u.pathname.split("/").filter(Boolean).filter((s) => !["pages", "profile.php", "people"].includes(s)).pop() || raw;
-      const m = u.pathname.match(/-(\d{8,})\/?$/); if (m) ref = m[1];
-    } catch { /* plain id/username */ }
-    const info: any = await g.get(ref, { fields: "id,name,link" }).catch(() => null);
-    const pageId = info?.id ? String(info.id) : /^\d{8,}$/.test(ref) ? ref : null;
-    if (!pageId) throw new Error("Page খুঁজে পাওয়া যায়নি — Page-এর পুরো লিংক বা Page ID দিন");
+    const { resolveFacebookPage } = await import("@/lib/facebookPageResolution.server");
+    const userToken = await clientUserToken(supabaseAdmin, targetUser);
+    const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined);
+    const pageId = info.id;
     let already = false;
     try {
       await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });

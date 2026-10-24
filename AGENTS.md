@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Resolve pasted Facebook Page links through the consenting client's me/accounts list or a Page-specific BM read before requesting access; never treat a numeric fallback as verified Page identity.
+
 - Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
 
 - Share My Ads filtering and deletion-cache rules between screen sizes in a browser-safe helper; delete Meta objects only through the API's existing ownership-checked mutation path.
