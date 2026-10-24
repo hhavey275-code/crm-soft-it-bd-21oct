@@ -53,7 +53,7 @@ export function FacebookConnectButton({ onDone, label = "Connect Facebook" }: { 
   return (
     <button onClick={connect} disabled={busy} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-fb-blue text-primary-foreground text-[13px] font-semibold disabled:opacity-60">
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Facebook className="h-4 w-4" />}
-      {status && !status.connected ? "Facebook আবার connect" : label}
+      {status && !status.connected && label === "Connect Facebook" ? "Facebook আবার connect" : label}
     </button>
   );
 }
