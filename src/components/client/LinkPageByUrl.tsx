@@ -61,10 +61,10 @@ export function LinkPageByUrl({ adAccountDbId, onDone, pages = [] }: { adAccount
           </div>
         ) : (
           <div className="space-y-2 text-sm">
-            <p className="font-medium">{res.already ? "এই Page-এ access আগেই আছে ✅" : "Request পাঠানো হয়েছে ✅"}</p>
+            <p className="font-medium">{res.granted ? "Page-এ access নিজে থেকে যুক্ত হয়েছে ✅ — এখন ad চালাতে পারবেন" : res.already ? "এই Page-এ access আগেই আছে ✅" : "Request পাঠানো হয়েছে ✅"}</p>
             <p>Page: <b>{res.pageName || res.pageId}</b></p>
             <p className="break-all text-muted-foreground">Page ID: {res.pageId}</p>
-            {!res.already && (
+            {!res.already && !res.granted && (
               <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
                 <li>Facebook-এ notification দেখুন, অথবা Page → Settings → <b>Page access</b> / <b>Partner access</b> খুলুন।</li>
                 <li><b>{res.bmName || "Business"}</b> (ID {res.bmId})-এর request-এ <b>Approve</b> চাপুন।</li>
