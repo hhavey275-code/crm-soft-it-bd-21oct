@@ -108,6 +108,18 @@ export default function MyAdsPage() {
     refetchOnReconnect: false,
     enabled: !!uid && !onAccountPicker,
   });
+  // On each fresh login, pull the latest data from Facebook once automatically;
+  // after that the cached list stays until the client presses "Update now".
+  useEffect(() => {
+    if (!uid || onAccountPicker) return;
+    const key = `myads-session-fetched:${uid}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { /* ignore */ }
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, onAccountPicker]);
   // Fast CRM-only account list (no Facebook calls), cached on the device for instant display.
   const { data: fastAccounts, isFetching: fastLoading } = useQuery({
     queryKey: ["managed-ads-accounts", uid],
@@ -143,10 +155,30 @@ export default function MyAdsPage() {
   const ads: any[] = fbOrder((data?.ads ?? []).filter((a: any) =>
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
   ));
-  const rows = (tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
+  // Optional re-ordering on top of the Facebook order: best results / lowest cost per result first, etc.
+  const sortRows = (list: any[]) => {
+    if (sortBy === "fb") return list;
+    const metric = (r: any) => {
+      const res = resultOf(r.insights);
+      return { res: res.count, cost: res.cost, spend: Number(r.insights?.spend || 0), t: String(r.created_time || r.updated_time || "") };
+    };
+    return [...list].sort((a, b) => {
+      const A = metric(a), B = metric(b);
+      if (sortBy === "results") return B.res - A.res || B.spend - A.spend;
+      if (sortBy === "cost") {
+        if (A.cost == null && B.cost == null) return B.spend - A.spend;
+        if (A.cost == null) return 1;
+        if (B.cost == null) return -1;
+        return A.cost - B.cost;
+      }
+      if (sortBy === "spend") return B.spend - A.spend;
+      return B.t.localeCompare(A.t);
+    });
+  };
+  const rows = sortRows((tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
     matchesAdsFilter(r, quick) &&
     (!search.trim() || r.name?.toLowerCase().includes(search.trim().toLowerCase())),
-  );
+  ));
 
   const totals = useMemo(() => campaigns.reduce((t, c) => {
     t.spend += Number(c.insights?.spend || 0); t.impr += Number(c.insights?.impressions || 0); t.clicks += Number(c.insights?.clicks || 0);
