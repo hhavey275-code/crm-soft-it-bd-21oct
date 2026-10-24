@@ -664,18 +664,70 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
 
   // ---- create ----
   const bal = await walletBalance(supabaseAdmin, page.user_id);
-  if (shared && !isAdmin && body.amount > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
+  const cbo = body.budgetLevel === "campaign" || body.advantageSales;
+
+  // One campaign can hold many ad sets, each with many ads. Older callers send a single
+  // ad set + ad at the top level; wrap those into the same shape so one path handles both.
+  type AdIn = {
+    adName: string; existingPostId?: string; message?: string; headline?: string; link?: string; cta?: string;
+    imageBase64?: string; videoId?: string; videoPath?: string; messages?: string[]; headlines?: string[];
+    description?: string; displayLink?: string; urlTags?: string; advantageCreative: boolean;
+    format: "single" | "carousel" | "catalog";
+    cards?: { imageBase64: string; headline?: string; description?: string; link?: string }[];
+  };
+  type AdsetIn = {
+    adsetName: string; conversionLocation: "WEBSITE" | "MESSAGING"; pixelId?: string; customEvent?: string;
+    customConversionId?: string; performanceGoal: "CONVERSIONS" | "VALUE"; attribution: "7C1V" | "7C" | "1C" | "1C1V";
+    advantageSales: boolean; advantageAudience: boolean; customAudiences: string[]; excludedAudiences: string[];
+    locales: number[]; placements?: { publisher_platforms: string[]; facebook_positions?: string[]; instagram_positions?: string[]; messenger_positions?: string[]; audience_network_positions?: string[] };
+    adSchedule?: { days: number[]; start_minute: number; end_minute: number }[];
+    catalogId?: string; productSetId?: string; startTime?: string; endTime?: string;
+    budgetType: "daily" | "lifetime"; amount: number; bidStrategy: string; bidAmount?: number;
+    countries: string[]; ageMin: number; ageMax: number; genders: (1 | 2)[];
+    interests: { id: string; name: string; type?: string }[]; connections: "all" | "include" | "exclude";
+    msgDestinations?: ("MESSENGER" | "WHATSAPP")[]; whatsappNumber?: string; phoneNumber?: string;
+    mainDestination?: "WEBSITE" | "CALL" | "BOTH";
+    engagementLocation?: "ON_AD" | "MESSAGING" | "WEBSITE" | "CALLS" | "PAGE_LIKES" | "EVENT";
+    ads: AdIn[];
+  };
+  const adsetsIn: AdsetIn[] = body.adsets?.length ? body.adsets : [{
+    adsetName: body.adsetName, conversionLocation: body.conversionLocation, pixelId: body.pixelId, customEvent: body.customEvent,
+    customConversionId: body.customConversionId, performanceGoal: body.performanceGoal, attribution: body.attribution,
+    advantageSales: body.advantageSales, advantageAudience: body.advantageAudience, customAudiences: body.customAudiences,
+    excludedAudiences: body.excludedAudiences, locales: body.locales, placements: body.placements, adSchedule: body.adSchedule,
+    catalogId: body.catalogId, productSetId: body.productSetId, startTime: body.startTime, endTime: body.endTime,
+    budgetType: body.budgetType, amount: body.amount, bidStrategy: body.bidStrategy, bidAmount: body.bidAmount,
+    countries: body.countries, ageMin: body.ageMin, ageMax: body.ageMax, genders: body.genders, interests: body.interests,
+    connections: body.connections, msgDestinations: body.msgDestinations, whatsappNumber: body.whatsappNumber,
+    phoneNumber: body.phoneNumber, mainDestination: body.mainDestination, engagementLocation: body.engagementLocation,
+    ads: [{
+      adName: body.adName, existingPostId: body.existingPostId, message: body.message, headline: body.headline,
+      link: body.link, cta: body.cta, imageBase64: body.imageBase64, videoId: body.videoId, videoPath: body.videoPath,
+      messages: body.messages, headlines: body.headlines, description: body.description, displayLink: body.displayLink,
+      urlTags: body.urlTags, advantageCreative: body.advantageCreative, format: body.format, cards: body.cards,
+    }],
+  }];
+
+  const totalBudget = cbo ? body.amount : adsetsIn.reduce((t, s) => t + s.amount, 0);
+  if (shared && !isAdmin && totalBudget > bal) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — এর বেশি budget দেওয়া যাবে না`);
   if (shared && body.publish && bal <= settings.pauseThreshold) throw new Error(`Wallet-এ $${bal.toFixed(2)} আছে — আগে top-up করুন`);
-  if (body.budgetType === "lifetime" && !body.endTime) throw new Error("Lifetime budget-এর জন্য শেষ তারিখ দিন");
-  if (body.bidStrategy !== "LOWEST_COST_WITHOUT_CAP" && !body.bidAmount) throw new Error(body.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal দিন (যেমন 2.0)" : "Bid amount দিন");
-  if (body.format === "carousel" && (body.cards?.length ?? 0) < 2) throw new Error("Carousel-এ কমপক্ষে ২টা card দিন");
-  if (body.format === "catalog" && (!body.catalogId || !body.productSetId)) throw new Error("Catalog ও Product set বাছুন");
-  if (body.existingPostId && !body.existingPostId.startsWith(`${page.page_id}_`) && !/^\d+$/.test(body.existingPostId)) {
-    throw new Error("Post টি এই page-এর নয়");
+  if (cbo && body.budgetType === "lifetime" && !body.endTime) throw new Error("Lifetime budget-এর জন্য শেষ তারিখ দিন");
+  for (const s of adsetsIn) {
+    if (!cbo && s.budgetType === "lifetime" && !s.endTime) throw new Error(`"${s.adsetName}" — Lifetime budget-এর জন্য শেষ তারিখ দিন`);
+    const bs = cbo ? body.bidStrategy : s.bidStrategy;
+    const ba = cbo ? body.bidAmount : s.bidAmount;
+    if (bs !== "LOWEST_COST_WITHOUT_CAP" && !ba) throw new Error(bs === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal দিন (যেমন 2.0)" : "Bid amount দিন");
+    for (const ad of s.ads) {
+      if (ad.format === "carousel" && (ad.cards?.length ?? 0) < 2) throw new Error("Carousel-এ কমপক্ষে ২টা card দিন");
+      if (ad.format === "catalog" && (!s.catalogId || !s.productSetId)) throw new Error("Catalog ও Product set বাছুন");
+      if (ad.existingPostId && !ad.existingPostId.startsWith(`${page.page_id}_`) && !/^\d+$/.test(ad.existingPostId)) {
+        throw new Error("Post টি এই page-এর নয়");
+      }
+      if (ad.videoPath && !ad.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
+    }
   }
 
   const status = body.publish ? "ACTIVE" : "PAUSED";
-  const msging = (body.objective === "SALES" || body.objective === "LEADS") && body.conversionLocation === "MESSAGING";
   const base = {
     SALES: { objective: "OUTCOME_SALES", goal: "OFFSITE_CONVERSIONS", destination: "WEBSITE", cta: "SHOP_NOW" },
     LEADS: { objective: "OUTCOME_LEADS", goal: "OFFSITE_CONVERSIONS", destination: "WEBSITE", cta: "SIGN_UP" },
@@ -684,42 +736,18 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     ENGAGEMENT: { objective: "OUTCOME_ENGAGEMENT", goal: "POST_ENGAGEMENT", destination: "ON_POST", cta: "" },
     AWARENESS: { objective: "OUTCOME_AWARENESS", goal: "REACH", destination: "", cta: "LEARN_MORE" },
   }[body.objective];
-  const eng = body.objective === "ENGAGEMENT" ? (body.engagementLocation ?? "ON_AD") : null;
-  const dests = body.msgDestinations?.length ? body.msgDestinations : ["MESSENGER"];
-  const msgDest = dests.length === 2 ? "MESSAGING_MESSENGER_WHATSAPP" : dests[0];
-  let map: { objective: string; goal: string; destination: string; cta: string } = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
-  if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
-  if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
-  const callAd = eng === "CALLS" || (!eng && !msging && body.mainDestination === "CALL" && ["SALES", "LEADS", "TRAFFIC"].includes(body.objective));
-  const bothAd = !eng && !msging && body.mainDestination === "BOTH" && ["SALES", "LEADS"].includes(body.objective);
-  if (bothAd) map = { ...base, destination: "WEBSITE_AND_PHONE_CALL" };
-  if (callAd) map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
-  if (eng === "PAGE_LIKES") map = { ...base, goal: "PAGE_LIKES", destination: "ON_PAGE", cta: "LIKE_PAGE" };
-  if (eng === "EVENT") map = { ...base, goal: "EVENT_RESPONSES", destination: "ON_EVENT", cta: "" };
-  if (eng === "EVENT" && !body.existingPostId) throw new Error("Event response-এর জন্য page-এর event post বাছুন");
-  if (body.videoPath && !body.videoPath.startsWith(`${user.id}/`) && !isAdmin) throw new Error("Video টি আপনার নয়");
-  const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
-  const waOnly = map.destination === "WHATSAPP";
-  if ((callAd || bothAd) && !body.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
-  if (eng === "WEBSITE" && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
-  const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging && !callAd;
-  if (eng === "ON_AD" && !body.existingPostId) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
-  if (pixelNeeded && (!body.pixelId || (!body.customEvent && !body.customConversionId))) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
-  if ((pixelNeeded || (body.objective === "TRAFFIC" && !callAd)) && !body.existingPostId && !/^https?:\/\//.test(body.link || "")) throw new Error("Website URL দিন (https://...)");
-
-  const cents = String(Math.round(body.amount * 100));
-  const budgetKey = body.budgetType === "daily" ? "daily_budget" : "lifetime_budget";
-  const cbo = body.budgetLevel === "campaign" || body.advantageSales;
-  const isRoas = body.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS";
-  const bidFields = !body.bidAmount || body.bidStrategy === "LOWEST_COST_WITHOUT_CAP" ? {}
-    : isRoas ? { bid_constraints: { roas_average_floor: Math.round(body.bidAmount * 10000) } }
-    : { bid_amount: String(Math.round(body.bidAmount * 100)) };
   const ATTR: Record<string, { event_type: string; window_days: number }[]> = {
     "7C1V": [{ event_type: "CLICK_THROUGH", window_days: 7 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
     "7C": [{ event_type: "CLICK_THROUGH", window_days: 7 }],
     "1C": [{ event_type: "CLICK_THROUGH", window_days: 1 }],
     "1C1V": [{ event_type: "CLICK_THROUGH", window_days: 1 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
   };
+  const centsOf = (n: number) => String(Math.round(n * 100));
+  const budgetKeyOf = (t: "daily" | "lifetime") => (t === "daily" ? "daily_budget" : "lifetime_budget");
+  const bidFieldsOf = (strategy: string, amt?: number) =>
+    !amt || strategy === "LOWEST_COST_WITHOUT_CAP" ? {}
+      : strategy === "LOWEST_COST_WITH_MIN_ROAS" ? { bid_constraints: { roas_average_floor: Math.round(amt * 10000) } }
+      : { bid_amount: String(Math.round(amt * 100)) };
 
   // Before creating anything: the ad account must be active and our Business must be able to use the Page.
   const accInfo = await g.get(act, { fields: "account_status,name" }).catch(() => null);
@@ -733,11 +761,12 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   let step = "Campaign";
   try {
     step = "Campaign";
+    const catalogSrc = adsetsIn.find((s) => s.catalogId);
     const camp = await g.post(`${act}/campaigns`, {
-      name: body.campaignName, objective: map.objective, status, buying_type: "AUCTION",
+      name: body.campaignName, objective: base.objective, status, buying_type: "AUCTION",
       special_ad_categories: body.specialCategories,
-      ...(body.format === "catalog" && body.catalogId ? { promoted_object: { product_catalog_id: body.catalogId } } : {}),
-      ...(cbo ? { [budgetKey]: cents, bid_strategy: body.bidStrategy } : { is_adset_budget_sharing_enabled: false }),
+      ...(catalogSrc ? { promoted_object: { product_catalog_id: catalogSrc.catalogId } } : {}),
+      ...(cbo ? { [budgetKeyOf(body.budgetType)]: centsOf(body.amount), bid_strategy: body.bidStrategy } : { is_adset_budget_sharing_enabled: false }),
     });
     campaignId = String(camp.id);
     if (shared) {
@@ -746,156 +775,186 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       });
     }
 
-    const targeting: Record<string, unknown> = {
-      geo_locations: { countries: body.countries, location_types: ["home", "recent"] },
-      age_min: Math.min(body.ageMin, body.ageMax), age_max: Math.max(body.ageMin, body.ageMax),
-      targeting_automation: { advantage_audience: body.advantageAudience || body.advantageSales ? 1 : 0 },
-    };
-    if (body.connections === "include") targeting.connections = [{ id: pageId }];
-    if (body.connections === "exclude") targeting.excluded_connections = [{ id: pageId }];
-    if (body.customAudiences.length) targeting.custom_audiences = body.customAudiences.map((id) => ({ id }));
-    if (body.excludedAudiences.length) targeting.excluded_custom_audiences = body.excludedAudiences.map((id) => ({ id }));
-    if (body.locales.length) targeting.locales = body.locales;
-    if (body.placements && !body.advantageSales && body.placements.publisher_platforms.length) {
-      Object.assign(targeting, body.placements);
-    }
-    if (body.genders.length === 1) targeting.genders = body.genders;
-    if (body.interests.length && !body.advantageSales) {
-      const grp: Record<string, { id: string; name: string }[]> = {};
-      for (const i of body.interests) { const k = i.type || "interests"; (grp[k] ??= []).push({ id: i.id, name: i.name }); }
-      targeting.flexible_spec = [grp];
-    }
+    for (const s of adsetsIn) {
+      step = `Ad set "${s.adsetName}"`;
+      // Goal/destination depend on this ad set's conversion location.
+      const msging = (body.objective === "SALES" || body.objective === "LEADS") && s.conversionLocation === "MESSAGING";
+      const eng = body.objective === "ENGAGEMENT" ? (s.engagementLocation ?? "ON_AD") : null;
+      const dests = s.msgDestinations?.length ? s.msgDestinations : ["MESSENGER"];
+      const msgDest = dests.length === 2 ? "MESSAGING_MESSENGER_WHATSAPP" : dests[0];
+      let map: { objective: string; goal: string; destination: string; cta: string } = msging ? { ...base, goal: "CONVERSATIONS", destination: "MESSENGER", cta: "MESSAGE_PAGE" } : base;
+      if (eng === "MESSAGING") map = { ...base, goal: "CONVERSATIONS", destination: msgDest, cta: "MESSAGE_PAGE" };
+      if (eng === "WEBSITE") map = { ...base, goal: "LINK_CLICKS", destination: "WEBSITE", cta: "LEARN_MORE" };
+      const callAd = eng === "CALLS" || (!eng && !msging && s.mainDestination === "CALL" && ["SALES", "LEADS", "TRAFFIC"].includes(body.objective));
+      const bothAd = !eng && !msging && s.mainDestination === "BOTH" && ["SALES", "LEADS"].includes(body.objective);
+      if (bothAd) map = { ...base, destination: "WEBSITE_AND_PHONE_CALL" };
+      if (callAd) map = { ...base, goal: "QUALITY_CALL", destination: "PHONE_CALL", cta: "CALL_NOW" };
+      if (eng === "PAGE_LIKES") map = { ...base, goal: "PAGE_LIKES", destination: "ON_PAGE", cta: "LIKE_PAGE" };
+      if (eng === "EVENT") map = { ...base, goal: "EVENT_RESPONSES", destination: "ON_EVENT", cta: "" };
+      if (eng === "EVENT" && !s.ads.some((a) => a.existingPostId)) throw new Error("Event response-এর জন্য page-এর event post বাছুন");
+      const isMsg = ["MESSENGER", "WHATSAPP", "MESSAGING_MESSENGER_WHATSAPP"].includes(map.destination);
+      const waOnly = map.destination === "WHATSAPP";
+      if ((callAd || bothAd) && !s.phoneNumber) throw new Error("Call-এর জন্য phone number দিন");
+      const pixelNeeded = (body.objective === "SALES" || body.objective === "LEADS") && !msging && !callAd;
+      if (eng === "ON_AD" && !s.ads.some((a) => a.existingPostId)) throw new Error("Engagement-এর জন্য page-এর একটি post বাছুন");
+      if (pixelNeeded && (!s.pixelId || (!s.customEvent && !s.customConversionId))) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
 
-    step = "Ad set";
-    const adset = await g.post(`${act}/adsets`, {
-      name: body.adsetName, campaign_id: campaignId, status,
-      billing_event: "IMPRESSIONS", optimization_goal: pixelNeeded && body.performanceGoal === "VALUE" ? "VALUE" : map.goal,
-      ...(pixelNeeded ? { attribution_spec: ATTR[body.attribution] } : {}),
-      ...(body.adSchedule?.length && body.budgetType === "lifetime" ? { pacing_type: ["day_parting"], adset_schedule: body.adSchedule.map((x) => ({ ...x, timezone_type: "USER" })) } : {}),
-      ...(map.destination ? { destination_type: map.destination } : {}),
-      ...(cbo ? {} : { bid_strategy: body.bidStrategy, [budgetKey]: cents }),
-      ...bidFields,
-      ...(body.startTime ? { start_time: body.startTime } : {}),
-      ...(body.endTime ? { end_time: body.endTime } : {}),
-      promoted_object: pixelNeeded ? {
-          pixel_id: body.pixelId,
-          ...(body.customConversionId ? { custom_conversion_id: body.customConversionId, custom_event_type: "OTHER" } : { custom_event_type: body.customEvent }),
-          ...(body.format === "catalog" && body.productSetId ? { product_set_id: body.productSetId } : {}),
-        }
-        : map.destination.includes("WHATSAPP") ? (body.whatsappNumber && /\d{8}/.test(body.whatsappNumber.replace(/\D/g, "")) ? { page_id: pageId, whatsapp_phone_number: body.whatsappNumber.replace(/[^\d]/g, "") } : { page_id: pageId }) : { page_id: pageId },
-      targeting,
-    });
-
-    let creative: Record<string, unknown>;
-    // A plain existing post has no Message/Call button, so Meta rejects it for message/call/website ads
-    // (#1487891). For those, rebuild the ad from the post's own text + photo with the right button.
-    // Also rebuild when the client picked a button (e.g. Order Now) for an existing post.
-    const rebuildFromPost = !!body.existingPostId && (isMsg || callAd || bothAd || eng === "WEBSITE" || (!!body.cta && body.objective !== "AWARENESS" && eng !== "ON_AD" && eng !== "EVENT"));
-    let postText: string | undefined; let postImageB64: string | undefined;
-    if (rebuildFromPost) {
-      const storyId = body.existingPostId!.includes("_") ? body.existingPostId! : `${pageId}_${body.existingPostId}`;
-      let pt = await savedPageToken(supabaseAdmin, pageId, page.user_id);
-      if (!pt) { try { pt = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* none */ } }
-      const post: any = await (pt ? graphClient(pt) : g).get(storyId, { fields: "message,full_picture" }).catch(() => null);
-      if (!post) throw new Error("Post টি পড়া যায়নি — Facebook আবার connect করে চেষ্টা করুন বা নতুন ছবি দিয়ে ad বানান");
-      postText = post.message ?? "";
-      if (post.full_picture) {
-        const res = await fetch(post.full_picture);
-        if (res.ok) {
-          const buf = new Uint8Array(await res.arrayBuffer());
-          let s = ""; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-          postImageB64 = btoa(s);
-        }
-      }
-    }
-    if (body.existingPostId && !rebuildFromPost) {
-      const storyId = body.existingPostId.includes("_") ? body.existingPostId : `${pageId}_${body.existingPostId}`;
-      creative = { name: `${body.adName} creative`, object_story_id: storyId };
-    } else {
-      let imageHash: string | undefined;
-      const imgB64 = body.imageBase64 || postImageB64;
-      if (imgB64) {
-        const up = await g.post(`${act}/adimages`, { bytes: imgB64 });
-        imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
-      }
-      // Message ads need Meta's special links, otherwise Meta says "Invalid creative for objective" (#1487891).
-      const link = waOnly ? "https://api.whatsapp.com/send"
-        : isMsg ? "https://fb.com/messenger_doc/"
-        : body.link && /^https?:\/\//.test(body.link) ? body.link : `https://facebook.com/${pageId}`;
-      const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : callAd ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (body.cta || map.cta || "LEARN_MORE");
-      const cta: Record<string, unknown> = {
-        type: ctaType,
-        value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : callAd ? { link: `tel:${body.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
+      const targeting: Record<string, unknown> = {
+        geo_locations: { countries: s.countries, location_types: ["home", "recent"] },
+        age_min: Math.min(s.ageMin, s.ageMax), age_max: Math.max(s.ageMin, s.ageMax),
+        targeting_automation: { advantage_audience: s.advantageAudience || s.advantageSales ? 1 : 0 },
       };
-      const msgs = (body.messages ?? []).map((x) => x.trim()).filter(Boolean);
-      const heads = (body.headlines ?? []).map((x) => x.trim()).filter(Boolean);
-      const primary = msgs[0] || body.message || postText || "";
-      const head = heads[0] || body.headline || undefined;
-      const ld: Record<string, unknown> = { link, message: primary, name: head, image_hash: imageHash, call_to_action: cta };
-      if (body.description) ld.description = body.description;
-      if (body.displayLink) ld.caption = body.displayLink;
-      if (body.format === "carousel" && body.cards?.length) {
-        const kids = [];
-        for (const c of body.cards) {
-          const up = await g.post(`${act}/adimages`, { bytes: c.imageBase64 });
-          const h = (Object.values(up.images ?? {})[0] as any)?.hash;
-          const cl = c.link && /^https?:\/\//.test(c.link) ? c.link : link;
-          kids.push({ link: cl, image_hash: h, name: c.headline || head, description: c.description || undefined, call_to_action: { type: ctaType, value: { link: cl } } });
-        }
-        delete ld.image_hash; delete ld.name;
-        ld.child_attachments = kids; ld.multi_share_optimized = true; ld.multi_share_end_card = false;
+      if (s.connections === "include") targeting.connections = [{ id: pageId }];
+      if (s.connections === "exclude") targeting.excluded_connections = [{ id: pageId }];
+      if (s.customAudiences.length) targeting.custom_audiences = s.customAudiences.map((id) => ({ id }));
+      if (s.excludedAudiences.length) targeting.excluded_custom_audiences = s.excludedAudiences.map((id) => ({ id }));
+      if (s.locales.length) targeting.locales = s.locales;
+      if (s.placements && !s.advantageSales && s.placements.publisher_platforms.length) {
+        Object.assign(targeting, s.placements);
       }
-      if (body.format === "catalog") {
-        delete ld.image_hash;
-        ld.name = head || "{{product.name}}"; ld.description = body.description || "{{product.price}}";
-        creative = { name: `${body.adName} creative`, product_set_id: body.productSetId, object_story_spec: { page_id: pageId, template_data: ld } };
-      } else {
-        creative = { name: `${body.adName} creative`, object_story_spec: { page_id: pageId, link_data: ld } };
-        if (body.format === "single" && (msgs.length > 1 || heads.length > 1)) {
-          creative.asset_feed_spec = {
-            bodies: (msgs.length ? msgs : [primary]).map((text) => ({ text })),
-            titles: (heads.length ? heads : head ? [head] : []).map((text) => ({ text })),
-            ...(body.description ? { descriptions: [{ text: body.description }] } : {}),
-            optimization_type: "DEGREES_OF_FREEDOM",
+      if (s.genders.length === 1) targeting.genders = s.genders;
+      if (s.interests.length && !s.advantageSales) {
+        const grp: Record<string, { id: string; name: string }[]> = {};
+        for (const i of s.interests) { const k = i.type || "interests"; (grp[k] ??= []).push({ id: i.id, name: i.name }); }
+        targeting.flexible_spec = [grp];
+      }
+
+      const adset = await g.post(`${act}/adsets`, {
+        name: s.adsetName, campaign_id: campaignId, status,
+        billing_event: "IMPRESSIONS", optimization_goal: pixelNeeded && s.performanceGoal === "VALUE" ? "VALUE" : map.goal,
+        ...(pixelNeeded ? { attribution_spec: ATTR[s.attribution] } : {}),
+        ...(s.adSchedule?.length && s.budgetType === "lifetime" ? { pacing_type: ["day_parting"], adset_schedule: s.adSchedule.map((x) => ({ ...x, timezone_type: "USER" })) } : {}),
+        ...(map.destination ? { destination_type: map.destination } : {}),
+        ...(cbo ? {} : { bid_strategy: s.bidStrategy, [budgetKeyOf(s.budgetType)]: centsOf(s.amount) }),
+        ...bidFieldsOf(cbo ? body.bidStrategy : s.bidStrategy, cbo ? body.bidAmount : s.bidAmount),
+        ...(s.startTime ? { start_time: s.startTime } : {}),
+        ...(s.endTime ? { end_time: s.endTime } : {}),
+        promoted_object: pixelNeeded ? {
+            pixel_id: s.pixelId,
+            ...(s.customConversionId ? { custom_conversion_id: s.customConversionId, custom_event_type: "OTHER" } : { custom_event_type: s.customEvent }),
+            ...(s.catalogId && s.productSetId ? { product_set_id: s.productSetId } : {}),
+          }
+          : map.destination.includes("WHATSAPP") ? (s.whatsappNumber && /\d{8}/.test(s.whatsappNumber.replace(/\D/g, "")) ? { page_id: pageId, whatsapp_phone_number: s.whatsappNumber.replace(/[^\d]/g, "") } : { page_id: pageId }) : { page_id: pageId },
+        targeting,
+      });
+
+      for (const ad of s.ads) {
+        step = `Ad "${ad.adName}"`;
+        if (eng === "WEBSITE" && !ad.existingPostId && !/^https?:\/\//.test(ad.link || "")) throw new Error("Website URL দিন (https://...)");
+        if ((pixelNeeded || (body.objective === "TRAFFIC" && !callAd)) && !ad.existingPostId && !/^https?:\/\//.test(ad.link || "")) throw new Error("Website URL দিন (https://...)");
+
+        let creative: Record<string, unknown>;
+        // A plain existing post has no Message/Call button, so Meta rejects it for message/call/website ads
+        // (#1487891). For those, rebuild the ad from the post's own text + photo with the right button.
+        // Also rebuild when the client picked a button (e.g. Order Now) for an existing post.
+        const rebuildFromPost = !!ad.existingPostId && (isMsg || callAd || bothAd || eng === "WEBSITE" || (!!ad.cta && body.objective !== "AWARENESS" && eng !== "ON_AD" && eng !== "EVENT"));
+        let postText: string | undefined; let postImageB64: string | undefined;
+        if (rebuildFromPost) {
+          const storyId = ad.existingPostId!.includes("_") ? ad.existingPostId! : `${pageId}_${ad.existingPostId}`;
+          let pt = await savedPageToken(supabaseAdmin, pageId, page.user_id);
+          if (!pt) { try { pt = (await g.get(pageId, { fields: "access_token" })).access_token; } catch { /* none */ } }
+          const post: any = await (pt ? graphClient(pt) : g).get(storyId, { fields: "message,full_picture" }).catch(() => null);
+          if (!post) throw new Error("Post টি পড়া যায়নি — Facebook আবার connect করে চেষ্টা করুন বা নতুন ছবি দিয়ে ad বানান");
+          postText = post.message ?? "";
+          if (post.full_picture) {
+            const res = await fetch(post.full_picture);
+            if (res.ok) {
+              const buf = new Uint8Array(await res.arrayBuffer());
+              let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+              postImageB64 = btoa(bin);
+            }
+          }
+        }
+        if (ad.existingPostId && !rebuildFromPost) {
+          const storyId = ad.existingPostId.includes("_") ? ad.existingPostId : `${pageId}_${ad.existingPostId}`;
+          creative = { name: `${ad.adName} creative`, object_story_id: storyId };
+        } else {
+          let imageHash: string | undefined;
+          const imgB64 = ad.imageBase64 || postImageB64;
+          if (imgB64) {
+            const up = await g.post(`${act}/adimages`, { bytes: imgB64 });
+            imageHash = (Object.values(up.images ?? {})[0] as any)?.hash;
+          }
+          // Message ads need Meta's special links, otherwise Meta says "Invalid creative for objective" (#1487891).
+          const link = waOnly ? "https://api.whatsapp.com/send"
+            : isMsg ? "https://fb.com/messenger_doc/"
+            : ad.link && /^https?:\/\//.test(ad.link) ? ad.link : `https://facebook.com/${pageId}`;
+          const ctaType = waOnly ? "WHATSAPP_MESSAGE" : isMsg ? "MESSAGE_PAGE" : callAd ? "CALL_NOW" : eng === "PAGE_LIKES" ? "LIKE_PAGE" : (ad.cta || map.cta || "LEARN_MORE");
+          const cta: Record<string, unknown> = {
+            type: ctaType,
+            value: waOnly ? { app_destination: "WHATSAPP" } : isMsg ? { app_destination: "MESSENGER" } : callAd ? { link: `tel:${s.phoneNumber}` } : eng === "PAGE_LIKES" ? { page: pageId } : { link },
           };
+          const msgs = (ad.messages ?? []).map((x) => x.trim()).filter(Boolean);
+          const heads = (ad.headlines ?? []).map((x) => x.trim()).filter(Boolean);
+          const primary = msgs[0] || ad.message || postText || "";
+          const head = heads[0] || ad.headline || undefined;
+          const ld: Record<string, unknown> = { link, message: primary, name: head, image_hash: imageHash, call_to_action: cta };
+          if (ad.description) ld.description = ad.description;
+          if (ad.displayLink) ld.caption = ad.displayLink;
+          if (ad.format === "carousel" && ad.cards?.length) {
+            const kids = [];
+            for (const c of ad.cards) {
+              const up = await g.post(`${act}/adimages`, { bytes: c.imageBase64 });
+              const h = (Object.values(up.images ?? {})[0] as any)?.hash;
+              const cl = c.link && /^https?:\/\//.test(c.link) ? c.link : link;
+              kids.push({ link: cl, image_hash: h, name: c.headline || head, description: c.description || undefined, call_to_action: { type: ctaType, value: { link: cl } } });
+            }
+            delete ld.image_hash; delete ld.name;
+            ld.child_attachments = kids; ld.multi_share_optimized = true; ld.multi_share_end_card = false;
+          }
+          if (ad.format === "catalog") {
+            delete ld.image_hash;
+            ld.name = head || "{{product.name}}"; ld.description = ad.description || "{{product.price}}";
+            creative = { name: `${ad.adName} creative`, product_set_id: s.productSetId, object_story_spec: { page_id: pageId, template_data: ld } };
+          } else {
+            creative = { name: `${ad.adName} creative`, object_story_spec: { page_id: pageId, link_data: ld } };
+            if (ad.format === "single" && (msgs.length > 1 || heads.length > 1)) {
+              creative.asset_feed_spec = {
+                bodies: (msgs.length ? msgs : [primary]).map((text) => ({ text })),
+                titles: (heads.length ? heads : head ? [head] : []).map((text) => ({ text })),
+                ...(ad.description ? { descriptions: [{ text: ad.description }] } : {}),
+                optimization_type: "DEGREES_OF_FREEDOM",
+              };
+            }
+          }
+          if (ad.advantageCreative) creative.degrees_of_freedom_spec = { creative_features_spec: { standard_enhancements: { enroll_status: "OPT_IN" } } };
+          if ((ad.videoId || ad.videoPath) && ad.format !== "carousel" && ad.format !== "catalog") {
+            let vid: any;
+            if (ad.videoId) vid = { id: ad.videoId };
+            else {
+              const { data: su, error: se } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(ad.videoPath!, 3600);
+              if (se || !su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
+              step = "Video upload";
+              vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: ad.adName });
+            }
+            let thumb: string | undefined;
+            for (let i = 0; i < 10 && !thumb; i++) {
+              await new Promise((r) => setTimeout(r, 3000));
+              const t = await g.get(`${vid.id}/thumbnails`, { fields: "uri,is_preferred" }).catch(() => null);
+              thumb = (t?.data ?? []).find((x: any) => x.is_preferred)?.uri ?? t?.data?.[0]?.uri;
+            }
+            if (!thumb) throw new Error("Facebook এখনো video প্রসেস করছে — ১-২ মিনিট পর আবার চেষ্টা করুন");
+            const vd: Record<string, unknown> = { video_id: String(vid.id), image_url: thumb, message: ld.message, title: ld.name, call_to_action: ld.call_to_action };
+            if (ad.description) vd.link_description = ad.description;
+            creative.object_story_spec = { page_id: pageId, video_data: vd };
+            delete creative.asset_feed_spec;
+          }
+          if (ad.urlTags) creative.url_tags = ad.urlTags.replace(/^\?/, "");
         }
+        step = `Ad "${ad.adName}" creative`;
+        let cr: any;
+        try { cr = await g.post(`${act}/adcreatives`, creative); }
+        catch (err: any) {
+          // Page not yet shared with our ad token: grant access using the client's saved Page login, then retry once.
+          if (!/1487202|page permission|full control|ADVERTISE|\(#100\)|\(#200\)/i.test(String(err?.message))) throw err;
+          const p2 = usingClientLogin ? null : accessProblem ?? (await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId));
+          if (p2) throw new Error(p2);
+          cr = await g.post(`${act}/adcreatives`, creative);
+        }
+        step = `Ad "${ad.adName}"`;
+        await g.post(`${act}/ads`, { name: ad.adName, adset_id: adset.id, creative: { creative_id: cr.id }, status });
       }
-      if (body.advantageCreative) creative.degrees_of_freedom_spec = { creative_features_spec: { standard_enhancements: { enroll_status: "OPT_IN" } } };
-      if ((body.videoId || body.videoPath) && body.format !== "carousel" && body.format !== "catalog") {
-        let vid: any;
-        if (body.videoId) vid = { id: body.videoId };
-        else {
-          const { data: su, error: se } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(body.videoPath!, 3600);
-          if (se || !su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
-          step = "Video upload";
-          vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: body.adName });
-        }
-        let thumb: string | undefined;
-        for (let i = 0; i < 10 && !thumb; i++) {
-          await new Promise((r) => setTimeout(r, 3000));
-          const t = await g.get(`${vid.id}/thumbnails`, { fields: "uri,is_preferred" }).catch(() => null);
-          thumb = (t?.data ?? []).find((x: any) => x.is_preferred)?.uri ?? t?.data?.[0]?.uri;
-        }
-        if (!thumb) throw new Error("Facebook এখনো video প্রসেস করছে — ১-২ মিনিট পর আবার চেষ্টা করুন");
-        const vd: Record<string, unknown> = { video_id: String(vid.id), image_url: thumb, message: ld.message, title: ld.name, call_to_action: ld.call_to_action };
-        if (body.description) vd.link_description = body.description;
-        creative.object_story_spec = { page_id: pageId, video_data: vd };
-        delete creative.asset_feed_spec;
-      }
-      if (body.urlTags) creative.url_tags = body.urlTags.replace(/^\?/, "");
     }
-    step = "Ad creative";
-    let cr: any;
-    try { cr = await g.post(`${act}/adcreatives`, creative); }
-    catch (err: any) {
-      // Page not yet shared with our ad token: grant access using the client's saved Page login, then retry once.
-      if (!/1487202|page permission|full control|ADVERTISE|\(#100\)|\(#200\)/i.test(String(err?.message))) throw err;
-      const p2 = usingClientLogin ? null : accessProblem ?? (await ensurePageAccess(g, supabaseAdmin, pageId, page.user_id, bmId));
-      if (p2) throw new Error(p2);
-      cr = await g.post(`${act}/adcreatives`, creative);
-    }
-    step = "Ad";
-    await g.post(`${act}/ads`, { name: body.adName, adset_id: adset.id, creative: { creative_id: cr.id }, status });
     return { ok: true, campaignId };
   } catch (e: any) {
     if (campaignId) {
