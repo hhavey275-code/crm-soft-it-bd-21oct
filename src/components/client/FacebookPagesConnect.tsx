@@ -4,6 +4,7 @@ import { Facebook, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FACEBOOK_CONNECT_SCOPES } from "@/lib/facebookPermissions";
 
 type FbPage = { id: string; name: string; link: string; picture: string | null };
 
@@ -54,7 +55,7 @@ export function FacebookPagesConnect({ userId, existingIds, onImported }: { user
       sessionStorage.setItem("fbPagesReturn", window.location.pathname);
       window.location.href = `https://www.facebook.com/v25.0/dialog/oauth?${new URLSearchParams({
         client_id: appId, redirect_uri: redirectUri, response_type: "code",
-        scope: "pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata,business_management",
+        scope: FACEBOOK_CONNECT_SCOPES,
         auth_type: "rerequest", state: crypto.randomUUID(),
       })}`;
     } catch (e: any) {
