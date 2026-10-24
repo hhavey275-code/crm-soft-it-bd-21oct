@@ -35,6 +35,10 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("fb_status") }),
+  z.object({ action: z.literal("videos"), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("video_start"), adAccountDbId: z.string().uuid(), fileSize: z.number().int().positive().max(4_000_000_000) }),
+  z.object({ action: z.literal("video_chunk"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), startOffset: z.number().int().min(0), chunkBase64: z.string().max(14_000_000) }),
+  z.object({ action: z.literal("video_finish"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), title: z.string().max(200).optional() }),
   z.object({ action: z.literal("account_summary"), ids: z.array(z.string().uuid()).min(1).max(60), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("demographics"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().max(60).optional() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
@@ -102,6 +106,7 @@ const schema = z.discriminatedUnion("action", [
     msgDestinations: z.array(z.enum(["MESSENGER", "WHATSAPP"])).max(2).optional(),
     whatsappNumber: z.string().max(30).optional(),
     phoneNumber: z.string().max(30).optional(),
+    videoId: z.string().regex(/^\d+$/).optional(),
     mainDestination: z.enum(["WEBSITE", "CALL"]).optional(),
     publish: z.boolean(),
   }),
@@ -210,6 +215,37 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
 
   const { getManagedSettings } = await import("@/lib/managedSpend.server");
   const settings = await getManagedSettings(supabaseAdmin);
+
+  // Ad account video library (videos live in the Meta ad account itself).
+  if (body.action === "videos" || body.action === "video_start" || body.action === "video_chunk" || body.action === "video_finish") {
+    const accId = body.adAccountDbId;
+    const allowed = (await sharedAccountIds(supabaseAdmin, targetUser)).includes(accId)
+      || (await ownAccounts(supabaseAdmin, targetUser, true, isAdmin)).some((a: any) => a.id === accId);
+    if (!allowed) throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
+    const { token, act } = await tokenFor(supabaseAdmin, accId);
+    const g = graphClient(token);
+    if (body.action === "videos") {
+      const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
+      return { videos: (r.data ?? []).map((v: any) => ({ id: String(v.id), title: v.title || "Video", picture: v.picture ?? null, length: v.length ?? null, source: v.source ?? null, created: v.created_time ?? null })) };
+    }
+    if (body.action === "video_start") {
+      const r = await g.post(`${act}/advideos`, { upload_phase: "start", file_size: body.fileSize });
+      return { sessionId: String(r.upload_session_id), videoId: String(r.video_id), start: Number(r.start_offset), end: Number(r.end_offset) };
+    }
+    if (body.action === "video_chunk") {
+      const bin = Uint8Array.from(atob(body.chunkBase64), (ch) => ch.charCodeAt(0));
+      const fd = new FormData();
+      fd.append("access_token", token); fd.append("upload_phase", "transfer");
+      fd.append("upload_session_id", body.sessionId); fd.append("start_offset", String(body.startOffset));
+      fd.append("video_file_chunk", new Blob([bin]), "chunk");
+      const res = await fetch(`https://graph-video.facebook.com/v25.0/${act}/advideos`, { method: "POST", body: fd });
+      const j: any = await res.json().catch(() => ({}));
+      if (!res.ok || j.error) throw new Error(j.error?.error_user_msg || j.error?.message || "Video upload ব্যর্থ");
+      return { start: Number(j.start_offset), end: Number(j.end_offset) };
+    }
+    await g.post(`${act}/advideos`, { upload_phase: "finish", upload_session_id: body.sessionId, ...(body.title ? { title: body.title } : {}) });
+    return { ok: true };
+  }
 
   if (body.action === "account_summary") {
     // Per-account Meta status + active campaign count for the account picker.
@@ -717,11 +753,15 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         }
       }
       if (body.advantageCreative) creative.degrees_of_freedom_spec = { creative_features_spec: { standard_enhancements: { enroll_status: "OPT_IN" } } };
-      if (body.videoPath && body.format !== "carousel" && body.format !== "catalog") {
-        const { data: su, error: se } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(body.videoPath, 3600);
-        if (se || !su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
-        step = "Video upload";
-        const vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: body.adName });
+      if ((body.videoId || body.videoPath) && body.format !== "carousel" && body.format !== "catalog") {
+        let vid: any;
+        if (body.videoId) vid = { id: body.videoId };
+        else {
+          const { data: su, error: se } = await supabaseAdmin.storage.from("ad-media").createSignedUrl(body.videoPath!, 3600);
+          if (se || !su) throw new Error("Video পাওয়া যায়নি — আবার upload করুন");
+          step = "Video upload";
+          vid = await g.post(`${act}/advideos`, { file_url: su.signedUrl, name: body.adName });
+        }
         let thumb: string | undefined;
         for (let i = 0; i < 10 && !thumb; i++) {
           await new Promise((r) => setTimeout(r, 3000));
