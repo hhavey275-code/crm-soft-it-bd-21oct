@@ -432,7 +432,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   useEffect(() => {
     setPixels(null); setPixelId("");
     if (!needsPixel || !accId || !pageDbId || phase !== "edit") return;
-    cached(`pixels:${accId}:${pageDbId}`, () => managedAds<{ pixels: any[] }>({ action: "pixels", pageDbId, adAccountDbId: accId }), force > 0)
+    cached(`pixels2:${accId}`, () => managedAds<{ pixels: any[] }>({ action: "pixels", pageDbId, adAccountDbId: accId }), force > 0)
       .then((r) => { setPixels(r.pixels); if (r.pixels[0]) setPixelId(r.pixels[0].id); })
       .catch((e) => { setPixels([]); toast.error(e.message); });
   }, [needsPixel, accId, pageDbId, phase, force]);
