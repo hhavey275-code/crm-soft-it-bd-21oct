@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { AdminBusinessManagers } from "@/components/admin/AdminBusinessManagers";
 import { AdminTikTokBusinessCenters } from "@/components/admin/AdminTikTokBusinessCenters";
+import { BmPagesImport } from "@/components/admin/BmPagesImport";
 import { Navigate } from "@/lib/router-compat";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
@@ -26,6 +27,7 @@ export default function BusinessManagersPage() {
           <TabsTrigger value="tiktok">TikTok Business Centre</TabsTrigger>
         </TabsList>
         <TabsContent value="meta">
+          <BmPagesImport />
           <AdminBusinessManagers />
         </TabsContent>
         <TabsContent value="tiktok">

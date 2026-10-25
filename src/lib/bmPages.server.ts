@@ -20,6 +20,11 @@ export function requireBmPageAdmin(isAdmin: boolean) {
   if (!isAdmin) throw new Error("শুধু Admin BM থেকে Page আনতে পারবেন");
 }
 
+export function validateBmPageAssignment(accountBm: string | undefined, selectedBm: string, hasClientLink: boolean) {
+  if (accountBm !== selectedBm) throw new Error("এই ad account নির্বাচিত BM-এর নয়");
+  if (!hasClientLink) throw new Error("এই ad account নির্বাচিত ক্লায়েন্টের নয়");
+}
+
 async function bmReader(db: any, id: string) {
   const { data: bm, error } = await db.from("business_managers").select("bm_id,name,access_token").eq("id", id).maybeSingle();
   if (error || !bm?.access_token || !bm?.bm_id) throw new Error("Business Manager বা তার access token পাওয়া যায়নি");
@@ -36,9 +41,10 @@ export async function readBmPages(db: any, bmDbId: string) {
 
 export async function importBmPage(db: any, actor: string, input: { bmDbId: string; pageId: string; clientId: string; accountId: string }) {
   const { data: account, error: accountError } = await db.from("ad_accounts").select("id,business_manager_id").eq("id", input.accountId).maybeSingle();
-  if (accountError || account?.business_manager_id !== input.bmDbId) throw new Error("এই ad account নির্বাচিত BM-এর নয়");
+  if (accountError) throw new Error(accountError.message);
   const { data: link, error: linkError } = await db.from("user_ad_accounts").select("id").eq("user_id", input.clientId).eq("ad_account_id", input.accountId).maybeSingle();
-  if (linkError || !link) throw new Error("এই ad account নির্বাচিত ক্লায়েন্টের নয়");
+  if (linkError) throw new Error(linkError.message);
+  validateBmPageAssignment(account?.business_manager_id, input.bmDbId, !!link);
   const { bm, g } = await bmReader(db, input.bmDbId);
   const page = (await listApprovedBmPages(g, String(bm.bm_id))).find(p => p.id === input.pageId);
   if (!page) throw new Error("এই Page-এ BM-এর অনুমোদিত access পাওয়া যায়নি");

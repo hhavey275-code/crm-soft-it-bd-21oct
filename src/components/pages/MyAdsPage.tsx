@@ -292,8 +292,22 @@ export default function MyAdsPage() {
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
 
-  const pages: any[] = data?.pages ?? [];
-  const allPages: any[] = data?.allPages ?? pages;
+  // Read client Page assignments independently of the saved Meta campaign report.
+  const { data: liveClientPages } = useQuery({
+    queryKey: ["my-ads-client-pages", uid],
+    enabled: !!uid,
+    queryFn: async () => {
+      if (!uid) return [];
+      const { data: rows, error } = await (await import("@/integrations/supabase/client")).supabase
+        .from("client_facebook_pages").select("id,page_id,page_name,ad_account_id,status").eq("user_id", uid).neq("status", "rejected");
+      if (error) throw error;
+      return rows ?? [];
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+  const pages: any[] = liveClientPages ?? data?.pages ?? [];
+  const allPages: any[] = liveClientPages ?? data?.allPages ?? pages;
   const accounts: any[] = (data?.accounts?.length ? data.accounts : fastAccounts) ?? [];
   const currentAccId: string | undefined = accSel ?? data?.selectedAccountId ?? accounts[0]?.id;
   const currentAcc = accounts.find((a) => a.id === currentAccId);
