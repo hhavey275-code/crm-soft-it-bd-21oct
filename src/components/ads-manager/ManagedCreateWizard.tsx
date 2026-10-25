@@ -166,6 +166,19 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [gender, setGender] = useState("all");
   const [interests, setInterests] = useState<{ id: string; name: string; type?: string }[]>([]);
   const [reach, setReach] = useState<"loading" | "error" | { lower: number | null; upper: number | null } | null>(null);
+  const reachKey = JSON.stringify([accId, pageDbId, countries, ageMin, ageMax, gender, interests.map((i) => i.id)]);
+  useEffect(() => {
+    if (level !== 1 || !accId || !pageDbId || !countries.length) return;
+    let stop = false;
+    setReach("loading");
+    const t = setTimeout(() => {
+      managedAds<{ lower: number | null; upper: number | null }>({ action: "reach_estimate", pageDbId, adAccountDbId: accId, countries, ageMin, ageMax, gender, interests })
+        .then((r) => { if (!stop) setReach(r); })
+        .catch(() => { if (!stop) setReach("error"); });
+    }, 600);
+    return () => { stop = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reachKey, level]);
   const [iq, setIq] = useState("");
   const [iResults, setIResults] = useState<any[]>([]);
   const [placements, setPlacements] = useState<"auto" | "manual">("auto");
