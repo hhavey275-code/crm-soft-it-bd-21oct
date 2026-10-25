@@ -272,17 +272,22 @@ export default function MyAdsPage() {
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
 
-  const editBudget = async (o: any) => {
+  const [budgetEdit, setBudgetEdit] = useState<{ id: string; type: string; value: string; adAccountDbId: any } | null>(null);
+  const startBudgetEdit = (o: any) => {
     const type = o.lifetime_budget ? "lifetime" : "daily";
     const cur = Number(o[`${type}_budget`] || 0) / 100;
-    const v = window.prompt(`নতুন ${type === "daily" ? "daily" : "lifetime"} budget ($)`, cur ? cur.toFixed(2) : "");
-    if (!v) return;
-    const amount = Number(v);
-    if (!(amount > 0)) return toast.error("সঠিক পরিমাণ দিন");
-    setBusy(o.id);
+    setBudgetEdit({ id: String(o.id), type, value: cur ? cur.toFixed(2) : "", adAccountDbId: o.ad_account_db_id });
+  };
+  const saveBudget = async () => {
+    if (!budgetEdit) return;
+    const { id, type, value, adAccountDbId } = budgetEdit;
+    const amount = Number(value);
+    if (!(amount > 0)) { toast.error("সঠিক পরিমাণ দিন"); return; }
+    setBusy(id);
     try {
-      await managedAds({ action: "set_budget", objectId: String(o.id), budgetType: type, amount, adAccountDbId: o.ad_account_db_id });
+      await managedAds({ action: "set_budget", objectId: id, budgetType: type, amount, adAccountDbId });
       toast.success("Budget আপডেট হয়েছে");
+      setBudgetEdit(null);
       refetch();
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
