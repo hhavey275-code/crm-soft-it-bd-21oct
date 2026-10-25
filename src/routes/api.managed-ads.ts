@@ -345,10 +345,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         if (!after) break;
       }
       const list = [...ids];
-      for (let i = 0; i < list.length; i += 10) await Promise.all(list.slice(i, i + 10).map((id) => g.del(id)));
-      const left = await g.get(`${act}/advideos`, { fields: "id", limit: "100" }).catch(() => ({ data: [] }));
-      const failed = (left.data ?? []).filter((v: any) => ids.has(String(v.id))).length;
-      return { deleted: list.length - failed, failed };
+      let deleted = 0, lastError = "";
+      for (let i = 0; i < list.length; i += 10) await Promise.all(list.slice(i, i + 10).map(async (id) => {
+        try { await g.delStrict(`${act}/advideos`, { video_id: id }); deleted++; return; } catch (e: any) { lastError = e.message; }
+        try { await g.delStrict(id); deleted++; } catch (e: any) { lastError = e.message; }
+      }));
+      const failed = list.length - deleted;
+      if (!deleted && failed) throw new Error(`Meta ভিডিও মুছতে দেয়নি: ${lastError}`);
+      return { deleted, failed, error: failed ? lastError : undefined };
     }
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
