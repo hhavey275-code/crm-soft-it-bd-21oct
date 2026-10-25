@@ -683,9 +683,15 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       for (const i of ints) (by[i.type || "interests"] ??= []).push({ id: i.id });
       t.flexible_spec = [by];
     }
-    const r = await g.get(`${act}/reachestimate`, { targeting_spec: JSON.stringify(t) });
-    const d = Array.isArray(r.data) ? r.data[0] : r.data;
-    return { lower: d?.users_lower_bound ?? null, upper: d?.users_upper_bound ?? null };
+    const spec = JSON.stringify(t);
+    try {
+      const r = await g.get(`${act}/reachestimate`, { targeting_spec: spec });
+      const d = Array.isArray(r.data) ? r.data[0] : r.data;
+      if (d?.users_lower_bound != null) return { lower: d.users_lower_bound, upper: d.users_upper_bound ?? null };
+    } catch { /* fall back to delivery estimate */ }
+    const r2 = await g.get(`${act}/delivery_estimate`, { targeting_spec: spec, optimization_goal: "REACH" });
+    const d2 = Array.isArray(r2.data) ? r2.data[0] : r2.data;
+    return { lower: d2?.estimate_mau_lower_bound ?? d2?.estimate_mau ?? null, upper: d2?.estimate_mau_upper_bound ?? d2?.estimate_mau ?? null };
   }
 
   if (body.action === "interests") {

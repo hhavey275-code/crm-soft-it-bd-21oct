@@ -166,6 +166,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [gender, setGender] = useState("all");
   const [interests, setInterests] = useState<{ id: string; name: string; type?: string }[]>([]);
   const [reach, setReach] = useState<"loading" | "error" | { lower: number | null; upper: number | null } | null>(null);
+  const [reachErr, setReachErr] = useState("");
   const reachKey = JSON.stringify([accId, pageDbId, countries, ageMin, ageMax, gender, interests.map((i) => i.id)]);
   useEffect(() => {
     if (level !== 1 || !accId || !pageDbId || !countries.length) return;
@@ -173,8 +174,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     setReach("loading");
     const t = setTimeout(() => {
       managedAds<{ lower: number | null; upper: number | null }>({ action: "reach_estimate", pageDbId, adAccountDbId: accId, countries, ageMin, ageMax, gender, interests })
-        .then((r) => { if (!stop) setReach(r); })
-        .catch(() => { if (!stop) setReach("error"); });
+        .then((r) => { if (!stop) { setReachErr(""); setReach(r); } })
+        .catch((e: any) => { if (!stop) { setReachErr(String(e?.message ?? "").slice(0, 160)); setReach("error"); } });
     }, 600);
     return () => { stop = true; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
