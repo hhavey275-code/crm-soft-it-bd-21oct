@@ -97,6 +97,7 @@ export function ClientWalletConvertAction({
         p_source: from,
         p_target: to,
         p_usd_amount: parsed,
+        p_user_id: userId ?? null,
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(String(data?.error ?? "Transfer failed"));
@@ -110,6 +111,8 @@ export function ClientWalletConvertAction({
       setAmount("");
       queryClient.invalidateQueries({ queryKey: ["dual-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-detail-wallet", userId] });
+      queryClient.invalidateQueries({ queryKey: ["client-detail-transactions", userId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Transfer failed"),
   });
