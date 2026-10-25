@@ -356,7 +356,16 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     }
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
-      const list = r.data ?? [];
+      let list = r.data ?? [];
+      // Clients only see videos added after this account was given to them, so a previous client's content stays hidden.
+      if (!isAdmin || targetUser !== user.id) {
+        const [a1, a2] = await Promise.all([
+          supabaseAdmin.from("managed_account_assignments").select("assigned_at").eq("user_id", targetUser).eq("ad_account_id", accId).maybeSingle(),
+          supabaseAdmin.from("user_ad_accounts").select("assigned_at").eq("user_id", targetUser).eq("ad_account_id", accId).maybeSingle(),
+        ]);
+        const since = [a1.data?.assigned_at, a2.data?.assigned_at].filter(Boolean).map((d: any) => Date.parse(d)).sort((x, y) => x - y)[0];
+        if (since) list = list.filter((v: any) => v.created_time && Date.parse(v.created_time) >= since);
+      }
       // Some videos come back without a playable link in the list; ask each one directly.
       await Promise.all(list.filter((v: any) => !v.source).map(async (v: any) => {
         const one = await g.get(String(v.id), { fields: "source,picture" }).catch(() => null);
