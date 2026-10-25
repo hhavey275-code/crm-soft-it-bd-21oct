@@ -9,7 +9,7 @@
 - Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.
 - On the client's own ad accounts, My Ads uses the client's saved Facebook login (client_user_tokens, server-only) when it can read the account, so Pages our Business Manager cannot access still work; shared accounts keep the BM token.
 
-- Derive My Ads Create availability from the selected account's verified Meta summary through the browser-safe availability helper; failed or pending reads cannot enable creation, and Refresh must recheck the summary.
+- Derive My Ads Create availability and its separate warning/blur presentation from the selected account's verified Meta summary through browser-safe helpers; failed or pending reads cannot enable creation but remain visually quiet, and Refresh must recheck the summary.
 
 - Keep external CRM retry business logic in a server-only helper shared by authenticated server functions and the public API route, so both admin and client actions enforce identical checks.
 - Send bulk Meta ad-account creation through the authenticated JSON route and the configured Meta proxy, so browser domains and Meta egress restrictions cannot turn responses into HTML.

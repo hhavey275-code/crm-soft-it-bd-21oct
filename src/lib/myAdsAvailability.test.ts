@@ -1,8 +1,17 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
-import { myAdsAvailability } from "./myAdsAvailability";
+import { myAdsAvailability, myAdsAvailabilityPresentation } from "./myAdsAvailability";
 
 describe("My Ads Create availability", () => {
+  test("pending and failed checks do not show account warnings or blur Create", () => {
+    for (const availability of [myAdsAvailability(), myAdsAvailability(null, "Network failed")]) {
+      assert.deepEqual(myAdsAvailabilityPresentation(availability), { showWarning: false, blurCreate: false });
+      assert.equal(availability.canCreate, false);
+    }
+  });
+  test("confirmed Disabled status 2 shows the warning and blurs Create", () => {
+    assert.deepEqual(myAdsAvailabilityPresentation(myAdsAvailability({ status: 2 })), { showWarning: true, blurCreate: true });
+  });
   test("Disabled status 2 blocks creation", () => {
     const result = myAdsAvailability({ status: 2 });
     assert.equal(result.canCreate, false);
