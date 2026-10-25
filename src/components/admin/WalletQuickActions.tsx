@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Minus, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
+import { ClientWalletConvertAction } from "@/components/client/ClientWalletConvertAction";
 import { useWallets, formatBdt } from "@/hooks/useWallets";
 
 export type WalletKind = "primary" | "secondary" | "credit_line";
@@ -145,15 +146,7 @@ export function WalletQuickActions({
           >
             <Minus className="h-3 w-3" />
           </button>
-          {kind !== "primary" && (
-            <button
-              aria-label={`Convert to ${LABEL[kind]}`}
-              className={iconBtn}
-              onClick={() => { setConvertOpen(true); setConvertAmount(""); }}
-            >
-              <ArrowRightLeft className="h-3 w-3" />
-            </button>
-          )}
+          <ClientWalletConvertAction userId={userId} target={kind} />
         </div>
 
         <Dialog open={!!adjustType} onOpenChange={(o) => { if (!o) setAdjustType(null); }}>
@@ -268,17 +261,7 @@ export function WalletQuickActions({
           <Minus className="mr-1 h-3 w-3" />
           Deduct
         </Button>
-        {kind !== "primary" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 flex-1 rounded-md text-[11px]"
-            onClick={() => { setConvertOpen(true); setConvertAmount(""); }}
-          >
-            <ArrowRightLeft className="mr-1 h-3 w-3" />
-            Convert
-          </Button>
-        )}
+        <ClientWalletConvertAction userId={userId} target={kind} variant="button" />
       </div>
 
 
