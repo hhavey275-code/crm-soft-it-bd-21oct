@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [ ] Add per-client My Ads metric visibility and left-to-right ordering with saved preferences; verify ordering and reload persistence.
 - [x] Diagnose IT Corner pasted Page link: code previously forwarded unverified numeric IDs after failed lookup. Resolve canonical Page IDs through client me/accounts or Page-specific BM read; show failures in dialog. Seven tests passed, build OK.
 - [ ] Verify IT Corner's actual Facebook Page → BM access request. Blocker: external Supabase client session unavailable and no matching IT Corner profile found through available server read; published/preview request logs absent. Client must reconnect with Page consent and retry.
 - [x] Add Page name/ID selection, copy ID and Facebook connection inside the My Ads Page-link dialog. Isolated browser selection/copy checks passed; real Facebook consent and BM request unavailable without client login.
