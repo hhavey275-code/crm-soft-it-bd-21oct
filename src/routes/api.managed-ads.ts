@@ -335,22 +335,20 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       return { videoId: String(r.id) };
     }
     if (body.action === "videos_clear") {
-      let deleted = 0, failed = 0;
-      for (let round = 0; round < 20; round++) {
-        const r = await g.get(`${act}/advideos`, { fields: "id", limit: "100" });
-        const ids: string[] = (r.data ?? []).map((v: any) => String(v.id));
-        if (!ids.length) break;
-        let progress = 0;
-        for (let i = 0; i < ids.length; i += 10) {
-          await Promise.all(ids.slice(i, i + 10).map(async (id) => {
-            try { const x = await g.post(`${act}/advideos`, { video_id: id, _method: "DELETE" }).catch(async () => { await g.del(id); return null; }); void x; deleted++; progress++; } catch { failed++; }
-          }));
-        }
-        if (!progress) break;
-        const left = await g.get(`${act}/advideos`, { fields: "id", limit: "100" });
-        if ((left.data ?? []).length >= ids.length) { failed = (left.data ?? []).length; deleted = Math.max(0, deleted - failed); break; }
+      // Remove every video from this ad account's library; videos used by live ads may be refused by Meta.
+      const ids = new Set<string>();
+      let after: string | undefined;
+      for (let i = 0; i < 20; i++) {
+        const r = await g.get(`${act}/advideos`, { fields: "id", limit: "100", ...(after ? { after } : {}) });
+        for (const v of r.data ?? []) ids.add(String(v.id));
+        after = r.paging?.next ? r.paging?.cursors?.after : undefined;
+        if (!after) break;
       }
-      return { deleted, failed };
+      const list = [...ids];
+      for (let i = 0; i < list.length; i += 10) await Promise.all(list.slice(i, i + 10).map((id) => g.del(id)));
+      const left = await g.get(`${act}/advideos`, { fields: "id", limit: "100" }).catch(() => ({ data: [] }));
+      const failed = (left.data ?? []).filter((v: any) => ids.has(String(v.id))).length;
+      return { deleted: list.length - failed, failed };
     }
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
