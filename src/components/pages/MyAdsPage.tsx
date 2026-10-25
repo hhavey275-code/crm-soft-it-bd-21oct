@@ -753,7 +753,7 @@ export default function MyAdsPage() {
               <tr>
                 <th className={cn(th, "w-10")} />
                 <th className={cn(th, "w-16")}>Off / On</th>
-                <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
+                <th className={cn(th, "min-w-[320px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
                 <th className={cn(th, "text-fb-blue")}>Delivery</th>
                 {visibleMetricKeys.map(key => <Fragment key={key}>{metricHeader(key)}</Fragment>)}
               </tr>
