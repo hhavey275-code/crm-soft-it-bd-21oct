@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { cacheGet, cacheSet } from "@/lib/myAdsCache";
+import { cacheGet, cacheSet, cacheTransform } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown, Check, X, Copy } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
@@ -31,7 +31,7 @@ import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { myAdsAvailability, myAdsAvailabilityPresentation } from "@/lib/myAdsAvailability";
 import { MetaLoading } from "@/components/ads-manager/MetaLoading";
-import { matchesAdsFilter, removeAdsObject } from "@/lib/myAdsRows";
+import { matchesAdsFilter, removeAdsObject, updateAdsStatus } from "@/lib/myAdsRows";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 
 type Level = "campaign" | "adset" | "ad";
@@ -65,6 +65,8 @@ export default function MyAdsPage() {
   // Click a column header: big→small, then small→big, then back to the normal order.
   const toggleCol = (key: ColKey) => setColSort((c) => (!c || c.key !== key ? { key, dir: "desc" } : c.dir === "desc" ? { key, dir: "asc" } : null));
   const [creating, setCreating] = useState(false);
+  const [duplicateTarget, setDuplicateTarget] = useState<any | null>(null);
+  const [copyName, setCopyName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ level: Level; objects: any[] } | null>(null);
   const [lastManual, setLastManual] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -101,7 +103,7 @@ export default function MyAdsPage() {
   const onAccountPicker = isMobile && mobileStep === "accounts";
   const forceFresh = useRef(false);
   const { data, isFetching, error, refetch: refetchQuery } = useQuery({
-    queryKey: ["managed-ads-list", dates, accSel],
+    queryKey: ["managed-ads-list", uid, dates, accSel],
     queryFn: async () => {
       const ck = `myads-list2:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`;
       // Saved result for this account + date range opens instantly; only an explicit refresh asks Facebook.
@@ -134,7 +136,7 @@ export default function MyAdsPage() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     // Date changes keep the same account's rows on screen (only the thin bar shows); an account switch clears them so the full loader appears.
-    placeholderData: (prev: any, prevQuery: any) => (prevQuery?.queryKey?.[2] === accSel ? prev : undefined),
+    placeholderData: (prev: any, prevQuery: any) => (prevQuery?.queryKey?.[1] === uid && prevQuery?.queryKey?.[3] === accSel ? prev : undefined),
     enabled: !!uid && !onAccountPicker,
   });
   const refetch = () => { forceFresh.current = true; return refetchQuery(); };
@@ -259,16 +261,33 @@ export default function MyAdsPage() {
     t.results += resultOf(c.insights).count; return t;
   }, { spend: 0, impr: 0, clicks: 0, results: 0 }), [campaigns]);
 
+  const persistMutation = async (transform: (old: any) => any) => {
+    qc.setQueriesData({ queryKey: ["managed-ads-list", uid] }, (old: any) => old ? transform(old) : old);
+    if (uid) await cacheTransform(uid, transform);
+  };
   const toggle = async (level: Level, o: any, on: boolean) => {
+    if (busy) return;
     setBusy(o.id);
     try {
-      await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED", adAccountDbId: o.ad_account_db_id });
-      toast.success(on ? "চালু হয়েছে" : "বন্ধ হয়েছে");
-      qc.setQueryData(["managed-ads-list", dates, accSel], (old: any) => {
-        if (!old) return old;
-        const key = level === "campaign" ? "campaigns" : level === "adset" ? "adsets" : "ads";
-        return { ...old, [key]: old[key].map((x: any) => x.id === o.id ? { ...x, status: on ? "ACTIVE" : "PAUSED", effective_status: on ? "ACTIVE" : "PAUSED" } : x) };
-      });
+      const result = await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED", adAccountDbId: o.ad_account_db_id });
+      await persistMutation(old => updateAdsStatus(old, level, String(o.id), result.object));
+      toast.success(on ? "Enabled" : "Paused");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
+  };
+  const startDuplicate = (campaign: any) => {
+    setDuplicateTarget(campaign);
+    setCopyName(`${campaign.name} - Copy`.slice(0, 200));
+  };
+  const duplicateCampaign = async () => {
+    if (!duplicateTarget || busy || !copyName.trim()) return;
+    setBusy("duplicating");
+    try {
+      const result = await managedAds({ action: "duplicate", level: "campaign", objectId: String(duplicateTarget.id), adAccountDbId: duplicateTarget.ad_account_db_id, name: copyName.trim() });
+      await persistMutation(old => ({ ...old, campaigns: old.campaigns.some((c: any) => String(c.id) === result.campaignId) ? old.campaigns : [...old.campaigns, result.campaign] }));
+      setDuplicateTarget(null);
+      toast.success("Campaign and all ad sets/ads copied — paused");
+      if (result.warning) toast.warning(result.warning);
+      await refetch();
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
 
@@ -396,14 +415,14 @@ export default function MyAdsPage() {
   const deleteObjects = async () => {
     if (!deleteTarget || busy) return;
     const { level, objects } = deleteTarget;
-    const queryKey = ["managed-ads-list", dates, accSel];
+    const queryKey = ["managed-ads-list", uid, dates, accSel];
     setBusy("deleting");
     const failed: any[] = [];
     let deleted = 0;
     for (const object of objects) {
       try {
         await managedAds({ action: "delete", level, objectId: String(object.id), adAccountDbId: object.ad_account_db_id });
-        qc.setQueryData(queryKey, (old: any) => old ? removeAdsObject(old, level, String(object.id)) : old);
+        await persistMutation(old => removeAdsObject(old, level, String(object.id)));
         deleted += 1;
       } catch (error: any) {
         failed.push(object);
@@ -419,14 +438,23 @@ export default function MyAdsPage() {
     setBusy(null);
     if (deleted) toast.success(`${deleted}টি ${level === "campaign" ? "campaign" : level === "adset" ? "ad set" : "ad"} মুছে ফেলা হয়েছে`);
     if (deleted) {
-      qc.invalidateQueries({ queryKey: ["managed-ads-list"] });
+      await refetch();
       qc.invalidateQueries({ queryKey: ["managed-ads-cur-summary"] });
       qc.invalidateQueries({ queryKey: ["managed-ads-acc-summary"] });
     }
   };
+  const duplicateDialog = (
+    <AlertDialog open={!!duplicateTarget} onOpenChange={open => { if (!open && !busy) setDuplicateTarget(null); }}>
+      <AlertDialogContent className="ads-controls">
+        <AlertDialogHeader><AlertDialogTitle>Duplicate campaign</AlertDialogTitle><AlertDialogDescription>All ad sets and ads will be copied. The new campaign stays paused.</AlertDialogDescription></AlertDialogHeader>
+        <Input aria-label="Copied campaign name" maxLength={200} value={copyName} onChange={e => setCopyName(e.target.value)} />
+        <AlertDialogFooter><AlertDialogCancel disabled={!!busy}>Cancel</AlertDialogCancel><Button variant="ads-copy" disabled={!!busy || !copyName.trim()} onClick={duplicateCampaign}><Copy />{busy === "duplicating" ? "Copying…" : "Duplicate"}</Button></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
   const deleteDialog = (
     <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !busy) setDeleteTarget(null); }}>
-      <AlertDialogContent>
+      <AlertDialogContent className="ads-controls">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {deleteTarget?.level === "campaign" ? "campaign" : deleteTarget?.level === "adset" ? "ad set" : "ad"}?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -538,7 +566,7 @@ export default function MyAdsPage() {
           {wizard}
         {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
           {fastLoading && !accounts.length && <MetaLoading />}
-          <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
+          <div className="ads-controls fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
               <h1 className="text-center text-lg font-bold">Select account</h1>
               <Input className="mt-3 h-11 rounded-full border-fb-border px-4" placeholder="Search accounts" value={accSearch} onChange={(e) => setAccSearch(e.target.value)} />
@@ -582,9 +610,10 @@ export default function MyAdsPage() {
         {wizard}
         {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
         {deleteDialog}
+        {duplicateDialog}
         {isFetching && !data && <MetaLoading />}
         {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
-        <div className="fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
+        <div className="ads-controls fb-font min-h-[calc(100dvh-3.5rem)] bg-fb-bg pb-6 text-fb-text">
           <div className="sticky top-0 z-10 space-y-3 bg-fb-bg px-3 pb-2 pt-3">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <button onClick={() => setMobileStep("accounts")} className="min-w-0 text-left">
@@ -595,7 +624,7 @@ export default function MyAdsPage() {
                 <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fb-border bg-background disabled:opacity-50" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
                   <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                 </button>
-                <Button onClick={startCreate} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined} className={cn("inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed", availabilityPresentation.blurCreate ? "disabled:opacity-40 disabled:blur-[1px]" : "disabled:opacity-100")}>
+                <Button onClick={startCreate} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined} variant="ads-publish" className={cn("inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed", availabilityPresentation.blurCreate ? "disabled:opacity-40 disabled:blur-[1px]" : "disabled:opacity-100")}>
                   <Plus className="h-4 w-4" />Create
                 </Button>
               </div>
@@ -665,7 +694,8 @@ export default function MyAdsPage() {
                       <p className="text-[17px] leading-snug">{c.name}</p>
                       <p className="flex items-center gap-1.5 text-[13px]"><span className={cn("h-2.5 w-2.5 rounded-full", dot)} /><span className={dv.tone === "green" ? "text-fb-green" : "text-fb-muted"}>{dv.label}</span><span className="text-fb-muted">{String(c.objective || "").replace("OUTCOME_", "").toLowerCase()}</span></p>
                     </button>
-                    <Button variant="ghost" size="icon" title="Delete campaign" aria-label={`Delete ${c.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: "campaign", objects: [c] })}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ads-copy" size="icon" title="Duplicate campaign" aria-label={`Duplicate ${c.name}`} disabled={!!busy || isFetching} onClick={() => startDuplicate(c)}><Copy /></Button>
+                    <Button variant="destructive" size="icon" title="Delete campaign" aria-label={`Delete ${c.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: "campaign", objects: [c] })}><Trash2 className="h-4 w-4" /></Button>
                     <Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle("campaign", c, v)} />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3">
@@ -684,9 +714,10 @@ export default function MyAdsPage() {
     <DashboardLayout fullBleed hideChat>
       {wizard}
       {deleteDialog}
+        {duplicateDialog}
       {isFetching && !data && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
-      <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
+      <div className="ads-controls fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:px-4">
           <h1 className="text-lg font-bold">Campaigns</h1>
@@ -751,7 +782,7 @@ export default function MyAdsPage() {
         {/* Action toolbar */}
         <div className="relative flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-1.5 sm:px-4">
           {isFetching && data && <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
-          <Button onClick={startNew} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined}
+          <Button variant="ads-publish" onClick={startNew} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined}
             className={cn("inline-flex items-center gap-1.5 h-8 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed", availabilityPresentation.blurCreate ? "disabled:opacity-40 disabled:blur-[1px]" : "disabled:opacity-100")}>
             <Plus className="h-4 w-4" />Create
           </Button>
@@ -763,10 +794,11 @@ export default function MyAdsPage() {
             }}>
             <Pencil className="h-4 w-4" />Edit
           </button>
-          <Button variant="outline" className={tbBtn} title="Delete selected" disabled={!sel.length || !!busy || isFetching}
+          <Button variant="destructive" className="rounded-full" title="Delete selected" disabled={!sel.length || !!busy || isFetching}
             onClick={() => { const objects = rows.filter(row => sel.includes(String(row.id))); if (objects.length) setDeleteTarget({ level: tab, objects }); }}>
             <Trash2 className="h-4 w-4" />Delete
           </Button>
+          {tab === "campaign" && <Button variant="ads-copy" disabled={sel.length !== 1 || !!busy || isFetching} onClick={() => { const c = campaigns.find(c => String(c.id) === sel[0]); if (c) startDuplicate(c); }}><Copy />Duplicate</Button>}
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length}</button>}
           <div className="ml-auto flex gap-2">
             <ColumnsPicker {...columns} className={tbBtn} />
@@ -827,7 +859,7 @@ export default function MyAdsPage() {
                             else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
                           }}>{r.name}</button>
                         <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => { const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id)); if (c) setEditCampaign(c); }}><Pencil className="h-3 w-3" /></button>
-                        <Button variant="ghost" size="icon" title="Delete" aria-label={`Delete ${r.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: tab, objects: [r] })} className="h-7 w-7 text-fb-muted hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                        <Button variant="destructive" size="icon" title="Delete" aria-label={`Delete ${r.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: tab, objects: [r] })} className="h-7 w-7"><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </td>
                     <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-3 w-3 rounded-full", dot)} />{deliv}</span></td>
