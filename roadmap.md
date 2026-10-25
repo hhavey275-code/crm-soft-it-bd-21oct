@@ -1,7 +1,8 @@
 # Roadmap
 
 ## Open tasks
-- [ ] Diagnose and fix BM-approved Raiyanshop Page link resolution for Arazshop BM; verify with focused tests. Live client check requires external Supabase session.
+- [x] Add exact Page-link/ID matching against the selected account's BM client_pages/owned_pages, skip duplicate requests for existing access, and surface CRM save errors. Thirteen Page resolution/permission tests pass; build OK.
+- [ ] Verify actual Raiyanshop → Arazshop BM → marketer CRM link. Blocker: external Supabase client login unavailable; actual Page ID/link and Meta access were not read in sandbox.
 - [x] Fix campaign/ad-set budget typing stuck at $5 by preserving editor identity; isolated browser checks passed for typing, focus, navigation and saved amounts. Real Meta publish remains unverified without external Supabase login.
 - [x] Add per-client My Ads metric visibility and left-to-right ordering with saved preferences. Seven logic/result tests pass; isolated desktop/mobile controls verified for reorder, hide, reset and reload persistence; build OK.
 - [ ] Verify saved column layout with real client campaign data in My Ads. Blocker: external Supabase session unavailable; actual /my-ads redirects to /auth.
