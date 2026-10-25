@@ -25,7 +25,7 @@ export function MetaLoading() {
         <p className="break-words text-lg font-semibold text-fb-text">Hi {username},</p>
         <p className="text-sm text-fb-muted">your campaign is loading</p>
       </div>
-      <style>{`.meta-loading path{stroke-dasharray:150;stroke-dashoffset:150;animation:meta-loading-draw 1.6s ease-in-out infinite}@keyframes meta-loading-draw{0%{stroke-dashoffset:150}55%{stroke-dashoffset:0}100%{stroke-dashoffset:-150}}@media(prefers-reduced-motion:reduce){.meta-loading path{animation:none;stroke-dashoffset:0}}`}</style>
+      <style>{`.meta-loading path{stroke-dasharray:150;stroke-dashoffset:150;animation:meta-loading-draw 4s ease-in-out infinite}@keyframes meta-loading-draw{0%{stroke-dashoffset:150}55%{stroke-dashoffset:0}100%{stroke-dashoffset:-150}}@media(prefers-reduced-motion:reduce){.meta-loading path{animation:none;stroke-dashoffset:0}}`}</style>
     </div>
   );
 }
