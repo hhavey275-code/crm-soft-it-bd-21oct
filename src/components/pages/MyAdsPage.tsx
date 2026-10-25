@@ -450,10 +450,10 @@ export default function MyAdsPage() {
       </button>
     </th>
   );
-  const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
-  const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
-  const sub = "block text-[11px] text-fb-muted";
-  const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
+  const th = "px-2 py-1.5 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-middle";
+  const td = "px-2 py-1 font-medium border-r border-fb-border align-top whitespace-nowrap leading-tight";
+  const sub = "block text-[11px] leading-tight text-fb-muted";
+  const tbBtn = "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
 
   const metricHeader = (key: string) => {
@@ -660,7 +660,7 @@ export default function MyAdsPage() {
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
-        <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:gap-3 sm:px-4 sm:py-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:px-4">
           <h1 className="text-lg font-bold">Campaigns</h1>
           <div className="ml-auto flex items-center gap-2 sm:order-last">
             <span className="hidden text-[13px] text-fb-muted sm:inline">
@@ -683,13 +683,13 @@ export default function MyAdsPage() {
           {currentAcc?.kind === "shared" && <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>}
         </div>
 
-        {/* Filter chips + search */}
-        <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
+        {/* Filter chips + search (one row on PC) */}
+        <div className="flex flex-col gap-2 bg-background border-x border-fb-border px-3 pb-2 sm:px-4 lg:flex-row lg:items-center">
           <div className="flex flex-wrap items-center gap-2">
             {quickFilters}
             {sortPicker}
           </div>
-          <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="h-8 border-fb-border lg:flex-1" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
         {(error || (data?.errors ?? []).length > 0 || (isShared && data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
@@ -706,7 +706,7 @@ export default function MyAdsPage() {
         <div className="flex flex-wrap items-end gap-1 bg-background border-x border-fb-border px-2 pt-2 sm:flex-nowrap sm:px-4">
           {([["campaign", "Campaigns"], ["adset", "Ad sets"], ["ad", "Ads"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)}
-              className={cn("flex-1 sm:max-w-[300px] h-10 px-2 text-center text-[13px] font-semibold rounded-t-lg border border-b-0 border-fb-border sm:h-11 sm:px-4 sm:text-left sm:text-[15px]",
+              className={cn("flex-1 sm:max-w-[300px] h-9 px-2 text-center text-[13px] font-semibold rounded-t-lg border border-b-0 border-fb-border sm:h-9 sm:px-4 sm:text-left sm:text-[15px]",
                 tab === k ? "bg-background text-fb-blue border-t-2 border-t-fb-blue" : "bg-fb-bg text-fb-text")}>
               {l}
               {k === "adset" && selCampaigns.length > 0 && <span className="ml-2 hidden text-xs font-normal text-fb-blue sm:inline">for {selCampaigns.length} campaign</span>}
@@ -721,10 +721,10 @@ export default function MyAdsPage() {
         <EditObjectDialog level={tab} obj={editing} adAccountDbId={editing?.ad_account_db_id} onClose={() => setEditing(null)} onSaved={() => { setSel([]); refetch(); }} />
         {blockedBanner && <div className="bg-background border-x border-t border-fb-border px-2 pt-2 sm:px-4">{blockedBanner}</div>}
         {/* Action toolbar */}
-        <div className="relative flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-2 sm:px-4">
+        <div className="relative flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-1.5 sm:px-4">
           {isFetching && data && <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
           <Button onClick={startNew} disabled={createDisabled} title={createDisabled ? availability.title : undefined}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
+            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
             <Plus className="h-4 w-4" />Create
           </Button>
           <button className={tbBtn} disabled={sel.length !== 1}
@@ -753,7 +753,7 @@ export default function MyAdsPage() {
               <tr>
                 <th className={cn(th, "w-10")} />
                 <th className={cn(th, "w-16")}>Off / On</th>
-                <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
+                <th className={cn(th, "min-w-[320px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
                 <th className={cn(th, "text-fb-blue")}>Delivery</th>
                 {visibleMetricKeys.map(key => <Fragment key={key}>{metricHeader(key)}</Fragment>)}
               </tr>
@@ -789,7 +789,7 @@ export default function MyAdsPage() {
                         <input type="checkbox" className="h-4 w-4 accent-fb-blue" checked={sel.includes(String(r.id))}
                           onChange={(e) => setSel((s) => e.target.checked ? [...s, String(r.id)] : s.filter((x) => x !== String(r.id)))} />
                       </td>
-                    <td className={td}><Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle(tab, r, v)} className="data-[state=checked]:bg-fb-blue" /></td>
+                    <td className={td}><Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle(tab, r, v)} className="scale-75 origin-left data-[state=checked]:bg-fb-blue" /></td>
                     <td className={cn(td, "whitespace-normal")}>
                       <div className="flex items-center gap-2">
                         {tab === "ad" && r.thumbnail_url && <img src={r.thumbnail_url} alt="" className="h-9 w-9 rounded object-cover" />}
