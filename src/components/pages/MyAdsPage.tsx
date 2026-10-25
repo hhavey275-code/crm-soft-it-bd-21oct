@@ -188,10 +188,21 @@ export default function MyAdsPage() {
   // Results follow each row's campaign objective (Sales → purchases only, not link clicks).
   const campObj = new Map<string, string>((data?.campaigns ?? []).map((c: any) => [String(c.id), String(c.objective || "")]));
   const setGoal = new Map<string, string>((data?.adsets ?? []).map((s: any) => [String(s.id), String(s.optimization_goal || "")]));
-  const rowResult = (r: any) => resultOf(r?.insights, {
+  const baseResult = (r: any) => resultOf(r?.insights, {
     objective: r?.objective ?? campObj.get(String(r?.campaign_id)),
     goal: r?.optimization_goal ?? (r?.adset_id ? setGoal.get(String(r.adset_id)) : undefined),
   });
+  // Like Ads Manager, a campaign's Results add up each ad set's own goal result.
+  const setsByCamp = new Map<string, any[]>();
+  for (const s of data?.adsets ?? []) { const k = String(s.campaign_id); if (!setsByCamp.has(k)) setsByCamp.set(k, []); setsByCamp.get(k)!.push(s); }
+  const rowResult = (r: any) => {
+    const isCamp = r && r.objective !== undefined && r.campaign_id === undefined;
+    const sets = isCamp ? (setsByCamp.get(String(r.id)) ?? []).filter((s: any) => s.insights) : [];
+    if (!sets.length) return baseResult(r);
+    const count = sets.reduce((t: number, s: any) => t + baseResult(s).count, 0);
+    const spend = Number(r.insights?.spend || 0);
+    return { count, cost: count ? spend / count : null };
+  };
   // Optional re-ordering on top of the Facebook order: best results / lowest cost per result first, etc.
   const sortRows = (list: any[]) => {
     if (colSort) {
