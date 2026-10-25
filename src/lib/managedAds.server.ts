@@ -137,7 +137,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       const allPages = async (level: string) => {
         const out: any[] = []; let after: string | undefined;
         for (let i = 0; i < 20; i++) {
-          const r: any = await g.get(`${act}/insights`, { level, fields: `${level}_id,${insightsFields}`, time_range: JSON.stringify(dateRange), limit: "2000", ...(after ? { after } : {}) }).catch(() => null);
+          const r: any = await g.get(`${act}/insights`, { level, fields: `${level}_id,${insightsFields}`, time_range: JSON.stringify(dateRange), use_unified_attribution_setting: "true", limit: "2000", ...(after ? { after } : {}) }).catch(() => null);
           if (!r) break; out.push(...(r.data ?? []));
           after = r.paging?.next ? r.paging?.cursors?.after : undefined; if (!after) break;
         }
@@ -155,7 +155,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       if (dateRange) {
         [ci, si, ai, accTotal] = await Promise.all([
           allPages("campaign"), allPages("adset"), allPages("ad"),
-          g.get(`${act}/insights`, { level: "account", fields: insightsFields, time_range: JSON.stringify(dateRange) }).then((r: any) => r.data?.[0] ?? null).catch(() => null),
+          g.get(`${act}/insights`, { level: "account", fields: insightsFields, time_range: JSON.stringify(dateRange), use_unified_attribution_setting: "true" }).then((r: any) => r.data?.[0] ?? null).catch(() => null),
         ]);
         camps.data = camps.data ?? []; adsets.data = adsets.data ?? []; ads.data = ads.data ?? [];
         await Promise.all([

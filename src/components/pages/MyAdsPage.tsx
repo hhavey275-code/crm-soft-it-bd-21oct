@@ -81,7 +81,7 @@ export default function MyAdsPage() {
       localStorage.removeItem("myads-account");
       localStorage.removeItem("myads-accounts-cache");
       localStorage.removeItem("myads-drafts-v2");
-      Object.keys(localStorage).filter((k) => k.startsWith("myads-list:")).forEach((k) => localStorage.removeItem(k));
+      Object.keys(localStorage).filter((k) => k.startsWith("myads-list")).forEach((k) => localStorage.removeItem(k));
     } catch { /* ignore */ }
   }, []);
   useEffect(() => { if (!uid) return; const v = localStorage.getItem(`myads-account:${uid}`); if (v) setAccSel(v); }, [uid]);
@@ -102,7 +102,7 @@ export default function MyAdsPage() {
   const { data, isFetching, error, refetch: refetchQuery } = useQuery({
     queryKey: ["managed-ads-list", dates, accSel],
     queryFn: async () => {
-      const ck = `myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`;
+      const ck = `myads-list2:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`;
       // Saved result for this account + date range opens instantly; only an explicit refresh asks Facebook.
       if (!forceFresh.current && uid) {
         const saved = await cacheGet(ck);
@@ -126,7 +126,7 @@ export default function MyAdsPage() {
       return r;
     },
     // The cache key carries the user id, so another user on this device never sees it.
-    initialData: () => { try { if (!uid) return undefined; const c = localStorage.getItem(`myads-list:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
+    initialData: () => { try { if (!uid) return undefined; const c = localStorage.getItem(`myads-list2:${uid}:${dates.dateFrom}:${dates.dateTo}:${accSel ?? ""}`); return c ? JSON.parse(c) : undefined; } catch { return undefined; } },
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnMount: false,
