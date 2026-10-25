@@ -1,4 +1,6 @@
 import { decryptToken, graphClient } from "./metaGraph.server";
+import { cleanKey } from "./serverKey";
+import { tokenFor } from "./managedAds.server";
 
 export async function listApprovedBmPages(g: { get: (path: string, params?: Record<string, string>) => Promise<any> }, bmId: string) {
   const pages = new Map<string, { id: string; name: string; link: string }>();
@@ -28,10 +30,20 @@ export function validateBmPageAssignment(accountBm: string | undefined, selected
 async function bmReader(db: any, id: string) {
   const { data: bm, error } = await db.from("business_managers").select("bm_id,name,access_token").eq("id", id).maybeSingle();
   if (error || !bm?.access_token || !bm?.bm_id) throw new Error("Business Manager বা তার access token পাওয়া যায়নি");
-  for (const secret of [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean) as string[]) {
+  if (!bm.access_token.startsWith("enc:")) return { bm, g: graphClient(bm.access_token) };
+  for (const secret of [process.env.BM_TOKEN_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY, cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY)].filter(Boolean) as string[]) {
     try { return { bm, g: graphClient(await decryptToken(bm.access_token, secret)) }; } catch { /* next key */ }
   }
-  throw new Error("Business Manager-এর token খোলা যায়নি — token আবার সেভ করুন");
+  // Older BM tokens may have been encrypted by the original backend. Reuse
+  // the same server-only recovery path as My Ads, scoped to this exact BM.
+  const { data: accounts, error: accountError } = await db.from("ad_accounts").select("id").eq("business_manager_id", id).limit(1);
+  if (!accountError && accounts?.[0]?.id) {
+    try {
+      const { token, bmId } = await tokenFor(db, accounts[0].id);
+      if (String(bmId) === String(bm.bm_id)) return { bm, g: graphClient(token) };
+    } catch { /* report a token-read failure, not a Page-permission failure */ }
+  }
+  throw new Error("CRM সংরক্ষিত BM token পড়তে পারেনি; এটি Page access প্রত্যাখ্যানের বার্তা নয়। Business Managers থেকে token যাচাই করুন।");
 }
 
 export async function readBmPages(db: any, bmDbId: string) {

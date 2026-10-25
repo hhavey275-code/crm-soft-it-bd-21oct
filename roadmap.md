@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [ ] Repair BM Page import token reading to match existing My Ads credential compatibility; verify regression tests. Live signed-in verification remains blocked by external Supabase session availability.
 - [x] Add admin Business Managers import of Meta-approved Pages and explicit assignment to a client's existing own ad account; My Ads reads Page assignments outside its campaign cache. Fifteen tests pass; shared accounts remain unchanged.
 - [ ] Verify live BM Page import → client My Ads selection. Blocker: external Supabase session unavailable; browser redirects Business Managers to /auth.
 - [x] Add exact Page-link/ID matching against the selected account's BM client_pages/owned_pages, skip duplicate requests for existing access, and surface CRM save errors. Thirteen Page resolution/permission tests pass; build OK.
