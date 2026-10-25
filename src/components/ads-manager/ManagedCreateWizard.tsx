@@ -14,6 +14,7 @@ import { VideoLibrary, uploadToAccount } from "./VideoLibrary";
 import { cached } from "@/lib/adsCache";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 import { PlacementPreview } from "./PlacementPreview";
+import { Button } from "@/components/ui/button";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
 const OBJECTIVES: { v: Obj; l: string; icon: any; d: string; good: string[] }[] = [
@@ -92,7 +93,7 @@ const sel = "h-9 w-full rounded-md border border-fb-border bg-background px-3 te
 const inp = sel;
 function Section({ title, ok = true, children, right }: { title: string; ok?: boolean; children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-fb-panel-border bg-background shadow-sm">
+    <div className="ads-key-section overflow-hidden rounded-lg border border-fb-panel-border bg-background shadow-sm">
       <div className="flex items-center gap-2 border-b border-fb-panel-border bg-fb-panel-soft px-4 py-2.5">
         {ok ? <CheckCircle2 className="h-4 w-4 text-fb-green" /> : <AlertCircle className="h-4 w-4 text-destructive" />}
         <h3 className="text-[15px] font-semibold">{title}</h3>
@@ -674,7 +675,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   if (phase === "objective") {
     const cur = OBJECTIVES.find((o) => o.v === pick);
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4 font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
+      <div className="ads-controls fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4 font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
         <div className="flex max-h-[100dvh] w-full max-w-[560px] flex-col rounded-t-xl bg-background shadow-2xl sm:max-h-[90vh] sm:rounded-lg">
           <div className="flex shrink-0 items-center gap-2 px-4 pt-4">
             <span className="rounded-md bg-fb-blue-soft px-3 py-2 text-[13px] font-semibold text-fb-blue">Create new campaign</span>
@@ -1221,7 +1222,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const curAd = curAdset?.ads[selPos.d];
 
   return (
-    <div className="fixed inset-0 z-50 flex h-[100dvh] bg-fb-bg font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
+    <div className="ads-controls fixed inset-0 z-50 flex h-[100dvh] bg-fb-bg font-[system-ui,-apple-system,'Segoe_UI',Helvetica,Arial,sans-serif] text-fb-text">
       {/* Left tree */}
       <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-fb-border bg-background md:block">
         <div className="flex h-12 items-center border-b border-fb-border px-2">
@@ -1339,13 +1340,13 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="flex flex-1 gap-2 sm:ml-auto sm:flex-none">
             {level > 0 && <button onClick={() => (level === 2 ? goto(selPos.a, -1) : gotoCampaign())} className="h-10 flex-1 rounded-md border border-fb-border px-3 font-semibold hover:bg-fb-bg sm:h-9 sm:flex-none sm:px-4">Back</button>}
             {level < 2 ? (
-              <button onClick={() => (level === 0 ? goto(selPos.a, -1) : goto(selPos.a, selPos.d))} className="h-10 flex-1 rounded-md bg-fb-blue px-5 font-semibold text-primary-foreground sm:h-9 sm:flex-none">Next</button>
+              <Button onClick={() => (level === 0 ? goto(selPos.a, -1) : goto(selPos.a, selPos.d))} className="h-10 flex-1 rounded-full px-5 font-semibold sm:h-9 sm:flex-none">Next</Button>
             ) : (
               <>
                 <button disabled={saving} onClick={keepDraft} className="h-10 flex-1 rounded-md border border-fb-border px-2 font-semibold hover:bg-fb-bg disabled:opacity-50 sm:h-9 sm:flex-none sm:px-4">Draft</button>
-                <button disabled={saving} onClick={() => { if (!ready) { setShowMissing(true); return toast.error("কিছু তথ্য বাকি — ডান পাশের তালিকা দেখুন"); } submit(true); }} className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-fb-green px-5 font-semibold text-primary-foreground disabled:opacity-40 sm:h-9 sm:flex-none">
+                <Button variant="ads-publish" disabled={saving} onClick={() => { if (!ready) { setShowMissing(true); return toast.error("কিছু তথ্য বাকি — ডান পাশের তালিকা দেখুন"); } submit(true); }} className="inline-flex h-10 flex-1 items-center justify-center px-5 font-semibold disabled:opacity-40 sm:h-9 sm:flex-none">
                   {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Publish
-                </button>
+                </Button>
               </>
             )}
           </div>

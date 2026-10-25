@@ -7,6 +7,7 @@
 - Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
 
 - Share My Ads filtering and deletion-cache rules between screen sizes in a browser-safe helper; delete Meta objects only through the API's existing ownership-checked mutation path.
+- Resolve My Ads mutations beyond the first Meta list page, persist confirmed changes across the user's saved date views, and deep-copy campaigns paused through the same ownership boundary; this prevents stale deleted rows and unintended duplicate spend.
 
 - Share Facebook OAuth permission scopes between client connection entry points so Page and campaign access cannot diverge.
 - On the client's own ad accounts, My Ads uses the client's saved Facebook login (client_user_tokens, server-only) when it can read the account, so Pages our Business Manager cannot access still work; shared accounts keep the BM token.

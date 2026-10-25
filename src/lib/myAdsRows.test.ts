@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
-import { matchesAdsFilter, removeAdsObject } from "./myAdsRows";
+import { matchesAdsFilter, removeAdsObject, updateAdsStatus } from "./myAdsRows";
 
 describe("My Ads filters and deletion", () => {
   test("Active ads includes active delivery but excludes ads paused by their campaign", () => {
@@ -34,5 +34,20 @@ describe("My Ads filters and deletion", () => {
     assert.equal(result.campaigns.length, 2);
     assert.equal(result.adsets.length, 2);
     assert.deepEqual(result.ads.map(r => r.id), ["222"]);
+  });
+  test("full campaign deletion removes children even if an ad lacks campaign_id", () => {
+    const result = removeAdsObject({ ...data, ads: [{ id: "111", adset_id: "11" }, { id: "222", adset_id: "22" }] }, "campaign", "1");
+    assert.deepEqual(result.ads.map(row => row.id), ["222"]);
+  });
+  test("campaign pause stops descendant delivery without changing their individual switches", () => {
+    const input = { campaigns: [{ id: "1", status: "ACTIVE" }], adsets: [{ id: "11", campaign_id: "1", status: "ACTIVE", effective_status: "ACTIVE" }], ads: [{ id: "111", campaign_id: "1", adset_id: "11", status: "ACTIVE", effective_status: "ACTIVE" }, { id: "112", campaign_id: "1", adset_id: "11", status: "PAUSED", effective_status: "PAUSED" }] };
+    const paused = updateAdsStatus(input, "campaign", "1", { status: "PAUSED", effective_status: "PAUSED" });
+    assert.equal(paused.adsets[0].effective_status, "CAMPAIGN_PAUSED");
+    assert.equal(paused.ads[0].effective_status, "CAMPAIGN_PAUSED");
+    assert.equal(paused.ads[0].status, "ACTIVE");
+    assert.equal(paused.ads[1].status, "PAUSED");
+    const resumed = updateAdsStatus(paused, "campaign", "1", { status: "ACTIVE", effective_status: "ACTIVE" });
+    assert.equal(resumed.ads[0].effective_status, "ACTIVE");
+    assert.equal(resumed.ads[1].effective_status, "PAUSED");
   });
 });

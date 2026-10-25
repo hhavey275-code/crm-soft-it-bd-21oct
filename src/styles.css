@@ -46,9 +46,20 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --color-ads-copy: var(--ads-copy);
+  --color-ads-copy-soft: var(--ads-copy-soft);
+  --color-ads-publish: var(--ads-publish);
+  --color-ads-action-foreground: var(--ads-action-foreground);
 }
 
 :root {
+  --ads-copy: oklch(0.48 0.16 310);
+  --ads-copy-soft: oklch(0.96 0.025 310);
+  --ads-publish: oklch(0.47 0.12 165);
+  --ads-action-foreground: oklch(0.99 0 0);
+  --ads-input-surface: oklch(0.98 0.01 230);
+  --ads-input-border: oklch(0.77 0.09 230);
+  --ads-field-shadow: 0 0 0 3px color-mix(in oklab, var(--ads-input-border) 16%, transparent);
   --radius: 0.5rem;
 
   --background: 210 20% 98%;
@@ -92,6 +103,17 @@
 }
 
 .dark {
+  --ads-copy: oklch(0.8 0.11 310);
+  --ads-copy-soft: oklch(0.27 0.04 310);
+  --ads-input-surface: oklch(0.24 0.02 230);
+  --ads-input-border: oklch(0.56 0.08 230);
+  --color-fb-text: oklch(0.94 0.01 230);
+  --color-fb-muted: oklch(0.74 0.02 230);
+  --color-fb-bg: oklch(0.2 0.01 230);
+  --color-fb-border: oklch(0.37 0.02 230);
+  --color-fb-blue: oklch(0.76 0.12 245);
+  --color-fb-blue-soft: oklch(0.3 0.045 245);
+  --color-fb-green: oklch(0.77 0.14 165);
   --color-fb-panel: #15202c;
   --color-fb-panel-border: #2c3d50;
   --color-fb-panel-soft: #1c2938;
@@ -407,6 +429,18 @@
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Scoped to My Ads: other CRM pages retain their existing controls. */
+.ads-controls button:not([role="switch"]):not([role="checkbox"]) { border-radius: 999px; }
+.ads-controls button:not([role]):not(:disabled) { transition: background-color 160ms, border-color 160ms; }
+.ads-controls button.border-fb-border { background-color: color-mix(in oklab, hsl(var(--primary)) 7%, hsl(var(--background))); border-color: color-mix(in oklab, hsl(var(--primary)) 25%, hsl(var(--border))); }
+.ads-controls button.border-fb-border:hover { background-color: color-mix(in oklab, hsl(var(--primary)) 14%, hsl(var(--background))); }
+.ads-controls :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, button[role="combobox"]) { background-color: var(--ads-input-surface); border-color: var(--ads-input-border); }
+.ads-controls :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus { box-shadow: var(--ads-field-shadow); outline-color: var(--ads-input-border); }
+.ads-key-section { border-left: 3px solid var(--ads-input-border); }
+.ads-key-section:focus-within { box-shadow: var(--ads-field-shadow); }
+.ads-preview-cta { border-radius: 999px; background-color: var(--ads-publish); color: var(--ads-action-foreground); }
+@media (prefers-reduced-motion: reduce) { .ads-controls button { transition: none; } }
 
 @keyframes myads-bar {
   0% { transform: translateX(300%); }

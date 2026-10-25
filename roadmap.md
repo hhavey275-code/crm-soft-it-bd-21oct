@@ -1,6 +1,9 @@
 # Roadmap
 
 ## Open tasks
+- [x] Repair My Ads full campaign deletion/cache persistence, verified pause status and paused deep-copy duplication; 24 focused/regression tests pass.
+- [ ] Verify real Meta campaign delete/pause/duplicate through signed-in My Ads. Blocker: external unmanaged authentication; /my-ads redirects to /auth. No real campaigns mutated during tests.
+- [x] Polish My Ads/wizard rounded colorful buttons and highlighted primary inputs; isolated desktop/mobile, Order now preview, dark theme and budget-focus checks pass; build OK.
 - [x] Repair BM Page import token reading to match existing My Ads credential compatibility; 17 Page import/resolution tests pass and build OK. Live signed-in verification remains blocked by external Supabase session availability.
 - [x] Add admin Business Managers import of Meta-approved Pages and explicit assignment to a client's existing own ad account; My Ads reads Page assignments outside its campaign cache. Fifteen tests pass; shared accounts remain unchanged.
 - [ ] Verify live BM Page import → client My Ads selection. Blocker: external Supabase session unavailable; browser redirects Business Managers to /auth.

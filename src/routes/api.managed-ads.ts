@@ -85,6 +85,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("accounts"), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("delete"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("duplicate"), level: z.literal("campaign"), objectId: z.string().regex(/^\d+$/), name: z.string().trim().min(1).max(200), adAccountDbId: z.string().uuid(), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({
     action: z.literal("update"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/),
@@ -450,17 +451,32 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { ...data, ...settings, walletBalance: wb, fetchedAt: new Date().toISOString() };
   }
 
-  if (body.action === "delete" || body.action === "set_status" || body.action === "set_budget" || body.action === "update") {
-    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId });
+  if (body.action === "delete" || body.action === "set_status" || body.action === "set_budget" || body.action === "update" || body.action === "duplicate") {
     const lvl = body.action === "set_budget" ? "adset" : body.level;
+    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId, mutationObject: { id: body.objectId, level: lvl } });
     const list = lvl === "campaign" ? owned.campaigns : lvl === "adset" ? owned.adsets : owned.ads;
     const obj = list.find((o: any) => String(o.id) === body.objectId);
     if (!obj) throw new Error("এই campaign/ad আপনার নয়");
     if (body.action === "delete") {
       const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
-      const result = await graphClient(token).post(body.objectId, { status: "DELETED" });
-      if (result?.success !== true) throw new Error("Facebook বিজ্ঞাপন মুছে দেওয়া নিশ্চিত করেনি — Refresh দিয়ে আবার দেখুন");
-      return { ok: true };
+      const { deleteMetaObject } = await import("@/lib/myAdsMutations.server");
+      return deleteMetaObject(graphClient(token), body.objectId);
+    }
+    if (body.action === "duplicate") {
+      let sourceRegistry: any = null;
+      if (obj.account_kind !== "own") {
+        const { data } = await supabaseAdmin.from("managed_campaigns").select("page_id").eq("campaign_id", body.objectId).eq("user_id", targetUser).maybeSingle();
+        sourceRegistry = data;
+        if (!sourceRegistry?.page_id) throw new Error("Shared campaign-এর Page assignment আগে admin-কে যাচাই করতে বলুন");
+      }
+      const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
+      const { duplicateMetaCampaign } = await import("@/lib/myAdsMutations.server");
+      const result = await duplicateMetaCampaign(graphClient(token), body.objectId, body.name);
+      if (obj.account_kind !== "own") {
+        const { error } = await supabaseAdmin.from("managed_campaigns").insert({ campaign_id: result.campaignId, user_id: targetUser, ad_account_id: obj.ad_account_db_id, page_id: sourceRegistry.page_id, campaign_name: body.name });
+        if (error) throw new Error(`Campaign copy হয়েছে (${result.campaignId}), কিন্তু CRM-এ save হয়নি — আবার Duplicate না করে admin-কে জানান`);
+      }
+      return { ...result, campaign: { ...result.campaign, ad_account_db_id: obj.ad_account_db_id, account_kind: obj.account_kind } };
     }
     const shared = obj.account_kind !== "own"; // own accounts spend their own limit, not the wallet
     const bal = await walletBalance(supabaseAdmin, targetUser);
@@ -566,7 +582,10 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     }
     const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
     const g = graphClient(token);
-    if (body.action === "set_status") await g.post(body.objectId, { status: body.status });
+    if (body.action === "set_status") {
+      const { setMetaObjectStatus } = await import("@/lib/myAdsMutations.server");
+      return setMetaObjectStatus(g, body.objectId, body.status);
+    }
     else await g.post(body.objectId, { [body.budgetType === "daily" ? "daily_budget" : "lifetime_budget"]: String(Math.round(body.amount * 100)) });
     return { ok: true };
   }
