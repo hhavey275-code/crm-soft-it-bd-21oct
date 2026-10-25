@@ -475,7 +475,15 @@ export default function MyAdsPage() {
       case "attribution": return <>7-day click or 1-day view<span className={sub}>All conversions</span></>;
       case "results": return <>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></>;
       case "cost": return <>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></>;
-      case "budget": return <><span className="inline-flex items-center gap-1">{r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}{tab === "adset" && (r.daily_budget || r.lifetime_budget) && <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit budget" onClick={() => editBudget(r)}><Pencil className="h-3 w-3" /></Button>}</span>{(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}</>;
+      case "budget": return budgetEdit?.id === String(r.id) ? (
+        <div className="flex items-center justify-end gap-1">
+          <input autoFocus inputMode="decimal" className="h-7 w-[72px] rounded-md border border-fb-border bg-background px-1.5 text-right text-xs tabular-nums" value={budgetEdit.value}
+            onChange={(e) => setBudgetEdit({ ...budgetEdit, value: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") saveBudget(); if (e.key === "Escape") setBudgetEdit(null); }} />
+          <Button size="sm" className="h-7 gap-1 px-2 text-xs" disabled={busy === budgetEdit.id} onClick={saveBudget}><Check className="h-3 w-3" />Publish</Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBudgetEdit(null)}><X className="h-3 w-3" /></Button>
+        </div>
+      ) : <><span className="inline-flex items-center gap-1">{r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}{tab === "adset" && (r.daily_budget || r.lifetime_budget) && <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit budget" onClick={() => startBudgetEdit(r)}><Pencil className="h-3 w-3" /></Button>}</span>{(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}</>;
       case "spend": return money(r.insights?.spend);
       case "impressions": return num(r.insights?.impressions);
       case "reach": return num(r.insights?.reach);
