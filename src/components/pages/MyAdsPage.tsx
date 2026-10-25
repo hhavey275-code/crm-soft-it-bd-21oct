@@ -3,7 +3,7 @@ import { cacheGet, cacheSet } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
@@ -272,17 +272,22 @@ export default function MyAdsPage() {
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
 
-  const editBudget = async (o: any) => {
+  const [budgetEdit, setBudgetEdit] = useState<{ id: string; type: string; value: string; adAccountDbId: any } | null>(null);
+  const startBudgetEdit = (o: any) => {
     const type = o.lifetime_budget ? "lifetime" : "daily";
     const cur = Number(o[`${type}_budget`] || 0) / 100;
-    const v = window.prompt(`নতুন ${type === "daily" ? "daily" : "lifetime"} budget ($)`, cur ? cur.toFixed(2) : "");
-    if (!v) return;
-    const amount = Number(v);
-    if (!(amount > 0)) return toast.error("সঠিক পরিমাণ দিন");
-    setBusy(o.id);
+    setBudgetEdit({ id: String(o.id), type, value: cur ? cur.toFixed(2) : "", adAccountDbId: o.ad_account_db_id });
+  };
+  const saveBudget = async () => {
+    if (!budgetEdit) return;
+    const { id, type, value, adAccountDbId } = budgetEdit;
+    const amount = Number(value);
+    if (!(amount > 0)) { toast.error("সঠিক পরিমাণ দিন"); return; }
+    setBusy(id);
     try {
-      await managedAds({ action: "set_budget", objectId: String(o.id), budgetType: type, amount, adAccountDbId: o.ad_account_db_id });
+      await managedAds({ action: "set_budget", objectId: id, budgetType: type, amount, adAccountDbId });
       toast.success("Budget আপডেট হয়েছে");
+      setBudgetEdit(null);
       refetch();
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
@@ -470,7 +475,15 @@ export default function MyAdsPage() {
       case "attribution": return <>7-day click or 1-day view<span className={sub}>All conversions</span></>;
       case "results": return <>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></>;
       case "cost": return <>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></>;
-      case "budget": return <><span className="inline-flex items-center gap-1">{r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}{tab === "adset" && (r.daily_budget || r.lifetime_budget) && <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit budget" onClick={() => editBudget(r)}><Pencil className="h-3 w-3" /></Button>}</span>{(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}</>;
+      case "budget": return budgetEdit?.id === String(r.id) ? (
+        <div className="flex items-center justify-end gap-1">
+          <input autoFocus inputMode="decimal" className="h-7 w-[72px] rounded-md border border-fb-border bg-background px-1.5 text-right text-xs tabular-nums" value={budgetEdit.value}
+            onChange={(e) => setBudgetEdit({ ...budgetEdit, value: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") saveBudget(); if (e.key === "Escape") setBudgetEdit(null); }} />
+          <Button size="sm" className="h-7 gap-1 px-2 text-xs" disabled={busy === budgetEdit.id} onClick={saveBudget}><Check className="h-3 w-3" />Publish</Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBudgetEdit(null)}><X className="h-3 w-3" /></Button>
+        </div>
+      ) : <><span className="inline-flex items-center gap-1">{r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}{tab === "adset" && (r.daily_budget || r.lifetime_budget) && <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit budget" onClick={() => startBudgetEdit(r)}><Pencil className="h-3 w-3" /></Button>}</span>{(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}</>;
       case "spend": return money(r.insights?.spend);
       case "impressions": return num(r.insights?.impressions);
       case "reach": return num(r.insights?.reach);
