@@ -14,12 +14,33 @@ function toB64(buf: ArrayBuffer) {
   return btoa(s);
 }
 
-/** Uploads straight into the Meta ad account's video library in pieces (no size cap from our side). */
+function putWithProgress(url: string, f: File, type: string, onProgress?: (pct: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", url);
+    x.setRequestHeader("Content-Type", type);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.min(99, Math.round((e.loaded / e.total) * 100))); };
+    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`Cloud upload ব্যর্থ (${x.status})`)));
+    x.onerror = () => reject(new Error("Cloud upload ব্যর্থ — R2 bucket-এর CORS সেটিং দেখুন"));
+    x.send(f);
+  });
+}
+
+/** Uploads a video into the Meta ad account's library. Uses Cloudflare R2 (browser -> R2, Meta pulls by URL) when configured; else small pieces via our server. */
 export async function uploadToAccount(accId: string, f: File, onProgress?: (pct: number) => void): Promise<LibraryVideo> {
+  const type = f.type || "video/mp4";
+  const title = f.name.replace(/\.[^.]+$/, "");
+  const pre = await managedAds<{ enabled: boolean; uploadUrl?: string; publicUrl?: string }>({ action: "video_r2_presign", adAccountDbId: accId, fileName: f.name, contentType: type }).catch(() => ({ enabled: false } as { enabled: boolean; uploadUrl?: string; publicUrl?: string }));
+  if (pre.enabled && pre.uploadUrl && pre.publicUrl) {
+    await putWithProgress(pre.uploadUrl, f, type, onProgress);
+    const r = await managedAds<{ videoId: string }>({ action: "video_from_url", adAccountDbId: accId, fileUrl: pre.publicUrl, title });
+    onProgress?.(100);
+    return { id: r.videoId, title: f.name };
+  }
   const st = await managedAds<{ sessionId: string; videoId: string; start: number; end: number }>({ action: "video_start", adAccountDbId: accId, fileSize: f.size });
   let start = st.start, end = st.end;
   while (start < end) {
-    const stop = Math.min(end, start + 8 * 1024 * 1024);
+    const stop = Math.min(end, start + Math.floor(1.5 * 1024 * 1024));
     const chunk = await f.slice(start, stop).arrayBuffer();
     const r = await managedAds<{ start: number; end: number }>({ action: "video_chunk", adAccountDbId: accId, sessionId: st.sessionId, startOffset: start, chunkBase64: toB64(chunk) });
     start = r.start; end = r.end;

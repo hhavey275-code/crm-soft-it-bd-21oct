@@ -117,6 +117,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("video_start"), adAccountDbId: z.string().uuid(), fileSize: z.number().int().positive().max(4_000_000_000) }),
   z.object({ action: z.literal("video_chunk"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), startOffset: z.number().int().min(0), chunkBase64: z.string().max(14_000_000) }),
   z.object({ action: z.literal("video_finish"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), title: z.string().max(200).optional() }),
+  z.object({ action: z.literal("video_r2_presign"), adAccountDbId: z.string().uuid(), fileName: z.string().max(300), contentType: z.string().max(100) }),
+  z.object({ action: z.literal("video_from_url"), adAccountDbId: z.string().uuid(), fileUrl: z.string().url().max(1000), title: z.string().max(200).optional() }),
   z.object({ action: z.literal("account_summary"), ids: z.array(z.string().uuid()).min(1).max(60), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("demographics"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().max(60).optional() }),
   z.object({ action: z.literal("posts"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
@@ -312,13 +314,25 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   // Ad account video library (videos live in the Meta ad account itself).
-  if (body.action === "videos" || body.action === "video_start" || body.action === "video_chunk" || body.action === "video_finish") {
+  if (body.action === "videos" || body.action === "video_start" || body.action === "video_chunk" || body.action === "video_finish" || body.action === "video_r2_presign" || body.action === "video_from_url") {
     const accId = body.adAccountDbId;
     const allowed = (await sharedAccountIds(supabaseAdmin, targetUser)).includes(accId)
       || (await ownAccounts(supabaseAdmin, targetUser, true, isAdmin)).some((a: any) => a.id === accId);
     if (!allowed) throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
+    if (body.action === "video_r2_presign") {
+      const { r2Config, presignVideoUpload } = await import("@/lib/r2.server");
+      if (!r2Config()) return { enabled: false };
+      return { enabled: true, ...(await presignVideoUpload(body.fileName, body.contentType)) };
+    }
     const { token, act } = await tokenFor(supabaseAdmin, accId);
     const g = graphClient(token);
+    if (body.action === "video_from_url") {
+      const { r2Config } = await import("@/lib/r2.server");
+      const c = r2Config();
+      if (!c || !body.fileUrl.startsWith(c.publicUrl + "/")) throw new Error("ভিডিও লিংক গ্রহণযোগ্য নয়");
+      const r = await g.post(`${act}/advideos`, { file_url: body.fileUrl, ...(body.title ? { title: body.title } : {}) });
+      return { videoId: String(r.id) };
+    }
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
       const list = r.data ?? [];
