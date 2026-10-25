@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Open tasks
+- [x] Fix campaign/ad-set budget typing stuck at $5 by preserving editor identity; isolated browser checks passed for typing, focus, navigation and saved amounts. Real Meta publish remains unverified without external Supabase login.
 - [x] Add per-client My Ads metric visibility and left-to-right ordering with saved preferences. Seven logic/result tests pass; isolated desktop/mobile controls verified for reorder, hide, reset and reload persistence; build OK.
 - [ ] Verify saved column layout with real client campaign data in My Ads. Blocker: external Supabase session unavailable; actual /my-ads redirects to /auth.
 - [x] Diagnose IT Corner pasted Page link: code previously forwarded unverified numeric IDs after failed lookup. Resolve canonical Page IDs through client me/accounts or Page-specific BM read; show failures in dialog. Seven tests passed, build OK.
