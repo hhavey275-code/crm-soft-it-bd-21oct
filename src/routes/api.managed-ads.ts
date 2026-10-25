@@ -615,8 +615,18 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   }
 
   if (body.action === "pixels") {
-    const r = await g.get(`${act}/adspixels`, { fields: "id,name,last_fired_time", limit: "50" });
-    return { pixels: (r.data ?? []).map((x: any) => ({ id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null })) };
+    // Datasets belong to the ad account, not the Page: read them with every token that can see the
+    // account (client login and our BM token) and merge, so any Page the client picks shows them all.
+    const ut = shared ? null : await clientUserToken(supabaseAdmin, page.user_id);
+    const tokens = Array.from(new Set([token, tf.token, ut].filter(Boolean) as string[]));
+    const seen = new Map<string, any>();
+    let lastErr: any = null;
+    for (const t of tokens) {
+      const r: any = await graphClient(t).get(`${act}/adspixels`, { fields: "id,name,last_fired_time", limit: "100" }).catch((e: any) => { lastErr = e; return null; });
+      for (const x of r?.data ?? []) if (!seen.has(String(x.id))) seen.set(String(x.id), { id: String(x.id), name: x.name, lastFired: x.last_fired_time ?? null });
+    }
+    if (!seen.size && lastErr) throw lastErr;
+    return { pixels: [...seen.values()] };
   }
 
   if (body.action === "sales_assets") {
