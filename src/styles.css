@@ -92,6 +92,9 @@
 }
 
 .dark {
+  --color-fb-panel: #15202c;
+  --color-fb-panel-border: #2c3d50;
+  --color-fb-panel-soft: #1c2938;
   --background: 220 14% 14%;
   --foreground: 210 20% 96%;
   --card: 220 18% 10%;
@@ -394,6 +397,9 @@
   --color-fb-border: #dadde1;
   --color-fb-text: #1c2b33;
   --color-fb-muted: #65676b;
+  --color-fb-panel: #e7eefb;
+  --color-fb-panel-border: #cddcf3;
+  --color-fb-panel-soft: #f4f8ff;
 }
 
 .fb-font {

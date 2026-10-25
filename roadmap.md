@@ -34,3 +34,4 @@
 - [ ] Confirm whether Supabase ref dhswrfzdqcavgmymllat is the "crm soft it bd" project; if not, user connects it via Settings → General → External Supabase
 - [x] WhatsApp secrets dropped from remix setup — user confirmed not needed (2026-10-22)
 - [x] AI Ads Assistant in My Ads (English chat -> campaign draft -> confirm & create) (2026-10-25).
+- [x] Create wizard: form column wrapped in its own tinted panel with header-strip cards, sidebar cards matched (2026-10-25).
