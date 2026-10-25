@@ -5,6 +5,11 @@ export type AccountAvailability = {
   instruction: string;
 };
 
+export function myAdsAvailabilityPresentation(availability: AccountAvailability) {
+  const confirmedBlocked = availability.status !== null && !availability.canCreate;
+  return { showWarning: confirmedBlocked, blurCreate: confirmedBlocked };
+}
+
 export function myAdsAvailability(summary?: { status?: unknown; error?: string } | null, requestError?: string): AccountAvailability {
   const status = summary?.status == null ? null : Number(summary.status);
   if (summary?.error || requestError) return {
