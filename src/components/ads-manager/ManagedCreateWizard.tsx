@@ -1285,7 +1285,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 <div className="space-y-2 overflow-hidden"><div className="flex items-center justify-between"><p className="text-[13px] font-semibold">Ad preview</p><button type="button" className="text-[12px] font-semibold text-fb-blue" onClick={() => { setForce((x) => x + 1); if (posts !== null) loadPosts(true); }}>Update now</button></div>{preview}</div>
               )}
               {level === 1 && tab === "edit" && (
-                <div className="rounded-lg border border-fb-border bg-background p-4 text-[13px]">
+                <div className="rounded-xl border border-fb-panel-border bg-background p-4 text-[13px]">
                   <p className="text-[15px] font-semibold">Estimated audience size <Info className="inline h-3 w-3 text-fb-muted" /></p>
                   <p className="mt-2 text-[20px] font-bold">
                     {reach === "loading" || reach === null ? <Loader2 className="inline h-5 w-5 animate-spin text-fb-muted" />
@@ -1296,21 +1296,21 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
                 </div>
               )}
-              <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">
+              <div className="hidden rounded-xl border border-fb-panel-border bg-background p-4 sm:block">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-full border-4 text-[14px] font-bold", ready ? "border-fb-green" : "border-fb-blue/50")}>{ready ? 100 : 70}</div>
                   <div><p className="text-[14px] font-semibold">Campaign score</p><p className="text-[12px] text-fb-muted">{ready ? "You're using our recommended setup." : "Complete the required fields."}</p></div>
                 </div>
               </div>
               {acc?.kind === "shared" && (
-                <div className={cn("rounded-lg border bg-background p-4", ((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet ? "border-destructive" : "border-fb-border")}>
+                <div className={cn("rounded-xl border bg-background p-4", ((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet ? "border-destructive" : "border-fb-panel-border")}>
                   <p className="flex items-center gap-2 text-[14px] font-semibold"><Wallet className="h-4 w-4" />Account balance</p>
                   <p className="mt-1 text-[20px] font-bold">{fmt(walletBalance)}</p>
                   {(((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
                 </div>
               )}
               {missing.length > 0 && (
-                <div className={cn("rounded-lg border bg-background p-4 text-[13px]", showMissing ? "border-destructive" : "border-fb-border")}>
+                <div className={cn("rounded-xl border bg-background p-4 text-[13px]", showMissing ? "border-destructive" : "border-fb-panel-border")}>
                   <p className="flex items-center gap-2 font-semibold text-destructive"><AlertCircle className="h-4 w-4" />Publish করার আগে যা বাকি ({missing.length})</p>
                   <ul className="mt-2 space-y-1">
                     {missing.map((m, i) => (
