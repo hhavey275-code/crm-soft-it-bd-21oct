@@ -51,19 +51,18 @@ export async function readBmPages(db: any, bmDbId: string) {
   return listApprovedBmPages(g, String(bm.bm_id));
 }
 
-export async function importBmPage(db: any, actor: string, input: { bmDbId: string; pageId: string; clientId: string; accountId: string }) {
-  const { data: account, error: accountError } = await db.from("ad_accounts").select("id,business_manager_id").eq("id", input.accountId).maybeSingle();
-  if (accountError) throw new Error(accountError.message);
-  const { data: link, error: linkError } = await db.from("user_ad_accounts").select("id").eq("user_id", input.clientId).eq("ad_account_id", input.accountId).maybeSingle();
-  if (linkError) throw new Error(linkError.message);
-  validateBmPageAssignment(account?.business_manager_id, input.bmDbId, !!link);
+export async function importBmPage(db: any, actor: string, input: { bmDbId: string; pageId: string; clientId: string; accountId?: string }) {
+  // The Page belongs to the client, not one ad account: usable from any of their accounts.
+  const { data: profile, error: profileError } = await db.from("profiles").select("user_id").eq("user_id", input.clientId).maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+  if (!profile) throw new Error("ক্লায়েন্ট পাওয়া যায়নি");
   const { bm, g } = await bmReader(db, input.bmDbId);
   const page = (await listApprovedBmPages(g, String(bm.bm_id))).find(p => p.id === input.pageId);
   if (!page) throw new Error("এই Page-এ BM-এর অনুমোদিত access পাওয়া যায়নি");
   const { data: existing, error: readError } = await db.from("client_facebook_pages").select("id,user_id").eq("page_id", page.id).maybeSingle();
   if (readError) throw new Error(readError.message);
   if (existing && existing.user_id !== input.clientId) throw new Error("এই Page অন্য ক্লায়েন্টের সঙ্গে যুক্ত আছে — আগে সেই সংযোগ সরান");
-  const values = { page_name: page.name, page_url: page.link, ad_account_id: input.accountId, status: "approved", approved_at: new Date().toISOString(), approved_by: actor };
+  const values = { page_name: page.name, page_url: page.link, ad_account_id: null, status: "approved", approved_at: new Date().toISOString(), approved_by: actor };
   const { data, error } = existing
     ? await db.from("client_facebook_pages").update(values).eq("id", existing.id).select("id,page_id,page_name,user_id,status").single()
     : await db.from("client_facebook_pages").insert({ ...values, user_id: input.clientId, page_id: page.id }).select("id,page_id,page_name,user_id,status").single();
