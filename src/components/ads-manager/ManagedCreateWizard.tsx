@@ -92,13 +92,13 @@ const sel = "h-9 w-full rounded-md border border-fb-border bg-background px-3 te
 const inp = sel;
 function Section({ title, ok = true, children, right }: { title: string; ok?: boolean; children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-fb-border bg-background p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
+    <div className="overflow-hidden rounded-xl border border-fb-panel-border bg-background shadow-sm">
+      <div className="flex items-center gap-2 border-b border-fb-panel-border bg-fb-panel-soft px-4 py-2.5">
         {ok ? <CheckCircle2 className="h-4 w-4 text-fb-green" /> : <AlertCircle className="h-4 w-4 text-destructive" />}
         <h3 className="text-[15px] font-semibold">{title}</h3>
         <div className="ml-auto">{right}</div>
       </div>
-      <div className="space-y-3 text-[13px]">{children}</div>
+      <div className="space-y-3 p-4 text-[13px]">{children}</div>
     </div>
   );
 }
@@ -1279,7 +1279,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         {/* Body */}
         <main className="wizard-bg flex-1 overflow-auto overscroll-contain">
           <div className="mx-auto grid max-w-[1500px] gap-4 p-2 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-            <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
+            <div className="min-w-0 space-y-3 rounded-2xl border border-fb-panel-border bg-fb-panel p-2.5 shadow-sm sm:p-4">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
             <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
               {level === 2 && tab === "edit" && (
                 <div className="space-y-2 overflow-hidden"><div className="flex items-center justify-between"><p className="text-[13px] font-semibold">Ad preview</p><button type="button" className="text-[12px] font-semibold text-fb-blue" onClick={() => { setForce((x) => x + 1); if (posts !== null) loadPosts(true); }}>Update now</button></div>{preview}</div>
