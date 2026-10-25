@@ -450,10 +450,10 @@ export default function MyAdsPage() {
       </button>
     </th>
   );
-  const th = "px-3 py-2 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-top";
-  const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
-  const sub = "block text-[11px] text-fb-muted";
-  const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
+  const th = "px-2 py-1.5 text-left text-[13px] font-bold text-fb-text border-r border-fb-border whitespace-nowrap align-middle";
+  const td = "px-2 py-1 font-medium border-r border-fb-border align-top whitespace-nowrap leading-tight";
+  const sub = "block text-[11px] leading-tight text-fb-muted";
+  const tbBtn = "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
 
 
   const metricHeader = (key: string) => {
