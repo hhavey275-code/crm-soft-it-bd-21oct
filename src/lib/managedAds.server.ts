@@ -71,7 +71,7 @@ export async function ownAccounts(supabaseAdmin: any, userId: string, ignoreTogg
  * Shared accounts: only campaigns of the user's approved pages (these are wallet-charged).
  * includeOwn: also the user's own dedicated accounts (not wallet-charged; spend uses the account's own limit).
  */
-export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string; viewAllOwn?: boolean; allForAdmin?: boolean }) {
+export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string; viewAllOwn?: boolean; allForAdmin?: boolean; mutationObject?: { id: string; level: "campaign" | "adset" | "ad" } }) {
   const { graphClient } = await import("@/lib/metaGraph.server");
   // All of the client's own pages (any not rejected). Page IDs are globally unique, so one owner per page.
   const { data: allPages } = await supabaseAdmin
@@ -109,9 +109,9 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   // Meta rejects big nested requests with (#1); retry the same call with a smaller page.
   // Only switched-on / in-review objects are listed; anything that delivered in the chosen dates
   // is added back from insights (backfill), so thousands of old off campaigns are never read.
-  const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED"] }]);
+  const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED"] }]);
   const getSmall = async (g: any, path: string, fields: string) => {
-    const base = path.endsWith("/campaigns") ? { filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"] }]) } : { filtering: liveFilter };
+    const base = { filtering: liveFilter };
     try { return await g.get(path, { fields, limit: "100", ...base }); }
     catch (e: any) {
       if (!/reduce the amount of data|\(#1\)/i.test(String(e?.message))) throw e;
@@ -120,6 +120,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   };
 
   const onlyAcc = opts?.onlyAccount === "first" ? accounts[0]?.id : opts?.onlyAccount;
+  if (onlyAcc && !accounts.some(a => a.id === onlyAcc)) throw new Error("এই ad account আপনাকে দেওয়া হয়নি");
   if (onlyAcc && accounts.some((a) => a.id === onlyAcc)) (result as any).selectedAccountId = onlyAcc;
   for (const [accId, pageIds] of byAccount) {
     if ((result as any).selectedAccountId && accId !== (result as any).selectedAccountId) continue;
@@ -131,6 +132,16 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
         getSmall(g, `${act}/adsets`, "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
         getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
       ]);
+      // Mutations must also resolve paused/older objects beyond Meta's first result page.
+      if (opts?.mutationObject) {
+        const { id, level } = opts.mutationObject;
+        const list = level === "campaign" ? camps : level === "adset" ? adsets : ads;
+        if (!(list.data ?? []).some((row: any) => String(row.id) === id)) {
+          const fields = level === "campaign" ? "id,account_id,name,status,effective_status,objective" : level === "adset" ? "id,account_id,name,status,effective_status,campaign_id,promoted_object" : "id,account_id,name,status,effective_status,campaign_id,adset_id,creative{actor_id,object_story_spec,effective_object_story_id}";
+          const row = await g.get(id, { fields });
+          if (String(row.account_id) === String(act).replace(/^act_/, "")) list.data = [...(list.data ?? []), row];
+        }
+      }
       // Meta pages lists at 100; big accounts (2000+ campaigns) lost most delivered rows.
       // Read every insights page, then fetch any delivered object missing from the first page.
       const insightsFields = "spend,impressions,reach,frequency,clicks,cpc,ctr,cpm,inline_link_clicks,cost_per_inline_link_click,actions,cost_per_action_type,action_values,purchase_roas";
