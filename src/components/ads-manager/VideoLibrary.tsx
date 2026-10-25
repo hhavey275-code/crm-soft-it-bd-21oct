@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Upload, Check, X, Film } from "lucide-react";
+import { Loader2, Upload, Check, X, Film, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { managedAds } from "@/lib/managedAdsApi";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,19 @@ export async function uploadToAccount(accId: string, f: File, onProgress?: (pct:
 export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open: boolean; onClose: () => void; onPick?: (v: LibraryVideo) => void; selected?: string; accId?: string }) {
   const [items, setItems] = useState<LibraryVideo[] | null>(null);
   const [pct, setPct] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  const clearAll = async () => {
+    if (!accId || !items?.length) return;
+    if (!window.confirm(`এই ad account-এর library থেকে ${items.length}টি video সব মুছে ফেলবেন? এটা আর ফেরত আনা যাবে না।`)) return;
+    setClearing(true);
+    try {
+      const r = await managedAds<{ deleted: number; failed: number }>({ action: "videos_clear", adAccountDbId: accId });
+      if (r.failed) toast.warning(`${r.deleted}টি মুছে গেছে, ${r.failed}টি মোছা যায়নি (হয়তো চলমান ad-এ ব্যবহার হচ্ছে)`);
+      else toast.success(`${r.deleted}টি video মুছে ফেলা হয়েছে`);
+      await load(true);
+    } catch (e: any) { toast.error(e.message || "মোছা যায়নি"); } finally { setClearing(false); }
+  };
 
   const load = async (force = false) => {
     if (!accId) return setItems([]);
@@ -85,6 +98,9 @@ export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open:
               {pct !== null ? <><Loader2 className="h-4 w-4 animate-spin" />{pct}%</> : <><Upload className="h-4 w-4" />Upload video</>}
               <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
             </label>
+            <button onClick={clearAll} disabled={clearing || !items?.length || pct !== null} className="inline-flex h-9 items-center gap-2 rounded-md border border-destructive/40 px-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Delete all
+            </button>
             <button onClick={() => load(true)} disabled={items === null} className="h-9 rounded-md border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-60">Update now</button>
             <button onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-muted"><X className="h-5 w-5" /></button>
           </div>
