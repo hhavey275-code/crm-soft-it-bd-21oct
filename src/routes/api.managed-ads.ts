@@ -103,6 +103,12 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({
+    action: z.literal("reach_estimate"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(),
+    countries: z.array(z.string().regex(/^[A-Z]{2}$/)).max(50), ageMin: z.string().max(3), ageMax: z.string().max(3),
+    gender: z.enum(["all", "male", "female"]),
+    interests: z.array(z.object({ id: z.string().regex(/^\d+$/), name: z.string().optional(), type: z.string().regex(/^[a-z_]+$/).optional() })).max(50),
+  }),
   z.object({ action: z.literal("sales_assets"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(), pixelId: z.string().regex(/^\d+$/).optional(), catalogId: z.string().regex(/^\d+$/).optional() }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
