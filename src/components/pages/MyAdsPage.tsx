@@ -185,6 +185,13 @@ export default function MyAdsPage() {
   const ads: any[] = fbOrder((data?.ads ?? []).filter((a: any) =>
     (!selCampaigns.length || selCampaigns.includes(String(a.campaign_id))) && (!selAdsets.length || selAdsets.includes(String(a.adset_id))),
   ));
+  // Results follow each row's campaign objective (Sales → purchases only, not link clicks).
+  const campObj = new Map<string, string>((data?.campaigns ?? []).map((c: any) => [String(c.id), String(c.objective || "")]));
+  const setGoal = new Map<string, string>((data?.adsets ?? []).map((s: any) => [String(s.id), String(s.optimization_goal || "")]));
+  const rowResult = (r: any) => resultOf(r?.insights, {
+    objective: r?.objective ?? campObj.get(String(r?.campaign_id)),
+    goal: r?.optimization_goal ?? (r?.adset_id ? setGoal.get(String(r.adset_id)) : undefined),
+  });
   // Optional re-ordering on top of the Facebook order: best results / lowest cost per result first, etc.
   const sortRows = (list: any[]) => {
     if (colSort) {
