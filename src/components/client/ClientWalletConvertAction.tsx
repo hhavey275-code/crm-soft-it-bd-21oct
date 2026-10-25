@@ -50,7 +50,6 @@ export function ClientWalletConvertAction({
     ...(wallets.secondaryEnabled ? (["secondary"] as WalletKind[]) : []),
     ...(wallets.creditLineEnabled ? (["credit_line"] as WalletKind[]) : []),
   ];
-  if (enabled.length < 2) return null;
 
   const balanceOf = (k: WalletKind) =>
     k === "primary" ? wallets.mainBalance : k === "secondary" ? wallets.secondaryBalance : wallets.creditLineBalance;
@@ -129,6 +128,8 @@ export function ClientWalletConvertAction({
       </SelectContent>
     </Select>
   );
+
+  if (enabled.length < 2) return null;
 
   return (
     <>

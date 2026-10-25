@@ -18,6 +18,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ClientWalletConvertAction } from "@/components/client/ClientWalletConvertAction";
 import { MainWalletDebitCard } from "@/components/MainWalletDebitCard";
 import { SecondaryWalletDebitCard } from "@/components/SecondaryWalletDebitCard";
 import { CreditLineWalletDebitCard } from "@/components/CreditLineWalletDebitCard";
@@ -189,109 +190,19 @@ export function ClientWallet() {
         </div>
       )}
 
-      {/* Move balance from the main wallet into an extra wallet */}
       {extraWalletOn && (
         <Card className="border-border/60">
           <CardContent className="p-4 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-[180px]">
-              <p className="text-sm font-semibold">Move Main Wallet balance</p>
+              <p className="text-sm font-semibold">Wallet Exchange</p>
               <p className="text-xs text-muted-foreground">
-                Converted at each wallet&apos;s own rate. Use it to clear a due or pre-fund a wallet.
+                Move dollars from any wallet to any other wallet, converted at each wallet&apos;s own rate.
               </p>
             </div>
-            {wallets.creditLineEnabled && (
-              <Button
-                size="sm"
-                className="bg-sky-600 hover:bg-sky-700 text-white"
-                disabled={wallets.mainBalance <= 0}
-                onClick={() => { setTransferTarget("credit_line"); setTransferAmount(""); }}
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
-                To Credit Line
-              </Button>
-            )}
-            {wallets.secondaryEnabled && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={wallets.mainBalance <= 0}
-                onClick={() => { setTransferTarget("secondary"); setTransferAmount(""); }}
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
-                To Secondary
-              </Button>
-            )}
+            <ClientWalletConvertAction userId={user?.id} target="primary" variant="button" />
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={!!transferTarget} onOpenChange={(o) => { if (!o) setTransferTarget(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Main Wallet → {targetLabel}</DialogTitle>
-            <DialogDescription>
-              Available in Main Wallet: ${wallets.mainBalance.toLocaleString()} (৳{wallets.mainRate}/USD)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="transfer-amount">Amount to move (USD)</Label>
-            <Input
-              id="transfer-amount"
-              type="number"
-              min="0"
-              max={wallets.mainBalance}
-              step="0.01"
-              value={transferAmount}
-              onChange={(e) => setTransferAmount(e.target.value)}
-              placeholder="e.g. 100"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 text-[11px]"
-                onClick={() => setTransferAmount((Math.floor(wallets.mainBalance * 100) / 100).toFixed(2))}
-                disabled={wallets.mainBalance <= 0}
-              >
-                Max ${(Math.floor(wallets.mainBalance * 100) / 100).toFixed(2)}
-              </Button>
-            </div>
-            {previewCredit > 0 && !transferTooManyDecimals && !transferOverBalance && (
-              <p className="text-xs text-muted-foreground">
-                ${parsedTransfer.toLocaleString()} × ৳{wallets.mainRate} = ৳{previewBdt.toLocaleString()} ÷ ৳{targetRate} ={" "}
-                <span className="font-semibold text-foreground">
-                  ${previewCredit.toFixed(2)}
-                </span>{" "}
-                credited to {targetLabel}
-              </p>
-            )}
-            {transferTooManyDecimals && (
-              <p className="text-xs text-destructive">সর্বোচ্চ ২ দশমিক পর্যন্ত amount দিন (যেমন 100.25)।</p>
-            )}
-            {transferOverBalance && (
-              <p className="text-xs text-destructive">
-                Main wallet-এ আছে ${wallets.mainBalance.toLocaleString()} — এর বেশি move করা যাবে না।
-              </p>
-            )}
-            {(!(targetRate > 0) || !(wallets.mainRate > 0)) && (
-              <p className="text-xs text-destructive">USD rate সেট করা নেই — admin-কে জানান।</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => transferMutation.mutate()}
-              disabled={transferMutation.isPending || transferBlocked}
-            >
-              {transferMutation.isPending ? "Moving…" : "Confirm transfer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Due Limit Notices — each wallet has its own limit */}
       {(dueLimit > 0 ||
