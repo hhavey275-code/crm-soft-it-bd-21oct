@@ -31,19 +31,42 @@ export async function lookupPageIdByUsername(username: string, appToken?: string
   return null;
 }
 
-export async function resolveFacebookPage(input: string, bm: GraphReader, client?: GraphReader, lookup?: (username: string) => Promise<{ id: string; name?: string } | null>) {
+function matchesPage(page: any, ref: string): boolean {
+  if (String(page.id) === ref) return true;
+  if (page.username && String(page.username).toLowerCase() === ref.toLowerCase()) return true;
+  try { return !!page.link && facebookPageReference(page.link).toLowerCase() === ref.toLowerCase(); } catch { return false; }
+}
+
+/** Only the selected account's BM is searched; never return its unrelated Pages to the client. */
+export async function findBusinessPage(input: string, bm: GraphReader, bmId: string) {
+  const ref = facebookPageReference(input);
+  for (const edge of ["client_pages", "owned_pages"]) {
+    let after: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const result = await bm.get(`${bmId}/${edge}`, { fields: "id,name,link", limit: "100", ...(after ? { after } : {}) }).catch(() => null);
+      if (!result || result.error) break;
+      const page = (result.data ?? []).find((p: any) => matchesPage(p, ref));
+      if (page?.id) return { id: String(page.id), name: page.name, link: page.link, bmAccess: true as const };
+      after = result.paging?.next ? result.paging?.cursors?.after : undefined;
+      if (!after) break;
+    }
+  }
+  return null;
+}
+
+export async function resolveFacebookPage(input: string, bm: GraphReader, client?: GraphReader, lookup?: (username: string) => Promise<{ id: string; name?: string } | null>, bmId?: string) {
   const ref = facebookPageReference(input);
   if (!ref) throw new Error("Page-এর পুরো লিংক বা Page ID দিন");
+  if (bmId) {
+    const businessPage = await findBusinessPage(input, bm, bmId);
+    if (businessPage) return businessPage;
+  }
   if (client) {
     let after: string | undefined;
     for (let i = 0; i < 5; i++) {
       const result = await client.get("me/accounts", { fields: "id,name,link,username", limit: "100", ...(after ? { after } : {}) }).catch(() => null);
       if (!result) break;
-      const page = (result.data ?? []).find((p: any) => {
-        if (String(p.id) === ref) return true;
-        if (p.username && String(p.username).toLowerCase() === ref.toLowerCase()) return true;
-        try { return p.link && facebookPageReference(p.link).toLowerCase() === ref.toLowerCase(); } catch { return false; }
-      });
+      const page = (result.data ?? []).find((p: any) => matchesPage(p, ref));
       if (page) return { id: String(page.id), name: page.name, link: page.link };
       after = result.paging?.next ? result.paging?.cursors?.after : undefined;
       if (!after) break;

@@ -258,6 +258,11 @@ async function savedPageToken(supabaseAdmin: any, pageId: string, preferUser?: s
 // Give our Business Manager "Advertise" rights on the client's Page using the client's saved Page login.
 // Returns a plain-language problem when Facebook refuses, so the client knows exactly what to do.
 async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, ownerId: string, bmId?: string | null): Promise<string | null> {
+  // A marketer need not personally administer a Page already approved for this BM.
+  if (bmId) {
+    const { findBusinessPage } = await import("@/lib/facebookPageResolution.server");
+    if (await findBusinessPage(pageId, g, bmId)) return null;
+  }
   const pt = await savedPageToken(supabaseAdmin, pageId, ownerId);
   const v = "https://graph.facebook.com/v25.0";
   const tasks = ["ADVERTISE", "ANALYZE", "CREATE_CONTENT", "MODERATE", "MESSAGING"];
@@ -535,17 +540,17 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const { resolveFacebookPage, lookupPageIdByUsername } = await import("@/lib/facebookPageResolution.server");
     const userToken = await clientUserToken(supabaseAdmin, targetUser);
     const appToken = process.env.META_APP_ID && process.env.META_APP_SECRET ? `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}` : undefined;
-    const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined, (u) => lookupPageIdByUsername(u, appToken));
+    const info = await resolveFacebookPage(raw, g, userToken ? graphClient(userToken) : undefined, (u) => lookupPageIdByUsername(u, appToken), bmId);
     const pageId = info.id;
-    let already = false;
+    let already = "bmAccess" in info && info.bmAccess === true;
     let granted = false;
     // 1) Client is the Page admin and connected Facebook: grant our BM directly with their Page login (no approval needed).
-    if (await savedPageToken(supabaseAdmin, pageId, targetUser)) {
+    if (!already && await savedPageToken(supabaseAdmin, pageId, targetUser)) {
       const problem = await ensurePageAccess(g, supabaseAdmin, pageId, targetUser, bmId);
       if (!problem) granted = true;
     }
     // 2) Otherwise send a BM request that the Page admin approves on Facebook.
-    if (!granted) {
+    if (!already && !granted) {
       try {
         await g.post(`${bmId}/client_pages`, { page_id: pageId, permitted_tasks: ["ADVERTISE", "ANALYZE", "CREATE_CONTENT"] });
       } catch (e: any) {
@@ -559,8 +564,16 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
         }
       }
     }
-    const { data: ex } = await supabaseAdmin.from("client_facebook_pages").select("id").eq("user_id", targetUser).eq("page_id", pageId).maybeSingle();
-    if (!ex) await supabaseAdmin.from("client_facebook_pages").insert({ user_id: targetUser, page_id: pageId, page_name: info?.name || `Page ${pageId}`, page_url: info?.link || raw, ad_account_id: wantAcc } as any);
+    const { data: ex, error: readError } = await supabaseAdmin.from("client_facebook_pages").select("id").eq("user_id", targetUser).eq("page_id", pageId).maybeSingle();
+    if (readError) throw new Error(`CRM-এ Page যাচাই করা যায়নি: ${readError.message}`);
+    const values = { page_name: info.name || `Page ${pageId}`, page_url: info.link || raw, ad_account_id: wantAcc,
+      ...(already || granted ? { status: "approved", approved_at: new Date().toISOString() } : {}) };
+    const { error: saveError } = ex
+      ? await supabaseAdmin.from("client_facebook_pages").update(values).eq("id", ex.id).eq("user_id", targetUser)
+      : await supabaseAdmin.from("client_facebook_pages").insert({ user_id: targetUser, page_id: pageId, ...values } as any);
+    if (saveError) throw new Error(saveError.code === "23505"
+      ? "এই Page CRM-এ অন্য ক্লায়েন্টের সঙ্গে যুক্ত আছে — Admin-কে সঠিক ক্লায়েন্টের সঙ্গে যুক্ত করতে বলুন"
+      : `Facebook-এ access আছে বা request হয়েছে, কিন্তু CRM-এ Page সেভ হয়নি: ${saveError.message}`);
     const bm: any = await g.get(String(bmId), { fields: "name" }).catch(() => null);
     return { ok: true, already, granted, pageId, pageName: info?.name ?? null, bmName: bm?.name ?? null, bmId: String(bmId) };
   }
