@@ -15,7 +15,7 @@ const EVENT_ENUM = z.enum(["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD
 const BID_ENUM = z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"]);
 const PLACEMENTS_SCHEMA = z.object({
   publisher_platforms: z.array(z.string().max(30)).max(6),
-  facebook_positions: z.array(z.string().max(40)).max(20).optional(),
+  facebook_positions: z.array(z.string().max(40)).max(20).optional().transform((v) => v?.filter((p) => p !== "video_feeds")),
   instagram_positions: z.array(z.string().max(40)).max(20).optional(),
   messenger_positions: z.array(z.string().max(40)).max(10).optional(),
   audience_network_positions: z.array(z.string().max(40)).max(10).optional(),

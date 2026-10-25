@@ -33,7 +33,7 @@ export const defaultSalesOpts: SalesOpts = {
   performanceGoal: "CONVERSIONS", attribution: "7C1V", customConversionId: "", advantageSales: false, advantageAudience: false,
   customAudiences: [], excludedAudiences: [], locales: [], placementMode: "auto",
   positions: {
-    facebook: ["feed", "story", "facebook_reels", "instream_video", "search", "marketplace", "video_feeds", "right_hand_column", "profile_feed", "notification"],
+    facebook: ["feed", "story", "facebook_reels", "instream_video", "search", "marketplace", "right_hand_column", "profile_feed", "notification"],
     instagram: ["stream", "story", "reels", "explore", "explore_home", "profile_feed", "ig_search"],
     messenger: ["messenger_home", "story"],
     audience_network: ["classic", "rewarded_video"],
@@ -44,7 +44,7 @@ export const defaultSalesOpts: SalesOpts = {
 };
 
 const POS: Record<string, [string, string][]> = {
-  facebook: [["feed", "Feed"], ["profile_feed", "Profile feed"], ["marketplace", "Marketplace"], ["video_feeds", "Video feeds"], ["right_hand_column", "Right column"], ["story", "Stories"], ["facebook_reels", "Reels"], ["instream_video", "In-stream videos"], ["search", "Search results"], ["notification", "Notifications"]],
+  facebook: [["feed", "Feed"], ["profile_feed", "Profile feed"], ["marketplace", "Marketplace"], ["right_hand_column", "Right column"], ["story", "Stories"], ["facebook_reels", "Reels"], ["instream_video", "In-stream videos"], ["search", "Search results"], ["notification", "Notifications"]],
   instagram: [["stream", "Feed"], ["profile_feed", "Profile feed"], ["explore", "Explore"], ["explore_home", "Explore home"], ["story", "Stories"], ["reels", "Reels"], ["ig_search", "Search results"]],
   messenger: [["messenger_home", "Inbox"], ["story", "Stories"]],
   audience_network: [["classic", "Native, banner & interstitial"], ["rewarded_video", "Rewarded videos"]],
