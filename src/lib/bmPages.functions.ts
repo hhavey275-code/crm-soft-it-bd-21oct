@@ -6,7 +6,7 @@ export const bmPages = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.discriminatedUnion("action", [
     z.object({ action: z.literal("list"), bmDbId: z.string().uuid() }),
-    z.object({ action: z.literal("import"), bmDbId: z.string().uuid(), pageId: z.string().regex(/^\d{5,25}$/), clientId: z.string().uuid(), accountId: z.string().uuid() }),
+    z.object({ action: z.literal("import"), bmDbId: z.string().uuid(), pageId: z.string().regex(/^\d{5,25}$/), clientId: z.string().uuid() }),
   ]).parse(input))
   .handler(async ({ data, context }) => {
     const [{ data: admin }, { data: superadmin }] = await Promise.all([
