@@ -123,6 +123,52 @@ function Radio({ on, title, desc, onClick, disabled }: { on: boolean; title: str
 }
 const Adv = () => <span className="inline-flex items-center gap-1 rounded-full bg-fb-green/10 px-2 py-0.5 text-[11px] font-semibold text-fb-green"><Sparkles className="h-3 w-3" />Advantage+ on</span>;
 
+const fmt = (n: number) => `$${n.toFixed(2)}`;
+
+// Keep editor component identities stable so typing never remounts the input.
+function BudgetInputs({ bt, setBt, am, setAm, onLifetime }: { bt: "daily" | "lifetime"; setBt: (v: "daily" | "lifetime") => void; am: string; setAm: (v: string) => void; onLifetime: () => void }) {
+  const n = Number(am) || 0;
+  return (
+    <>
+      <div className="grid grid-cols-2 overflow-hidden rounded-md border border-fb-border">
+        <select aria-label="Budget type" className="h-9 border-r border-fb-border bg-background px-3 text-[13px]" value={bt} onChange={(e) => {
+          const value = e.target.value === "lifetime" ? "lifetime" : "daily";
+          setBt(value);
+          if (value === "lifetime") onLifetime();
+        }}>
+          <option value="daily">Daily budget</option><option value="lifetime">Lifetime budget</option>
+        </select>
+        <div className="flex items-center px-3"><span>$</span>
+          <input aria-label="Budget amount (USD)" type="number" min={1} step="0.01" className="h-9 w-full bg-background px-1 text-[13px] outline-none" value={am} onChange={(e) => setAm(e.target.value)} />
+          <span className="text-fb-muted">USD</span>
+        </div>
+      </div>
+      {bt === "daily" && n > 0 && (
+        <p className="text-[12px]">We'll spend around <b>{fmt(n)}</b> per day. Your maximum daily spend is <b>{fmt(n * 1.75)}</b> and your maximum weekly spend is <b>{fmt(n * 7)}</b>.</p>
+      )}
+      <p className="text-[12px] text-fb-muted">Spending may be higher some days and lower on others.</p>
+    </>
+  );
+}
+
+function BidStrategy({ bs, setBs, ba, setBa, objective }: { bs: string; setBs: (v: string) => void; ba: string; setBa: (v: string) => void; objective: Obj }) {
+  return (
+    <div className="border-t border-fb-border pt-3">
+      <Field label="Campaign bid strategy">
+        <select className={sel} value={bs} onChange={(e) => setBs(e.target.value)}>
+          <option value="LOWEST_COST_WITHOUT_CAP">Highest volume or value</option>
+          <option value="COST_CAP">Cost per result goal</option>
+          <option value="LOWEST_COST_WITH_BID_CAP">Bid cap</option>
+          {objective === "SALES" && <option value="LOWEST_COST_WITH_MIN_ROAS">ROAS goal</option>}
+        </select>
+      </Field>
+      {bs !== "LOWEST_COST_WITHOUT_CAP" && (
+        <div className="mt-2"><Field label={bs === "COST_CAP" ? "Cost per result goal ($)" : bs === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal (যেমন 2.0)" : "Bid cap ($)"}><input type="number" className={inp} value={ba} onChange={(e) => setBa(e.target.value)} /></Field></div>
+      )}
+    </div>
+  );
+}
+
 export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose, onCreated, draft, newDraftId, userId }: Props) {
   const pages = allPages.filter((p) => p.status !== "rejected");
   const [phase, setPhase] = useState<"objective" | "edit">("objective");
@@ -693,7 +739,6 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   }
 
   // ================= Phase 2: 3-level editor =================
-  const fmt = (n: number) => `$${n.toFixed(2)}`;
 
   const campaignView = (
     <>
@@ -723,8 +768,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
             <Radio on={budgetLevel === "adset"} onClick={() => setBudgetLevel("adset")} title="Ad set budget" desc="Set different bid strategies or budget schedules for each ad set." />
           </div>
         )}
-        {budgetLevel === "campaign" && <BudgetInputs bt={cBudgetType} setBt={setCBudgetType} am={cAmount} setAm={setCAmount} />}
-        {budgetLevel === "campaign" && <BidStrategy bs={cBidStrategy} setBs={setCBidStrategy} ba={cBidAmount} setBa={setCBidAmount} />}
+        {budgetLevel === "campaign" && <BudgetInputs bt={cBudgetType} setBt={setCBudgetType} am={cAmount} setAm={setCAmount} onLifetime={() => setHasEnd(true)} />}
+        {budgetLevel === "campaign" && <BidStrategy bs={cBidStrategy} setBs={setCBidStrategy} ba={cBidAmount} setBa={setCBidAmount} objective={objective} />}
         {budgetLevel === "adset" && <p className="text-[12px] text-fb-muted">প্রতিটা ad set-এর budget আলাদা করে সেই ad set-এর ধাপে দেবেন।</p>}
         <WalletNote />
       </Section>
@@ -751,43 +796,6 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     </>
   );
 
-  function BudgetInputs({ bt, setBt, am, setAm }: { bt: "daily" | "lifetime"; setBt: (v: "daily" | "lifetime") => void; am: string; setAm: (v: string) => void }) {
-    const n = Number(am) || 0;
-    return (
-      <>
-        <div className="grid grid-cols-2 overflow-hidden rounded-md border border-fb-border">
-          <select className="h-9 border-r border-fb-border bg-background px-3 text-[13px]" value={bt} onChange={(e) => { setBt(e.target.value as any); if (e.target.value === "lifetime") setHasEnd(true); }}>
-            <option value="daily">Daily budget</option><option value="lifetime">Lifetime budget</option>
-          </select>
-          <div className="flex items-center px-3"><span>$</span>
-            <input type="number" min={1} step="0.01" className="h-9 w-full bg-background px-1 text-[13px] outline-none" value={am} onChange={(e) => setAm(e.target.value)} />
-            <span className="text-fb-muted">USD</span>
-          </div>
-        </div>
-        {bt === "daily" && n > 0 && (
-          <p className="text-[12px]">We'll spend around <b>{fmt(n)}</b> per day. Your maximum daily spend is <b>{fmt(n * 1.75)}</b> and your maximum weekly spend is <b>{fmt(n * 7)}</b>.</p>
-        )}
-        <p className="text-[12px] text-fb-muted">Spending may be higher some days and lower on others.</p>
-      </>
-    );
-  }
-  function BidStrategy({ bs, setBs, ba, setBa }: { bs: string; setBs: (v: string) => void; ba: string; setBa: (v: string) => void }) {
-    return (
-      <div className="border-t border-fb-border pt-3">
-        <Field label="Campaign bid strategy">
-          <select className={sel} value={bs} onChange={(e) => setBs(e.target.value)}>
-            <option value="LOWEST_COST_WITHOUT_CAP">Highest volume or value</option>
-            <option value="COST_CAP">Cost per result goal</option>
-            <option value="LOWEST_COST_WITH_BID_CAP">Bid cap</option>
-            {objective === "SALES" && <option value="LOWEST_COST_WITH_MIN_ROAS">ROAS goal</option>}
-          </select>
-        </Field>
-        {bs !== "LOWEST_COST_WITHOUT_CAP" && (
-          <div className="mt-2"><Field label={bs === "COST_CAP" ? "Cost per result goal ($)" : bs === "LOWEST_COST_WITH_MIN_ROAS" ? "ROAS goal (যেমন 2.0)" : "Bid cap ($)"}><input type="number" className={inp} value={ba} onChange={(e) => setBa(e.target.value)} /></Field></div>
-        )}
-      </div>
-    );
-  }
   function WalletNote() {
     if (acc?.kind !== "shared") return null;
     return <p className={cn("text-[12px]", overWallet ? "text-destructive" : "text-fb-muted")}>Available balance: {fmt(walletBalance)}{overWallet && " — মোট budget balance-এর বেশি"}</p>;
@@ -930,7 +938,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       <Section title="Budget & schedule" ok={budgetType !== "lifetime" || hasEnd}>
         {budgetLevel === "campaign" ? (
           <div><p className="font-semibold">Budget strategy</p><p className="text-[12px] text-fb-muted">Your campaign budget automatically distributes your {cBudgetType} budget of {fmt(cAmt)} across ad sets to get the best performance.</p></div>
-        ) : (<><BudgetInputs bt={budgetType} setBt={setBudgetType} am={amount} setAm={setAmount} /><BidStrategy bs={bidStrategy} setBs={setBidStrategy} ba={bidAmount} setBa={setBidAmount} /><WalletNote /></>)}
+        ) : (<><BudgetInputs bt={budgetType} setBt={setBudgetType} am={amount} setAm={setAmount} onLifetime={() => setHasEnd(true)} /><BidStrategy bs={bidStrategy} setBs={setBidStrategy} ba={bidAmount} setBa={setBidAmount} objective={objective} /><WalletNote /></>)}
         <p className="pt-2 font-semibold">Schedule</p>
         <Field label="Start date"><input type="datetime-local" className={inp} value={startTime} onChange={(e) => setStartTime(e.target.value)} /></Field>
         <label className="flex items-center gap-2"><input type="checkbox" checked={hasEnd} disabled={budgetType === "lifetime"} onChange={(e) => setHasEnd(e.target.checked)} />Set an end date</label>

@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Declare stateful wizard input components at module scope and pass dependencies as props, so parent updates preserve input focus and caret while editing budgets and bids.
+
 - Resolve pasted Facebook Page links through the consenting client's me/accounts list or a Page-specific BM read before requesting access; a bare typed Page ID nobody can read may only be sent as a BM request (Facebook validates it), flagged unverified, never as verified identity.
 
 - Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
