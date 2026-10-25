@@ -165,6 +165,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [ageMax, setAgeMax] = useState("65");
   const [gender, setGender] = useState("all");
   const [interests, setInterests] = useState<{ id: string; name: string; type?: string }[]>([]);
+  const [reach, setReach] = useState<"loading" | "error" | { lower: number | null; upper: number | null } | null>(null);
   const [iq, setIq] = useState("");
   const [iResults, setIResults] = useState<any[]>([]);
   const [placements, setPlacements] = useState<"auto" | "manual">("auto");
@@ -1265,7 +1266,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         <main className="flex-1 overflow-auto overscroll-contain bg-gradient-to-br from-fb-bg via-background to-fb-blue-soft/40">
           <div className="mx-auto grid max-w-[920px] gap-3 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
-            <div className="min-w-0 space-y-3">
+            <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
               <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-full border-4 text-[14px] font-bold", ready ? "border-fb-green" : "border-fb-blue/50")}>{ready ? 100 : 70}</div>
@@ -1283,6 +1284,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 <div className="rounded-lg border border-fb-border bg-background p-4 text-[13px]">
                   <p className="font-semibold">Audience definition</p>
                   <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
+                  <p className="mt-3 font-semibold">Estimated audience size <Info className="inline h-3 w-3 text-fb-muted" /></p>
+                  <p className="mt-1 text-[16px] font-bold">
+                    {reach === "loading" ? <Loader2 className="inline h-4 w-4 animate-spin text-fb-muted" />
+                      : reach && reach !== "error" && reach.lower != null ? `${reach.lower.toLocaleString("en-US")} - ${(reach.upper ?? reach.lower).toLocaleString("en-US")}` : "—"}
+                  </p>
+                  <p className="text-[11px] text-fb-muted">{reach === "error" ? "Meta থেকে এখন হিসাব আনা যায়নি।" : "Estimates come from Meta and may vary over time."}</p>
                 </div>
               )}
               {missing.length > 0 && (
