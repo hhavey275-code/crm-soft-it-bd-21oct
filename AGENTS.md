@@ -2,7 +2,7 @@
 
 - Declare stateful wizard input components at module scope and pass dependencies as props, so parent updates preserve input focus and caret while editing budgets and bids.
 
-- Resolve pasted Facebook Page links through the consenting client's me/accounts list or a Page-specific BM read before requesting access; a bare typed Page ID nobody can read may only be sent as a BM request (Facebook validates it), flagged unverified, never as verified identity.
+- Resolve pasted Facebook Page links through the selected authorized account's BM client_pages/owned_pages, the consenting client's me/accounts, or a Page-specific BM read; exact BM membership skips duplicate access requests and personal Page login requirements, while unreadable typed IDs remain unverified requests and CRM save failures must surface.
 
 - Use the searchable AccountPicker for My Ads account selection, so keyboard search and selection remain in one focused control.
 

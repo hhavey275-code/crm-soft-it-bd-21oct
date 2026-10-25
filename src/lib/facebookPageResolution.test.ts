@@ -3,6 +3,40 @@ import { strict as assert } from "node:assert";
 import { facebookPageReference, resolveFacebookPage } from "./facebookPageResolution.server";
 
 describe("Facebook Page request resolution", () => {
+  it("resolves Raiyanshop from Arazshop BM without the marketer's Page login", async () => {
+    const bm = { get: async (path: string) => {
+      assert.equal(path, "arazshop-bm/client_pages");
+      return { data: [{ id: "123456789012345", name: "Raiyanshop", link: "https://www.facebook.com/raiyanshop" }] };
+    } };
+    const page = await resolveFacebookPage("https://facebook.com/Raiyanshop/", bm, undefined, undefined, "arazshop-bm");
+    assert.equal(page.id, "123456789012345");
+    assert.equal("bmAccess" in page && page.bmAccess, true);
+  });
+  it("resolves a profile.php alias to the BM's canonical Page ID", async () => {
+    const page = await resolveFacebookPage("https://facebook.com/profile.php?id=100078746184144", {
+      get: async () => ({ data: [{ id: "950812028110247", name: "Raiyanshop", link: "https://facebook.com/profile.php?id=100078746184144" }] }),
+    }, undefined, undefined, "arazshop-bm");
+    assert.equal(page.id, "950812028110247");
+  });
+  it("searches later BM pages and then owned Pages by cursor", async () => {
+    const calls: string[] = [];
+    const page = await resolveFacebookPage("123456789012345", { get: async (path: string, params?: Record<string, string>) => {
+      calls.push(`${path}:${params?.after || ""}`);
+      if (path.endsWith("client_pages")) return params?.after ? { data: [] } : { data: [], paging: { next: "next", cursors: { after: "cursor-2" } } };
+      return { data: [{ id: "123456789012345", name: "Raiyanshop" }] };
+    } }, undefined, undefined, "arazshop-bm");
+    assert.equal(page.id, "123456789012345");
+    assert.deepEqual(calls, ["arazshop-bm/client_pages:", "arazshop-bm/client_pages:cursor-2", "arazshop-bm/owned_pages:"]);
+  });
+  it("never matches unrelated BM Pages or treats failed membership reads as approved access", async () => {
+    const page = await resolveFacebookPage("61593375281848", { get: async (path: string) => {
+      if (path.endsWith("client_pages")) return { data: [{ id: "123456789012345", name: "Other Page" }] };
+      throw new Error("no access");
+    } }, undefined, undefined, "arazshop-bm");
+    assert.equal(page.id, "61593375281848");
+    assert.equal("bmAccess" in page, false);
+    assert.equal("unverified" in page && page.unverified, true);
+  });
   it("reads IT Corner's pasted profile.php reference without guessing its type", () => {
     assert.equal(facebookPageReference("https://www.facebook.com/profile.php?id=100078746184144"), "100078746184144");
   });
