@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { cacheGet, cacheSet } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { AdsAssistant } from "@/components/ads-manager/AdsAssistant";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
-import { ColumnsPicker, fmtCol, totalCol, useExtraColumns } from "@/components/ads-manager/fbColumns";
+import { ColumnsPicker, EXTRA_COLUMNS, METRIC_COLUMNS, fmtCol, totalCol, useMetricColumns } from "@/components/ads-manager/fbColumns";
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
 import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-manager/FbDateRangePicker";
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
@@ -50,7 +50,8 @@ export default function MyAdsPage() {
   const [tab, setTab] = useState<Level>("campaign");
   // Default to the last 7 days like Facebook Ads Manager, so results/spend are not empty on "today".
   const [range, setRange] = useState<FbRange>(() => makeRange("today"));
-  const extra = useExtraColumns();
+  const columns = useMetricColumns(uid);
+  const visibleMetricKeys = columns.keys.filter(key => tab !== "ad" || key !== "budget");
   const [editCampaign, setEditCampaign] = useState<any | null>(null);
   const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
   const [selAdsets, setSelAdsets] = useState<string[]>([]);
@@ -194,7 +195,7 @@ export default function MyAdsPage() {
   });
   // Like Ads Manager, a campaign's Results add up each ad set's own goal result.
   const setsByCamp = new Map<string, any[]>();
-  for (const s of data?.adsets ?? []) { const k = String(s.campaign_id); if (!setsByCamp.has(k)) setsByCamp.set(k, []); setsByCamp.get(k)!.push(s); }
+  for (const s of data?.adsets ?? []) { const k = String(s.campaign_id); if (!setsByCamp.has(k)) setsByCamp.set(k, []); setsByCamp.get(k)?.push(s); }
   const rowResult = (r: any) => {
     const isCamp = r && r.objective !== undefined && r.campaign_id === undefined;
     const sets = isCamp ? (setsByCamp.get(String(r.id)) ?? []).filter((s: any) => s.insights) : [];
@@ -208,8 +209,8 @@ export default function MyAdsPage() {
     if (colSort) {
       const val = (r: any): number | null => {
         const i = r.insights || {};
-        if (colSort.key === "results") return resultOf(i).count;
-        if (colSort.key === "cost") return resultOf(i).cost ?? null;
+        if (colSort.key === "results") return rowResult(r).count;
+        if (colSort.key === "cost") return rowResult(r).cost ?? null;
         if (colSort.key === "budget") { const b = Number(r.daily_budget || r.lifetime_budget || 0); return b ? b / 100 : null; }
         if (colSort.key === "spend") return Number(i.spend || 0);
         if (colSort.key === "impressions") return Number(i.impressions || 0);
@@ -227,7 +228,7 @@ export default function MyAdsPage() {
     }
     if (sortBy === "fb") return list;
     const metric = (r: any) => {
-      const res = resultOf(r.insights);
+      const res = rowResult(r);
       return { res: res.count, cost: res.cost, spend: Number(r.insights?.spend || 0), t: String(r.created_time || r.updated_time || "") };
     };
     return [...list].sort((a, b) => {
@@ -365,7 +366,7 @@ export default function MyAdsPage() {
   const setSel = tab === "campaign" ? setSelCampaigns : tab === "adset" ? setSelAdsets : setSelAds;
   const summed = rows.reduce((t, r) => {
     t.spend += Number(r.insights?.spend || 0); t.impr += Number(r.insights?.impressions || 0);
-    t.reach += Number(r.insights?.reach || 0); t.results += resultOf(r.insights).count; return t;
+    t.reach += Number(r.insights?.reach || 0); t.results += rowResult(r).count; return t;
   }, { spend: 0, impr: 0, reach: 0, results: 0 });
   // Reach is de-duplicated by Meta, so unfiltered totals come from the account-level read.
   const acct = (data as any)?.accountTotals;
@@ -453,6 +454,51 @@ export default function MyAdsPage() {
   const td = "px-3 py-2 font-medium border-r border-fb-border align-top whitespace-nowrap";
   const sub = "block text-[11px] text-fb-muted";
   const tbBtn = "inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-fb-border bg-background text-[13px] text-fb-text hover:bg-fb-bg disabled:opacity-50";
+
+
+  const metricHeader = (key: string) => {
+    const sortable: ColKey[] = ["results", "cost", "budget", "spend", "impressions", "reach", "ctr"];
+    const column = METRIC_COLUMNS.find(c => c.key === key);
+    if (sortable.includes(key as ColKey)) return sortTh(key as ColKey, column?.label ?? key);
+    return <th className={cn(th, "text-right max-w-[180px] whitespace-normal")}>{column?.label ?? key}</th>;
+  };
+  const metricContent = (r: any, key: string, draft = false) => {
+    if (draft) return key === "budget" ? <>{r.data.amount ? money(Number(r.data.amount)) : "—"}<span className={sub}>{r.data.budgetType === "lifetime" ? "Lifetime" : "Daily"}</span></> : "—";
+    const res = rowResult(r);
+    const sales = salesOf(r.insights);
+    switch (key) {
+      case "attribution": return <>7-day click or 1-day view<span className={sub}>All conversions</span></>;
+      case "results": return <>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></>;
+      case "cost": return <>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></>;
+      case "budget": return <><span className="inline-flex items-center gap-1">{r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}{tab === "adset" && (r.daily_budget || r.lifetime_budget) && <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit budget" onClick={() => editBudget(r)}><Pencil className="h-3 w-3" /></Button>}</span>{(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}</>;
+      case "spend": return money(r.insights?.spend);
+      case "impressions": return num(r.insights?.impressions);
+      case "reach": return num(r.insights?.reach);
+      case "ctr": return r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—";
+      case "purchases": return sales.purchases || "—";
+      case "cost_purchase": return sales.cpp != null ? money(sales.cpp) : "—";
+      case "purchase_value": return sales.value ? money(sales.value) : "—";
+      case "roas": return sales.roas ? sales.roas.toFixed(2) : "—";
+      default: { const col = EXTRA_COLUMNS.find(c => c.key === key); return col ? fmtCol(col, col.get(r.insights)) : "—"; }
+    }
+  };
+  const salesTotals = rows.reduce((a, r) => { const sales = salesOf(r.insights); return { purchases: a.purchases + sales.purchases, value: a.value + sales.value, spend: a.spend + Number(r.insights?.spend || 0) }; }, { purchases: 0, value: 0, spend: 0 });
+  const metricTotal = (key: string) => {
+    switch (key) {
+      case "attribution": return "Multiple attribution settings";
+      case "results": return <>{num(rowTotals.results)}<span className={sub}>Results</span></>;
+      case "cost": return <>{rowTotals.results ? money(rowTotals.spend / rowTotals.results) : "—"}<span className={sub}>Per result</span></>;
+      case "spend": return <>{money(rowTotals.spend)}<span className={sub}>Total spent</span></>;
+      case "impressions": return num(rowTotals.impr);
+      case "reach": return <>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></>;
+      case "budget": case "ctr": return "—";
+      case "purchases": return salesTotals.purchases || "—";
+      case "cost_purchase": return salesTotals.purchases ? money(salesTotals.spend / salesTotals.purchases) : "—";
+      case "purchase_value": return salesTotals.value ? money(salesTotals.value) : "—";
+      case "roas": return salesTotals.value && salesTotals.spend ? (salesTotals.value / salesTotals.spend).toFixed(2) : "—";
+      default: { const col = EXTRA_COLUMNS.find(c => c.key === key); return col ? <>{fmtCol(col, totalCol(col, rows))}<span className={sub}>{col.sub}</span></> : "—"; }
+    }
+  };
 
   if (isMobile) {
     const startCreate = startNew;
@@ -566,7 +612,7 @@ export default function MyAdsPage() {
             </div>
             {quickFilters}
             <Input className="h-10 border-fb-border bg-background" placeholder="Search campaigns" value={search} onChange={(e) => setSearch(e.target.value)} />
-            {sortPicker}
+            <div className="flex flex-wrap items-center gap-2">{sortPicker}<ColumnsPicker {...columns} className={tbBtn} /></div>
             {(quick === "all" ? drafts : []).map((d) => (
               <div key={d.id} className="rounded-lg border border-fb-border bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -594,10 +640,8 @@ export default function MyAdsPage() {
                     <Button variant="ghost" size="icon" title="Delete campaign" aria-label={`Delete ${c.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: "campaign", objects: [c] })}><Trash2 className="h-4 w-4" /></Button>
                     <Switch checked={on} disabled={!!busy} onCheckedChange={(v) => toggle("campaign", c, v)} />
                   </div>
-                  <div className="mt-3 grid grid-cols-3 divide-x divide-fb-border">
-                    <div className="pr-2"><p className="text-lg font-bold">{res.count ? num(res.count) : "—"}</p><p className="text-[12px] text-fb-muted">Results</p></div>
-                    <div className="px-2"><p className="text-lg font-bold">{res.cost != null ? money(res.cost) : "—"}</p><p className="text-[12px] text-fb-muted">Cost per result</p></div>
-                    <div className="pl-2"><p className="text-lg font-bold">{money(c.insights?.spend ?? 0)}</p><p className="text-[12px] text-fb-muted">Spent</p></div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    {columns.keys.filter(key => key !== "attribution").map(key => <div key={key} className="min-w-0"><div className="break-words text-base font-bold">{metricContent(c, key)}</div><p className="text-[12px] text-fb-muted">{METRIC_COLUMNS.find(col => col.key === key)?.label}</p></div>)}
                   </div>
                 </div>
               );
@@ -697,7 +741,7 @@ export default function MyAdsPage() {
           </Button>
           {sel.length > 0 && <button className={tbBtn} onClick={() => setSel([])}>Clear {sel.length}</button>}
           <div className="ml-auto flex gap-2">
-            <ColumnsPicker keys={extra.keys} toggle={extra.toggle} className={tbBtn} />
+            <ColumnsPicker {...columns} className={tbBtn} />
             <span className={cn(tbBtn, "hidden sm:inline-flex")}>Breakdown</span>
           </div>
         </div>
@@ -711,20 +755,11 @@ export default function MyAdsPage() {
                 <th className={cn(th, "w-16")}>Off / On</th>
                 <th className={cn(th, "min-w-[240px]")}>{tab === "campaign" ? "Campaign" : tab === "adset" ? "Ad set" : "Ad"}</th>
                 <th className={cn(th, "text-fb-blue")}>Delivery</th>
-                <th className={th}>Attribution setting</th>
-                {sortTh("results", "Results")}
-                {sortTh("cost", "Cost per result")}
-                {tab !== "ad" && sortTh("budget", "Budget")}
-                {sortTh("spend", "Amount spent")}
-                {sortTh("impressions", "Impressions")}
-                {sortTh("reach", "Reach")}
-                {sortTh("ctr", "CTR")}
-                <th className={cn(th, "text-right")}>Purchases</th><th className={cn(th, "text-right")}>Cost per purchase</th><th className={cn(th, "text-right")}>Purchase value</th><th className={cn(th, "text-right")}>ROAS</th>
-                {extra.cols.map((c) => <th key={c.key} className={cn(th, "text-right max-w-[140px] whitespace-normal")}>{c.label}</th>)}
+                {visibleMetricKeys.map(key => <Fragment key={key}>{metricHeader(key)}</Fragment>)}
               </tr>
             </thead>
             <tbody>
-              {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={16} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
+              {data && rows.length === 0 && !(tab === "campaign" && drafts.length) && <tr><td colSpan={4 + visibleMetricKeys.length} className="py-10 text-center text-fb-muted">No {levelName} yet. Click Create to start.</td></tr>}
               {tab === "campaign" && quick === "all" && drafts.filter((d) => !search.trim() || String(d.data.campaignName || "").toLowerCase().includes(search.trim().toLowerCase())).map((d) => (
                 <tr key={d.id} className="border-b border-fb-border hover:bg-fb-blue-soft/50">
                   <td className={td} />
@@ -738,11 +773,7 @@ export default function MyAdsPage() {
                     <span className={sub}>Edited {new Date(d.updatedAt).toLocaleString()}</span>
                   </td>
                   <td className={td}><span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-fb-muted" />In draft</span></td>
-                  <td className={td}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
-                  <td className={cn(td, "text-right")}>{d.data.amount ? money(Number(d.data.amount)) : "—"}<span className={sub}>{d.data.budgetType === "lifetime" ? "Lifetime" : "Daily"}</span></td>
-                  <td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
-                  <td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td><td className={cn(td, "text-right")}>—</td>
-                  {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>—</td>)}
+                  {visibleMetricKeys.map(key => <td key={key} className={cn(td, "text-right")}>{metricContent(d, key, true)}</td>)}
                 </tr>
               ))}
               {rows.map((r, i) => {
@@ -772,29 +803,7 @@ export default function MyAdsPage() {
                       </div>
                     </td>
                     <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-3 w-3 rounded-full", dot)} />{deliv}</span></td>
-                    <td className={td}>7-day click or 1-day view<span className={sub}>All conversions</span></td>
-                    <td className={cn(td, "text-right")}>{res.count ? num(res.count) : "—"}<span className={sub}>Results</span></td>
-                    <td className={cn(td, "text-right")}>{res.cost != null ? money(res.cost) : "—"}<span className={sub}>Per result</span></td>
-                    {tab !== "ad" && (
-                      <td className={cn(td, "text-right")}>
-                        <span className="inline-flex items-center gap-1">
-                          {r.daily_budget ? money(Number(r.daily_budget) / 100) : r.lifetime_budget ? money(Number(r.lifetime_budget) / 100) : "Using ad set budget"}
-                          {canBudget && <button onClick={() => editBudget(r)} className="text-fb-muted hover:text-fb-blue"><Pencil className="h-3 w-3" /></button>}
-                        </span>
-                        {(r.daily_budget || r.lifetime_budget) && <span className={sub}>{r.daily_budget ? "Daily" : "Lifetime"}</span>}
-                      </td>
-                    )}
-                    <td className={cn(td, "text-right")}>{money(r.insights?.spend)}</td>
-                    <td className={cn(td, "text-right")}>{num(r.insights?.impressions)}</td>
-                    <td className={cn(td, "text-right")}>{num(r.insights?.reach)}</td>
-                    <td className={cn(td, "text-right")}>{r.insights?.ctr ? `${Number(r.insights.ctr).toFixed(2)}%` : "—"}</td>
-                    {(() => { const s = salesOf(r.insights); return (<>
-                      <td className={cn(td, "text-right")}>{s.purchases || "—"}</td>
-                      <td className={cn(td, "text-right")}>{s.cpp != null ? money(s.cpp) : "—"}</td>
-                      <td className={cn(td, "text-right")}>{s.value ? money(s.value) : "—"}</td>
-                      <td className={cn(td, "text-right")}>{s.roas ? s.roas.toFixed(2) : "—"}</td>
-                    </>); })()}
-                    {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, c.get(r.insights))}</td>)}
+                    {visibleMetricKeys.map(key => <td key={key} className={cn(td, "text-right")}>{metricContent(r, key)}</td>)}
                   </tr>
                 );
               })}
@@ -806,21 +815,7 @@ export default function MyAdsPage() {
                   <td className={td} />
                   <td className={td}>Results from {rows.length} {levelName}</td>
                   <td className={td} />
-                  <td className={td}>Multiple attribution settings</td>
-                  <td className={cn(td, "text-right")}>{num(rowTotals.results)}<span className={sub}>Results</span></td>
-                  <td className={cn(td, "text-right")}>{rowTotals.results ? money(rowTotals.spend / rowTotals.results) : "—"}<span className={sub}>Per result</span></td>
-                  <td className={td} />
-                  <td className={cn(td, "text-right")}>{money(rowTotals.spend)}<span className={sub}>Total spent</span></td>
-                  <td className={cn(td, "text-right")}>{num(rowTotals.impr)}<span className={sub}>Total</span></td>
-                  <td className={cn(td, "text-right")}>{rowTotals.reach ? num(rowTotals.reach) : "—"}<span className={sub}>Accounts Center accounts</span></td>
-                  <td className={td} />
-                  {(() => { const t = rows.reduce((a: any, r: any) => { const s = salesOf(r.insights); a.p += s.purchases; a.v += s.value; a.sp += Number(r.insights?.spend || 0); return a; }, { p: 0, v: 0, sp: 0 }); return (<>
-                    <td className={cn(td, "text-right")}>{t.p || "—"}</td>
-                    <td className={cn(td, "text-right")}>{t.p ? money(t.sp / t.p) : "—"}</td>
-                    <td className={cn(td, "text-right")}>{t.v ? money(t.v) : "—"}</td>
-                    <td className={cn(td, "text-right")}>{t.v && t.sp ? (t.v / t.sp).toFixed(2) : "—"}</td>
-                  </>); })()}
-                  {extra.cols.map((c) => <td key={c.key} className={cn(td, "text-right")}>{fmtCol(c, totalCol(c, rows))}<span className={sub}>{c.sub}</span></td>)}
+                  {visibleMetricKeys.map(key => <td key={key} className={cn(td, "text-right")}>{metricTotal(key)}</td>)}
                 </tr>
               </tfoot>
             )}
