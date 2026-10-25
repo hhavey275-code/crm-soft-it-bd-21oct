@@ -369,6 +369,7 @@ export function ClientDashboard() {
         data-tutorial="card-wallet"
         balanceLabel={fmt(clientWallets.mainBalance)}
         footer={`Rate ৳${clientWallets.mainRate}/USD`}
+        actions={<ClientWalletConvertAction userId={user?.id} target="primary" />}
       />
       )}
       {clientWallets.secondaryEnabled && (

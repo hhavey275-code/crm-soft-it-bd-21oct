@@ -845,6 +845,7 @@ export function ClientAdAccounts() {
           <SecondaryWalletDebitCard
             balanceLabel={`$${Number(wallets.secondaryBalance ?? 0).toLocaleString()}`}
             footer={`Rate ৳${wallets.secondaryRate}/USD${secondaryDueLimit > 0 ? ` · Due limit: $${secondaryDueLimit.toLocaleString()}` : ""}`}
+            actions={<ClientWalletConvertAction userId={user?.id} target="secondary" />}
           />
         )}
         {/* Credit line wallet — shown for clients who have it enabled */}
