@@ -9,6 +9,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        "ads-copy": "rounded-full border border-ads-copy/25 bg-ads-copy-soft text-ads-copy shadow-sm hover:bg-ads-copy hover:text-ads-action-foreground",
+        "ads-publish": "rounded-full bg-ads-publish text-ads-action-foreground shadow-sm hover:bg-ads-publish/90",
         default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:

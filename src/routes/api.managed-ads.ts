@@ -463,11 +463,17 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       return deleteMetaObject(graphClient(token), body.objectId);
     }
     if (body.action === "duplicate") {
+      let sourceRegistry: any = null;
+      if (obj.account_kind !== "own") {
+        const { data } = await supabaseAdmin.from("managed_campaigns").select("page_id").eq("campaign_id", body.objectId).eq("user_id", targetUser).maybeSingle();
+        sourceRegistry = data;
+        if (!sourceRegistry?.page_id) throw new Error("Shared campaign-এর Page assignment আগে admin-কে যাচাই করতে বলুন");
+      }
       const { token } = await tokenFor(supabaseAdmin, obj.ad_account_db_id);
       const { duplicateMetaCampaign } = await import("@/lib/myAdsMutations.server");
       const result = await duplicateMetaCampaign(graphClient(token), body.objectId, body.name);
       if (obj.account_kind !== "own") {
-        const { error } = await supabaseAdmin.from("managed_campaigns").insert({ campaign_id: result.campaignId, user_id: targetUser, ad_account_id: obj.ad_account_db_id });
+        const { error } = await supabaseAdmin.from("managed_campaigns").insert({ campaign_id: result.campaignId, user_id: targetUser, ad_account_id: obj.ad_account_db_id, page_id: sourceRegistry.page_id, campaign_name: body.name });
         if (error) throw new Error(`Campaign copy হয়েছে (${result.campaignId}), কিন্তু CRM-এ save হয়নি — আবার Duplicate না করে admin-কে জানান`);
       }
       return { ...result, campaign: { ...result.campaign, ad_account_db_id: obj.ad_account_db_id, account_kind: obj.account_kind } };

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ImagePlus, MoreHorizontal, X, Monitor, Tablet, Smartphone, Heart, MessageCircle, Send, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type PreviewData = {
   pageName: string;
@@ -41,7 +42,7 @@ function Feed({ d }: { d: PreviewData }) {
       {d.showCta && (
         <div className="flex items-center justify-between gap-2 bg-fb-bg p-3">
           <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{d.domain}</p><p className="truncate text-[13px] font-semibold">{d.headline}</p></div>
-          <span className="shrink-0 rounded-md bg-fb-border px-3 py-1.5 text-[12px] font-semibold text-foreground">{d.cta}</span>
+          <span className="ads-preview-cta max-w-[55%] shrink-0 break-words px-3 py-1.5 text-center text-[12px] font-semibold">{d.cta}</span>
         </div>
       )}
       <div className="flex justify-around border-t border-fb-border py-2 text-[12px] font-semibold text-fb-muted"><span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span></div>
@@ -61,7 +62,7 @@ function Story({ d }: { d: PreviewData }) {
       <div className="flex flex-1 items-center"><Media d={d} cls="w-full max-h-full" /></div>
       <div className="absolute inset-x-0 bottom-3 flex flex-col items-center gap-1">
         <ChevronUp className="h-4 w-4" />
-        <span className="rounded-full bg-background px-4 py-1.5 text-[12px] font-semibold text-foreground">{d.cta}</span>
+        <span className="ads-preview-cta max-w-full px-4 py-1.5 text-center text-[12px] font-semibold">{d.cta}</span>
       </div>
     </div>
   );
@@ -77,7 +78,7 @@ function Reels({ d }: { d: PreviewData }) {
       <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-foreground/90 to-transparent p-3 pt-10">
         <div className="flex items-center gap-2"><Avatar d={d} size="h-6 w-6" /><p className="truncate text-[12px] font-semibold">{d.pageName}</p><span className="text-[10px] opacity-80">· Sponsored</span></div>
         {d.text && <p className="line-clamp-2 text-[11px] opacity-90">{d.text}</p>}
-        <span className="block rounded-md bg-fb-blue py-1.5 text-center text-[12px] font-semibold text-primary-foreground">{d.cta}</span>
+        <span className="ads-preview-cta block py-1.5 text-center text-[12px] font-semibold">{d.cta}</span>
       </div>
     </div>
   );
@@ -90,10 +91,10 @@ export function PlacementPreview({ d }: { d: PreviewData }) {
     <div className="rounded-lg border border-fb-border bg-background">
       <div className="flex items-center justify-center gap-1 border-b border-fb-border p-1.5">
         {devices.map(([k, I, l]) => (
-          <button key={k} type="button" title={l} aria-label={l} onClick={() => setDevice(k)}
+          <Button variant="ghost" size="icon" key={k} type="button" title={l} aria-label={l} onClick={() => setDevice(k)}
             className={cn("flex h-8 w-9 items-center justify-center rounded-md", device === k ? "bg-fb-blue-soft text-fb-blue" : "text-fb-muted hover:bg-fb-bg")}>
             <I className="h-4 w-4" />
-          </button>
+          </Button>
         ))}
       </div>
       <div className={cn("grid max-h-[calc(100vh-230px)] gap-4 overflow-y-auto overscroll-contain bg-fb-bg/60 p-4", device === "desktop" ? "grid-cols-1" : "sm:grid-cols-2")}>
