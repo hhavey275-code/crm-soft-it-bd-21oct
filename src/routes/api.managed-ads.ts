@@ -667,6 +667,21 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { items: (q ? out.filter((i) => `${i.name} ${i.path}`.toLowerCase().includes(q)) : out).slice(0, 200) };
   }
 
+  if (body.action === "reach_estimate") {
+    const t: any = { geo_locations: { countries: body.countries?.length ? body.countries : ["BD"] }, age_min: Number(body.ageMin) || 18, age_max: Number(body.ageMax) || 65 };
+    if (body.gender === "male") t.genders = [1];
+    if (body.gender === "female") t.genders = [2];
+    const ints = (body.interests ?? []) as { id: string; type?: string }[];
+    if (ints.length) {
+      const by: Record<string, any[]> = {};
+      for (const i of ints) (by[i.type || "interests"] ??= []).push({ id: i.id });
+      t.flexible_spec = [by];
+    }
+    const r = await g.get(`${act}/reachestimate`, { targeting_spec: JSON.stringify(t) });
+    const d = Array.isArray(r.data) ? r.data[0] : r.data;
+    return { lower: d?.users_lower_bound ?? null, upper: d?.users_upper_bound ?? null };
+  }
+
   if (body.action === "interests") {
     const r = await g.get("search", { type: "adinterest", q: body.q, limit: "20" });
     return { interests: (r.data ?? []).map((i: any) => ({ id: String(i.id), name: i.name, audience: i.audience_size_upper_bound })) };
