@@ -103,6 +103,12 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({
+    action: z.literal("reach_estimate"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(),
+    countries: z.array(z.string().regex(/^[A-Z]{2}$/)).max(50), ageMin: z.string().max(3), ageMax: z.string().max(3),
+    gender: z.enum(["all", "male", "female"]),
+    interests: z.array(z.object({ id: z.string().regex(/^\d+$/), name: z.string().optional(), type: z.string().regex(/^[a-z_]+$/).optional() })).max(50),
+  }),
   z.object({ action: z.literal("sales_assets"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(), pixelId: z.string().regex(/^\d+$/).optional(), catalogId: z.string().regex(/^\d+$/).optional() }),
   z.object({ action: z.literal("pixels"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
@@ -665,6 +671,21 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     }
     const q = (body.q ?? "").toLowerCase();
     return { items: (q ? out.filter((i) => `${i.name} ${i.path}`.toLowerCase().includes(q)) : out).slice(0, 200) };
+  }
+
+  if (body.action === "reach_estimate") {
+    const t: any = { geo_locations: { countries: body.countries?.length ? body.countries : ["BD"] }, age_min: Number(body.ageMin) || 18, age_max: Number(body.ageMax) || 65 };
+    if (body.gender === "male") t.genders = [1];
+    if (body.gender === "female") t.genders = [2];
+    const ints = (body.interests ?? []) as { id: string; type?: string }[];
+    if (ints.length) {
+      const by: Record<string, any[]> = {};
+      for (const i of ints) (by[i.type || "interests"] ??= []).push({ id: i.id });
+      t.flexible_spec = [by];
+    }
+    const r = await g.get(`${act}/reachestimate`, { targeting_spec: JSON.stringify(t) });
+    const d = Array.isArray(r.data) ? r.data[0] : r.data;
+    return { lower: d?.users_lower_bound ?? null, upper: d?.users_upper_bound ?? null };
   }
 
   if (body.action === "interests") {

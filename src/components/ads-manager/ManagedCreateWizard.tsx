@@ -13,6 +13,7 @@ import { SalesAdsetOptions, SalesAdOptions, defaultSalesOpts, salesPayload, type
 import { VideoLibrary, uploadToAccount } from "./VideoLibrary";
 import { cached } from "@/lib/adsCache";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
+import { PlacementPreview } from "./PlacementPreview";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
 const OBJECTIVES: { v: Obj; l: string; icon: any; d: string; good: string[] }[] = [
@@ -164,6 +165,20 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
   const [ageMax, setAgeMax] = useState("65");
   const [gender, setGender] = useState("all");
   const [interests, setInterests] = useState<{ id: string; name: string; type?: string }[]>([]);
+  const [reach, setReach] = useState<"loading" | "error" | { lower: number | null; upper: number | null } | null>(null);
+  const reachKey = JSON.stringify([accId, pageDbId, countries, ageMin, ageMax, gender, interests.map((i) => i.id)]);
+  useEffect(() => {
+    if (level !== 1 || !accId || !pageDbId || !countries.length) return;
+    let stop = false;
+    setReach("loading");
+    const t = setTimeout(() => {
+      managedAds<{ lower: number | null; upper: number | null }>({ action: "reach_estimate", pageDbId, adAccountDbId: accId, countries, ageMin, ageMax, gender, interests })
+        .then((r) => { if (!stop) setReach(r); })
+        .catch(() => { if (!stop) setReach("error"); });
+    }, 600);
+    return () => { stop = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reachKey, level]);
   const [iq, setIq] = useState("");
   const [iResults, setIResults] = useState<any[]>([]);
   const [placements, setPlacements] = useState<"auto" | "manual">("auto");
@@ -1151,24 +1166,17 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
     const img = setup === "post" ? sp?.picture : image?.url;
     const ctaLabel = isMsg ? (finalDests.length === 1 && finalDests[0] === "WHATSAPP" ? "Send WhatsApp message" : "Send message") : callMode ? "Call now" : setup === "post" && postCta ? CTAS.find((c) => c[0] === postCta)?.[1] ?? "Learn more" : CTAS.find((c) => c[0] === cta)?.[1] ?? "Learn more";
     return (
-      <div className="rounded-lg border border-fb-border bg-background">
-        <div className="flex items-center gap-2 p-3">
-          {pageInfo?.picture ? <img src={pageInfo.picture} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-fb-blue-soft text-[13px] font-bold text-fb-blue">{(page?.page_name ?? "P")[0]}</div>}
-          <div className="flex-1"><p className="text-[13px] font-semibold">{page?.page_name ?? "Your Page"}</p><p className="text-[11px] text-fb-muted">Sponsored · 🌐</p></div>
-          <MoreHorizontal className="h-4 w-4 text-fb-muted" />
-        </div>
-        {text ? <p className="whitespace-pre-line px-3 pb-2 text-[13px] line-clamp-6">{text}</p> : <p className="px-3 pb-2 text-[13px] text-fb-muted">Primary text</p>}
-        {setup === "new" && video ? (video.src ? <video key={video.src} src={video.src} poster={video.picture ?? undefined} controls muted playsInline className="aspect-square w-full bg-foreground object-contain" />
-          : video.picture ? <img src={video.picture} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted">🎬 {video.name}</div>)
-        : img ? <img src={img} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center bg-fb-bg text-fb-muted"><ImagePlus className="h-8 w-8" /></div>}
-        {(setup === "new" || isMsg || callMode || (setup === "post" && !!postCta) || (objective === "ENGAGEMENT" && engLoc !== "ON_AD")) && (
-          <div className="flex items-center justify-between gap-2 bg-fb-bg p-3">
-            <div className="min-w-0"><p className="truncate text-[11px] uppercase text-fb-muted">{isMsg ? (finalDests.includes("WHATSAPP") && finalDests.length === 1 ? "WhatsApp" : "Messenger") : link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com"}</p><p className="truncate text-[13px] font-semibold">{setup === "new" ? (headline || "Headline") : (page?.page_name ?? "")}</p></div>
-            <span className="shrink-0 rounded-md bg-fb-border px-3 py-1.5 text-[12px] font-semibold text-foreground">{ctaLabel}</span>
-          </div>
-        )}
-        <div className="flex justify-around border-t border-fb-border py-2 text-[12px] font-semibold text-fb-muted"><span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span></div>
-      </div>
+      <PlacementPreview d={{
+        pageName: page?.page_name ?? "Your Page",
+        avatar: pageInfo?.picture,
+        text,
+        img,
+        video: setup === "new" ? video : null,
+        domain: isMsg ? (finalDests.includes("WHATSAPP") && finalDests.length === 1 ? "WhatsApp" : "Messenger") : link ? link.replace(/^https?:\/\//, "").split("/")[0] : "website.com",
+        headline: setup === "new" ? (headline || "Headline") : (page?.page_name ?? ""),
+        cta: ctaLabel,
+        showCta: setup === "new" || isMsg || callMode || (setup === "post" && !!postCta) || (objective === "ENGAGEMENT" && engLoc !== "ON_AD"),
+      }} />
     );
   })();
 
@@ -1271,7 +1279,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         <main className="flex-1 overflow-auto overscroll-contain bg-gradient-to-br from-fb-bg via-background to-fb-blue-soft/40">
           <div className="mx-auto grid max-w-[920px] gap-3 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
-            <div className="min-w-0 space-y-3">
+            <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
               <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-full border-4 text-[14px] font-bold", ready ? "border-fb-green" : "border-fb-blue/50")}>{ready ? 100 : 70}</div>
@@ -1289,6 +1297,12 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                 <div className="rounded-lg border border-fb-border bg-background p-4 text-[13px]">
                   <p className="font-semibold">Audience definition</p>
                   <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
+                  <p className="mt-3 font-semibold">Estimated audience size <Info className="inline h-3 w-3 text-fb-muted" /></p>
+                  <p className="mt-1 text-[16px] font-bold">
+                    {reach === "loading" ? <Loader2 className="inline h-4 w-4 animate-spin text-fb-muted" />
+                      : reach && reach !== "error" && reach.lower != null ? `${reach.lower.toLocaleString("en-US")} - ${(reach.upper ?? reach.lower).toLocaleString("en-US")}` : "—"}
+                  </p>
+                  <p className="text-[11px] text-fb-muted">{reach === "error" ? "Meta থেকে এখন হিসাব আনা যায়নি।" : "Estimates come from Meta and may vary over time."}</p>
                 </div>
               )}
               {missing.length > 0 && (
