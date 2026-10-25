@@ -107,6 +107,13 @@
   --ads-copy-soft: oklch(0.27 0.04 310);
   --ads-input-surface: oklch(0.24 0.02 230);
   --ads-input-border: oklch(0.56 0.08 230);
+  --color-fb-text: oklch(0.94 0.01 230);
+  --color-fb-muted: oklch(0.74 0.02 230);
+  --color-fb-bg: oklch(0.2 0.01 230);
+  --color-fb-border: oklch(0.37 0.02 230);
+  --color-fb-blue: oklch(0.76 0.12 245);
+  --color-fb-blue-soft: oklch(0.3 0.045 245);
+  --color-fb-green: oklch(0.77 0.14 165);
   --color-fb-panel: #15202c;
   --color-fb-panel-border: #2c3d50;
   --color-fb-panel-soft: #1c2938;

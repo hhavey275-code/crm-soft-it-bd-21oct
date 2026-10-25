@@ -415,7 +415,6 @@ export default function MyAdsPage() {
   const deleteObjects = async () => {
     if (!deleteTarget || busy) return;
     const { level, objects } = deleteTarget;
-    const queryKey = ["managed-ads-list", uid, dates, accSel];
     setBusy("deleting");
     const failed: any[] = [];
     let deleted = 0;

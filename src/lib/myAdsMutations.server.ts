@@ -27,8 +27,8 @@ export async function duplicateMetaCampaign(g: Graph, id: string, name: string) 
   });
   const campaignId = String(result?.copied_campaign_id ?? "");
   if (!/^\d+$/.test(campaignId)) throw new Error("Facebook did not return the copied campaign. Refresh before retrying.");
-  const renamed = await g.post(campaignId, { name });
-  const campaign = await g.get(campaignId, { fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time" });
-  if (campaign.status !== "PAUSED") throw new Error("The copied campaign's paused status could not be confirmed. Refresh before retrying.");
+  const renamed = await g.post(campaignId, { name }).catch(() => null);
+  const campaign = await g.get(campaignId, { fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time" }).catch(() => { throw new Error(`Campaign copied (${campaignId}), but could not be read back. Refresh instead of duplicating again.`); });
+  if (campaign.status !== "PAUSED") throw new Error(`Campaign copied (${campaignId}); paused status could not be confirmed. Check it in Meta instead of duplicating again.`);
   return { ok: true, campaignId, campaign, warning: renamed?.success === true ? undefined : "Campaign copied; name update was not confirmed." };
 }
