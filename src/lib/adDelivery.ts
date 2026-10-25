@@ -52,9 +52,8 @@ export function campaignDelivery(c: any, allAdsets: any[], allAds: any[]): Deliv
   const e = String(c.effective_status || c.status || "");
   if (sets.length && ads.some((a) => adDelivery(a).label === "Active")) {
     const live = sets.map((s) => adsetDelivery(s, allAds));
-    if (live.some((d) => d.label === "Active")) return D("Active", "green");
-    if (live.some((d) => d.label === "Learning")) return D("Learning", "green");
-    if (live.some((d) => d.label === "Learning limited")) return D("Learning limited", "amber");
+    // Meta shows only "Active" at campaign level; learning appears on ad sets.
+    if (live.some((d) => ["Active", "Learning", "Learning limited"].includes(d.label))) return D("Active", "green");
     if (live.some((d) => d.label === "Scheduled")) return D("Scheduled", "blue");
   }
   return fromChildren(e, c.start_time, c.stop_time, ads);
