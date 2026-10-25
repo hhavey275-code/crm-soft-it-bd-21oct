@@ -1280,6 +1280,21 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div className="mx-auto grid max-w-[1500px] gap-4 p-2 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
             <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
             <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
+              {level === 2 && tab === "edit" && (
+                <div className="space-y-2 overflow-hidden"><div className="flex items-center justify-between"><p className="text-[13px] font-semibold">Ad preview</p><button type="button" className="text-[12px] font-semibold text-fb-blue" onClick={() => { setForce((x) => x + 1); if (posts !== null) loadPosts(true); }}>Update now</button></div>{preview}</div>
+              )}
+              {level === 1 && tab === "edit" && (
+                <div className="rounded-lg border border-fb-border bg-background p-4 text-[13px]">
+                  <p className="text-[15px] font-semibold">Estimated audience size <Info className="inline h-3 w-3 text-fb-muted" /></p>
+                  <p className="mt-2 text-[20px] font-bold">
+                    {reach === "loading" || reach === null ? <Loader2 className="inline h-5 w-5 animate-spin text-fb-muted" />
+                      : reach !== "error" && reach.lower != null ? `${reach.lower.toLocaleString("en-US")} - ${(reach.upper ?? reach.lower).toLocaleString("en-US")}` : "—"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-fb-muted">{reach === "error" ? `Meta থেকে এখন হিসাব আনা যায়নি${reachErr ? `: ${reachErr}` : ""}` : "Estimates come from Meta and may vary significantly over time."}</p>
+                  <p className="mt-3 font-semibold">Audience definition</p>
+                  <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
+                </div>
+              )}
               <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-full border-4 text-[14px] font-bold", ready ? "border-fb-green" : "border-fb-blue/50")}>{ready ? 100 : 70}</div>
@@ -1293,18 +1308,6 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   {(((acc as any)?.kind === "shared" && walletBalance < 1) || overWallet) && <p className="text-[12px] text-destructive">Balance কম — publish করার আগে top-up করুন।</p>}
                 </div>
               )}
-              {level === 1 && tab === "edit" && (
-                <div className="rounded-lg border border-fb-border bg-background p-4 text-[13px]">
-                  <p className="font-semibold">Audience definition</p>
-                  <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
-                  <p className="mt-3 font-semibold">Estimated audience size <Info className="inline h-3 w-3 text-fb-muted" /></p>
-                  <p className="mt-1 text-[16px] font-bold">
-                    {reach === "loading" ? <Loader2 className="inline h-4 w-4 animate-spin text-fb-muted" />
-                      : reach && reach !== "error" && reach.lower != null ? `${reach.lower.toLocaleString("en-US")} - ${(reach.upper ?? reach.lower).toLocaleString("en-US")}` : "—"}
-                  </p>
-                  <p className="text-[11px] text-fb-muted">{reach === "error" ? "Meta থেকে এখন হিসাব আনা যায়নি।" : "Estimates come from Meta and may vary over time."}</p>
-                </div>
-              )}
               {missing.length > 0 && (
                 <div className={cn("rounded-lg border bg-background p-4 text-[13px]", showMissing ? "border-destructive" : "border-fb-border")}>
                   <p className="flex items-center gap-2 font-semibold text-destructive"><AlertCircle className="h-4 w-4" />Publish করার আগে যা বাকি ({missing.length})</p>
@@ -1315,7 +1318,6 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   </ul>
                 </div>
               )}
-              <div className="space-y-2 overflow-hidden"><div className="flex items-center justify-between"><p className="text-[13px] font-semibold">Ad preview</p><button type="button" className="text-[12px] font-semibold text-fb-blue" onClick={() => { setForce((x) => x + 1); if (posts !== null) loadPosts(true); }}>Update now</button></div>{preview}</div>
             </div>
           </div>
         </main>
