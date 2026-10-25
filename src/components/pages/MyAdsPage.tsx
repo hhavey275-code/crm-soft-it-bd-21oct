@@ -660,7 +660,7 @@ export default function MyAdsPage() {
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
         {/* Top bar */}
-        <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:gap-3 sm:px-4 sm:py-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-t-lg bg-background px-3 py-2 border border-fb-border sm:px-4">
           <h1 className="text-lg font-bold">Campaigns</h1>
           <div className="ml-auto flex items-center gap-2 sm:order-last">
             <span className="hidden text-[13px] text-fb-muted sm:inline">
@@ -683,13 +683,13 @@ export default function MyAdsPage() {
           {currentAcc?.kind === "shared" && <div className="text-[13px] text-fb-muted">Wallet: <b className="text-fb-text">{money(data?.walletBalance ?? 0)}</b></div>}
         </div>
 
-        {/* Filter chips + search */}
-        <div className="bg-background border-x border-fb-border px-3 pb-2 space-y-2 sm:px-4 sm:pb-3 sm:space-y-3">
+        {/* Filter chips + search (one row on PC) */}
+        <div className="flex flex-col gap-2 bg-background border-x border-fb-border px-3 pb-2 sm:px-4 lg:flex-row lg:items-center">
           <div className="flex flex-wrap items-center gap-2">
             {quickFilters}
             {sortPicker}
           </div>
-          <Input className="h-10 border-fb-border" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="h-8 border-fb-border lg:flex-1" placeholder="Search to filter by: name" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
         {(error || (data?.errors ?? []).length > 0 || (isShared && data && Number(data.walletBalance) <= Number(data.lowBalanceAlert ?? 10)) || (!isFetching && data && accounts.length === 0)) && (
