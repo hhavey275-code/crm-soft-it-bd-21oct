@@ -3,7 +3,7 @@ import { cacheGet, cacheSet } from "@/lib/myAdsCache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
-import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
