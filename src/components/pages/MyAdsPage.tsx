@@ -29,7 +29,7 @@ import { FbDateRangePicker, makeRange, type FbRange } from "@/components/ads-man
 import { FacebookConnectButton } from "@/components/client/FacebookConnectButton";
 import { LinkPageByUrl } from "@/components/client/LinkPageByUrl";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { myAdsAvailability } from "@/lib/myAdsAvailability";
+import { myAdsAvailability, myAdsAvailabilityPresentation } from "@/lib/myAdsAvailability";
 import { MetaLoading } from "@/components/ads-manager/MetaLoading";
 import { matchesAdsFilter, removeAdsObject } from "@/lib/myAdsRows";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
@@ -325,9 +325,10 @@ export default function MyAdsPage() {
   });
   const curSm: any = currentAcc ? (curSummary?.[currentAcc.id] ?? accSummary?.[currentAcc.id]) : null;
   const availability = myAdsAvailability(curSm, curSummaryError?.message);
+  const availabilityPresentation = myAdsAvailabilityPresentation(availability);
   const createDisabled = !currentAcc || !availability.canCreate;
   const blockedInfo = curSm && !curSm.error ? accountStatusInfo(curSm) : null;
-  const blockedBanner = currentAcc && createDisabled && (
+  const blockedBanner = currentAcc && availabilityPresentation.showWarning && (
     <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-[13px] text-destructive">
       <p className="font-bold">{availability.title}</p>
       <p className="mt-1">{availability.instruction}</p>
@@ -580,7 +581,7 @@ export default function MyAdsPage() {
                 <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-fb-border bg-background disabled:opacity-50" disabled={isFetching || cooldownLeft > 0} onClick={manualRefresh} title="Refresh">
                   <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                 </button>
-                <Button onClick={startCreate} disabled={createDisabled} title={createDisabled ? availability.title : undefined} className="inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
+                <Button onClick={startCreate} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined} className={cn("inline-flex h-9 items-center gap-1 rounded-full bg-fb-green px-3 text-[13px] font-semibold text-background disabled:cursor-not-allowed", availabilityPresentation.blurCreate ? "disabled:opacity-40 disabled:blur-[1px]" : "disabled:opacity-100")}>
                   <Plus className="h-4 w-4" />Create
                 </Button>
               </div>
@@ -736,8 +737,8 @@ export default function MyAdsPage() {
         {/* Action toolbar */}
         <div className="relative flex flex-wrap items-center gap-2 bg-background border border-fb-border px-2 py-1.5 sm:px-4">
           {isFetching && data && <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading"><div className="h-full w-1/3 bg-primary animate-[myads-bar_1.1s_ease-in-out_infinite]" /></div>}
-          <Button onClick={startNew} disabled={createDisabled} title={createDisabled ? availability.title : undefined}
-            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:blur-[1px]">
+          <Button onClick={startNew} disabled={createDisabled} title={availabilityPresentation.showWarning ? availability.title : undefined}
+            className={cn("inline-flex items-center gap-1.5 h-8 px-4 rounded-md bg-fb-green text-[13px] font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed", availabilityPresentation.blurCreate ? "disabled:opacity-40 disabled:blur-[1px]" : "disabled:opacity-100")}>
             <Plus className="h-4 w-4" />Create
           </Button>
           <button className={tbBtn} disabled={sel.length !== 1}
