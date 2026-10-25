@@ -5073,6 +5073,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      convert_between_wallets: {
+        Args: {
+          p_source: string
+          p_target: string
+          p_usd_amount: number
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       convert_main_wallet: {
         Args: { p_target: string; p_usd_amount: number; p_user_id?: string }
         Returns: Json
