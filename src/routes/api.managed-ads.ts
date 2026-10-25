@@ -114,6 +114,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("page_info"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("fb_status") }),
   z.object({ action: z.literal("videos"), adAccountDbId: z.string().uuid() }),
+  z.object({ action: z.literal("videos_clear"), adAccountDbId: z.string().uuid() }),
   z.object({ action: z.literal("video_start"), adAccountDbId: z.string().uuid(), fileSize: z.number().int().positive().max(4_000_000_000) }),
   z.object({ action: z.literal("video_chunk"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), startOffset: z.number().int().min(0), chunkBase64: z.string().max(14_000_000) }),
   z.object({ action: z.literal("video_finish"), adAccountDbId: z.string().uuid(), sessionId: z.string().regex(/^\d+$/), title: z.string().max(200).optional() }),
@@ -314,7 +315,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   const settings = await getManagedSettings(supabaseAdmin);
 
   // Ad account video library (videos live in the Meta ad account itself).
-  if (body.action === "videos" || body.action === "video_start" || body.action === "video_chunk" || body.action === "video_finish" || body.action === "video_r2_presign" || body.action === "video_from_url") {
+  if (body.action === "videos" || body.action === "videos_clear" || body.action === "video_start" || body.action === "video_chunk" || body.action === "video_finish" || body.action === "video_r2_presign" || body.action === "video_from_url") {
     const accId = body.adAccountDbId;
     const allowed = (await sharedAccountIds(supabaseAdmin, targetUser)).includes(accId)
       || (await ownAccounts(supabaseAdmin, targetUser, true, isAdmin)).some((a: any) => a.id === accId);
@@ -332,6 +333,24 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       if (!c || !body.fileUrl.startsWith(c.publicUrl + "/")) throw new Error("ভিডিও লিংক গ্রহণযোগ্য নয়");
       const r = await g.post(`${act}/advideos`, { file_url: body.fileUrl, ...(body.title ? { title: body.title } : {}) });
       return { videoId: String(r.id) };
+    }
+    if (body.action === "videos_clear") {
+      let deleted = 0, failed = 0;
+      for (let round = 0; round < 20; round++) {
+        const r = await g.get(`${act}/advideos`, { fields: "id", limit: "100" });
+        const ids: string[] = (r.data ?? []).map((v: any) => String(v.id));
+        if (!ids.length) break;
+        let progress = 0;
+        for (let i = 0; i < ids.length; i += 10) {
+          await Promise.all(ids.slice(i, i + 10).map(async (id) => {
+            try { const x = await g.post(`${act}/advideos`, { video_id: id, _method: "DELETE" }).catch(async () => { await g.del(id); return null; }); void x; deleted++; progress++; } catch { failed++; }
+          }));
+        }
+        if (!progress) break;
+        const left = await g.get(`${act}/advideos`, { fields: "id", limit: "100" });
+        if ((left.data ?? []).length >= ids.length) { failed = (left.data ?? []).length; deleted = Math.max(0, deleted - failed); break; }
+      }
+      return { deleted, failed };
     }
     if (body.action === "videos") {
       const r = await g.get(`${act}/advideos`, { fields: "id,title,picture,length,created_time,source", limit: "100" });
