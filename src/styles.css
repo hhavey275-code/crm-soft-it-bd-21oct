@@ -406,3 +406,15 @@
   0% { transform: translateX(300%); }
   100% { transform: translateX(-100%); }
 }
+
+/* Soft Meta-style backdrop for the create wizard */
+@utility wizard-bg {
+  background-color: var(--color-fb-bg, #f0f2f5);
+  background-image:
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--color-fb-blue-soft) 90%, transparent) 0, transparent 38%),
+    radial-gradient(circle at 88% 8%, color-mix(in oklab, var(--color-fb-blue-soft) 70%, transparent) 0, transparent 32%),
+    radial-gradient(circle at 70% 92%, color-mix(in oklab, var(--color-fb-green) 10%, transparent) 0, transparent 35%),
+    radial-gradient(color-mix(in oklab, var(--color-fb-blue) 9%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, auto, 18px 18px;
+  background-attachment: local;
+}

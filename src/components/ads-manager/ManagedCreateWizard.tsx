@@ -1276,8 +1276,8 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
         </div>
 
         {/* Body */}
-        <main className="flex-1 overflow-auto overscroll-contain bg-gradient-to-br from-fb-bg via-background to-fb-blue-soft/40">
-          <div className="mx-auto grid max-w-[920px] gap-3 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="wizard-bg flex-1 overflow-auto overscroll-contain">
+          <div className="mx-auto grid max-w-[1500px] gap-4 p-2 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
             <div className="min-w-0 space-y-3">{tab === "review" ? reviewView : level === 0 ? campaignView : level === 1 ? adsetView : adView}</div>
             <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
               <div className="hidden rounded-lg border border-fb-border bg-background p-4 sm:block">

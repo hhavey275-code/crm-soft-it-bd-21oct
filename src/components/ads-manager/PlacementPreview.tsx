@@ -15,7 +15,7 @@ export type PreviewData = {
 };
 
 type Device = "mobile" | "tablet" | "desktop";
-const WIDTH: Record<Device, string> = { mobile: "max-w-[260px]", tablet: "max-w-[340px]", desktop: "max-w-full" };
+const WIDTH: Record<Device, string> = { mobile: "max-w-[300px]", tablet: "max-w-[400px]", desktop: "max-w-[520px]" };
 
 function Avatar({ d, size = "h-8 w-8" }: { d: PreviewData; size?: string }) {
   return d.avatar ? <img src={d.avatar} alt="" className={cn(size, "shrink-0 rounded-full object-cover")} />
@@ -96,7 +96,7 @@ export function PlacementPreview({ d }: { d: PreviewData }) {
           </button>
         ))}
       </div>
-      <div className="max-h-[calc(100vh-260px)] space-y-4 overflow-y-auto overscroll-contain p-3">
+      <div className={cn("grid max-h-[calc(100vh-230px)] gap-4 overflow-y-auto overscroll-contain bg-fb-bg/60 p-4", device === "desktop" ? "grid-cols-1" : "sm:grid-cols-2")}>
         {([["Feed", Feed], ["Stories", Story], ["Reels", Reels]] as const).map(([l, C]) => (
           <div key={l} className={cn("mx-auto w-full", WIDTH[device])}>
             <p className="mb-1.5 text-center"><span className="rounded-full bg-fb-bg px-2.5 py-0.5 text-[11px] font-semibold">{l}</span></p>
