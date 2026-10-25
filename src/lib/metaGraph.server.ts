@@ -106,5 +106,12 @@ export function graphClient(token: string) {
     const qs = new URLSearchParams({ access_token: token });
     await metaFetch(`${GRAPH_BASE}/${path}?${qs}`, { method: "DELETE" }).catch(() => null);
   };
-  return { get, post, del };
+  /** DELETE that reports Meta's answer instead of hiding failures. */
+  const delStrict = async (path: string, params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams({ ...params, access_token: token });
+    const { status, json } = await metaFetch(`${GRAPH_BASE}/${path}?${qs}`, { method: "DELETE" });
+    if (status >= 400 || json?.error || json?.success === false) throw new MetaError(metaMsg(json));
+    return json;
+  };
+  return { get, post, del, delStrict };
 }

@@ -60,8 +60,8 @@ export function VideoLibrary({ open, onClose, onPick, selected, accId }: { open:
     if (!window.confirm(`এই ad account-এর library থেকে ${items.length}টি video সব মুছে ফেলবেন? এটা আর ফেরত আনা যাবে না।`)) return;
     setClearing(true);
     try {
-      const r = await managedAds<{ deleted: number; failed: number }>({ action: "videos_clear", adAccountDbId: accId });
-      if (r.failed) toast.warning(`${r.deleted}টি মুছে গেছে, ${r.failed}টি মোছা যায়নি (হয়তো চলমান ad-এ ব্যবহার হচ্ছে)`);
+      const r = await managedAds<{ deleted: number; failed: number; error?: string }>({ action: "videos_clear", adAccountDbId: accId });
+      if (r.failed) toast.warning(`${r.deleted}টি মুছে গেছে, ${r.failed}টি মোছা যায়নি — ${r.error ?? ""}`);
       else toast.success(`${r.deleted}টি video মুছে ফেলা হয়েছে`);
       await load(true);
     } catch (e: any) { toast.error(e.message || "মোছা যায়নি"); } finally { setClearing(false); }
