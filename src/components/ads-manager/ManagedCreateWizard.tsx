@@ -14,6 +14,7 @@ import { VideoLibrary, uploadToAccount } from "./VideoLibrary";
 import { cached } from "@/lib/adsCache";
 import { saveDraft, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 import { PlacementPreview } from "./PlacementPreview";
+import { LocationPicker, locationLabel } from "./LocationPicker";
 import { Button } from "@/components/ui/button";
 
 type Obj = "AWARENESS" | "TRAFFIC" | "ENGAGEMENT" | "LEADS" | "APP" | "SALES";
@@ -948,13 +949,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
       <Section title="Audience" ok={countries.length > 0} right={<Adv />}>
         <p className="text-fb-muted">Set up your audience using controls and suggestions.</p>
         <Field label="Locations">
-          <div className="flex flex-wrap gap-1.5 rounded-md border border-fb-border p-2">
-            {countries.map((c) => (
-              <span key={c} className="inline-flex items-center gap-1 rounded bg-fb-blue-soft px-2 py-0.5 text-[12px] text-fb-blue">{c}<X className="h-3 w-3 cursor-pointer" onClick={() => setCountries(countries.filter((x) => x !== c))} /></span>
-            ))}
-            <input className="min-w-[120px] flex-1 bg-background text-[13px] outline-none" placeholder="দেশের কোড (যেমন BD) লিখে Enter" value={cq} maxLength={2}
-              onChange={(e) => setCq(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCountry()} />
-          </div>
+          <LocationPicker value={countries} onChange={setCountries} pageDbId={pageDbId} accId={accId} />
         </Field>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Field label="Minimum age"><select className={sel} value={ageMin} onChange={(e) => setAgeMin(e.target.value)}>{Array.from({ length: 48 }, (_, i) => 18 + i).map((n) => <option key={n}>{n}</option>)}</select></Field>
@@ -1205,7 +1200,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
           <div key={i} className="border-b border-fb-border pb-2 last:border-0">
             <p className="font-semibold">Ad set {i + 1}: {s.adsetName}</p>
             <p className="text-fb-muted">
-              {s.countries.join(", ")} · Age {s.ageMin}-{s.ageMax}
+              {s.countries.map((c) => locationLabel(c).name).join(", ")} · Age {s.ageMin}-{s.ageMax}
               {budgetLevel === "adset" ? ` · ${fmt(Number(s.amount) || 0)} ${s.budgetType}` : ""}
               {fl.np ? ` · ${pixels?.find((p) => p.id === s.pixelId)?.name ?? "Dataset"} · ${s.customEvent}` : ""}
             </p>
@@ -1302,7 +1297,7 @@ export function ManagedCreateWizard({ accounts, allPages, walletBalance, onClose
                   </p>
                   <p className="mt-1 text-[11px] text-fb-muted">{reach === "error" ? `Meta থেকে এখন হিসাব আনা যায়নি${reachErr ? `: ${reachErr}` : ""}` : "Estimates come from Meta and may vary significantly over time."}</p>
                   <p className="mt-3 font-semibold">Audience definition</p>
-                  <p className="text-fb-muted">{countries.join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
+                  <p className="text-fb-muted">{countries.map((c) => locationLabel(c).name).join(", ") || "—"} · Age {ageMin}-{ageMax === "65" ? "65+" : ageMax} · {gender === "all" ? "All genders" : gender === "male" ? "Men" : "Women"}{interests.length ? ` · ${interests.length} interests` : ""}</p>
                 </div>
               )}
               <div className="hidden rounded-xl border border-fb-panel-border bg-background p-4 sm:block">
