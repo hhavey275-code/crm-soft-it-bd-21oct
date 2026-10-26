@@ -86,6 +86,7 @@ export function AdsAgent({ account, userId, asUserId, onChanged }: { account: { 
   };
 
   const send = async (text: string) => {
+    if (micOn.current) stopMic();
     const t = text.trim();
     if (!t || busy) return;
     const next: Msg[] = [...messages, { role: "user", content: t }];
@@ -139,24 +140,41 @@ export function AdsAgent({ account, userId, asUserId, onChanged }: { account: { 
     catch (e: any) { toast.error(e.message); }
   };
 
+  // Voice only fills the text box; nothing is sent until the client presses Send (or Enter).
+  // Recognition keeps listening through pauses and restarts itself if the browser ends it.
+  const micOn = useRef(false);
+  const stopMic = () => { micOn.current = false; try { recRef.current?.stop(); } catch { /* ignore */ } setListening(false); };
+  useEffect(() => { if (!open && micOn.current) stopMic(); }, [open]);
+  useEffect(() => () => { micOn.current = false; try { recRef.current?.stop(); } catch { /* ignore */ } }, []);
   const toggleMic = () => {
     const SR: any = typeof window !== "undefined" ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
     if (!SR) return toast.error("এই browser-এ voice নেই — Chrome ব্যবহার করুন");
-    if (listening) { recRef.current?.stop(); return; }
-    const rec = new SR();
-    rec.lang = "bn-BD"; rec.interimResults = true; rec.continuous = false;
-    let finalText = "";
-    rec.onresult = (e: any) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
-      }
-      setInput((finalText + interim).trim());
+    if (micOn.current) return stopMic();
+    micOn.current = true; setListening(true);
+    let base = input.trim();
+    const start = () => {
+      const rec = new SR();
+      rec.lang = "bn-BD"; rec.interimResults = true; rec.continuous = true;
+      let finalText = "";
+      rec.onresult = (e: any) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) finalText += `${r[0].transcript} `; else interim += r[0].transcript;
+        }
+        setInput(`${base} ${finalText}${interim}`.replace(/\s+/g, " ").trim());
+      };
+      rec.onerror = (e: any) => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") { stopMic(); toast.error("Microphone-এর অনুমতি দিন"); }
+        else if (e.error !== "aborted" && e.error !== "no-speech") toast.error(`Voice সমস্যা: ${e.error}`);
+      };
+      rec.onend = () => {
+        base = `${base} ${finalText}`.replace(/\s+/g, " ").trim();
+        if (micOn.current) { try { start(); } catch { stopMic(); } } else setListening(false);
+      };
+      recRef.current = rec; rec.start();
     };
-    rec.onerror = (e: any) => { if (e.error !== "aborted" && e.error !== "no-speech") toast.error(e.error === "not-allowed" ? "Microphone-এর অনুমতি দিন" : `Voice সমস্যা: ${e.error}`); };
-    rec.onend = () => { setListening(false); if (finalText.trim()) send(finalText); };
-    recRef.current = rec; setListening(true); rec.start();
+    start();
   };
 
   const visible = messages.filter((m) => typeof m.content === "string" || (Array.isArray(m.content) && m.content.some((b: any) => b.type === "text" && b.text?.trim())));
