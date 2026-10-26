@@ -9,7 +9,13 @@ import { AccountPicker } from "@/components/ads-manager/AccountPicker";
 import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
 import { useAuth } from "@/contexts/AuthContext";
 import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { DashboardLayout as FullLayout } from "@/components/DashboardLayout";
+import { createContext, useContext } from "react";
+// Inside admin Client Details the page is already in a layout; nesting it duplicates header/realtime.
+const EmbeddedCtx = createContext(false);
+function DashboardLayout({ children, ...rest }: any) {
+  return useContext(EmbeddedCtx) ? <div className="min-h-[70vh]">{children}</div> : <FullLayout {...rest}>{children}</FullLayout>;
+}
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +49,11 @@ const num = (v: any) => (v == null || v === "" ? "—" : Number(v).toLocaleStrin
 const budget = (o: any) =>
   o.daily_budget ? `${money(Number(o.daily_budget) / 100)}/দিন` : o.lifetime_budget ? `${money(Number(o.lifetime_budget) / 100)} মোট` : "—";
 
-export default function MyAdsPage({ asUserId }: { asUserId?: string } = {}) {
+export default function MyAdsPage(props: { asUserId?: string } = {}) {
+  return <EmbeddedCtx.Provider value={!!props.asUserId}><MyAdsInner {...props} /></EmbeddedCtx.Provider>;
+}
+
+function MyAdsInner({ asUserId }: { asUserId?: string }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   // Set synchronously so the very first requests already target the client.
