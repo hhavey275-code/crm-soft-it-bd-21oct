@@ -281,11 +281,47 @@ function stripThinking(messages: ChatMessage[]): ChatMessage[] {
   });
 }
 
+// Every tool_use must be answered by a tool_result in the very next message (and vice versa).
+// A reply cut off by max_tokens or an interrupted request can leave one side alone, which makes
+// every later request fail — so unmatched blocks are dropped before sending.
+export function repairToolPairs(messages: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (!Array.isArray(m.content)) { out.push(m); continue; }
+    if (m.role === "assistant") {
+      const next = messages[i + 1];
+      const answered = new Set<string>(
+        next?.role === "user" && Array.isArray(next.content) ? next.content.filter((b: any) => b?.type === "tool_result").map((b: any) => String(b.tool_use_id)) : [],
+      );
+      const content = m.content.filter((b: any) => b?.type !== "tool_use" || answered.has(String(b.id)));
+      out.push({ ...m, content: content.length ? content : [{ type: "text", text: "…" }] });
+    } else {
+      const prev = out[out.length - 1];
+      const asked = new Set<string>(
+        prev?.role === "assistant" && Array.isArray(prev.content) ? prev.content.filter((b: any) => b?.type === "tool_use").map((b: any) => String(b.id)) : [],
+      );
+      const content = m.content.filter((b: any) => b?.type !== "tool_result" || asked.has(String(b.tool_use_id)));
+      if (content.length) out.push({ ...m, content });
+    }
+  }
+  // Merge back-to-back turns of the same role left behind by the removals.
+  const merged: ChatMessage[] = [];
+  for (const m of out) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === m.role) {
+      const toArr = (c: any) => (Array.isArray(c) ? c : [{ type: "text", text: String(c ?? "") }]);
+      last.content = [...toArr(last.content), ...toArr(m.content)];
+    } else merged.push({ ...m });
+  }
+  return merged;
+}
+
 function trimHistory(messages: ChatMessage[]): ChatMessage[] {
-  let list = stripThinking(messages).slice(-40);
+  let list = repairToolPairs(stripThinking(messages)).slice(-40);
   // Start at a plain user text turn so tool_use/tool_result pairs are never split.
   while (list.length && !(list[0].role === "user" && typeof list[0].content === "string")) list = list.slice(1);
-  return list;
+  return repairToolPairs(list);
 }
 
 export async function agentChat(admin: any, c: Caller, history: ChatMessage[], selectedAccount?: string) {
@@ -296,11 +332,12 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
   let plan: Plan | null = null;
   let planError: string | null = null;
   const system = systemPrompt(selectedAccount);
+  let cutOff = false;
   for (let i = 0; i < 8; i++) {
     const res = await fetch(CLAUDE_URL, {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model, max_tokens: 4096, system, tools: TOOLS, messages }),
+      body: JSON.stringify({ model, max_tokens: 16000, system, tools: TOOLS, messages }),
     });
     const j: any = await res.json().catch(() => null);
     if (!res.ok || !j) {
@@ -310,6 +347,7 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
       throw new Error(`AI উত্তর দিতে পারেনি: ${m}`);
     }
     messages.push({ role: "assistant", content: j.content });
+    if (j.stop_reason === "max_tokens") { cutOff = true; break; }
     if (j.stop_reason !== "tool_use") break;
     const results: any[] = [];
     for (const b of j.content ?? []) {
@@ -335,7 +373,14 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
   const reply = last?.role === "assistant" && Array.isArray(last.content)
     ? last.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim()
     : "";
-  return { messages: stripThinking(messages), reply: reply || (plan ? "Plan তৈরি — নিচের তালিকা দেখে Confirm চাপুন।" : planError ? `Plan বানানো যায়নি: ${planError}` : "…"), plan };
+  if (cutOff && !plan) {
+    const note = "উত্তর অনেক বড় হয়ে যাওয়ায় শেষ করা যায়নি — একবারে কম campaign (যেমন ২০টা করে) বলুন।";
+    const fixed = repairToolPairs(stripThinking(messages));
+    if (fixed[fixed.length - 1]?.role === "assistant") fixed[fixed.length - 1] = { role: "assistant", content: note };
+    else fixed.push({ role: "assistant", content: note });
+    return { messages: fixed, reply: note, plan };
+  }
+  return { messages: repairToolPairs(stripThinking(messages)), reply: reply || (plan ? "Plan তৈরি — নিচের তালিকা দেখে Confirm চাপুন।" : planError ? `Plan বানানো যায়নি: ${planError}` : "…"), plan };
 }
 
 // ---------------- tasks ----------------
