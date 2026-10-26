@@ -66,14 +66,17 @@ const ACTION_ITEM = {
     account_id: { type: "string", description: "Ad account id (the `id` from list_accounts)." },
     // create_campaign
     page_id: { type: "string", description: "create_campaign: Page id (the `id` from list_pages)." },
-    objective: { type: "string", enum: ["MESSAGES", "ENGAGEMENT", "TRAFFIC", "AWARENESS"], description: "create_campaign: MESSAGES = Messenger conversations, ENGAGEMENT = post engagement (needs post_id), TRAFFIC = website visits (needs link), AWARENESS = reach." },
+    objective: { type: "string", enum: ["MESSAGES", "SALES", "ENGAGEMENT", "TRAFFIC", "AWARENESS"], description: "create_campaign: MESSAGES = Messenger conversations, SALES = sales campaign (see sales_destination), ENGAGEMENT = post engagement (needs post_id), TRAFFIC = website visits (needs link), AWARENESS = reach." },
+    sales_destination: { type: "string", enum: ["WEBSITE", "MESSAGING"], description: "SALES only: WEBSITE = purchases on a website (needs pixel_id from list_pixels + link), MESSAGING = sales through Messenger chats (no pixel needed)." },
+    pixel_id: { type: "string", description: "SALES + WEBSITE: Dataset/Pixel id from list_pixels." },
+    conversion_event: { type: "string", enum: ["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "VIEW_CONTENT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT"], description: "SALES + WEBSITE: event to optimise for (default PURCHASE)." },
     campaign_name: { type: "string" },
     daily_budget: { type: "number", description: "create_campaign: daily budget in USD (min 1)." },
     video_id: { type: "string", description: "create_campaign: a video id from list_videos (the ad uses this video)." },
     post_id: { type: "string", description: "create_campaign: an existing Page post id from list_posts (instead of a video)." },
     message: { type: "string", description: "create_campaign: primary text of the ad (for video ads)." },
     headline: { type: "string" },
-    link: { type: "string", description: "create_campaign: website URL for TRAFFIC (https://…)." },
+    link: { type: "string", description: "create_campaign: website URL for TRAFFIC or SALES+WEBSITE (https://…, e.g. the product page)." },
     countries: { type: "array", items: { type: "string" }, description: "2-letter country codes, default [\"BD\"]." },
     age_min: { type: "integer" }, age_max: { type: "integer" },
     gender: { type: "string", enum: ["all", "men", "women"] },
@@ -99,6 +102,7 @@ export const TOOLS = [
   },
   { name: "list_pages", description: "Facebook Pages the client can run ads for on this ad account.", input_schema: { type: "object", properties: { account_id: { type: "string" } }, required: ["account_id"] } },
   { name: "list_videos", description: "Videos in this ad account's Video library (what the client uploaded).", input_schema: { type: "object", properties: { account_id: { type: "string" } }, required: ["account_id"] } },
+  { name: "list_pixels", description: "Datasets (Meta Pixels) on this ad account, with last fired time. Needed for SALES ads to a website.", input_schema: { type: "object", properties: { account_id: { type: "string" }, page_id: { type: "string" } }, required: ["account_id", "page_id"] } },
   { name: "list_posts", description: "Recent posts of a Page (for ENGAGEMENT or post-based ads).", input_schema: { type: "object", properties: { account_id: { type: "string" }, page_id: { type: "string" } }, required: ["account_id", "page_id"] } },
   {
     name: "propose_plan",
@@ -143,7 +147,14 @@ export function expandAction(a: PlanAction): { label: string; body: Record<strin
   const page = String(a.page_id ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(page)) throw new Error("Page id ঠিক নেই");
   const objective = String(a.objective ?? "MESSAGES");
-  if (!["MESSAGES", "ENGAGEMENT", "TRAFFIC", "AWARENESS"].includes(objective)) throw new Error("objective ঠিক নেই");
+  if (!["MESSAGES", "SALES", "ENGAGEMENT", "TRAFFIC", "AWARENESS"].includes(objective)) throw new Error("objective ঠিক নেই");
+  const isSales = objective === "SALES";
+  const salesMsg = isSales && a.sales_destination === "MESSAGING";
+  const salesWeb = isSales && !salesMsg;
+  const pixelId = a.pixel_id && /^\d+$/.test(String(a.pixel_id)) ? String(a.pixel_id) : undefined;
+  const EVENTS = ["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "VIEW_CONTENT", "LEAD", "COMPLETE_REGISTRATION", "CONTACT"];
+  const customEvent = EVENTS.includes(String(a.conversion_event)) ? String(a.conversion_event) : "PURCHASE";
+  if (salesWeb && !pixelId) throw new Error("Website Sales campaign-এ Pixel (Dataset) লাগবে — না থাকলে Messenger-এ Sales বেছে নিন");
   const amount = Number(a.daily_budget);
   if (!(amount >= 1 && amount <= 100000)) throw new Error("daily budget ঠিক নেই (কমপক্ষে $1)");
   const videoId = a.video_id && /^\d+$/.test(String(a.video_id)) ? String(a.video_id) : undefined;
@@ -152,6 +163,7 @@ export function expandAction(a: PlanAction): { label: string; body: Record<strin
   if (objective === "ENGAGEMENT" && !postId) throw new Error("Engagement campaign-এ post লাগবে");
   const link = typeof a.link === "string" && /^https?:\/\//.test(a.link) ? a.link : undefined;
   if (objective === "TRAFFIC" && !link && !postId) throw new Error("Traffic campaign-এ website link লাগবে");
+  if (salesWeb && !link && !postId) throw new Error("Website Sales campaign-এ product/website link লাগবে");
   const countries = (Array.isArray(a.countries) && a.countries.length ? a.countries : ["BD"]).map((c: any) => String(c).toUpperCase()).filter((c: string) => /^[A-Z]{2}$/.test(c)).slice(0, 25);
   const ageMin = Math.min(Math.max(Number(a.age_min) || 18, 18), 65), ageMax = Math.min(Math.max(Number(a.age_max) || 65, 18), 65);
   const genders = a.gender === "men" ? [1] : a.gender === "women" ? [2] : [];
@@ -159,14 +171,18 @@ export function expandAction(a: PlanAction): { label: string; body: Record<strin
   const metaObjective = isMsg ? "ENGAGEMENT" : objective;
   const name = cut(a.campaign_name || `${objective} campaign`, 180);
   const endTime = Number(a.duration_days) > 0 ? new Date(Date.now() + Number(a.duration_days) * 86400_000).toISOString() : undefined;
-  const cta = isMsg ? undefined : objective === "TRAFFIC" ? "LEARN_MORE" : undefined;
+  const cta = isMsg || salesMsg ? undefined : objective === "TRAFFIC" ? "LEARN_MORE" : salesWeb ? "SHOP_NOW" : undefined;
+  const message = a.message ? cut(a.message, 4900) : undefined;
+  const headline = a.headline ? cut(a.headline, 250) : undefined;
   const ad = {
     adName: `${name} - Ad`, existingPostId: postId, videoId: postId ? undefined : videoId,
-    message: a.message ? cut(a.message, 4900) : undefined, headline: a.headline ? cut(a.headline, 250) : undefined,
-    link: objective === "TRAFFIC" ? link : undefined, cta, advantageCreative: false, format: "single",
+    message, headline,
+    link: objective === "TRAFFIC" || salesWeb ? link : undefined, cta, advantageCreative: false, format: "single",
+    ...(salesWeb && !postId ? { messages: message ? [message] : undefined, headlines: headline ? [headline] : undefined } : {}),
   };
   const adset = {
-    adsetName: `${name} - Ad set`, conversionLocation: "WEBSITE", endTime,
+    adsetName: `${name} - Ad set`, conversionLocation: salesMsg ? "MESSAGING" : "WEBSITE", endTime,
+    ...(salesWeb ? { pixelId, customEvent, performanceGoal: "CONVERSIONS", attribution: "7C1V", advantageSales: false, advantageAudience: false, customAudiences: [], excludedAudiences: [], locales: [] } : {}),
     budgetType: "daily", amount, bidStrategy: "LOWEST_COST_WITHOUT_CAP",
     countries, ageMin, ageMax, genders, interests: [], connections: "all",
     ...(metaObjective === "ENGAGEMENT" ? { engagementLocation: isMsg ? "MESSAGING" : "ON_AD", msgDestinations: isMsg ? ["MESSENGER"] : undefined } : {}),
@@ -220,6 +236,10 @@ async function runTool(admin: any, c: Caller, name: string, input: any): Promise
     const { videos } = await callManagedAds(admin, c, { action: "videos", adAccountDbId: input.account_id });
     return (videos ?? []).map((v: any) => ({ id: v.id, title: v.title, length_sec: v.length ? Math.round(v.length) : null, created: v.created }));
   }
+  if (name === "list_pixels") {
+    const { pixels } = await callManagedAds(admin, c, { action: "pixels", pageDbId: input.page_id, adAccountDbId: input.account_id });
+    return { pixels: pixels ?? [] };
+  }
   if (name === "list_posts") {
     const { posts, needsAccess } = await callManagedAds(admin, c, { action: "posts", pageDbId: input.page_id, adAccountDbId: input.account_id });
     if (needsAccess) return { error: "এই Page-এর post পড়ার অনুমতি নেই" };
@@ -244,7 +264,8 @@ How to work:
 - Schedules: "kal sokal 9 tay" etc. → run_at with +06:00 offset. Daily repeats → repeat "daily". If they want something at a time AND also now, make two plans.
 - Ad account status must be 1 (active) to create; otherwise explain the problem.
 - Budget is per campaign per day in USD. For shared (wallet) accounts the spend is charged from their CRM wallet.
-- Only these goals are available here: Messages, Engagement, Traffic, Awareness. For Sales/Leads with a Pixel, tell them to use the Create button in My Ads.
+- Goals available here: Messages, Sales, Engagement, Traffic, Awareness. For Leads (instant forms) or advanced Sales options (catalog, carousel, custom audiences), tell them to use the Create button in My Ads.
+- SALES: if the client did not say where sales happen, ask: website (needs Pixel + product link) or Messenger (inbox orders, no Pixel). For website: call list_pixels, use the Pixel that fired most recently if there is only one obvious choice (otherwise ask), conversion_event PURCHASE unless told otherwise, and ask for the product/website link if not given. Show the Pixel name in the plan summary.
 - Stay on ads topics; be brief.`;
 }
 
