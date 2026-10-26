@@ -727,6 +727,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
       {wizard}
       {deleteDialog}
         {duplicateDialog}
+      <AdsAgent account={currentAcc} userId={uid} />
       {isFetching && !data && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="ads-controls fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">
