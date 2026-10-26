@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export async function managedAds<T = any>(body: Record<string, unknown>): Promise<T> {
+// Admin "view as client" inside Client Details: every My Ads request carries asUserId.
+// The server only honours it for admins, so clients cannot use it.
+let viewAsUserId: string | null = null;
+export function setManagedAdsViewAs(id: string | null) { viewAsUserId = id; }
+
+export async function managedAds<T = any>(rawBody: Record<string, unknown>): Promise<T> {
+  const body = viewAsUserId && rawBody.asUserId === undefined ? { ...rawBody, asUserId: viewAsUserId } : rawBody;
   let { data: { session } } = await supabase.auth.getSession();
   if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
     const r = await supabase.auth.refreshSession();

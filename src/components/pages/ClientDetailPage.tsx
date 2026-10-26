@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
+const ClientMyAds = lazy(() => import("@/components/pages/MyAdsPage"));
 import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -1297,6 +1298,18 @@ export default function ClientDetailPage() {
                   <AppWindow className="h-3.5 w-3.5" />
                   Unused
                 </TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger
+                    value="myads"
+                    className={cn(
+                      "gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm",
+                      isMobile && "text-xs px-3 whitespace-nowrap",
+                    )}
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    My Ads
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
           </div>
@@ -3549,6 +3562,17 @@ export default function ClientDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* My Ads exactly as the client sees it, controlled by admin */}
+          {isAdmin && userId && (
+            <TabsContent value="myads" className="mt-0">
+              {mainTab === "myads" && (
+                <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading My Ads…</div>}>
+                  <ClientMyAds asUserId={userId} />
+                </Suspense>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
