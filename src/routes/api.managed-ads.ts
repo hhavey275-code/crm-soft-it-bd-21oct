@@ -67,7 +67,7 @@ const adsetInSchema = z.object({
   amount: z.number().min(1).max(100000),
   bidStrategy: BID_ENUM,
   bidAmount: z.number().positive().optional(),
-  countries: z.array(z.string().length(2)).min(1).max(25),
+  countries: z.array(z.string().regex(/^([A-Z]{2}|[rc]:\d+:[^\n]{0,80})$/)).min(1).max(25),
   ageMin: z.number().int().min(18).max(65),
   ageMax: z.number().int().min(18).max(65),
   genders: z.array(z.union([z.literal(1), z.literal(2)])).max(2),
@@ -92,7 +92,7 @@ const schema = z.discriminatedUnion("action", [
     adAccountDbId: z.string().uuid().optional(), asUserId: z.string().uuid().optional(),
     name: z.string().min(1).max(200).optional(),
     budgetType: z.enum(["daily", "lifetime"]).optional(), amount: z.number().positive().max(1000000).optional(),
-    countries: z.array(z.string().length(2)).min(1).max(25).optional(),
+    countries: z.array(z.string().regex(/^([A-Z]{2}|[rc]:\d+:[^\n]{0,80})$/)).min(1).max(25).optional(),
     ageMin: z.number().int().min(18).max(65).optional(), ageMax: z.number().int().min(18).max(65).optional(),
     message: z.string().max(5000).optional(), headline: z.string().max(255).optional(), link: z.string().max(1000).optional(),
     startTime: z.string().max(40).optional(), endTime: z.string().max(40).optional(),
@@ -103,10 +103,12 @@ const schema = z.discriminatedUnion("action", [
     postMessage: z.string().max(5000).optional(),
   }),
   z.object({ action: z.literal("set_budget"), objectId: z.string().regex(/^\d+$/), budgetType: z.enum(["daily", "lifetime"]), amount: z.number().positive().max(1000000), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("geo_search"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
+  z.object({ action: z.literal("ad_details"), objectId: z.string().regex(/^\d+$/), adAccountDbId: z.string().uuid().optional(), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("interests"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid().optional(), q: z.string().min(2).max(60) }),
   z.object({
     action: z.literal("reach_estimate"), pageDbId: z.string().uuid(), adAccountDbId: z.string().uuid(),
-    countries: z.array(z.string().regex(/^[A-Z]{2}$/)).max(50), ageMin: z.string().max(3), ageMax: z.string().max(3),
+    countries: z.array(z.string().regex(/^([A-Z]{2}|[rc]:\d+:[^\n]{0,80})$/)).max(50), ageMin: z.string().max(3), ageMax: z.string().max(3),
     gender: z.enum(["all", "male", "female"]),
     interests: z.array(z.object({ id: z.string().regex(/^\d+$/), name: z.string().optional(), type: z.string().regex(/^[a-z_]+$/).optional() })).max(50),
   }),
@@ -172,7 +174,7 @@ const schema = z.discriminatedUnion("action", [
     endTime: z.string().optional(),
     bidStrategy: z.enum(["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"]),
     bidAmount: z.number().positive().optional(),
-    countries: z.array(z.string().length(2)).min(1).max(25),
+    countries: z.array(z.string().regex(/^([A-Z]{2}|[rc]:\d+:[^\n]{0,80})$/)).min(1).max(25),
     ageMin: z.number().int().min(18).max(65),
     ageMax: z.number().int().min(18).max(65),
     genders: z.array(z.union([z.literal(1), z.literal(2)])).max(2),
@@ -197,6 +199,18 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 type Body = z.infer<typeof schema>;
+
+// Locations are "BD" (country), "r:<key>:<name>" (region/division) or "c:<key>:<name>" (city).
+function geoLocations(list: string[]) {
+  const g: Record<string, unknown> = { location_types: ["home", "recent"] };
+  const countries = list.filter((x) => /^[A-Z]{2}$/.test(x));
+  const regions = list.filter((x) => x.startsWith("r:")).map((x) => ({ key: x.split(":")[1] }));
+  const cities = list.filter((x) => x.startsWith("c:")).map((x) => ({ key: x.split(":")[1], radius: 10, distance_unit: "kilometer" }));
+  if (countries.length) g.countries = countries;
+  if (regions.length) g.regions = regions;
+  if (cities.length) g.cities = cities;
+  return g;
+}
 
 // Verify the browser's login with the project's public URL + anon key (works on every host,
 // independent of server env names).
@@ -451,6 +465,55 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { ...data, ...settings, walletBalance: wb, fetchedAt: new Date().toISOString() };
   }
 
+  if (body.action === "ad_details") {
+    const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId, mutationObject: { id: body.objectId, level: "ad" } });
+    const obj = owned.ads.find((o: any) => String(o.id) === body.objectId);
+    if (!obj) throw new Error("এই ad আপনার নয়");
+    const g = graphClient((await tokenFor(supabaseAdmin, obj.ad_account_db_id)).token);
+    const ad: any = await g.get(body.objectId, { fields: "creative{object_story_spec,object_story_id,effective_object_story_id,body,title,image_url,thumbnail_url,video_id,call_to_action_type,link_url}" });
+    const c = ad?.creative ?? {};
+    const spec = c.object_story_spec ?? {};
+    const ld = spec.link_data ?? null, vd = spec.video_data ?? null;
+    const postId: string | undefined = c.object_story_id || c.effective_object_story_id;
+    const pageId = String(spec.page_id ?? postId?.split("_")[0] ?? "");
+    const out: any = {
+      editable: !!(ld || vd), postId: postId ?? null, pageId,
+      message: ld?.message ?? vd?.message ?? c.body ?? "",
+      headline: ld?.name ?? vd?.title ?? c.title ?? "",
+      description: ld?.description ?? vd?.link_description ?? "",
+      link: ld?.link ?? vd?.call_to_action?.value?.link ?? c.link_url ?? "",
+      cta: (ld ?? vd)?.call_to_action?.type ?? c.call_to_action_type ?? "",
+      picture: c.image_url ?? ld?.picture ?? vd?.image_url ?? c.thumbnail_url ?? null,
+      videoSrc: null as string | null, pageName: null as string | null, pagePicture: null as string | null,
+    };
+    const pt = pageId ? await savedPageToken(supabaseAdmin, pageId, targetUser) : undefined;
+    const pg = pt ? graphClient(pt) : g;
+    if (postId && !out.editable) {
+      const post: any = await pg.get(postId, { fields: "message,full_picture,attachments{media_type,title,description,unshimmed_url,target{id},media{source,image{src}}}" }).catch(() => null);
+      if (post) {
+        const at = post.attachments?.data?.[0];
+        out.message = post.message ?? out.message;
+        out.picture = post.full_picture ?? at?.media?.image?.src ?? out.picture;
+        out.headline = out.headline || at?.title || "";
+        out.description = out.description || at?.description || "";
+        out.link = out.link || at?.unshimmed_url || "";
+        if (at?.media?.source) out.videoSrc = at.media.source;
+        else if (/video/i.test(at?.media_type ?? "") && at?.target?.id) out.videoId = at.target.id;
+      }
+    }
+    const vid = vd?.video_id ?? c.video_id ?? out.videoId;
+    if (vid && !out.videoSrc) {
+      const v: any = await pg.get(String(vid), { fields: "source,picture" }).catch(() => g.get(String(vid), { fields: "source,picture" }).catch(() => null));
+      out.videoSrc = v?.source ?? null; out.picture = out.picture ?? v?.picture ?? null;
+    }
+    if (pageId) {
+      const p: any = await pg.get(pageId, { fields: "name,picture{url}" }).catch(() => null);
+      out.pageName = p?.name ?? null; out.pagePicture = p?.picture?.data?.url ?? null;
+    }
+    delete out.videoId;
+    return out;
+  }
+
   if (body.action === "delete" || body.action === "set_status" || body.action === "set_budget" || body.action === "update" || body.action === "duplicate") {
     const lvl = body.action === "set_budget" ? "adset" : body.level;
     const owned = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId, mutationObject: { id: body.objectId, level: lvl } });
@@ -493,7 +556,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       if (lvl === "adset" && body.endTime) upd.end_time = body.endTime;
       if (lvl === "adset" && (body.countries || body.ageMin || body.ageMax)) {
         const t: any = { ...(obj.targeting ?? {}) };
-        if (body.countries) t.geo_locations = { countries: body.countries, location_types: ["home", "recent"] };
+        if (body.countries) t.geo_locations = geoLocations(body.countries);
         if (body.ageMin) t.age_min = body.ageMin;
         if (body.ageMax) t.age_max = body.ageMax;
         upd.targeting = t;
@@ -760,7 +823,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
   }
 
   if (body.action === "reach_estimate") {
-    const t: any = { geo_locations: { countries: body.countries?.length ? body.countries : ["BD"] }, age_min: Number(body.ageMin) || 18, age_max: Number(body.ageMax) || 65 };
+    const t: any = { geo_locations: geoLocations(body.countries?.length ? body.countries : ["BD"]), age_min: Number(body.ageMin) || 18, age_max: Number(body.ageMax) || 65 };
     if (body.gender === "male") t.genders = [1];
     if (body.gender === "female") t.genders = [2];
     const ints = (body.interests ?? []) as { id: string; type?: string }[];
@@ -778,6 +841,11 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     const r2 = await g.get(`${act}/delivery_estimate`, { targeting_spec: spec, optimization_goal: "REACH" });
     const d2 = Array.isArray(r2.data) ? r2.data[0] : r2.data;
     return { lower: d2?.estimate_mau_lower_bound ?? d2?.estimate_mau ?? null, upper: d2?.estimate_mau_upper_bound ?? d2?.estimate_mau ?? null };
+  }
+
+  if (body.action === "geo_search") {
+    const r = await g.get("search", { type: "adgeolocation", q: body.q, location_types: JSON.stringify(["country", "region", "city"]), limit: "25" });
+    return { locations: (r.data ?? []).map((l: any) => ({ key: String(l.key), name: l.name, type: l.type, country_code: l.country_code, country_name: l.country_name, region: l.region })) };
   }
 
   if (body.action === "interests") {
@@ -923,7 +991,7 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       if (pixelNeeded && (!s.pixelId || (!s.customEvent && !s.customConversionId))) throw new Error("Website conversion-এর জন্য Dataset (Pixel) ও conversion event বাছুন");
 
       const targeting: Record<string, unknown> = {
-        geo_locations: { countries: s.countries, location_types: ["home", "recent"] },
+        geo_locations: geoLocations(s.countries),
         age_min: Math.min(s.ageMin, s.ageMax), age_max: Math.max(s.ageMin, s.ageMax),
         targeting_automation: { advantage_audience: s.advantageAudience || s.advantageSales ? 1 : 0 },
       };

@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { PlacementPreview } from "./PlacementPreview";
 import { toast } from "sonner";
 import { Folder, LayoutGrid, FileText, X, Loader2, CheckCircle2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,9 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
 
   const [forms, setForms] = useState<Record<string, ReturnType<typeof initForm>>>(() =>
     Object.fromEntries(nodes.map((n) => [String(n.obj.id), initForm(n.level, n.obj)])));
+  const [base, setBase] = useState<Record<string, ReturnType<typeof initForm>>>(() =>
+    Object.fromEntries(nodes.map((n) => [String(n.obj.id), initForm(n.level, n.obj)])));
+  const [details, setDetails] = useState<Record<string, any>>({});
   const [cur, setCur] = useState(String(campaign.id));
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -66,7 +70,21 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
   const fm = forms[cur];
   const set = (k: string, v: any) => setForms((p) => ({ ...p, [cur]: { ...p[cur], [k]: v } }));
 
-  const dirtyIds = nodes.filter((n) => JSON.stringify(forms[String(n.obj.id)]) !== JSON.stringify(initForm(n.level, n.obj))).map((n) => String(n.obj.id));
+  const dirtyIds = nodes.filter((n) => JSON.stringify(forms[String(n.obj.id)]) !== JSON.stringify(base[String(n.obj.id)])).map((n) => String(n.obj.id));
+
+  // Load the ad's real text, media and post content (Meta's list omits it for page-post ads).
+  useEffect(() => {
+    if (node?.level !== "ad" || details[cur]) return;
+    const id = cur;
+    setDetails((p) => ({ ...p, [id]: { loading: true } }));
+    managedAds<any>({ action: "ad_details", objectId: id, adAccountDbId: node.obj.ad_account_db_id }).then((d) => {
+      setDetails((p) => ({ ...p, [id]: d }));
+      const patch = (f: ReturnType<typeof initForm>) => ({ ...f, message: d.message ?? "", headline: d.headline ?? "", link: d.link ?? "", description: d.description ?? "",
+        cta: d.cta || f.cta, editableCreative: !!d.editable, preview: d.picture ?? f.preview, postId: d.postId ?? f.postId, postMessage: d.editable ? "" : (d.message ?? "") });
+      setBase((p) => ({ ...p, [id]: patch(p[id]) }));
+      setForms((p) => (JSON.stringify(p[id]) === JSON.stringify(base[id]) ? { ...p, [id]: patch(p[id]) } : p));
+    }).catch((e: any) => { setDetails((p) => ({ ...p, [id]: { error: e.message } })); });
+  }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const publish = async () => {
     if (!dirtyIds.length) return toast.info("কিছু বদলানো হয়নি");
@@ -74,7 +92,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
     let ok = 0;
     for (const id of dirtyIds) {
       const n = nodes.find((x) => String(x.obj.id) === id)!;
-      const a = forms[id], b = initForm(n.level, n.obj);
+      const a = forms[id], b = base[id];
       const body: Record<string, unknown> = { action: "update", level: n.level, objectId: id, adAccountDbId: n.obj.ad_account_db_id };
       if (a.name.trim() && a.name !== b.name) body.name = a.name.trim();
       if (a.budgetType && a.amount !== b.amount && Number(a.amount) > 0) { body.budgetType = a.budgetType; body.amount = Number(a.amount); }
@@ -176,16 +194,20 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
             )}
             {node.level === "ad" && (
               <Section title="Ad creative">
-                {(fm.preview || fm.postId) && (
-                  <div className="flex items-center gap-3 rounded-md border border-fb-border p-2">
-                    {fm.preview && <img src={fm.preview} alt="Ad media" className="h-20 w-20 rounded object-cover" />}
-                    <div className="min-w-0 text-[12px]">
-                      <p className="font-semibold">বর্তমান ad content</p>
-                      {fm.postId && <a href={`https://facebook.com/${fm.postId}`} target="_blank" rel="noreferrer" className="text-fb-blue underline">Post দেখুন ({fm.postId})</a>}
-                    </div>
-                  </div>
-                )}
-                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর post থেকে — post-এর লেখা নিচে বদলাতে বা অন্য post বেছে নিতে পারবেন।</p>}
+                {details[cur]?.loading && <p className="flex items-center gap-2 text-fb-muted"><Loader2 className="h-4 w-4 animate-spin" />Ad-এর লেখা ও video আনা হচ্ছে…</p>}
+                {details[cur]?.error && <p className="text-destructive">Ad-এর তথ্য আনা যায়নি: {details[cur].error}</p>}
+                <PlacementPreview d={{
+                  pageName: details[cur]?.pageName ?? "Your Page", avatar: details[cur]?.pagePicture,
+                  text: fm.editableCreative ? fm.message : (fm.postMessage || fm.message),
+                  img: fm.image?.url ?? fm.preview ?? null,
+                  video: details[cur]?.videoSrc && !fm.image ? { src: details[cur].videoSrc, picture: fm.preview, name: "video" } : null,
+                  domain: fm.link ? fm.link.replace(/^https?:\/\//, "").split("/")[0] : "website.com",
+                  headline: fm.headline || "Headline",
+                  cta: (fm.cta || "LEARN_MORE").replace(/_/g, " ").toLowerCase().replace(/^./, (x: string) => x.toUpperCase()),
+                  showCta: !!fm.cta || fm.editableCreative,
+                }} />
+                {fm.postId && <a href={`https://facebook.com/${fm.postId}`} target="_blank" rel="noreferrer" className="text-[12px] text-fb-blue underline">Facebook-এ post দেখুন</a>}
+                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর post থেকে — Primary text, Headline, Website URL শুধু দেখা যাবে; post-এর লেখা নিচে বদলাতে বা অন্য post বেছে নিতে পারবেন।</p>}
                 <div><Lbl>Primary text</Lbl><textarea rows={4} disabled={!fm.editableCreative} className={cn(inp, "h-auto py-2")} value={fm.message} onChange={(e) => set("message", e.target.value)} /></div>
                 <div><Lbl>Headline</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.headline} onChange={(e) => set("headline", e.target.value)} /></div>
                 <div><Lbl>Website URL</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.link} onChange={(e) => set("link", e.target.value)} /></div>
