@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { managedAds, resultOf, salesOf } from "@/lib/managedAdsApi";
+import { managedAds, resultOf, salesOf, setManagedAdsViewAs } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
 import { AdsAssistant } from "@/components/ads-manager/AdsAssistant";
@@ -43,10 +43,13 @@ const num = (v: any) => (v == null || v === "" ? "—" : Number(v).toLocaleStrin
 const budget = (o: any) =>
   o.daily_budget ? `${money(Number(o.daily_budget) / 100)}/দিন` : o.lifetime_budget ? `${money(Number(o.lifetime_budget) / 100)} মোট` : "—";
 
-export default function MyAdsPage() {
+export default function MyAdsPage({ asUserId }: { asUserId?: string } = {}) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const uid = user?.id;
+  // Set synchronously so the very first requests already target the client.
+  setManagedAdsViewAs(asUserId ?? null);
+  useEffect(() => () => setManagedAdsViewAs(null), []);
+  const uid = asUserId ?? user?.id;
   const [tab, setTab] = useState<Level>("campaign");
   // Default to the last 7 days like Facebook Ads Manager, so results/spend are not empty on "today".
   const [range, setRange] = useState<FbRange>(() => makeRange("today"));
