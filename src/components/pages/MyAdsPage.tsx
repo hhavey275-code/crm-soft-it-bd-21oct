@@ -49,7 +49,11 @@ const num = (v: any) => (v == null || v === "" ? "—" : Number(v).toLocaleStrin
 const budget = (o: any) =>
   o.daily_budget ? `${money(Number(o.daily_budget) / 100)}/দিন` : o.lifetime_budget ? `${money(Number(o.lifetime_budget) / 100)} মোট` : "—";
 
-export default function MyAdsPage({ asUserId }: { asUserId?: string } = {}) {
+export default function MyAdsPage(props: { asUserId?: string } = {}) {
+  return <EmbeddedCtx.Provider value={!!props.asUserId}><MyAdsInner {...props} /></EmbeddedCtx.Provider>;
+}
+
+function MyAdsInner({ asUserId }: { asUserId?: string }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   // Set synchronously so the very first requests already target the client.
