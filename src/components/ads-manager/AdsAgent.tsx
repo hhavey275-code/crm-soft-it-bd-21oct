@@ -35,7 +35,7 @@ const EXAMPLES = [
 ];
 
 /** Floating AI Ads Agent: chat or speak in Bangla to run campaigns; every change needs Confirm. */
-export function AdsAgent({ account, userId, asUserId }: { account: { id: string; name: string } | undefined; userId?: string; asUserId?: string }) {
+export function AdsAgent({ account, userId, asUserId, onChanged }: { account: { id: string; name: string } | undefined; userId?: string; asUserId?: string; onChanged?: () => void }) {
   const storeKey = `myads-agent:${userId ?? "anon"}`;
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"chat" | "tasks">("chat");
@@ -56,8 +56,25 @@ export function AdsAgent({ account, userId, asUserId }: { account: { id: string;
   useEffect(() => { try { sessionStorage.setItem(storeKey, JSON.stringify({ messages: messages.slice(-60), plan })); } catch { /* ignore */ } }, [messages, plan, storeKey]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, plan, busy, open, tab]);
 
-  const loadTasks = async () => { try { setTasks((await agentApi<{ tasks: Task[] }>({ action: "tasks" })).tasks); } catch (e: any) { toast.error(e.message); } };
+  // My Ads keeps its campaign list cached; when a task has run since we last looked (now, or by the
+  // scheduler while the page was closed), ask the page to reload so the new campaigns show up.
+  const seenKey = `myads-agent-seen:${userId ?? "anon"}`;
+  const noteRuns = (list: Task[]) => {
+    const latest = list.reduce((m, t: any) => Math.max(m, t.last_run_at ? Date.parse(t.last_run_at) : 0), 0);
+    if (!latest) return;
+    let seen = 0;
+    try { seen = Number(localStorage.getItem(seenKey) || 0); } catch { /* ignore */ }
+    if (latest > seen) {
+      try { localStorage.setItem(seenKey, String(latest)); } catch { /* ignore */ }
+      if (seen) onChanged?.();
+    }
+  };
+  const loadTasks = async (quiet = false) => {
+    try { const { tasks: list } = await agentApi<{ tasks: Task[] }>({ action: "tasks" }); setTasks(list); noteRuns(list); }
+    catch (e: any) { if (!quiet) toast.error(e.message); }
+  };
   useEffect(() => { if (open && tab === "tasks") loadTasks(); }, [open, tab]);
+  useEffect(() => { if (userId) loadTasks(true); }, [userId]);
 
   const say = (text: string) => {
     if (!speak || !text || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -107,6 +124,7 @@ export function AdsAgent({ account, userId, asUserId }: { account: { id: string;
       setTab("tasks");
       const done = await runUntilDone(task);
       const ok = done.steps.filter((s: any) => s.status === "done").length, bad = done.steps.filter((s: any) => s.status === "failed").length;
+      if (ok) { onChanged?.(); try { localStorage.setItem(seenKey, String(Date.now())); } catch { /* ignore */ } }
       const msg = done.status === "running" || done.status === "scheduled"
         ? `${ok}টি হয়ে গেছে, বাকিগুলো সার্ভারে চলছে — পেজ বন্ধ করলেও শেষ হবে।`
         : `শেষ: ${ok}টি সফল${bad ? `, ${bad}টি হয়নি (কারণ কাজের তালিকায় দেখুন)` : ""}।`;
