@@ -94,7 +94,7 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
         if (a.image) body.imageBase64 = a.image.b64;
         if (a.video) body.videoPath = a.video.path;
         if (a.newPostId.trim()) body.newPostId = (a.newPostId.match(/(\d{5,}(?:_\d+)?)\/?$/)?.[1] ?? a.newPostId.match(/(?:posts|videos|story_fbid=|fbid=)\/?(\d{5,})/)?.[1] ?? a.newPostId.trim());
-        if (a.postMessage.trim()) body.postMessage = a.postMessage;
+        if (a.postMessage.trim() && a.postMessage !== b.postMessage) body.postMessage = a.postMessage;
       }
       if (Object.keys(body).length <= 4) continue;
       try {
