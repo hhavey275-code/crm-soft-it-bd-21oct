@@ -8,7 +8,7 @@ const CLAUDE_URL = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = "claude-sonnet-5-5";
 const MAX_ACTIONS = 60;
 
-export type Caller = { origin: string; userId: string };
+export type Caller = { origin: string; userId: string; asUserId?: string };
 
 // ---------------- managed-ads bridge ----------------
 let cachedSecret: { v: string; at: number } | null = null;
@@ -25,7 +25,8 @@ export async function callManagedAds(admin: any, c: Caller, body: Record<string,
   const res = await fetch(`${c.origin}/api/managed-ads`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-agent-secret": await agentSecret(admin), "x-agent-user": c.userId },
-    body: JSON.stringify(body),
+    // asUserId = admin "view as client"; /api/managed-ads only honours it for admins.
+    body: JSON.stringify(c.asUserId && body.asUserId === undefined ? { ...body, asUserId: c.asUserId } : body),
   });
   const j: any = await res.json().catch(() => ({ error: `সার্ভার উত্তর দেয়নি (HTTP ${res.status})` }));
   if (!res.ok || j?.error) throw new Error(j?.error || `HTTP ${res.status}`);
@@ -249,8 +250,18 @@ How to work:
 
 export type ChatMessage = { role: "user" | "assistant"; content: any };
 
+// Thinking blocks are bound to the exact request they came from (system prompt includes the time),
+// so they are never carried across turns.
+function stripThinking(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((m) => {
+    if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
+    const content = m.content.filter((b: any) => b?.type !== "thinking" && b?.type !== "redacted_thinking");
+    return { ...m, content: content.length ? content : [{ type: "text", text: "…" }] };
+  });
+}
+
 function trimHistory(messages: ChatMessage[]): ChatMessage[] {
-  let list = messages.slice(-40);
+  let list = stripThinking(messages).slice(-40);
   // Start at a plain user text turn so tool_use/tool_result pairs are never split.
   while (list.length && !(list[0].role === "user" && typeof list[0].content === "string")) list = list.slice(1);
   return list;
@@ -263,11 +274,12 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
   const messages: ChatMessage[] = trimHistory(history);
   let plan: Plan | null = null;
   let planError: string | null = null;
+  const system = systemPrompt(selectedAccount);
   for (let i = 0; i < 8; i++) {
     const res = await fetch(CLAUDE_URL, {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model, max_tokens: 4096, system: systemPrompt(selectedAccount), tools: TOOLS, messages }),
+      body: JSON.stringify({ model, max_tokens: 4096, system, tools: TOOLS, messages }),
     });
     const j: any = await res.json().catch(() => null);
     if (!res.ok || !j) {
@@ -302,14 +314,17 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
   const reply = last?.role === "assistant" && Array.isArray(last.content)
     ? last.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim()
     : "";
-  return { messages, reply: reply || (plan ? "Plan তৈরি — নিচের তালিকা দেখে Confirm চাপুন।" : planError ? `Plan বানানো যায়নি: ${planError}` : "…"), plan };
+  return { messages: stripThinking(messages), reply: reply || (plan ? "Plan তৈরি — নিচের তালিকা দেখে Confirm চাপুন।" : planError ? `Plan বানানো যায়নি: ${planError}` : "…"), plan };
 }
 
 // ---------------- tasks ----------------
 type Step = { label: string; body: Record<string, unknown>; status: "pending" | "done" | "failed"; error?: string; result?: string };
 
-export async function createTask(admin: any, userId: string, plan: Plan) {
-  const steps: Step[] = plan.actions.map((a) => ({ ...expandAction(a), status: "pending" as const }));
+export async function createTask(admin: any, userId: string, plan: Plan, asUserId?: string) {
+  const steps: Step[] = plan.actions.map((a) => {
+    const s = expandAction(a);
+    return { ...s, body: asUserId ? { ...s.body, asUserId } : s.body, status: "pending" as const };
+  });
   const { data, error } = await admin.from("ads_agent_tasks").insert({
     user_id: userId, title: plan.summary || `${steps.length}টি কাজ`, run_at: plan.run_at ?? new Date().toISOString(),
     repeat: plan.repeat, steps, status: "scheduled",

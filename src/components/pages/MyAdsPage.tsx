@@ -576,7 +576,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
       return (
         <DashboardLayout fullBleed hideChat>
           {wizard}
-        <AdsAgent account={currentAcc} userId={uid} />
+        <AdsAgent account={currentAcc} userId={uid} asUserId={asUserId} />
           {fastLoading && !accounts.length && <MetaLoading />}
           <div className="ads-controls fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
@@ -620,7 +620,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
-        <AdsAgent account={currentAcc} userId={uid} />
+        <AdsAgent account={currentAcc} userId={uid} asUserId={asUserId} />
         {deleteDialog}
         {duplicateDialog}
         {isFetching && !data && <MetaLoading />}
@@ -727,7 +727,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
       {wizard}
       {deleteDialog}
         {duplicateDialog}
-      <AdsAgent account={currentAcc} userId={uid} />
+      <AdsAgent account={currentAcc} userId={uid} asUserId={asUserId} />
       {isFetching && !data && <MetaLoading />}
       {editCampaign && <FbCampaignEditor campaign={editCampaign} adsets={data?.adsets ?? []} ads={data?.ads ?? []} onClose={() => setEditCampaign(null)} onSaved={() => refetch()} />}
       <div className="ads-controls fb-font flex h-[calc(100dvh-3.5rem)] flex-col bg-fb-bg p-1 text-fb-text sm:p-2">

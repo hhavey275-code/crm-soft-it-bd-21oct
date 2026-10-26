@@ -40,18 +40,19 @@ export const Route = createFileRoute("/api/ads-agent")({
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const agent = await import("@/lib/adsAgent.server");
           const admin: any = supabaseAdmin;
+          const asUserId = uuid(body.asUserId) && body.asUserId !== userId ? String(body.asUserId) : undefined;
 
           if (body.action === "chat") {
             const history = Array.isArray(body.messages) ? body.messages.filter((m: any) => m && (m.role === "user" || m.role === "assistant")) : [];
             if (!history.length || history[history.length - 1].role !== "user") return json({ error: "মেসেজ খালি" }, 400);
-            const out = await agent.agentChat(admin, { origin, userId }, history, typeof body.selectedAccount === "string" ? body.selectedAccount.slice(0, 200) : undefined);
+            const out = await agent.agentChat(admin, { origin, userId, asUserId }, history, typeof body.selectedAccount === "string" ? body.selectedAccount.slice(0, 200) : undefined);
             return json(out);
           }
 
           if (body.action === "confirm") {
             // Re-validate the plan on the server; the steps are rebuilt here, never taken from the browser as-is.
             const plan = agent.normalizePlan(body.plan);
-            const task = await agent.createTask(admin, userId, plan);
+            const task = await agent.createTask(admin, userId, plan, asUserId);
             return json({ task });
           }
 

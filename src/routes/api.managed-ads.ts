@@ -241,7 +241,10 @@ async function ctx(request: Request) {
     const { data: row } = await (supabaseAdmin as any).from("internal_job_secrets").select("secret").eq("job_name", "ads-agent-tasks").maybeSingle();
     const expected = String(row?.secret ?? "");
     if (!expected || expected.length !== agentSecret.length || expected !== agentSecret) return null;
-    return { supabaseAdmin, user: { id: agentUser }, isAdmin: false };
+    // Same rights the logged-in person has in the browser (admins keep admin view; clients stay limited).
+    const { data: roles } = await (supabaseAdmin as any).from("user_roles").select("role").eq("user_id", agentUser);
+    const isAdmin = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "superadmin");
+    return { supabaseAdmin, user: { id: agentUser }, isAdmin };
   }
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return null;

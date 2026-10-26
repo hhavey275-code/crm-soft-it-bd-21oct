@@ -35,7 +35,7 @@ const EXAMPLES = [
 ];
 
 /** Floating AI Ads Agent: chat or speak in Bangla to run campaigns; every change needs Confirm. */
-export function AdsAgent({ account, userId }: { account: { id: string; name: string } | undefined; userId?: string }) {
+export function AdsAgent({ account, userId, asUserId }: { account: { id: string; name: string } | undefined; userId?: string; asUserId?: string }) {
   const storeKey = `myads-agent:${userId ?? "anon"}`;
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"chat" | "tasks">("chat");
@@ -74,7 +74,7 @@ export function AdsAgent({ account, userId }: { account: { id: string; name: str
     const next: Msg[] = [...messages, { role: "user", content: t }];
     setMessages(next); setInput(""); setBusy(true); setPlan(null);
     try {
-      const r = await agentApi<{ messages: Msg[]; reply: string; plan: Plan | null }>({ action: "chat", messages: next, selectedAccount: account ? `${account.name} (id ${account.id})` : undefined });
+      const r = await agentApi<{ messages: Msg[]; reply: string; plan: Plan | null }>({ action: "chat", asUserId, messages: next, selectedAccount: account ? `${account.name} (id ${account.id})` : undefined });
       setMessages(r.messages?.length ? r.messages : [...next, { role: "assistant", content: r.reply }]);
       setPlan(r.plan ?? null);
       say(r.reply);
@@ -96,7 +96,7 @@ export function AdsAgent({ account, userId }: { account: { id: string; name: str
     if (!plan) return;
     setConfirming(true);
     try {
-      const { task } = await agentApi<{ task: Task }>({ action: "confirm", plan });
+      const { task } = await agentApi<{ task: Task }>({ action: "confirm", asUserId, plan });
       setPlan(null);
       setTasks((ts) => [task, ...ts.filter((x) => x.id !== task.id)]);
       if (Date.parse(task.run_at) > Date.now() + 60_000) {
