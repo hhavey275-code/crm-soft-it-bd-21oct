@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 
 const db = supabase as any;
 const ERRORS: Record<string, string> = {
-  insufficient_balance: "Wallet-এ যথেষ্ট balance নেই।",
+  insufficient_balance: "Balance ও due limit মিলিয়েও যথেষ্ট টাকা নেই।",
   not_enough_stock: "এত profile stock-এ নেই।",
   price_not_set: "এখন কেনা যাচ্ছে না — দাম সেট করা হয়নি।",
   invalid_quantity: "সঠিক সংখ্যা দিন।",
