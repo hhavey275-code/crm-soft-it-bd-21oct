@@ -27,11 +27,13 @@ function initForm(level: Level, o: any) {
     countries: (o.targeting?.geo_locations?.countries ?? []).join(", "),
     ageMin: o.targeting?.age_min ? String(o.targeting.age_min) : "",
     ageMax: o.targeting?.age_max ? String(o.targeting.age_max) : "",
-    message: spec?.message ?? "", headline: spec?.name ?? spec?.title ?? "", link: spec?.link ?? spec?.call_to_action?.value?.link ?? "",
+    message: spec?.message ?? o.creative?.body ?? "", headline: spec?.name ?? spec?.title ?? o.creative?.title ?? "", link: spec?.link ?? spec?.call_to_action?.value?.link ?? "",
     description: spec?.description ?? spec?.link_description ?? "", cta: spec?.call_to_action?.type ?? "",
     editableCreative: !!spec, level,
+    preview: (o.creative?.image_url ?? o.creative?.thumbnail_url ?? o.thumbnail_url ?? spec?.picture ?? spec?.image_url ?? "") as string,
+    postId: (o.creative?.effective_object_story_id ?? o.creative?.object_story_id ?? "") as string,
     image: null as null | { b64: string; url: string }, video: null as null | { path: string; name: string },
-    newPostId: "", postMessage: "",
+    newPostId: "", postMessage: spec ? "" : (o.creative?.body ?? ""),
   };
 }
 
@@ -174,7 +176,16 @@ export function FbCampaignEditor({ campaign, adsets, ads, onClose, onSaved }: {
             )}
             {node.level === "ad" && (
               <Section title="Ad creative">
-                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর post থেকে — post-এর লেখা বদলাতে বা অন্য post বেছে নিতে পারবেন।</p>}
+                {(fm.preview || fm.postId) && (
+                  <div className="flex items-center gap-3 rounded-md border border-fb-border p-2">
+                    {fm.preview && <img src={fm.preview} alt="Ad media" className="h-20 w-20 rounded object-cover" />}
+                    <div className="min-w-0 text-[12px]">
+                      <p className="font-semibold">বর্তমান ad content</p>
+                      {fm.postId && <a href={`https://facebook.com/${fm.postId}`} target="_blank" rel="noreferrer" className="text-fb-blue underline">Post দেখুন ({fm.postId})</a>}
+                    </div>
+                  </div>
+                )}
+                {!fm.editableCreative && <p className="rounded-md bg-fb-bg p-2 text-fb-muted">এই ad-টি page-এর post থেকে — post-এর লেখা নিচে বদলাতে বা অন্য post বেছে নিতে পারবেন।</p>}
                 <div><Lbl>Primary text</Lbl><textarea rows={4} disabled={!fm.editableCreative} className={cn(inp, "h-auto py-2")} value={fm.message} onChange={(e) => set("message", e.target.value)} /></div>
                 <div><Lbl>Headline</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.headline} onChange={(e) => set("headline", e.target.value)} /></div>
                 <div><Lbl>Website URL</Lbl><input disabled={!fm.editableCreative} className={inp} value={fm.link} onChange={(e) => set("link", e.target.value)} /></div>
