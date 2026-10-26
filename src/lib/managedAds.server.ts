@@ -128,7 +128,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       const { token, act } = await tokenFor(supabaseAdmin, accId);
       const g = graphClient(token);
       const [ads, adsets, camps] = await Promise.all([
-        getSmall(g, `${act}/ads`, "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,effective_object_story_id,thumbnail_url}"),
+        getSmall(g, `${act}/ads`, "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,object_story_id,effective_object_story_id,thumbnail_url,body,title,image_url}"),
         getSmall(g, `${act}/adsets`, "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
         getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
       ]);
@@ -172,7 +172,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
         await Promise.all([
           backfill(camps.data, ci.map((r) => String(r.campaign_id)), "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
           backfill(adsets.data, si.map((r) => String(r.adset_id)), "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
-          backfill(ads.data, ai.map((r) => String(r.ad_id)), "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,effective_object_story_id,thumbnail_url}"),
+          backfill(ads.data, ai.map((r) => String(r.ad_id)), "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,object_story_id,effective_object_story_id,thumbnail_url,body,title,image_url}"),
         ]);
       }
       let ownAds: any[], ownSets: any[], ownCamps: any[];
@@ -201,7 +201,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       const tag = (o: any) => ({ ...o, ad_account_db_id: accId, account_kind: kind });
       result.campaigns.push(...ownCamps.map(tag));
       result.adsets.push(...ownSets.map(tag));
-      result.ads.push(...ownAds.map(({ creative, ...a }: any) => tag({ ...a, thumbnail_url: creative?.thumbnail_url, page_id: pageOfAd({ creative }) })));
+      result.ads.push(...ownAds.map((a: any) => tag({ ...a, thumbnail_url: a.creative?.thumbnail_url, page_id: pageOfAd(a) })));
     } catch (e: any) {
       const m = String(e?.message || "");
       if (/#200|ads_management|ads_read/i.test(m)) noPerm.push(accName(accId));
