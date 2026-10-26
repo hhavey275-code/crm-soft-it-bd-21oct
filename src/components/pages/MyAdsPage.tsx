@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { managedAds, resultOf, salesOf, setManagedAdsViewAs } from "@/lib/managedAdsApi";
 import { getCampaignStatusConfig } from "@/components/ads-manager/types";
 import { ManagedCreateWizard } from "@/components/ads-manager/ManagedCreateWizard";
-import { AdsAssistant } from "@/components/ads-manager/AdsAssistant";
+import { AdsAgent } from "@/components/ads-manager/AdsAgent";
 import { EditObjectDialog } from "@/components/ads-manager/EditObjectDialog";
 import { ColumnsPicker, EXTRA_COLUMNS, METRIC_COLUMNS, fmtCol, totalCol, useMetricColumns } from "@/components/ads-manager/fbColumns";
 import { FbCampaignEditor } from "@/components/ads-manager/FbCampaignEditor";
@@ -576,7 +576,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
       return (
         <DashboardLayout fullBleed hideChat>
           {wizard}
-        {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
+        <AdsAgent account={currentAcc} userId={uid} />
           {fastLoading && !accounts.length && <MetaLoading />}
           <div className="ads-controls fb-font min-h-[calc(100dvh-3.5rem)] bg-background text-fb-text">
             <div className="sticky top-0 z-10 border-b border-fb-border bg-background px-4 py-3">
@@ -620,7 +620,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
     return (
       <DashboardLayout fullBleed hideChat>
         {wizard}
-        {!createDisabled && <AdsAssistant account={currentAcc} pages={allPages} onCreated={() => refetch()} />}
+        <AdsAgent account={currentAcc} userId={uid} />
         {deleteDialog}
         {duplicateDialog}
         {isFetching && !data && <MetaLoading />}

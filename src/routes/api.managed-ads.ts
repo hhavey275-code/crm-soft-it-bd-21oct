@@ -231,6 +231,18 @@ async function verifyUser(token: string): Promise<{ id: string } | null> {
 }
 
 async function ctx(request: Request) {
+  // AI Ads Agent server-to-server call (its own route already verified the client): acts as that
+  // client with normal (non-admin) rights, so every ownership and wallet check below still applies.
+  const agentSecret = request.headers.get("x-agent-secret") || "";
+  if (agentSecret) {
+    const agentUser = request.headers.get("x-agent-user") || "";
+    if (!/^[0-9a-f-]{36}$/i.test(agentUser)) return null;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await (supabaseAdmin as any).from("internal_job_secrets").select("secret").eq("job_name", "ads-agent-tasks").maybeSingle();
+    const expected = String(row?.secret ?? "");
+    if (!expected || expected.length !== agentSecret.length || expected !== agentSecret) return null;
+    return { supabaseAdmin, user: { id: agentUser }, isAdmin: false };
+  }
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return null;
   const user = await verifyUser(auth.slice(7).trim());
