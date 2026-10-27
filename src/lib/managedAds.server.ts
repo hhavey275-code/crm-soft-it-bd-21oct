@@ -109,11 +109,11 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   // Meta rejects big nested requests with (#1); retry the same call with a smaller page.
   // Only switched-on / in-review objects are listed; anything that delivered in the chosen dates
   // is added back from insights (backfill), so thousands of old off campaigns are never read.
-  const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED"] }]);
+  const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "DISAPPROVED"] }]);
   // Lighter list: off ad sets/ads are not read at all (heavy creative fields); those that spent in
   // the chosen dates still come back through the insights backfill, so day totals stay complete.
   // Off campaigns stay (cheap) so they can be switched back on; their children load on demand (campaignIds).
-  const runningFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"] }]);
+  const runningFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "DISAPPROVED"] }]);
   const treeFilter = (field: string) => JSON.stringify([{ field, operator: "IN", value: opts?.campaignIds ?? [] }]);
   const getSmall = async (g: any, path: string, fields: string) => {
     const level = path.endsWith("/campaigns") ? "campaign" : "child";

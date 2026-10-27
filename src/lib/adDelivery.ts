@@ -9,9 +9,9 @@ export function adDelivery(ad: any): Delivery {
   const e = String(ad?.effective_status || ad?.status || "").toUpperCase();
   if (e === "ACTIVE") {
     // Facebook shows "Preparing" for a freshly published ad until it starts delivering; the API
-    // already says ACTIVE then, so a new ad with no impressions yet is shown as Preparing too.
+    // already says ACTIVE then, so an ad from the last 12 hours with no impressions yet is Preparing.
     const made = ad?.created_time ? Date.parse(ad.created_time) : NaN;
-    const fresh = Number.isFinite(made) && Date.now() - made < 3 * 3600_000;
+    const fresh = Number.isFinite(made) && Date.now() - made < 12 * 3600_000;
     if (fresh && !(Number(ad?.insights?.impressions) > 0)) return D("Preparing", "blue");
     return D("Active", "green");
   }
