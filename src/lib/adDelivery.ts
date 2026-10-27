@@ -7,7 +7,14 @@ const D = (label: string, tone: Delivery["tone"]): Delivery => ({ label, tone })
 
 export function adDelivery(ad: any): Delivery {
   const e = String(ad?.effective_status || ad?.status || "").toUpperCase();
-  if (e === "ACTIVE") return D("Active", "green");
+  if (e === "ACTIVE") {
+    // Facebook shows "Preparing" for a freshly published ad until it starts delivering; the API
+    // already says ACTIVE then, so an ad from the last 12 hours with no impressions yet is Preparing.
+    const made = ad?.created_time ? Date.parse(ad.created_time) : NaN;
+    const fresh = Number.isFinite(made) && Date.now() - made < 12 * 3600_000;
+    if (fresh && !(Number(ad?.insights?.impressions) > 0)) return D("Preparing", "blue");
+    return D("Active", "green");
+  }
   if (e === "PENDING_REVIEW" || e === "IN_PROCESS" || e === "PREAPPROVED") return D("In review", "blue");
   if (e === "DISAPPROVED") return D("Rejected", "red");
   if (e === "WITH_ISSUES") return D("Error", "red");
@@ -35,6 +42,7 @@ function fromChildren(own: string, start: string | undefined, end: string | unde
     if (learning === "FAIL") return D("Learning limited", "amber");
     return D("Active", "green");
   }
+  if (has("Preparing")) return D("Preparing", "blue");
   if (has("In review")) return D("In review", "blue");
   if (has("Error") || has("Billing issue")) return D("Error", "red");
   if (has("Rejected")) return D("Rejected", "red");

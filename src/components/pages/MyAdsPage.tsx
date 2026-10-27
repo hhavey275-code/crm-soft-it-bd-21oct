@@ -262,7 +262,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
   // "Active ads" = what the Delivery column shows as running, not just the switch being on.
   const isLive = (level: "campaign" | "adset" | "ad", r: any) => {
     const d = level === "campaign" ? campaignDelivery(r, data?.adsets ?? [], data?.ads ?? []) : level === "adset" ? adsetDelivery(r, data?.ads ?? []) : adDelivery(r);
-    return d.label === "Active" || d.label === "Learning" || d.label === "Learning limited";
+    return d.label === "Active" || d.label === "Preparing" || d.label === "Learning" || d.label === "Learning limited";
   };
   const rows = sortRows((tab === "campaign" ? campaigns : tab === "adset" ? adsets : ads).filter((r) =>
     matchesAdsFilter(r, quick) && (quick !== "active" || isLive(tab, r)) &&
@@ -278,6 +278,29 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
     qc.setQueriesData({ queryKey: ["managed-ads-list", uid] }, (old: any) => old ? transform(old) : old);
     if (uid) await cacheTransform(uid, transform);
   };
+  // The list only carries running ad sets/ads (plus anything that spent in the dates). When an off
+  // campaign is opened or selected, its ad sets/ads are fetched once and merged into the same data.
+  const treeAsked = useRef(new Set<string>());
+  useEffect(() => { treeAsked.current.clear(); }, [data?.fetchedAt, accSel]);
+  useEffect(() => {
+    if (!data) return;
+    const want = new Set<string>([...(editCampaign ? [String(editCampaign.id)] : []), ...selCampaigns.map(String)]);
+    const byAcc = new Map<string, string[]>();
+    for (const id of want) {
+      if (treeAsked.current.has(id) || (data.adsets ?? []).some((s: any) => String(s.campaign_id) === id)) continue;
+      const c = (data.campaigns ?? []).find((x: any) => String(x.id) === id);
+      if (!c?.ad_account_db_id) continue;
+      treeAsked.current.add(id);
+      byAcc.set(c.ad_account_db_id, [...(byAcc.get(c.ad_account_db_id) ?? []), id]);
+    }
+    for (const [acc, ids] of byAcc) {
+      managedAds({ action: "tree", adAccountDbId: acc, campaignIds: ids.slice(0, 50) }).then((r: any) => {
+        const add = (cur: any[], extra: any[]) => [...cur, ...extra.filter((x) => !cur.some((y) => String(y.id) === String(x.id)))];
+        return persistMutation((old) => ({ ...old, adsets: add(old.adsets ?? [], r.adsets ?? []), ads: add(old.ads ?? [], r.ads ?? []) }));
+      }).catch(() => { ids.forEach((id) => treeAsked.current.delete(id)); });
+    }
+  }, [editCampaign, selCampaigns, data]);
+
   const toggle = async (level: Level, o: any, on: boolean) => {
     if (busy) return;
     setBusy(o.id);
