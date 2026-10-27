@@ -6,7 +6,8 @@ import { format, subDays } from "date-fns";
 import { Megaphone, Plus, RefreshCw, Pencil, Trash2, Film, ArrowUp, ArrowDown, ArrowUpDown, Check, X, Copy } from "lucide-react";
 import { VideoLibrary } from "@/components/ads-manager/VideoLibrary";
 import { AccountPicker } from "@/components/ads-manager/AccountPicker";
-import { listDrafts, deleteDraft, type CampaignDraft } from "@/lib/campaignDrafts";
+import { listDrafts, deleteDraft, saveDraft, type CampaignDraft } from "@/lib/campaignDrafts";
+import { draftFromCampaign } from "@/lib/draftFromCampaign";
 import { useAuth } from "@/contexts/AuthContext";
 import { adDelivery, adsetDelivery, campaignDelivery } from "@/lib/adDelivery";
 import { DashboardLayout as FullLayout } from "@/components/DashboardLayout";
@@ -190,11 +191,13 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
     qc.invalidateQueries({ queryKey: ["managed-ads-acc-summary"] });
   };
 
-  // Facebook order: switched-on items first, then newest first.
+  // Facebook order: switched-on items first, then the most recently published / switched on / edited
+  // on top, so a campaign just published never gets lost further down the list.
+  const recent = (o: any) => Math.max(Date.parse(o.updated_time || "") || 0, Date.parse(o.created_time || "") || 0, Number(o._touched || 0));
   const fbOrder = (list: any[]) => [...list].sort((a, b) => {
     const ra = a.status === "ACTIVE" ? 0 : 1, rb = b.status === "ACTIVE" ? 0 : 1;
     if (ra !== rb) return ra - rb;
-    return String(b.created_time || b.updated_time || "").localeCompare(String(a.created_time || a.updated_time || "")) || String(b.id).localeCompare(String(a.id));
+    return recent(b) - recent(a) || String(b.id).localeCompare(String(a.id));
   });
   const campaigns: any[] = fbOrder(data?.campaigns ?? []);
   const adsets: any[] = fbOrder((data?.adsets ?? []).filter((s: any) => !selCampaigns.length || selCampaigns.includes(String(s.campaign_id))));
@@ -306,13 +309,30 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
     setBusy(o.id);
     try {
       const result = await managedAds({ action: "set_status", level, objectId: String(o.id), status: on ? "ACTIVE" : "PAUSED", adAccountDbId: o.ad_account_db_id });
-      await persistMutation(old => updateAdsStatus(old, level, String(o.id), result.object));
+      const key = level === "campaign" ? "campaigns" : level === "adset" ? "adsets" : "ads";
+      await persistMutation(old => {
+        const next = updateAdsStatus(old, level, String(o.id), result.object);
+        return on ? { ...next, [key]: (next[key] ?? []).map((x: any) => (String(x.id) === String(o.id) ? { ...x, _touched: Date.now() } : x)) } : next;
+      });
       toast.success(on ? "Enabled" : "Paused");
     } catch (e: any) { toast.error(e.message); } finally { setBusy(null); }
   };
-  const startDuplicate = (campaign: any) => {
-    setDuplicateTarget(campaign);
-    setCopyName(`${campaign.name} - Copy`.slice(0, 200));
+  // Duplicate = an instant CRM copy: the campaign (with its ad sets and ads) becomes a draft and opens
+  // in the full Create wizard, so every option can be changed before Publish. No Facebook copy call.
+  const startDuplicate = async (campaign: any) => {
+    if (busy) return;
+    let sets = (data?.adsets ?? []).filter((x: any) => String(x.campaign_id) === String(campaign.id));
+    let adsList = data?.ads ?? [];
+    if (!sets.length) {
+      setBusy("duplicating");
+      try {
+        const r: any = await managedAds({ action: "tree", adAccountDbId: campaign.ad_account_db_id, campaignIds: [String(campaign.id)] });
+        sets = r.adsets ?? []; adsList = [...adsList, ...(r.ads ?? [])];
+      } catch (e: any) { toast.error(e.message); return; } finally { setBusy(null); }
+    }
+    const d = { id: crypto.randomUUID(), updatedAt: Date.now(), data: draftFromCampaign(campaign, sets, adsList, allPages) };
+    saveDraft(d.id, d.data, uid);
+    openDraft(d);
   };
   const duplicateCampaign = async () => {
     if (!duplicateTarget || busy || !copyName.trim()) return;
@@ -720,7 +740,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
             {mcamps.map((c) => {
               const res = resultOf(c.insights);
               const dv = campaignDelivery(c, data?.adsets ?? [], data?.ads ?? []);
-              const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "bg-fb-blue", amber: "bg-primary" }[dv.tone];
+              const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "border-[1.5px] border-fb-text/70 bg-transparent", amber: "bg-primary" }[dv.tone];
               const on = c.status === "ACTIVE";
               return (
                 <div key={c.id} className="rounded-lg border border-fb-border bg-background p-4">
@@ -877,7 +897,7 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
                 const on = r.status === "ACTIVE";
                 const dv = tab === "campaign" ? campaignDelivery(r, data?.adsets ?? [], data?.ads ?? []) : tab === "adset" ? adsetDelivery(r, data?.ads ?? []) : adDelivery(r);
                 const deliv = dv.label;
-                const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "bg-fb-blue", amber: "bg-primary" }[dv.tone];
+                const dot = { green: "bg-fb-green", red: "bg-destructive", grey: "bg-fb-muted", blue: "border-[1.5px] border-fb-text/70 bg-transparent", amber: "bg-primary" }[dv.tone];
                 const canBudget = tab === "adset" && (r.daily_budget || r.lifetime_budget);
                 return (
                   <tr key={r.id} className={cn("border-b border-fb-border hover:bg-fb-blue-soft/50", i % 2 && "bg-fb-bg/50")}>
@@ -895,7 +915,6 @@ function MyAdsInner({ asUserId }: { asUserId?: string }) {
                             else if (tab === "adset") { setSelAdsets([String(r.id)]); setTab("ad"); }
                           }}>{r.name}</button>
                         <button title="Edit" className="text-fb-muted hover:text-fb-blue" onClick={() => { const c = campaigns.find((x) => String(x.id) === String(tab === "campaign" ? r.id : r.campaign_id)); if (c) setEditCampaign(c); }}><Pencil className="h-3 w-3" /></button>
-                        <Button variant="destructive" size="icon" title="Delete" aria-label={`Delete ${r.name}`} disabled={!!busy || isFetching} onClick={() => setDeleteTarget({ level: tab, objects: [r] })} className="h-7 w-7"><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </td>
                     <td className={td}><span className="inline-flex items-center gap-2"><span className={cn("h-3 w-3 rounded-full", dot)} />{deliv}</span></td>

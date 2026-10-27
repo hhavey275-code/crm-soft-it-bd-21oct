@@ -139,7 +139,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
       const [ads, adsets, camps] = await Promise.all([
         getSmall(g, `${act}/ads`, "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,object_story_id,effective_object_story_id,thumbnail_url,body,title,image_url}"),
         getSmall(g, `${act}/adsets`, "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
-        getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
+        getSmall(g, `${act}/campaigns`, "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,updated_time,stop_time,start_time"),
       ]);
       // Mutations must also resolve paused/older objects beyond Meta's first result page.
       if (opts?.mutationObject) {
@@ -179,7 +179,7 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
         ]);
         camps.data = camps.data ?? []; adsets.data = adsets.data ?? []; ads.data = ads.data ?? [];
         await Promise.all([
-          backfill(camps.data, ci.map((r) => String(r.campaign_id)), "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,stop_time,start_time"),
+          backfill(camps.data, ci.map((r) => String(r.campaign_id)), "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,updated_time,stop_time,start_time"),
           backfill(adsets.data, si.map((r) => String(r.adset_id)), "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,bid_strategy,bid_amount,targeting,promoted_object,start_time,end_time,created_time,learning_stage_info"),
           backfill(ads.data, ai.map((r) => String(r.ad_id)), "id,name,status,effective_status,adset_id,campaign_id,created_time,creative{id,actor_id,object_story_spec,object_story_id,effective_object_story_id,thumbnail_url,body,title,image_url}"),
         ]);
