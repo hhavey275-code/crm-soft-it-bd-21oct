@@ -84,6 +84,7 @@ const adsetInSchema = z.object({
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list"), dateFrom: z.string().regex(dateRe), dateTo: z.string().regex(dateRe), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("accounts"), asUserId: z.string().uuid().optional() }),
+  z.object({ action: z.literal("tree"), campaignIds: z.array(z.string().regex(/^\d+$/)).min(1).max(50), adAccountDbId: z.string().uuid(), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("delete"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
   z.object({ action: z.literal("duplicate"), level: z.literal("campaign"), objectId: z.string().regex(/^\d+$/), name: z.string().trim().min(1).max(200), adAccountDbId: z.string().uuid(), asUserId: z.string().uuid().optional() }),
   z.object({ action: z.literal("set_status"), level: z.enum(["campaign", "adset", "ad"]), objectId: z.string().regex(/^\d+$/), status: z.enum(["ACTIVE", "PAUSED"]), asUserId: z.string().uuid().optional(), adAccountDbId: z.string().uuid().optional() }),
@@ -327,6 +328,17 @@ async function ensurePageAccess(g: any, supabaseAdmin: any, pageId: string, owne
   return `Page-টা এখনো এই ad account-এর Business Manager-এ access পায়নি${restricted}। ${where} — একবার Approve করলেই এই Page দিয়ে বারবার ad চালানো যাবে`;
 }
 
+const LIST_TTL_MS = 60_000;
+const RATE_LIMIT_RE = /too many (api )?calls|#17\b|#80004|#613|#4\b|request limit/i;
+const READ_ACTIONS = new Set(["list", "tree", "accounts", "account_summary", "fb_status", "videos", "posts", "pixels", "page_info", "sales_assets", "interests", "geo_search", "reach_estimate", "demographics", "ad_details", "video_r2_presign", "video_start", "video_chunk"]);
+
+/** Any change (create, on/off, budget, delete, …) drops the saved lists so the next load is fresh. */
+async function clearListCache(supabaseAdmin: any, userIds: string[], accountId?: string) {
+  const t = supabaseAdmin.from("my_ads_list_cache");
+  await t.delete().in("user_id", userIds).then(() => null, () => null);
+  if (accountId) await supabaseAdmin.from("my_ads_list_cache").delete().eq("account_id", accountId).then(() => null, () => null);
+}
+
 async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
   const { supabaseAdmin, user, isAdmin } = c;
   const targetUser = "asUserId" in body && body.asUserId && isAdmin ? body.asUserId : user.id;
@@ -463,8 +475,24 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
     return { accounts };
   }
 
+  if (body.action === "tree") {
+    // Ad sets + ads of chosen campaigns (off campaigns' children are not part of the light list).
+    const t = await loadOwned(supabaseAdmin, targetUser, undefined, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId, campaignIds: body.campaignIds });
+    return { adsets: t.adsets, ads: t.ads };
+  }
+
   if (body.action === "list") {
-    const listP = loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first" });
+    // Server-side copy shared by every reload, device and the AI Agent: within LIST_TTL_MS the
+    // same account + dates is answered without asking Facebook again (any change clears it).
+    const scope = isAdmin && targetUser === user.id ? "a" : "c";
+    const cacheKey = `${targetUser}|${scope}|${body.adAccountDbId ?? "first"}|${body.dateFrom}|${body.dateTo}`;
+    const { data: cached } = await (supabaseAdmin as any).from("my_ads_list_cache").select("data, fetched_at").eq("cache_key", cacheKey).maybeSingle();
+    const age = cached ? Date.now() - Date.parse(cached.fetched_at) : Infinity;
+    if (cached && age < LIST_TTL_MS) {
+      const wb = await walletBalance(supabaseAdmin, targetUser).catch(() => cached.data?.walletBalance ?? 0);
+      return { ...cached.data, ...settings, walletBalance: wb, fromCache: true };
+    }
+    const listP = loadOwned(supabaseAdmin, targetUser, { since: body.dateFrom, until: body.dateTo }, { includeOwn: true, viewAllOwn: true, allForAdmin: isAdmin && targetUser === user.id, onlyAccount: body.adAccountDbId ?? "first", liveChildrenOnly: true });
     const walletP = walletBalance(supabaseAdmin, targetUser);
     listP.catch(() => null); walletP.catch(() => null);
     const { error: keyErr } = await supabaseAdmin.from("ad_accounts").select("id", { head: true, count: "exact" });
@@ -477,7 +505,14 @@ async function handle(body: Body, c: NonNullable<Awaited<ReturnType<typeof ctx>>
       throw new Error(`সার্ভারের গোপন key (SUPABASE_SERVICE_ROLE_KEY) ঠিক নেই — ${why}। Vercel-এ সঠিক service_role key বসিয়ে Redeploy করুন`);
     }
     const [data, wb] = await Promise.all([listP, walletP]);
-    return { ...data, ...settings, walletBalance: wb, fetchedAt: new Date().toISOString() };
+    const limited = (data.errors ?? []).some((m: string) => RATE_LIMIT_RE.test(String(m)));
+    if (limited && cached) return { ...cached.data, ...settings, walletBalance: wb, errors: data.errors, fromCache: true };
+    const out = { ...data, ...settings, walletBalance: wb, fetchedAt: new Date().toISOString() };
+    if (!limited && !(data.errors ?? []).length) {
+      const acc = (data as any).selectedAccountId ?? null;
+      await (supabaseAdmin as any).from("my_ads_list_cache").upsert({ cache_key: cacheKey, user_id: targetUser, account_id: acc, data: out, fetched_at: out.fetchedAt }).then(() => null, () => null);
+    }
+    return out;
   }
 
   if (body.action === "ad_details") {
@@ -1208,8 +1243,15 @@ export const Route = createFileRoute("/api/managed-ads")({
           if (!c) return Response.json({ error: "Unauthorized" }, { status: 401 });
           const parsed = schema.safeParse(await request.json().catch(() => null));
           if (!parsed.success) return Response.json({ error: "ভুল তথ্য পাঠানো হয়েছে" }, { status: 400 });
-          const out = await handle(parsed.data, c);
-          return Response.json(out, { headers: { "Cache-Control": "no-store" } });
+          const b: any = parsed.data;
+          try {
+            const out = await handle(parsed.data, c);
+            return Response.json(out, { headers: { "Cache-Control": "no-store" } });
+          } finally {
+            if (!READ_ACTIONS.has(b.action)) {
+              await clearListCache(c.supabaseAdmin, [c.user.id, ...(b.asUserId ? [b.asUserId] : [])], b.adAccountDbId);
+            }
+          }
         } catch (e: any) {
           console.error("[managed-ads]", e);
           return Response.json({ error: e?.message || "কিছু একটা ভুল হয়েছে" }, { status: 400 });

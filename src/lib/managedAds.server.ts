@@ -71,7 +71,7 @@ export async function ownAccounts(supabaseAdmin: any, userId: string, ignoreTogg
  * Shared accounts: only campaigns of the user's approved pages (these are wallet-charged).
  * includeOwn: also the user's own dedicated accounts (not wallet-charged; spend uses the account's own limit).
  */
-export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string; viewAllOwn?: boolean; allForAdmin?: boolean; mutationObject?: { id: string; level: "campaign" | "adset" | "ad" } }) {
+export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: { since: string; until: string }, opts?: { includeOwn?: boolean; onlyAccount?: string; viewAllOwn?: boolean; allForAdmin?: boolean; mutationObject?: { id: string; level: "campaign" | "adset" | "ad" }; liveChildrenOnly?: boolean; campaignIds?: string[] }) {
   const { graphClient } = await import("@/lib/metaGraph.server");
   // All of the client's own pages (any not rejected). Page IDs are globally unique, so one owner per page.
   const { data: allPages } = await supabaseAdmin
@@ -110,8 +110,17 @@ export async function loadOwned(supabaseAdmin: any, userId: string, dateRange?: 
   // Only switched-on / in-review objects are listed; anything that delivered in the chosen dates
   // is added back from insights (backfill), so thousands of old off campaigns are never read.
   const liveFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO", "CAMPAIGN_PAUSED", "ADSET_PAUSED"] }]);
+  // Lighter list: off ad sets/ads are not read at all (heavy creative fields); those that spent in
+  // the chosen dates still come back through the insights backfill, so day totals stay complete.
+  // Off campaigns stay (cheap) so they can be switched back on; their children load on demand (campaignIds).
+  const runningFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"] }]);
+  const treeFilter = (field: string) => JSON.stringify([{ field, operator: "IN", value: opts?.campaignIds ?? [] }]);
   const getSmall = async (g: any, path: string, fields: string) => {
-    const base = { filtering: liveFilter };
+    const level = path.endsWith("/campaigns") ? "campaign" : "child";
+    const filtering = opts?.campaignIds?.length
+      ? treeFilter(level === "campaign" ? "id" : "campaign.id")
+      : opts?.liveChildrenOnly && level === "child" ? runningFilter : liveFilter;
+    const base = { filtering };
     try { return await g.get(path, { fields, limit: "100", ...base }); }
     catch (e: any) {
       if (!/reduce the amount of data|\(#1\)/i.test(String(e?.message))) throw e;
