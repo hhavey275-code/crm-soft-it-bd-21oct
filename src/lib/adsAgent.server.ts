@@ -228,8 +228,8 @@ async function runTool(admin: any, c: Caller, name: string, input: any): Promise
     if (name === "list_pages") return { pages };
     return {
       range, pages, errors: d.errors ?? [],
-      campaigns: (d.campaigns ?? []).slice(0, 150).map((x: any) => ({ id: x.id, name: x.name, status: x.status, delivery: x.effective_status, objective: x.objective, daily_budget: x.daily_budget ? num(x.daily_budget) / 100 : null, ...metrics(x.insights) })),
-      adsets: (d.adsets ?? []).slice(0, 200).map((x: any) => ({ id: x.id, campaign_id: x.campaign_id, name: x.name, status: x.status, daily_budget: x.daily_budget ? num(x.daily_budget) / 100 : null, spend: num(x.insights?.spend) })),
+      campaigns: (d.campaigns ?? []).slice(0, 80).map((x: any) => ({ id: x.id, name: x.name, status: x.status, delivery: x.effective_status, objective: x.objective, daily_budget: x.daily_budget ? num(x.daily_budget) / 100 : null, ...metrics(x.insights) })),
+      adsets: (d.adsets ?? []).slice(0, 100).map((x: any) => ({ id: x.id, campaign_id: x.campaign_id, name: x.name, status: x.status, daily_budget: x.daily_budget ? num(x.daily_budget) / 100 : null, spend: num(x.insights?.spend) })),
     };
   }
   if (name === "list_videos") {
@@ -270,6 +270,35 @@ How to work:
 }
 
 export type ChatMessage = { role: "user" | "assistant"; content: any };
+
+// ---- cost control ----
+// Prompt caching: tools + the fixed instructions are cached (cache reads cost ~10% of normal input),
+// and the conversation so far is cached at its last message, so each tool round and each new turn
+// only pays full price for what is new. The clock line stays outside the cached block.
+function systemBlocks(selectedAccount?: string) {
+  const lines = systemPrompt(selectedAccount).split("\n");
+  const i = lines.findIndex((l) => l.startsWith("Current time"));
+  const dyn = i >= 0 ? lines.splice(i, 1)[0] : "";
+  return [{ type: "text", text: lines.join("\n"), cache_control: { type: "ephemeral" } }, ...(dyn ? [{ type: "text", text: dyn }] : [])];
+}
+function withCacheMark(messages: ChatMessage[]): ChatMessage[] {
+  if (!messages.length) return messages;
+  const out = messages.slice();
+  const last = out[out.length - 1];
+  const blocks = typeof last.content === "string" ? [{ type: "text", text: last.content }] : (last.content ?? []).map((b: any) => ({ ...b }));
+  if (blocks.length) blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: "ephemeral" } };
+  out[out.length - 1] = { ...last, content: blocks };
+  return out;
+}
+// Big lookups (campaign lists etc.) from earlier turns are not sent again; Claude re-reads if needed.
+function compactOldResults(messages: ChatMessage[]): ChatMessage[] {
+  let lastText = -1;
+  messages.forEach((m, i) => { if (m.role === "user" && typeof m.content === "string") lastText = i; });
+  return messages.map((m, i) => {
+    if (i >= lastText || m.role !== "user" || !Array.isArray(m.content)) return m;
+    return { ...m, content: m.content.map((b: any) => (b?.type === "tool_result" ? { type: "tool_result", tool_use_id: b.tool_use_id, content: "(old result omitted — call the tool again if needed)" } : b)) };
+  });
+}
 
 // Thinking blocks are bound to the exact request they came from (system prompt includes the time),
 // so they are never carried across turns.
@@ -321,7 +350,7 @@ function trimHistory(messages: ChatMessage[]): ChatMessage[] {
   let list = repairToolPairs(stripThinking(messages)).slice(-40);
   // Start at a plain user text turn so tool_use/tool_result pairs are never split.
   while (list.length && !(list[0].role === "user" && typeof list[0].content === "string")) list = list.slice(1);
-  return repairToolPairs(list);
+  return compactOldResults(repairToolPairs(list));
 }
 
 export async function agentChat(admin: any, c: Caller, history: ChatMessage[], selectedAccount?: string) {
@@ -331,13 +360,13 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
   const messages: ChatMessage[] = trimHistory(history);
   let plan: Plan | null = null;
   let planError: string | null = null;
-  const system = systemPrompt(selectedAccount);
+  const system = systemBlocks(selectedAccount);
   let cutOff = false;
   for (let i = 0; i < 8; i++) {
     const res = await fetch(CLAUDE_URL, {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model, max_tokens: 16000, system, tools: TOOLS, messages }),
+      body: JSON.stringify({ model, max_tokens: 16000, system, tools: TOOLS, messages: withCacheMark(messages) }),
     });
     const j: any = await res.json().catch(() => null);
     if (!res.ok || !j) {
@@ -365,7 +394,7 @@ export async function agentChat(admin: any, c: Caller, history: ChatMessage[], s
         if (b.name === "propose_plan") planError = String(e?.message || e);
         out = { error: String(e?.message || e) };
       }
-      results.push({ type: "tool_result", tool_use_id: b.id, content: cut(JSON.stringify(out), 12000), ...(out && typeof out === "object" && "error" in (out as any) ? { is_error: true } : {}) });
+      results.push({ type: "tool_result", tool_use_id: b.id, content: cut(JSON.stringify(out), 8000), ...(out && typeof out === "object" && "error" in (out as any) ? { is_error: true } : {}) });
     }
     messages.push({ role: "user", content: results });
   }
